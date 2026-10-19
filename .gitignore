@@ -1,0 +1,32 @@
+# Local secrets and generated identity fixtures
+.env
+.env.*
+!.env.example
+infra/identity/generated/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.db
+
+# Node/build/test outputs
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# Local runtime data
+.data/
+backups/
+*.log
+.DS_Store
+Thumbs.db
+.claude/

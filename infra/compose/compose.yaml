@@ -1,0 +1,352 @@
+name: dx-workspace
+
+x-api-env: &api-env
+  ENVIRONMENT: development
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Run python scripts/bootstrap.py first}
+  OIDC_ISSUER: ${PUBLIC_BASE_URL}/identity/realms/dx
+  OIDC_INTERNAL_URL: http://identity:8080/identity
+  ALLOWED_ORIGINS: ${PUBLIC_BASE_URL}
+  SESSION_SECRET: ${SESSION_SECRET:?Bootstrap required}
+  CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:?Bootstrap required}
+  CORE_API_URL: http://core-api:8001
+  INTERNAL_BASE_URL: http://gateway
+  WORKSPACE_SERVICE_CLIENT_ID: workspace-service
+  WORKSPACE_SERVICE_CLIENT_SECRET: ${WORKSPACE_SERVICE_CLIENT_SECRET:?Bootstrap required}
+  S3_ENDPOINT: http://object-storage:9000
+  S3_BUCKET: dx-files
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Bootstrap required}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:?Bootstrap required}
+  ONLYOFFICE_PUBLIC_URL: ${PUBLIC_BASE_URL}/office
+  ONLYOFFICE_INTERNAL_URL: http://onlyoffice
+  ONLYOFFICE_JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:?Bootstrap required}
+  ONLYOFFICE_ENABLED: ${ONLYOFFICE_ENABLED:-false}
+  BROKER_URL: redis://broker:6379/0
+  COOKIE_SECURE: "false"
+
+x-api: &api
+  restart: unless-stopped
+  init: true
+  networks: [dx]
+  volumes:
+    - ../identity/generated/demo-users.json:/config/demo-users.json:ro
+  depends_on:
+    postgres:
+      condition: service_healthy
+    identity:
+      condition: service_healthy
+    object-storage:
+      condition: service_started
+  healthcheck:
+    test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:' + __import__('os').environ['PORT'] + '/health/ready', timeout=4)"]
+    interval: 15s
+    timeout: 5s
+    retries: 10
+    start_period: 20s
+
+services:
+  postgres:
+    image: postgres:17.5-alpine
+    profiles: [core, workspace]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dx_bootstrap
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Bootstrap required}
+      POSTGRES_DB: postgres
+      CORE_DB_PASSWORD: ${CORE_DB_PASSWORD:?Bootstrap required}
+      WORKSPACE_DB_PASSWORD: ${WORKSPACE_DB_PASSWORD:?Bootstrap required}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?Bootstrap required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-databases.sh:/docker-entrypoint-initdb.d/10-dx-databases.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U dx_bootstrap -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [dx]
+
+  identity-config:
+    image: alpine:3.21.3
+    profiles: [core, workspace]
+    command: [sh, -ec, "cp /input/dx-realm.json /output/dx-realm.json; chown 1000:0 /output/dx-realm.json; chmod 600 /output/dx-realm.json"]
+    volumes:
+      - ../identity/generated/dx-realm.json:/input/dx-realm.json:ro
+      - identity-import:/output
+    network_mode: none
+
+  identity:
+    image: quay.io/keycloak/keycloak:26.2.5
+    profiles: [core, workspace]
+    restart: unless-stopped
+    command: [start-dev, --import-realm]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/dx_identity
+      KC_DB_USERNAME: dx_identity
+      KC_DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_HTTP_RELATIVE_PATH: /identity
+      KC_HOSTNAME: ${PUBLIC_BASE_URL}/identity
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_MANAGEMENT_RELATIVE_PATH: /
+    healthcheck:
+      test: [CMD, /bin/bash, -ec, "exec 3<>/dev/tcp/127.0.0.1/9000; printf 'GET /health/ready HTTP/1.0\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; read -r protocol status remainder <&3; test \"$$status\" = 200"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      identity-config:
+        condition: service_completed_successfully
+    volumes:
+      - identity-import:/opt/keycloak/data/import:ro
+    networks: [dx]
+
+  broker:
+    image: valkey/valkey:8.1.1-alpine
+    profiles: [core, workspace]
+    restart: unless-stopped
+    command: [valkey-server, --appendonly, "yes", --appendfsync, everysec]
+    volumes:
+      - broker-data:/data
+    healthcheck:
+      test: [CMD, valkey-cli, ping]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [dx]
+
+  object-storage:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    profiles: [core, workspace]
+    restart: unless-stopped
+    command: [server, /data, --console-address, ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    volumes:
+      - object-data:/data
+    networks: [dx]
+
+  storage-init:
+    build:
+      context: ../..
+      dockerfile: infra/compose/api.Dockerfile
+      args:
+        SERVICE: core-api
+    profiles: [core, workspace]
+    command: [python, /config/init-storage.py]
+    environment:
+      S3_ENDPOINT: http://object-storage:9000
+      S3_BUCKET: dx-files
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+    volumes:
+      - ./init-storage.py:/config/init-storage.py:ro
+    depends_on:
+      object-storage:
+        condition: service_started
+    networks: [dx]
+
+  core-migrate:
+    build:
+      context: ../..
+      dockerfile: infra/compose/api.Dockerfile
+      args:
+        SERVICE: core-api
+    profiles: [core, workspace]
+    command: [python, -m, alembic, upgrade, head]
+    environment:
+      <<: *api-env
+      DATABASE_URL: postgresql+psycopg://dx_core:${CORE_DB_PASSWORD}@postgres:5432/dx_core
+      OIDC_CLIENT_ID: core-admin
+      OIDC_CLIENT_SECRET: ${CORE_ADMIN_CLIENT_SECRET}
+      OIDC_AUDIENCE: dx-core
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [dx]
+
+  core-api:
+    <<: *api
+    profiles: [core, workspace]
+    build:
+      context: ../..
+      dockerfile: infra/compose/api.Dockerfile
+      args:
+        SERVICE: core-api
+    command: [python, -m, uvicorn, dx_core.main:app, --host, 0.0.0.0, --port, "8001", --proxy-headers, --forwarded-allow-ips, "*"]
+    environment:
+      <<: *api-env
+      PORT: "8001"
+      DATABASE_URL: postgresql+psycopg://dx_core:${CORE_DB_PASSWORD}@postgres:5432/dx_core
+      OIDC_CLIENT_ID: core-admin
+      OIDC_CLIENT_SECRET: ${CORE_ADMIN_CLIENT_SECRET}
+      OIDC_AUDIENCE: dx-core
+    depends_on:
+      core-migrate:
+        condition: service_completed_successfully
+      identity:
+        condition: service_healthy
+      storage-init:
+        condition: service_completed_successfully
+
+  core-worker:
+    <<: *api
+    profiles: [core, workspace]
+    build:
+      context: ../..
+      dockerfile: infra/compose/api.Dockerfile
+      args:
+        SERVICE: core-api
+    command: [python, -m, dx_core.worker]
+    healthcheck:
+      disable: true
+    environment:
+      <<: *api-env
+      DATABASE_URL: postgresql+psycopg://dx_core:${CORE_DB_PASSWORD}@postgres:5432/dx_core
+      OIDC_CLIENT_ID: core-admin
+      OIDC_CLIENT_SECRET: ${CORE_ADMIN_CLIENT_SECRET}
+      OIDC_AUDIENCE: dx-core
+    depends_on:
+      core-migrate:
+        condition: service_completed_successfully
+
+  workspace-migrate:
+    build:
+      context: ../..
+      dockerfile: infra/compose/api.Dockerfile
+      args:
+        SERVICE: workspace-api
+    profiles: [workspace]
+    command: [python, -m, alembic, upgrade, head]
+    environment:
+      <<: *api-env
+      DATABASE_URL: postgresql+psycopg://dx_workspace:${WORKSPACE_DB_PASSWORD}@postgres:5432/dx_workspace
+      OIDC_CLIENT_ID: workspace
+      OIDC_CLIENT_SECRET: ${WORKSPACE_CLIENT_SECRET}
+      OIDC_AUDIENCE: dx-workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [dx]
+
+  workspace-api:
+    <<: *api
+    profiles: [workspace]
+    build:
+      context: ../..
+      dockerfile: infra/compose/api.Dockerfile
+      args:
+        SERVICE: workspace-api
+    command: [python, -m, uvicorn, dx_workspace.main:app, --host, 0.0.0.0, --port, "8002", --proxy-headers, --forwarded-allow-ips, "*"]
+    environment:
+      <<: *api-env
+      PORT: "8002"
+      DATABASE_URL: postgresql+psycopg://dx_workspace:${WORKSPACE_DB_PASSWORD}@postgres:5432/dx_workspace
+      OIDC_CLIENT_ID: workspace
+      OIDC_CLIENT_SECRET: ${WORKSPACE_CLIENT_SECRET}
+      OIDC_AUDIENCE: dx-workspace
+    depends_on:
+      workspace-migrate:
+        condition: service_completed_successfully
+      core-api:
+        condition: service_healthy
+      identity:
+        condition: service_healthy
+
+  workspace-worker:
+    <<: *api
+    profiles: [workspace]
+    build:
+      context: ../..
+      dockerfile: infra/compose/api.Dockerfile
+      args:
+        SERVICE: workspace-api
+    command: [python, -m, dx_workspace.worker]
+    healthcheck:
+      disable: true
+    environment:
+      <<: *api-env
+      DATABASE_URL: postgresql+psycopg://dx_workspace:${WORKSPACE_DB_PASSWORD}@postgres:5432/dx_workspace
+      OIDC_CLIENT_ID: workspace
+      OIDC_CLIENT_SECRET: ${WORKSPACE_CLIENT_SECRET}
+      OIDC_AUDIENCE: dx-workspace
+    depends_on:
+      workspace-migrate:
+        condition: service_completed_successfully
+      core-api:
+        condition: service_healthy
+
+  workspace-web:
+    build:
+      context: ../..
+      dockerfile: infra/compose/web.Dockerfile
+      args:
+        APP: workspace-web
+    profiles: [workspace]
+    restart: unless-stopped
+    networks: [dx]
+
+  core-admin:
+    build:
+      context: ../..
+      dockerfile: infra/compose/web.Dockerfile
+      args:
+        APP: core-admin
+    profiles: [core, workspace]
+    restart: unless-stopped
+    networks: [dx]
+
+  gateway:
+    image: nginx:1.28.0-alpine
+    profiles: [core, workspace]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-8080}:80"
+    volumes:
+      - ../gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      core-api:
+        condition: service_healthy
+      core-admin:
+        condition: service_started
+      identity:
+        condition: service_healthy
+    networks: [dx]
+
+  onlyoffice:
+    image: onlyoffice/documentserver:8.3.3
+    profiles: [office]
+    restart: unless-stopped
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: ${ONLYOFFICE_JWT_SECRET}
+      JWT_HEADER: Authorization
+      JWT_IN_BODY: "true"
+      ALLOW_PRIVATE_IP_ADDRESS: "true"
+      ALLOW_META_IP_ADDRESS: "false"
+    volumes:
+      - office-data:/var/www/onlyoffice/Data
+      - office-logs:/var/log/onlyoffice
+      - office-lib:/var/lib/onlyoffice
+    shm_size: 256mb
+    networks: [dx]
+
+networks:
+  dx:
+    driver: bridge
+
+volumes:
+  identity-import:
+  postgres-data:
+  object-data:
+  broker-data:
+  office-data:
+  office-logs:
+  office-lib:

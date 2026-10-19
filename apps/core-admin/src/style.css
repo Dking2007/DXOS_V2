@@ -1,0 +1,241 @@
+.console-shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 230px 1fr;
+}
+.console-nav {
+  background: #172f43;
+  color: #adbdcd;
+  padding: 30px 18px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.console-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 20px;
+  margin: 0 12px 35px;
+}
+.console-logo > span {
+  font-size: 29px;
+  letter-spacing: -0.13em;
+}
+.console-logo small {
+  display: block;
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: 9px;
+  color: #99b4c7;
+  letter-spacing: 0.16em;
+  margin-top: 5px;
+}
+.console-nav button {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  padding: 12px 14px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: #b2c5d5;
+}
+.console-nav button.active {
+  color: #fff;
+  background: #ffffff14;
+  box-shadow: inset 3px 0 #6acbd2;
+}
+.console-nav button:hover {
+  background: #ffffff0d;
+}
+.console-bottom {
+  margin-top: auto;
+  border-top: 1px solid #3a5064;
+  padding: 22px 12px 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.console-bottom a {
+  color: #9cc6d5;
+}
+.console-body {
+  min-width: 0;
+}
+.console-topbar {
+  height: 77px;
+  border-bottom: 1px solid var(--border);
+  background: white;
+  padding: 0 35px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.console-topbar strong {
+  color: var(--navy);
+  font-weight: 600;
+}
+.console-content {
+  padding: 34px 35px;
+  max-width: 1450px;
+  margin: auto;
+}
+.console-columns {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) minmax(350px, 1fr);
+  gap: 23px;
+}
+.console-object {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border: 0;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  padding: 17px 22px;
+  width: 100%;
+  text-align: left;
+  color: var(--navy);
+}
+.console-object:hover,
+.console-object.selected {
+  background: #f3fafb;
+}
+.console-object p {
+  font-weight: 600;
+}
+.console-object small {
+  color: var(--muted);
+  display: block;
+  margin-top: 4px;
+}
+.console-object > div {
+  flex: 1;
+}
+.json-output {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+  background: #f7f9fc;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  padding: 16px;
+  max-height: 500px;
+  overflow: auto;
+}
+.console-login {
+  max-width: 530px;
+  margin: 12vh auto;
+  padding: 35px;
+}
+.console-login h1 {
+  font-size: 26px;
+}
+.console-login p {
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 15px 0 23px;
+}
+.console-context {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #edf3f7;
+  padding: 7px 10px;
+  border-radius: 5px;
+}
+.workflow-node {
+  padding: 14px 17px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.workflow-node .grow {
+  flex: 1;
+}
+.workflow-node small {
+  color: var(--muted);
+  display: block;
+}
+.raw-toggle {
+  border: 0;
+  background: none;
+  color: var(--teal);
+  font-size: 12px;
+  padding: 8px 0;
+}
+.console-warning {
+  margin-bottom: 22px;
+}
+@media (max-width: 1050px) {
+  .console-columns {
+    grid-template-columns: 1fr;
+  }
+  .console-shell {
+    grid-template-columns: 195px 1fr;
+  }
+  .console-content {
+    padding: 27px;
+  }
+  .console-topbar {
+    padding: 0 27px;
+  }
+}
+@media (max-width: 700px) {
+  .console-shell {
+    display: block;
+  }
+  .console-nav {
+    min-height: auto;
+    padding: 18px;
+    position: static;
+  }
+  .console-logo {
+    margin: 0 0 18px;
+  }
+  .console-nav nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .console-nav button {
+    width: auto;
+    margin: 0;
+    padding: 9px 11px;
+    font-size: 12px;
+  }
+  .console-nav button svg {
+    height: 16px;
+    width: 16px;
+  }
+  .console-bottom {
+    display: none;
+  }
+  .console-topbar {
+    height: 65px;
+    padding: 0 18px;
+    font-size: 12px;
+  }
+  .console-content {
+    padding: 24px 17px;
+  }
+  .console-context {
+    display: none;
+  }
+  .console-login {
+    margin: 30px 17px;
+  }
+}

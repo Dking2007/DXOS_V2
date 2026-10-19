@@ -1,0 +1,42 @@
+name: Verify DX Workspace
+on: [push, pull_request]
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.5-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test-ci-only
+          POSTGRES_DB: dx_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U test -d dx_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DX_TEST_POSTGRES_URL: postgresql+psycopg://test:test-ci-only@localhost:5432/dx_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check packages services scripts tests examples infra
+      - run: python -m unittest discover -s infra/tests -v
+      - run: pytest -q
+      - run: python scripts/export_contracts.py
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build

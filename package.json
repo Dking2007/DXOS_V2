@@ -1,0 +1,33 @@
+{
+  "name": "dx-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/workspace-web",
+    "apps/core-admin",
+    "apps/shared"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @dx/workspace-web",
+    "dev:console": "npm run dev -w @dx/core-admin",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run --config apps/shared/vitest.config.ts",
+    "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
+    "lint": "eslint --config apps/eslint.config.mjs apps tests/e2e",
+    "format": "prettier --write \"apps/**/*.{ts,vue,css,json,mjs,html}\" \"tests/e2e/*.ts\" --ignore-path apps/.prettierignore --config apps/.prettierrc.json",
+    "generate:api": "openapi-typescript contracts/core.openapi.json -o apps/shared/src/generated/core-api.ts && openapi-typescript contracts/workspace.openapi.json -o apps/shared/src/generated/workspace-api.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@playwright/test": "1.64.1",
+    "eslint": "9.39.5",
+    "eslint-plugin-vue": "10.11.1",
+    "globals": "15.14.0",
+    "openapi-typescript": "7.13.0",
+    "prettier": "3.9.10",
+    "typescript-eslint": "8.71.2",
+    "vitest": "4.1.11",
+    "vue-eslint-parser": "10.4.1"
+  }
+}

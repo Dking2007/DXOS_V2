@@ -1,0 +1,15 @@
+DX Workspace
+Copyright 2026 DX Workspace contributors.
+
+The original code in this repository is licensed under the Apache License,
+Version 2.0. This notice does not relicense third-party software.
+
+This project integrates independent services including Keycloak, PostgreSQL,
+Valkey, MinIO, Nginx and optionally ONLYOFFICE Docs. Their respective licenses,
+trademarks and redistribution obligations remain applicable. In particular,
+ONLYOFFICE Docs Community and MinIO are not covered by this project's Apache
+license. Keep vendor logos and legal notices as required by the relevant edition.
+
+See docs/third-party-inventory.md for the dependency/service inventory and
+release-review limitations. Dependency locks and container tags identify the
+artifacts to review; inclusion is not a legal-compliance certification.

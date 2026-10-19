@@ -200,5 +200,3 @@ audit không thay chữ ký số. Không cam kết hiệu năng/RPO/RTO khi chư
 Code tự viết: [Apache-2.0](LICENSE), xem [NOTICE](NOTICE). ONLYOFFICE, MinIO và các
 service/dependency giữ giấy phép của họ. Cần rà soát artifact, notice, source offer
 và trademark đúng bản phát hành; tích hợp API không phải giấy miễn nghĩa vụ.
-#   D X O S _ V 2  
- 

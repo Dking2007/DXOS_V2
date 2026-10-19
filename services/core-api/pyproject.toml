@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=77,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dx-core"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = ["dx-platform-kit==0.1.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
