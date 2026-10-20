@@ -111,12 +111,61 @@ class Form(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class BusinessPackage(Base):
+    __tablename__ = "business_packages"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    department_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"))
+    allowed_roles: Mapped[list] = mapped_column(JSON, default=list)
+    active_version_id: Mapped[str | None] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PackageVersion(Base):
+    __tablename__ = "business_package_versions"
+    __table_args__ = (UniqueConstraint("package_id", "version_no"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    package_id: Mapped[str] = mapped_column(ForeignKey("business_packages.id"), index=True)
+    version_no: Mapped[int] = mapped_column(Integer)
+    form_id: Mapped[str] = mapped_column(ForeignKey("form_templates.id"))
+    approval_steps: Mapped[list] = mapped_column(JSON)
+    required_file_count: Mapped[int] = mapped_column(Integer, default=0)
+    config_hash: Mapped[str] = mapped_column(String(64))
+    state: Mapped[str] = mapped_column(String(20), default="draft")
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SimulationSuite(Base):
+    __tablename__ = "simulation_suites"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    version_id: Mapped[str] = mapped_column(ForeignKey("business_package_versions.id"), index=True)
+    cases: Mapped[list] = mapped_column(JSON)
+    config_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SimulationReport(Base):
+    __tablename__ = "simulation_reports"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    version_id: Mapped[str] = mapped_column(ForeignKey("business_package_versions.id"), index=True)
+    suite_id: Mapped[str] = mapped_column(ForeignKey("simulation_suites.id"))
+    config_hash: Mapped[str] = mapped_column(String(64))
+    passed: Mapped[bool] = mapped_column(Boolean)
+    results: Mapped[list] = mapped_column(JSON)
+    actor_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Case(Base):
     __tablename__ = "cases"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     number: Mapped[int] = mapped_column(Integer, unique=True)
     title: Mapped[str] = mapped_column(String(250))
     form_id: Mapped[str] = mapped_column(ForeignKey("form_templates.id"))
+    package_version_id: Mapped[str | None] = mapped_column(ForeignKey("business_package_versions.id"))
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     department_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"))
     payload_record_id: Mapped[str] = mapped_column(String(36), unique=True)
@@ -149,6 +198,8 @@ class Submission(Base):
     payload_snapshot: Mapped[dict] = mapped_column(JSON)
     payload_revision: Mapped[int] = mapped_column(Integer)
     form_schema_id: Mapped[str] = mapped_column(String(36))
+    package_version_id: Mapped[str | None] = mapped_column(String(36))
+    routing_evidence: Mapped[list] = mapped_column(JSON, default=list)
     files_snapshot: Mapped[list] = mapped_column(JSON, default=list)
     steps_snapshot: Mapped[list] = mapped_column(JSON)
     core_workflow_id: Mapped[str | None] = mapped_column(String(36))
@@ -173,6 +224,29 @@ class ApprovalTask(Base):
     decision: Mapped[str | None] = mapped_column(String(20))
     reason: Mapped[str | None] = mapped_column(Text)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class FieldEvidence(Base):
+    __tablename__ = "field_evidence"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    case_id: Mapped[str] = mapped_column(ForeignKey("cases.id"), index=True)
+    field_key: Mapped[str] = mapped_column(String(64), index=True)
+    source_file_id: Mapped[str] = mapped_column(String(36))
+    source_version_id: Mapped[str] = mapped_column(String(36))
+    source_checksum: Mapped[str] = mapped_column(String(64))
+    source_page: Mapped[int] = mapped_column(Integer)
+    source_quote: Mapped[str] = mapped_column(Text)
+    suggested_value: Mapped[dict] = mapped_column(JSON)
+    confirmed_value: Mapped[dict | None] = mapped_column(JSON)
+    source_kind: Mapped[str] = mapped_column(String(30), default="manual_import")
+    provenance: Mapped[dict] = mapped_column(JSON, default=dict)
+    review_state: Mapped[str] = mapped_column(String(30), default="needs_review")
+    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    reviewed_by_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class OfficeSession(Base):

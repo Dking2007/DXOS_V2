@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import hmac
+import logging
 import secrets
 import time
 from dataclasses import dataclass, field
@@ -16,6 +17,9 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 from .config import Settings
 from .errors import AppError
 from .security import SecretBox, random_token, token_hash
+
+
+logger = logging.getLogger("dx.auth")
 
 
 class AuthBase(DeclarativeBase):
@@ -105,6 +109,11 @@ class Auth:
                 raise ValueError("Nonce mismatch")
             return claims
         except (jwt.PyJWTError, ValueError, KeyError, httpx.HTTPError) as exc:
+            logger.warning(
+                "oidc_token_rejected reason=%s claim=%s",
+                type(exc).__name__,
+                exc.claim if isinstance(exc, jwt.MissingRequiredClaimError) else "",
+            )
             raise AppError(401, "invalid_token", "Phiên xác thực không hợp lệ hoặc đã hết hạn.") from exc
 
     def exchange(self, data):

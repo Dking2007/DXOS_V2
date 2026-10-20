@@ -54,6 +54,89 @@ const detail = useQuery({
       ? 10_000
       : false,
 })
+interface CaseExplanation {
+  submissions: {
+    submission_id: string
+    number: number
+    package_version_id: string | null
+    payload_revision: number
+    routing_evidence: {
+      label: string
+      selected: boolean
+      recipient: string | null
+      condition: { field: string; operator: string; value: unknown } | null
+      evaluated_value: unknown
+    }[]
+    decision_traces: {
+      node_id: string
+      expression: { path: string; operator: string; value: unknown }
+      evaluated_inputs: Record<string, unknown>
+      result: boolean
+      selected_edges: string[]
+    }[]
+  }[]
+}
+const explanation = useQuery({
+  queryKey: ['case-explanation', id],
+  queryFn: () => api.request<CaseExplanation>(`/cases/${id}/explanation`),
+  enabled: computed(() => !!detail.data.value?.submissions.length),
+})
+interface FieldEvidence {
+  id: string
+  field_key: string
+  source_file_id: string
+  source_version_id: string
+  source_page: number
+  source_quote: string
+  suggested_value: { value: unknown }
+  confirmed_value: { value: unknown } | null
+  review_state: string
+  source_kind: string
+  provenance: { extraction_job_id?: string; ai_profile_version?: string }
+  reviewed_by_id: string | null
+  revision: number
+}
+const fieldEvidence = useQuery({
+  queryKey: ['field-evidence', id],
+  queryFn: () => api.request<Page<FieldEvidence>>(`/cases/${id}/field-evidence`),
+})
+const evidenceField = ref('')
+const evidenceFile = ref('')
+const evidencePage = ref(1)
+const evidenceQuote = ref('')
+const evidenceValue = ref('null')
+const correctedValues = ref<Record<string, string>>({})
+async function addEvidence() {
+  busy.value = true
+  error.value = null
+  try {
+    await api.request(`/cases/${id}/field-evidence`, {
+      method: 'POST', headers: { 'Idempotency-Key': newIntent() },
+      body: JSON.stringify({ field_key: evidenceField.value, source_file_id: evidenceFile.value,
+        source_page: evidencePage.value, source_quote: evidenceQuote.value,
+        suggested_value: JSON.parse(evidenceValue.value) }),
+    })
+    evidenceQuote.value = ''
+    await queryClient.invalidateQueries({ queryKey: ['field-evidence', id] })
+  } catch (cause) { error.value = cause } finally { busy.value = false }
+}
+async function reviewEvidence(item: FieldEvidence, decision: 'confirm' | 'correct' | 'reject') {
+  busy.value = true
+  error.value = null
+  try {
+    await api.request(`/field-evidence/${item.id}/review`, {
+      method: 'POST', body: JSON.stringify({ expected_revision: item.revision, decision,
+        confirmed_value: decision === 'correct' ? JSON.parse(correctedValues.value[item.id] ?? 'null') : null }),
+    })
+    await queryClient.invalidateQueries({ queryKey: ['field-evidence', id] })
+  } catch (cause) { error.value = cause } finally { busy.value = false }
+}
+async function openEvidenceSource(item: FieldEvidence) {
+  try {
+    const ticket = await api.request<{ url: string }>(`/field-evidence/${item.id}/source-download`, { method: 'POST' })
+    window.location.assign(`${ticket.url}#page=${item.source_page}`)
+  } catch (cause) { error.value = cause }
+}
 const users = useQuery({
   queryKey: ['users'],
   queryFn: () => api.request<Page<User>>('/users'),
@@ -137,6 +220,7 @@ function stopEdit() {
 }
 async function refresh() {
   await queryClient.invalidateQueries({ queryKey: ['case', id] })
+  await queryClient.invalidateQueries({ queryKey: ['case-explanation', id] })
   await queryClient.invalidateQueries({ queryKey: ['cases'] })
   await queryClient.invalidateQueries({ queryKey: ['approvals'] })
   await queryClient.invalidateQueries({ queryKey: ['notifications'] })
@@ -506,6 +590,37 @@ onBeforeRouteLeave(
               description="Tài liệu được gắn từ kho và chốt phiên bản khi trình hồ sơ."
           /></template>
         </section>
+        <section class="card">
+          <header class="card-header"><div><span class="eyebrow">CĂN CỨ THEO TRƯỜNG</span><h2>Đối chiếu giá trị đề xuất</h2></div></header>
+          <div class="card-body">
+            <p class="muted">Giá trị nhập tại đây được đánh dấu là đề xuất nhập tay. Chỉ người tạo hồ sơ mới xác nhận; việc xác nhận không tự sửa biểu mẫu.</p>
+            <div v-if="canEdit" class="form-grid">
+              <div class="field"><label for="evidence-field">Trường</label><select id="evidence-field" v-model="evidenceField"><option value="">Chọn trường</option><option v-for="field in detail.data.value.form.fields" :key="field.key" :value="field.key">{{ field.label }}</option></select></div>
+              <div class="field"><label for="evidence-file">Tài liệu nguồn</label><select id="evidence-file" v-model="evidenceFile"><option value="">Chọn tài liệu</option><option v-for="file in detail.data.value.files" :key="file.id" :value="file.id">{{ file.name }}</option></select></div>
+              <div class="field"><label for="evidence-page">Trang</label><input id="evidence-page" v-model.number="evidencePage" type="number" min="1" /></div>
+              <div class="field"><label for="evidence-value">Giá trị đề xuất (JSON)</label><input id="evidence-value" v-model="evidenceValue" placeholder="12500000 hoặc &quot;văn bản&quot;" /></div>
+              <div class="field full-width"><label for="evidence-quote">Trích đoạn nguồn</label><textarea id="evidence-quote" v-model="evidenceQuote" rows="2" /></div>
+              <button class="button secondary" :disabled="busy || !evidenceField || !evidenceFile || !evidenceQuote" @click="addEvidence">Lưu căn cứ</button>
+            </div>
+            <StatePanel :loading="fieldEvidence.isPending.value" :error="fieldEvidence.error.value"
+              :empty="fieldEvidence.data.value?.items.length === 0" title="Chưa có căn cứ theo trường" @retry="fieldEvidence.refetch()" />
+            <div v-for="item in fieldEvidence.data.value?.items" :key="item.id" class="list-row">
+              <div class="grow"><strong>{{ item.field_key }} · {{ item.review_state === 'confirmed' ? 'Đã xác nhận' : item.review_state === 'rejected' ? 'Đã bác bỏ' : 'Cần kiểm tra' }}</strong>
+                <small>{{ item.source_kind === 'ai' ? 'Đề xuất AI cần xác nhận' : 'Đề xuất nhập tay' }}: {{ JSON.stringify(item.suggested_value.value) }} · trang {{ item.source_page }} · phiên bản {{ item.source_version_id.slice(0, 8) }}</small>
+                <small v-if="item.source_kind === 'ai'">Job {{ item.provenance.extraction_job_id }} · profile {{ item.provenance.ai_profile_version }}</small>
+                <small>Trích đoạn: {{ item.source_quote }}</small>
+                <small v-if="item.confirmed_value">Giá trị xác nhận: {{ JSON.stringify(item.confirmed_value.value) }} · {{ userName(item.reviewed_by_id || '') }}</small>
+                <div v-if="canEdit && item.review_state === 'needs_review'" class="inline-actions">
+                  <button class="button secondary small" :disabled="busy" @click="reviewEvidence(item, 'confirm')">Xác nhận</button>
+                  <input v-model="correctedValues[item.id]" :aria-label="`Giá trị sửa cho ${item.field_key}`" placeholder="Giá trị sửa (JSON)" />
+                  <button class="button secondary small" :disabled="busy || !correctedValues[item.id]" @click="reviewEvidence(item, 'correct')">Sửa và xác nhận</button>
+                  <button class="button ghost small" :disabled="busy" @click="reviewEvidence(item, 'reject')">Bác bỏ</button>
+                </div>
+              </div>
+              <button class="button ghost small" @click="openEvidenceSource(item)">Mở trang nguồn</button>
+            </div>
+          </div>
+        </section>
         <section v-if="detail.data.value.submissions.length" class="card">
           <header class="card-header">
             <div>
@@ -567,6 +682,33 @@ onBeforeRouteLeave(
                 <Download :size="17" />
               </button>
             </div>
+          </div>
+        </section>
+        <section v-if="submission" class="card">
+          <header class="card-header"><h2>Vì sao hồ sơ đi đường này?</h2></header>
+          <div class="card-body">
+            <StatePanel :loading="explanation.isPending.value" :error="explanation.error.value"
+              :empty="!explanation.data.value?.submissions.length" title="Chưa có dữ liệu truy vết"
+              @retry="explanation.refetch()" />
+            <template v-for="item in explanation.data.value?.submissions" :key="item.submission_id">
+              <div v-if="item.submission_id === submission.id">
+                <p class="muted">Lần trình {{ item.number }} · dữ liệu r{{ item.payload_revision }}
+                  <span v-if="item.package_version_id"> · gói {{ item.package_version_id.slice(0, 8) }}</span></p>
+                <div v-for="(step, index) in item.routing_evidence" :key="index" class="list-row">
+                  <div><strong>{{ step.label }}</strong><small>
+                    {{ step.selected ? `Chọn người xử lý: ${step.recipient}` : 'Bỏ qua bước này' }}
+                    <template v-if="step.condition"> · {{ step.condition.field }} {{ step.condition.operator }} {{ step.condition.value }}
+                      · giá trị: {{ step.evaluated_value }}</template>
+                  </small></div>
+                </div>
+                <div v-for="trace in item.decision_traces" :key="trace.node_id" class="list-row">
+                  <div><strong>{{ trace.node_id }}: {{ trace.result ? 'Đúng' : 'Sai' }}</strong>
+                    <small>{{ trace.expression.path }} {{ trace.expression.operator }} {{ trace.expression.value }}
+                      · giá trị: {{ trace.evaluated_inputs[trace.expression.path] }}
+                      · đi tiếp: {{ trace.selected_edges.join(', ') }}</small></div>
+                </div>
+              </div>
+            </template>
           </div>
         </section>
       </div>

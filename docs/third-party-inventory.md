@@ -1,6 +1,6 @@
 # Third-party inventory — bản triển khai đầu
 
-Không có mã ONLYOFFICE/Keycloak/MinIO được sao chép vào source ứng dụng. Những
+Không có mã ONLYOFFICE/Keycloak/RustFS được sao chép vào source ứng dụng. Những
 service này chạy bằng image riêng. Tách process không tự miễn nghĩa vụ phân phối,
 giấy phép hoặc thương hiệu. Bảng dưới là inventory kỹ thuật, **không phải tư vấn
 pháp lý hoặc xác nhận đã hoàn tất license/security audit**.
@@ -14,7 +14,7 @@ pháp lý hoặc xác nhận đã hoàn tất license/security audit**.
 | PostgreSQL | 17.5-alpine | Service DB | [PostgreSQL License](https://www.postgresql.org/about/licence/) | Exact image digest, extensions |
 | Keycloak | 26.2.5 | Service SSO | [Apache-2.0](https://github.com/keycloak/keycloak/blob/main/LICENSE.txt) | Exact distribution/notice, CVEs |
 | Valkey | 8.1.1-alpine | Optional broker provision | [BSD-3-Clause](https://github.com/valkey-io/valkey/blob/unstable/COPYING) | Not used as history/runtime source |
-| MinIO | RELEASE.2025-04-22T22-12-26Z | S3 service | [AGPL-3.0](https://github.com/minio/minio/blob/master/LICENSE) | Distribution/source obligations, edition/terms |
+| RustFS | 1.0.3 | S3-compatible object storage | [Apache-2.0](https://github.com/rustfs/rustfs#license) | S3 API compatibility, image provenance |
 | Nginx | 1.28.0-alpine | Gateway/static host | [BSD-like](https://nginx.org/LICENSE) | OS dependencies and notices |
 | Alpine | 3.21.3 | One-shot realm file permissions helper | [Alpine package licenses](https://www.alpinelinux.org/about/) | Package inventory |
 | ONLYOFFICE Docs | documentserver:8.3.3 | Optional separate Document Server | [License FAQ](https://www.onlyoffice.com/license-faq), [source license](https://github.com/ONLYOFFICE/DocumentServer/blob/master/LICENSE.txt) | Community AGPL-3.0, logo/legal notices, edition/concurrency, fonts |

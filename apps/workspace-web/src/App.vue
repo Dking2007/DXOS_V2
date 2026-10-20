@@ -12,6 +12,8 @@ import {
   House,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings2,
   ShieldCheck,
   X,
@@ -27,6 +29,7 @@ const route = useRoute()
 const session = useSession()
 const queryClient = useQueryClient()
 const sidebar = ref(false)
+const sidebarCollapsed = ref(window.localStorage.getItem('dx-workspace-sidebar-collapsed') === '1')
 const notificationsOpen = ref(false)
 const sessionError = ref('')
 const links = [
@@ -34,6 +37,7 @@ const links = [
   { to: '/drive', label: 'Tài liệu', icon: FolderClosed },
   { to: '/cases', label: 'Hồ sơ', icon: Files },
   { to: '/approvals', label: 'Cần phê duyệt', icon: ClipboardCheck },
+  { to: '/packages', label: 'Gói nghiệp vụ', icon: Files },
   { to: '/settings', label: 'Thiết lập', icon: Settings2 },
 ]
 const initials = computed(
@@ -67,14 +71,18 @@ async function logout() {
     sessionError.value = errorText(error)
   }
 }
+function toggleSidebarCollapsed() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+  window.localStorage.setItem('dx-workspace-sidebar-collapsed', sidebarCollapsed.value ? '1' : '0')
+}
 </script>
 <template>
   <RouterView v-if="route.meta.public" />
-  <div v-else class="app-shell">
+  <div v-else class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
     <a class="skip-link" href="#main-content">Đến nội dung chính</a>
     <div v-if="sidebar" class="sidebar-scrim" @click="sidebar = false" />
     <aside class="sidebar" :class="{ open: sidebar }">
-      <RouterLink to="/home" class="brand"
+      <RouterLink to="/home" class="brand" aria-label="Trang chủ"
         ><span class="brand-mark">dx<span /></span
         ><span>Workspace<small>KHÔNG GIAN LÀM VIỆC SỐ</small></span></RouterLink
       >
@@ -97,6 +105,8 @@ async function logout() {
           :key="link.to"
           :to="link.to"
           class="nav-link"
+          :title="link.label"
+          :aria-label="link.label"
           @click="sidebar = false"
           ><component :is="link.icon" :size="19" :stroke-width="1.7" /><span>{{
             link.label
@@ -104,6 +114,11 @@ async function logout() {
         >
       </nav>
       <div class="sidebar-bottom">
+        <button class="sidebar-collapse" type="button" :aria-label="sidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'" :title="sidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'" :aria-expanded="!sidebarCollapsed" @click="toggleSidebarCollapsed">
+          <PanelLeftOpen v-if="sidebarCollapsed" :size="18" />
+          <PanelLeftClose v-else :size="18" />
+          <span>{{ sidebarCollapsed ? 'Mở rộng menu' : 'Thu gọn menu' }}</span>
+        </button>
         <div class="privacy-note">
           <ShieldCheck :size="17" /><span
             >Đúng người. Đúng quyền.<br />Giữ trọn lịch sử.</span
@@ -113,7 +128,9 @@ async function logout() {
           v-if="session.user?.roles?.includes('technical_admin')"
           href="/console/"
           class="console-link"
-          >Mở Core console <span>↗</span></a
+          aria-label="Mở Core console"
+          title="Mở Core console"
+          ><span class="console-link-text">Mở Core console</span><span>↗</span></a
         >
         <div class="sidebar-version">
           <span class="connection-dot" /> Bản pilot · e-Office

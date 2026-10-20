@@ -33,10 +33,14 @@ def create_app(settings=None, engine=None):
         allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", "Idempotency-Key", "X-Request-ID"],
     )
     app.include_router(auth.router("/workspace/v1"))
+    from .insights import build_router as insights_router
     from .office import office_router
+    from .packages import build_router as package_router
     from .routers import build_router
 
     app.include_router(build_router(app))
+    app.include_router(package_router(app))
+    app.include_router(insights_router(app))
     app.include_router(office_router(app))
 
     @app.get("/health/live", tags=["health"])

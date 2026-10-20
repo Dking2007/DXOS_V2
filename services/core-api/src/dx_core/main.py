@@ -1,3 +1,5 @@
+import hashlib
+import json
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 from urllib.parse import quote
@@ -18,6 +20,7 @@ from sqlalchemy.orm import Session
 from .models import (
     Application,
     Audit,
+    DecisionTrace,
     DownloadTicket,
     Grant,
     Hold,
@@ -28,6 +31,7 @@ from .models import (
     Resource,
     Run,
     Schema,
+    SimulationRun,
     StorageFile,
     StorageVersion,
     Upload,
@@ -36,7 +40,7 @@ from .models import (
 from .policy import admin, authorized_resources, check, owner_or_admin
 from .storage import BlobStore, checksum, inspect_content
 from .transactions import audit, begin_idempotency, emit
-from .workflow import advance, validate_graph
+from .workflow import advance, simulate_graph, validate_graph
 
 
 class Input(BaseModel):
@@ -99,6 +103,12 @@ class WorkflowInput(Input):
 class RunInput(Input):
     input: dict = Field(default_factory=dict)
     external_key: str = Field(min_length=1, max_length=255)
+
+
+class SimulationInput(Input):
+    graph: dict
+    input: dict = Field(default_factory=dict)
+    decisions: dict = Field(default_factory=dict)
 
 
 class CompleteInput(Revision):
@@ -748,6 +758,41 @@ def create_app(settings: Settings | None = None, engine=None):
         owner_or_admin(actor, item)
         return {"valid": True, "order": validate_graph(item.graph, settings.workflow_max_steps)}
 
+    @router.post("/workflow-graphs/validate")
+    def validate_draft_graph(body: SimulationInput, actor: User):
+        return {"valid": True, "order": validate_graph(body.graph, settings.workflow_max_steps)}
+
+    @router.post("/workflow-simulations", status_code=201)
+    def simulate_draft_graph(body: SimulationInput, db: DB, actor: User,
+                             idem_key: str | None = Header(None, alias="Idempotency-Key")):
+        if len(json.dumps(body.model_dump(), ensure_ascii=False)) > 262_144:
+            raise AppError(413, "simulation_too_large", "Dữ liệu chạy thử vượt giới hạn.")
+        idem, replay = begin_idempotency(db, actor, "workflow.simulate", idem_key, body.model_dump())
+        if replay:
+            return idem.result
+        report = simulate_graph(body.graph, body.input, body.decisions)
+        item = SimulationRun(
+            application=actor.application,
+            owner=actor.subject,
+            graph_hash=hashlib.sha256(json.dumps(body.graph, sort_keys=True).encode()).hexdigest(),
+            input=body.input,
+            decisions=body.decisions,
+            report=report,
+        )
+        db.add(item)
+        db.flush()
+        idem.result = {"id": item.id, **report}
+        db.commit()
+        return idem.result
+
+    @router.get("/simulation-runs/{simulation_id}")
+    def simulation_detail(simulation_id: str, db: DB, actor: User):
+        item = db.get(SimulationRun, simulation_id)
+        if not item:
+            raise AppError(404, "not_found", "Không tìm thấy lượt chạy thử.")
+        owner_or_admin(actor, item)
+        return {"id": item.id, **item.report}
+
     @router.post("/workflows/{workflow_id}/publish")
     def publish_workflow(workflow_id: str, body: Revision, db: DB, actor: User):
         item = db.scalar(select(Workflow).where(Workflow.id == workflow_id).with_for_update())
@@ -836,6 +881,11 @@ def create_app(settings: Settings | None = None, engine=None):
     def run_detail(run_id: str, db: DB, actor: User):
         run = get_run(run_id, db, actor)
         return run_result(db, run)
+
+    @router.get("/workflow-runs/{run_id}/decision-traces")
+    def run_decision_traces(run_id: str, db: DB, actor: User):
+        run = get_run(run_id, db, actor)
+        return page(list(db.scalars(select(DecisionTrace).where(DecisionTrace.run_id == run.id).order_by(DecisionTrace.created_at, DecisionTrace.id))), 100)
 
     @router.post("/workflow-runs/{run_id}/cancel")
     def cancel_run(run_id: str, body: Revision, db: DB, actor: User):

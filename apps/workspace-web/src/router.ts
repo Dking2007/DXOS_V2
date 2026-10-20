@@ -46,6 +46,11 @@ export const router = createRouter({
       meta: { title: 'Thiết lập' },
     },
     {
+      path: '/packages',
+      component: () => import('./views/PackagesView.vue'),
+      meta: { title: 'Gói nghiệp vụ' },
+    },
+    {
       path: '/:pathMatch(.*)*',
       component: () => import('./views/NotFoundView.vue'),
       meta: { title: 'Không tìm thấy' },

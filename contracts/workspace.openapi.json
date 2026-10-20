@@ -769,6 +769,31 @@
             }
           },
           {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "created",
+                "name",
+                "size"
+              ],
+              "type": "string",
+              "default": "created",
+              "title": "Sort By"
+            }
+          },
+          {
+            "name": "descending",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Descending"
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -2149,6 +2174,1051 @@
         }
       }
     },
+    "/workspace/v1/business-packages": {
+      "get": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Packages",
+        "operationId": "packages_workspace_v1_business_packages_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Create Package",
+        "operationId": "create_package_workspace_v1_business_packages_post",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PackageCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/business-packages/active-versions": {
+      "get": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Active Versions",
+        "operationId": "active_versions_workspace_v1_business_packages_active_versions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/business-packages/from-template": {
+      "post": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Import Template",
+        "operationId": "import_template_workspace_v1_business_packages_from_template_post",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateImport"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/business-packages/{package_id}/versions": {
+      "get": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Versions",
+        "operationId": "versions_workspace_v1_business_packages__package_id__versions_get",
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Create Version",
+        "operationId": "create_version_workspace_v1_business_packages__package_id__versions_post",
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/package-versions/{version_id}/diff": {
+      "get": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Version Diff",
+        "operationId": "version_diff_workspace_v1_package_versions__version_id__diff_get",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          },
+          {
+            "name": "against_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Against Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/package-versions/{version_id}/validate": {
+      "post": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Validate Version",
+        "operationId": "validate_version_workspace_v1_package_versions__version_id__validate_post",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Revision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/package-versions/{version_id}/test-suites": {
+      "post": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Create Suite",
+        "operationId": "create_suite_workspace_v1_package_versions__version_id__test_suites_post",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuiteCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Suites",
+        "operationId": "suites_workspace_v1_package_versions__version_id__test_suites_get",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/package-versions/{version_id}/simulation-reports": {
+      "get": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Reports",
+        "operationId": "reports_workspace_v1_package_versions__version_id__simulation_reports_get",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/package-versions/{version_id}/preview": {
+      "post": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Preview",
+        "operationId": "preview_workspace_v1_package_versions__version_id__preview_post",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/package-versions/{version_id}/simulate": {
+      "post": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Simulate",
+        "operationId": "simulate_workspace_v1_package_versions__version_id__simulate_post",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          },
+          {
+            "name": "suite_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Suite Id"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/simulation-reports/{report_id}": {
+      "get": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Report",
+        "operationId": "report_workspace_v1_simulation_reports__report_id__get",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/package-versions/{version_id}/publish": {
+      "post": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Publish",
+        "operationId": "publish_workspace_v1_package_versions__version_id__publish_post",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Revision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/cases/{case_id}/explanation": {
+      "get": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Explanation",
+        "operationId": "explanation_workspace_v1_cases__case_id__explanation_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/cases/{case_id}/field-evidence": {
+      "get": {
+        "tags": [
+          "process-insights"
+        ],
+        "summary": "Field Evidence",
+        "operationId": "field_evidence_workspace_v1_cases__case_id__field_evidence_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "process-insights"
+        ],
+        "summary": "Create Evidence",
+        "operationId": "create_evidence_workspace_v1_cases__case_id__field_evidence_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/cases/{case_id}/field-evidence/import": {
+      "post": {
+        "tags": [
+          "process-insights"
+        ],
+        "summary": "Import Ai Evidence",
+        "operationId": "import_ai_evidence_workspace_v1_cases__case_id__field_evidence_import_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiEvidenceImport"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/field-evidence/{evidence_id}/review": {
+      "post": {
+        "tags": [
+          "process-insights"
+        ],
+        "summary": "Review Evidence",
+        "operationId": "review_evidence_workspace_v1_field_evidence__evidence_id__review_post",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/field-evidence/{evidence_id}/source-download": {
+      "post": {
+        "tags": [
+          "process-insights"
+        ],
+        "summary": "Source Download",
+        "operationId": "source_download_workspace_v1_field_evidence__evidence_id__source_download_post",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/process-metrics": {
+      "get": {
+        "tags": [
+          "process-insights"
+        ],
+        "summary": "Process Metrics",
+        "operationId": "process_metrics_workspace_v1_process_metrics_get",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/drive/files/{file_id}/office-sessions": {
       "post": {
         "tags": [
@@ -2319,6 +3389,69 @@
   },
   "components": {
     "schemas": {
+      "AiEvidenceImport": {
+        "properties": {
+          "field_key": {
+            "type": "string",
+            "title": "Field Key"
+          },
+          "source_file_id": {
+            "type": "string",
+            "title": "Source File Id"
+          },
+          "source_page": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Source Page"
+          },
+          "source_quote": {
+            "type": "string",
+            "maxLength": 1500,
+            "minLength": 1,
+            "title": "Source Quote"
+          },
+          "suggested_value": {
+            "title": "Suggested Value"
+          },
+          "source_version_id": {
+            "type": "string",
+            "title": "Source Version Id"
+          },
+          "extraction_job_id": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Extraction Job Id"
+          },
+          "ai_profile_version": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Ai Profile Version"
+          },
+          "prompt_version": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Prompt Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "field_key",
+          "source_file_id",
+          "source_page",
+          "source_quote",
+          "suggested_value",
+          "source_version_id",
+          "extraction_job_id",
+          "ai_profile_version",
+          "prompt_version"
+        ],
+        "title": "AiEvidenceImport"
+      },
       "ApprovalStep": {
         "properties": {
           "label": {
@@ -2401,6 +3534,17 @@
           "form_id": {
             "type": "string",
             "title": "Form Id"
+          },
+          "package_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Version Id"
           },
           "payload": {
             "additionalProperties": true,
@@ -2711,6 +3855,71 @@
         ],
         "title": "DepartmentPatch"
       },
+      "EvidenceCreate": {
+        "properties": {
+          "field_key": {
+            "type": "string",
+            "title": "Field Key"
+          },
+          "source_file_id": {
+            "type": "string",
+            "title": "Source File Id"
+          },
+          "source_page": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Source Page"
+          },
+          "source_quote": {
+            "type": "string",
+            "maxLength": 1500,
+            "minLength": 1,
+            "title": "Source Quote"
+          },
+          "suggested_value": {
+            "title": "Suggested Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "field_key",
+          "source_file_id",
+          "source_page",
+          "source_quote",
+          "suggested_value"
+        ],
+        "title": "EvidenceCreate"
+      },
+      "EvidenceReview": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "confirm",
+              "correct",
+              "reject"
+            ],
+            "title": "Decision"
+          },
+          "confirmed_value": {
+            "title": "Confirmed Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "decision"
+        ],
+        "title": "EvidenceReview"
+      },
       "FileCopy": {
         "properties": {
           "name": {
@@ -2822,6 +4031,74 @@
           "expected_revision"
         ],
         "title": "FilePatch"
+      },
+      "Fixture": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "decisions": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Decisions"
+          },
+          "file_count": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "File Count",
+            "default": 0
+          },
+          "expected_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Expected Path"
+          },
+          "expected_assignees": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Expected Assignees"
+          },
+          "expected_error_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "required_documents_missing",
+                  "approval_configuration_error",
+                  "form_validation_error",
+                  "self_approval_denied"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Error Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "payload"
+        ],
+        "title": "Fixture"
       },
       "FolderCreate": {
         "properties": {
@@ -3053,6 +4330,97 @@
         ],
         "title": "NewDocument"
       },
+      "PackageCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 3000,
+            "title": "Description",
+            "default": ""
+          },
+          "form_id": {
+            "type": "string",
+            "title": "Form Id"
+          },
+          "approval_steps": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ApprovalStep"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Steps"
+          },
+          "required_file_count": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "Required File Count",
+            "default": 0
+          },
+          "allowed_roles": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "staff",
+                "manager",
+                "director",
+                "technical_admin"
+              ]
+            },
+            "type": "array",
+            "title": "Allowed Roles"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "form_id"
+        ],
+        "title": "PackageCreate"
+      },
+      "PreviewInput": {
+        "properties": {
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "decisions": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Decisions"
+          },
+          "file_count": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "File Count",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "payload"
+        ],
+        "title": "PreviewInput"
+      },
       "RestoreInput": {
         "properties": {
           "expected_revision": {
@@ -3147,6 +4515,46 @@
           "access"
         ],
         "title": "ShareInput"
+      },
+      "SuiteCreate": {
+        "properties": {
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/Fixture"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Cases"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "cases"
+        ],
+        "title": "SuiteCreate"
+      },
+      "TemplateImport": {
+        "properties": {
+          "version_id": {
+            "type": "string",
+            "title": "Version Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version_id",
+          "name"
+        ],
+        "title": "TemplateImport"
       },
       "UserCreate": {
         "properties": {
@@ -3274,6 +4682,41 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VersionCreate": {
+        "properties": {
+          "form_id": {
+            "type": "string",
+            "title": "Form Id"
+          },
+          "approval_steps": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ApprovalStep"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Steps"
+          },
+          "required_file_count": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "Required File Count",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "form_id"
+        ],
+        "title": "VersionCreate"
       }
     }
   }

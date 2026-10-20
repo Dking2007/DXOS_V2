@@ -12,8 +12,17 @@ lệnh, ngày chạy và kết quả. Không suy ra test đạt chỉ vì đã c
   identities, secret ngẫu nhiên; cùng deployment không cho overwrite.
 - `docker compose ... --profile workspace --profile office config --quiet`: render
   hợp lệ với env được tạo trong thư mục tạm, không cần Docker daemon.
-- MinIO init bằng mock: bucket thiếu được tạo, bucket đã có không tạo lại; chưa
-  kiểm S3/MinIO thật. Seed wrapper được kiểm lệnh/đường dẫn bằng mock subprocess.
+- Object storage init bằng mock: bucket thiếu được tạo, bucket đã có không tạo lại; chưa
+  kiểm S3/RustFS thật. Seed wrapper được kiểm lệnh/đường dẫn bằng mock subprocess.
+- RustFS thay MinIO trong `infra/compose/compose.yaml`: đổi `image` +
+  `MINIO_ROOT_USER/PASSWORD` → `RUSTFS_ACCESS_KEY/SECRET_KEY`, `user: 10001:10001` và
+  command mới; `docker compose config` render hợp lệ. Lý do: `minio/minio` trả
+  `pull access denied` trên cả Docker Hub lẫn `quay.io/minio/minio` (`docker manifest
+  inspect` báo `no such manifest` cho mọi tag đã thử, trong khi các image khác cùng
+  registry vẫn pull được). Core chỉ dùng 4 thao tác S3 (`put_object`, `get_object`,
+  `head_bucket`, `create_bucket`) nên tương thích API là đủ.
+  **Chưa chạy container RustFS thật**, chưa kiểm `storage-init` tạo bucket, upload/get
+  trên HTTP thật, hay log/volume sau khi chạy. Đổi service không tự động nghiệm thu I07.
 - Ruff lint/format cho bootstrap, seed wrapper, storage initializer đã đạt.
 - Chưa pull/build/chạy image, SSO hay callback Office thật. Docker daemon của môi
   trường phát triển ban đầu không sẵn sàng (`dockerDesktopLinuxEngine` missing).

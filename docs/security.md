@@ -2,7 +2,7 @@
 
 ## Cấu hình dev không phải production
 
-Compose chỉ bind gateway vào `127.0.0.1`. Các service, DB, MinIO và broker không có
+Compose chỉ bind gateway vào `127.0.0.1`. Các service, DB, RustFS và broker không có
 host port; không mở chúng bằng cách thêm `ports` tùy tiện. Profile dev dùng HTTP,
 Keycloak `start-dev` và `COOKIE_SECURE=false`; chỉ dùng trên máy cá nhân/lab.
 

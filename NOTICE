@@ -5,10 +5,13 @@ The original code in this repository is licensed under the Apache License,
 Version 2.0. This notice does not relicense third-party software.
 
 This project integrates independent services including Keycloak, PostgreSQL,
-Valkey, MinIO, Nginx and optionally ONLYOFFICE Docs. Their respective licenses,
+Valkey, RustFS, Nginx and optionally ONLYOFFICE Docs. Their respective licenses,
 trademarks and redistribution obligations remain applicable. In particular,
-ONLYOFFICE Docs Community and MinIO are not covered by this project's Apache
-license. Keep vendor logos and legal notices as required by the relevant edition.
+ONLYOFFICE Docs Community is not covered by this project's Apache license.
+Keep vendor logos and legal notices as required by the relevant edition.
+
+RustFS replaces MinIO as the object-storage service because MinIO no longer
+publishes public container images; Core talks to it through the standard S3 API.
 
 See docs/third-party-inventory.md for the dependency/service inventory and
 release-review limitations. Dependency locks and container tags identify the

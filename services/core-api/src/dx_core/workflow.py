@@ -1,11 +1,12 @@
 from collections import deque
+from types import SimpleNamespace
 
 from dx_platform.database import utcnow
 from dx_platform.errors import AppError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import HumanTask, NodeRun, Run, Workflow
+from .models import DecisionTrace, HumanTask, NodeRun, Run, Workflow
 
 NODE_TYPES = {"start", "map", "if", "human_task", "end"}
 OPERATORS = {"eq", "ne", "gt", "gte", "lt", "lte", "in", "exists"}
@@ -160,6 +161,62 @@ def edge_selected(edge, parent):
     return False
 
 
+def simulate_graph(graph: dict, input_data: dict, decisions: dict | None = None) -> dict:
+    """Evaluate a graph in memory using the same condition and edge functions as live runs."""
+    order = validate_graph(graph)
+    definitions = {node["id"]: node for node in graph["nodes"]}
+    states = {node_id: SimpleNamespace(state="pending", output={}) for node_id in order}
+    context = {"input": input_data, "nodes": {node_id: {"output": row.output} for node_id, row in states.items()}}
+    traces, people = [], []
+    decisions = decisions or {}
+    for node_id in order:
+        row, node = states[node_id], definitions[node_id]
+        incoming = [edge for edge in graph["edges"] if edge["to"] == node_id]
+        if any(states[edge["from"]].state not in {"succeeded", "skipped", "cancelled"} for edge in incoming):
+            continue
+        if incoming and not any(edge_selected(edge, states[edge["from"]]) for edge in incoming):
+            row.state = "skipped"
+            continue
+        config = node.get("config", {})
+        if node["type"] == "human_task":
+            subject = resolve(config["assigned_subject"], context)
+            if not isinstance(subject, str) or not subject:
+                raise AppError(422, "assignee_unresolved", f"Bước '{node_id}' thiếu người nhận.")
+            decision = decisions.get(node_id)
+            people.append({"node_id": node_id, "subject": subject, "source": "fixture"})
+            if decision is None:
+                row.state = "waiting"
+                continue
+            if not isinstance(decision, dict):
+                raise AppError(422, "invalid_fixture", "Quyết định giả lập phải là object.")
+            row.output, row.state = decision, "succeeded"
+        elif node["type"] == "if":
+            result = evaluate(config, context)
+            row.output, row.state = {"result": result}, "succeeded"
+            traces.append({
+                "node_id": node_id,
+                "expression": {key: config.get(key) for key in ("path", "operator", "value")},
+                "evaluated_inputs": {config["path"]: path_value(context, config["path"])},
+                "result": result,
+                "selected_edges": [edge["to"] for edge in graph["edges"] if edge["from"] == node_id and edge_selected(edge, row)],
+            })
+        elif node["type"] == "map":
+            row.output, row.state = resolve(config.get("values", {}), context), "succeeded"
+        else:
+            row.output, row.state = {}, "succeeded"
+        context["nodes"][node_id] = {"output": row.output}
+    return {
+        "execution_mode": "simulation",
+        "state": "waiting" if any(row.state == "waiting" for row in states.values()) else "succeeded",
+        "path": [node_id for node_id in order if states[node_id].state in {"succeeded", "waiting"}],
+        "nodes": [{"node_id": node_id, "state": states[node_id].state, "output": states[node_id].output} for node_id in order],
+        "decision_traces": traces,
+        "assignees": people,
+        "actions": [],
+        "effects_performed": False,
+    }
+
+
 def advance(db: Session, run_id: str):
     """One bounded transaction locks the run; a crash rolls back all unfinished node work."""
     run = db.scalar(
@@ -223,6 +280,14 @@ def advance(db: Session, run_id: str):
                 row.output, row.state = task.result, "succeeded"
             elif node["type"] == "if":
                 row.output, row.state = {"result": evaluate(config, context)}, "succeeded"
+                db.add(DecisionTrace(
+                    run_id=run.id,
+                    node_id=key,
+                    expression={field: config.get(field) for field in ("path", "operator", "value")},
+                    evaluated_inputs={config["path"]: path_value(context, config["path"])},
+                    result=row.output["result"],
+                    selected_edges=[edge["to"] for edge in graph["edges"] if edge["from"] == key and edge_selected(edge, row)],
+                ))
             elif node["type"] == "map":
                 row.output, row.state = resolve(config.get("values", {}), context), "succeeded"
             else:

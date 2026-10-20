@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+from types import SimpleNamespace
+from typing import Literal
 
 from dx_platform.auth import Actor
 from dx_platform.errors import AppError
@@ -426,6 +428,8 @@ def build_router(app):
         folder_id: str | None = None,
         q: str = "",
         trash: bool = False,
+        sort_by: Literal["created", "name", "size"] = "created",
+        descending: bool = True,
         limit: int = Query(100, ge=1, le=200),
         cursor: str | None = None,
         db: Session = Depends(db_dep),
@@ -441,8 +445,14 @@ def build_router(app):
             statement = statement.where(
                 m.DriveFile.name.ilike("%" + q.replace("%", "\\%").replace("_", "\\_") + "%", escape="\\")
             )
-        candidates = list(db.scalars(statement.order_by(m.DriveFile.created_at.desc(), m.DriveFile.id)))
-        return page([v for v in candidates if file_access(db, user, v)], limit, cursor, transform=file_data)
+        candidates = [v for v in db.scalars(statement) if file_access(db, user, v)]
+        if sort_by == "name":
+            candidates.sort(key=lambda value: (value.name.casefold(), value.id), reverse=descending)
+        elif sort_by == "size":
+            candidates.sort(key=lambda value: (value.size or 0, value.id), reverse=descending)
+        else:
+            candidates.sort(key=lambda value: (value.created_at.timestamp(), value.id), reverse=descending)
+        return page(candidates, limit, cursor, transform=file_data)
 
     def save_upload(db, actor, user, name, mime, data, folder_id, key):
         require(db, user, "drive.use")
@@ -814,6 +824,23 @@ def build_router(app):
         form = db.get(m.Form, body.form_id)
         if not form or form.state != "published":
             raise AppError(422, "form_invalid", "Biểu mẫu chưa được phát hành.")
+        active_for_form = db.scalar(
+            select(m.PackageVersion.id)
+            .join(m.BusinessPackage, m.BusinessPackage.active_version_id == m.PackageVersion.id)
+            .where(m.PackageVersion.form_id == form.id)
+            .limit(1)
+        )
+        if active_for_form and not body.package_version_id:
+            raise AppError(422, "package_version_required", "Cần chọn gói quy trình đã phát hành cho biểu mẫu.")
+        package_version = db.get(m.PackageVersion, body.package_version_id) if body.package_version_id else None
+        if body.package_version_id:
+            package = db.get(m.BusinessPackage, package_version.package_id) if package_version else None
+            if (not package_version or package_version.state != "published" or
+                    not package or package.active_version_id != package_version.id or
+                    package_version.form_id != form.id):
+                raise AppError(422, "package_version_invalid", "Phiên bản gói không còn được phát hành cho biểu mẫu này.")
+            if package.allowed_roles and user.role not in package.allowed_roles:
+                raise AppError(403, "package_use_denied", "Vai trò của bạn chưa được dùng gói nghiệp vụ này.")
         payload = validate_payload(form, body.payload)
         if body.assignee_id:
             assignee = db.get(m.User, body.assignee_id)
@@ -842,6 +869,7 @@ def build_router(app):
             title=body.title,
             number=next_number(db),
             form_id=form.id,
+            package_version_id=package_version.id if package_version else None,
             owner_id=user.id,
             department_id=user.department_id,
             payload_record_id=record["id"],
@@ -1002,7 +1030,9 @@ def build_router(app):
         value = get_case(db, user, case_id)
         form = db.get(m.Form, value.form_id)
         payload = app.state.core_service.get(f"/records/{value.payload_record_id}")["payload"]
-        steps = resolve_steps(db, value, form, payload)
+        package_version = db.get(m.PackageVersion, value.package_version_id) if value.package_version_id else None
+        configured_form = SimpleNamespace(approval_steps=package_version.approval_steps) if package_version else form
+        steps = resolve_steps(db, value, configured_form, payload)
         return page(
             [
                 {
@@ -1047,7 +1077,13 @@ def build_router(app):
                 "Payload đã thay đổi ngoài hồ sơ. Tải lại và xác nhận dữ liệu trước khi trình.",
             )
         validate_payload(form, record["payload"])
-        steps = resolve_steps(db, value, form, record["payload"])
+        package_version = db.get(m.PackageVersion, value.package_version_id) if value.package_version_id else None
+        if package_version and len(value.file_ids) < package_version.required_file_count:
+            raise AppError(422, "required_documents_missing", "Hồ sơ chưa đủ số tài liệu bắt buộc của gói.")
+        configured_form = SimpleNamespace(approval_steps=package_version.approval_steps) if package_version else form
+        steps = resolve_steps(db, value, configured_form, record["payload"])
+        from .packages import step_evidence
+        routing_evidence = step_evidence(configured_form.approval_steps, record["payload"], steps)
         snapshots = []
         # The same logical-file lock orders editor open/save and submission pinning.
         for file_id in sorted(value.file_ids):
@@ -1087,6 +1123,8 @@ def build_router(app):
             payload_snapshot=record["payload"],
             payload_revision=record["revision"],
             form_schema_id=form.core_schema_id,
+            package_version_id=value.package_version_id,
+            routing_evidence=routing_evidence,
             files_snapshot=snapshots,
             steps_snapshot=steps,
         )

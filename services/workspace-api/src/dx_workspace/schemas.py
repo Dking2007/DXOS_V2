@@ -199,6 +199,7 @@ class FormCreate(Input):
 class CaseCreate(Input):
     title: str = Field(min_length=1, max_length=250)
     form_id: str
+    package_version_id: str | None = None
     payload: dict[str, Any]
     file_ids: list[str] = Field(default_factory=list, max_length=30)
     priority: Literal["low", "normal", "high", "urgent"] = "normal"

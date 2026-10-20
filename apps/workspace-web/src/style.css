@@ -124,6 +124,27 @@
   margin-top: auto;
   padding: 35px 12px 0;
 }
+.sidebar-collapse {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  margin-bottom: 18px;
+  padding: 7px 10px;
+  border: 1px solid #465b6e;
+  border-radius: 8px;
+  background: #ffffff08;
+  color: #c4d0dc;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sidebar-collapse:hover {
+  background: #ffffff18;
+  color: #fff;
+}
+.sidebar-collapse svg { flex: none; }
 .privacy-note {
   display: flex;
   gap: 10px;
@@ -166,6 +187,26 @@
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
+}
+@media (min-width: 901px) {
+  .sidebar, .workspace-main { transition: width 0.2s ease, margin-left 0.2s ease; }
+  .app-shell.sidebar-collapsed .sidebar { width: 76px; padding-right: 10px; padding-left: 10px; }
+  .app-shell.sidebar-collapsed .workspace-main { margin-left: 76px; }
+  .app-shell.sidebar-collapsed .brand { justify-content: center; padding-right: 0; padding-left: 0; }
+  .app-shell.sidebar-collapsed .brand > span:last-child,
+  .app-shell.sidebar-collapsed .workspace-label > div,
+  .app-shell.sidebar-collapsed .workspace-label > svg:last-child,
+  .app-shell.sidebar-collapsed .nav-label,
+  .app-shell.sidebar-collapsed .nav-link > span,
+  .app-shell.sidebar-collapsed .sidebar-collapse > span,
+  .app-shell.sidebar-collapsed .privacy-note,
+  .app-shell.sidebar-collapsed .console-link-text,
+  .app-shell.sidebar-collapsed .sidebar-version { display: none; }
+  .app-shell.sidebar-collapsed .workspace-label { justify-content: center; margin: 0 0 32px; padding: 9px; }
+  .app-shell.sidebar-collapsed .nav-link { justify-content: center; padding: 10px; }
+  .app-shell.sidebar-collapsed .sidebar-bottom { padding-right: 0; padding-left: 0; }
+  .app-shell.sidebar-collapsed .sidebar-collapse { justify-content: center; padding: 7px; }
+  .app-shell.sidebar-collapsed .console-link { justify-content: center; }
 }
 .topbar {
   height: 82px;
@@ -736,6 +777,7 @@
   }
 }
 @media (max-width: 900px) {
+  .sidebar-collapse { display: none; }
   .sidebar {
     transform: translateX(-100%);
     transition: transform 0.2s;

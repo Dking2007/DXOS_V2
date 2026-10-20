@@ -42,7 +42,7 @@ job lỗi, API không được khởi động thành công giả.
 
 Chưa có cam kết RPO/RTO. Đặt lịch chỉ sau khi restore đã thử và đo. Tối thiểu backup:
 1. Ba database PostgreSQL (Core/Workspace/Keycloak), cùng mốc phù hợp.
-2. Toàn bộ object data của MinIO và các immutable file version liên quan.
+2. Toàn bộ object data của RustFS và các immutable file version liên quan.
 3. `.env`/realm/config và khóa mã hóa được bảo vệ tách biệt.
 4. Office durable data nếu có phiên đang xử lý; không coi Office data thay Core bytes.
 5. Phiên bản source/image/migration và file inventory.

@@ -1332,6 +1332,133 @@
         }
       }
     },
+    "/core/v1/workflow-graphs/validate": {
+      "post": {
+        "summary": "Validate Draft Graph",
+        "operationId": "validate_draft_graph_core_v1_workflow_graphs_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/core/v1/workflow-simulations": {
+      "post": {
+        "summary": "Simulate Draft Graph",
+        "operationId": "simulate_draft_graph_core_v1_workflow_simulations_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/core/v1/simulation-runs/{simulation_id}": {
+      "get": {
+        "summary": "Simulation Detail",
+        "operationId": "simulation_detail_core_v1_simulation_runs__simulation_id__get",
+        "parameters": [
+          {
+            "name": "simulation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Simulation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/core/v1/workflows/{workflow_id}/publish": {
       "post": {
         "summary": "Publish Workflow",
@@ -1502,6 +1629,43 @@
       "get": {
         "summary": "Run Detail",
         "operationId": "run_detail_core_v1_workflow_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/core/v1/workflow-runs/{run_id}/decision-traces": {
+      "get": {
+        "summary": "Run Decision Traces",
+        "operationId": "run_decision_traces_core_v1_workflow_runs__run_id__decision_traces_get",
         "parameters": [
           {
             "name": "run_id",
@@ -1957,6 +2121,31 @@
           "json_schema"
         ],
         "title": "SchemaInput"
+      },
+      "SimulationInput": {
+        "properties": {
+          "graph": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Graph"
+          },
+          "input": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input"
+          },
+          "decisions": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Decisions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "graph"
+        ],
+        "title": "SimulationInput"
       },
       "UploadInput": {
         "properties": {

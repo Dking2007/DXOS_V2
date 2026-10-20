@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
 import {
@@ -35,6 +35,21 @@ const approvals = useQuery({
 const cases = useQuery({
   queryKey: ['cases', 'home'],
   queryFn: () => api.request<Page<CaseItem>>('/cases?limit=6'),
+})
+interface ProcessMetrics {
+  period_days: number
+  as_of: string
+  sample_size: number
+  truncated: boolean
+  overdue_cases: number
+  returns: number
+  steps: { step: string; package_version_id: string | null; count: number; waiting: number; average_wait_hours: number | null; case_ids: string[] }[]
+  suggestions: { kind: string; step?: string; sample_size: number; message: string; case_ids: string[] }[]
+}
+const metricDays = ref(30)
+const metrics = useQuery({
+  queryKey: computed(() => ['process-metrics', metricDays.value]),
+  queryFn: () => api.request<ProcessMetrics>(`/process-metrics?days=${metricDays.value}`),
 })
 </script>
 <template>
@@ -181,4 +196,28 @@ const cases = useQuery({
       hệ thống.
     </p>
   </div>
+  <section class="card" style="margin-top: 20px">
+    <header class="card-header">
+      <div><span class="eyebrow">CẢI TIẾN QUY TRÌNH</span><h2>Thời gian chờ theo bước</h2></div>
+      <label>Khoảng thời gian <select v-model.number="metricDays"><option :value="7">7 ngày</option><option :value="30">30 ngày</option><option :value="90">90 ngày</option></select></label>
+    </header>
+    <div class="card-body">
+      <StatePanel :loading="metrics.isPending.value" :error="metrics.error.value"
+        :empty="metrics.data.value?.sample_size === 0" title="Chưa có nhiệm vụ đủ dữ liệu thời gian"
+        @retry="metrics.refetch()" />
+      <template v-if="metrics.data.value?.sample_size">
+        <p>Hồ sơ quá hạn: {{ metrics.data.value.overdue_cases }} · Lần trả lại: {{ metrics.data.value.returns }}</p>
+        <p class="muted">{{ metrics.data.value.sample_size }} nhiệm vụ · cập nhật {{ formatDate(metrics.data.value.as_of, true) }}<span v-if="metrics.data.value.truncated"> · giới hạn 2.000 mẫu mới nhất</span></p>
+        <div v-for="step in metrics.data.value.steps" :key="`${step.package_version_id}:${step.step}`" class="list-row">
+          <div class="grow"><strong>{{ step.step }}</strong><small v-if="step.package_version_id">Gói {{ step.package_version_id.slice(0, 8) }}</small><small>{{ step.count }} lượt · {{ step.waiting }} đang chờ · trung bình {{ step.average_wait_hours === null ? 'chưa có' : `${step.average_wait_hours} giờ` }}</small>
+            <span v-for="caseId in step.case_ids" :key="caseId"><RouterLink :to="`/cases/${caseId}`" class="mono">Hồ sơ {{ caseId.slice(0, 8) }}</RouterLink> </span>
+          </div>
+        </div>
+        <div v-if="metrics.data.value.suggestions.length" class="notice" style="margin-top: 18px">
+          <strong>Điểm cần kiểm tra</strong>
+          <p v-for="suggestion in metrics.data.value.suggestions" :key="`${suggestion.kind}:${suggestion.step}`">{{ suggestion.step ? `${suggestion.step}: ` : '' }}{{ suggestion.message }} ({{ suggestion.sample_size }} mẫu)</p>
+        </div>
+      </template>
+    </div>
+  </section>
 </template>

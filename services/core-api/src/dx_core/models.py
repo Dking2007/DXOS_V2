@@ -153,6 +153,28 @@ class NodeRun(Entity, Base):
     attempts: Mapped[int] = mapped_column(default=0)
 
 
+class DecisionTrace(Entity, Base):
+    __tablename__ = "decision_traces"
+    __table_args__ = (UniqueConstraint("run_id", "node_id"),)
+    run_id: Mapped[str] = mapped_column(ForeignKey("workflow_runs.id"), index=True)
+    node_id: Mapped[str] = mapped_column(String(80))
+    expression: Mapped[dict] = mapped_column(JSON)
+    evaluated_inputs: Mapped[dict] = mapped_column(JSON)
+    result: Mapped[bool] = mapped_column()
+    selected_edges: Mapped[list] = mapped_column(JSON)
+
+
+class SimulationRun(Entity, Base):
+    __tablename__ = "simulation_runs"
+    application: Mapped[str] = mapped_column(String(80), index=True)
+    owner: Mapped[str] = mapped_column(String(255), index=True)
+    graph_hash: Mapped[str] = mapped_column(String(64))
+    input: Mapped[dict] = mapped_column(JSON)
+    decisions: Mapped[dict] = mapped_column(JSON)
+    report: Mapped[dict] = mapped_column(JSON)
+    execution_mode: Mapped[str] = mapped_column(String(20), default="simulation")
+
+
 class HumanTask(Entity, Base):
     __tablename__ = "human_tasks"
     __table_args__ = (UniqueConstraint("run_id", "node_id"),)

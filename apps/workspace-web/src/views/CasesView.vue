@@ -42,6 +42,16 @@ const forms = useQuery({
   queryKey: ['forms'],
   queryFn: () => api.request<Page<FormTemplate>>('/forms'),
 })
+interface ActivePackageVersion {
+  id: string
+  form_id: string
+  version_no: number
+  package_name: string
+}
+const activePackages = useQuery({
+  queryKey: ['business-packages', 'active'],
+  queryFn: () => api.request<Page<ActivePackageVersion>>('/business-packages/active-versions'),
+})
 const files = useQuery({
   queryKey: ['drive', 'case-picker'],
   queryFn: () => api.request<Page<DriveFile>>('/drive/files'),
@@ -49,6 +59,7 @@ const files = useQuery({
 const showCreate = ref(route.query.create === '1')
 const title = ref('')
 const formId = ref('')
+const packageVersionId = ref('')
 const payload = ref<Record<string, unknown>>({})
 const fileIds = ref<string[]>([])
 const priority = ref<'low' | 'normal' | 'high' | 'urgent'>('normal')
@@ -61,13 +72,21 @@ const intent = ref(newIntent())
 const selectedForm = computed(() =>
   forms.data.value?.items.find((form) => form.id === formId.value),
 )
+const matchingPackages = computed(() =>
+  activePackages.data.value?.items.filter((item) => item.form_id === formId.value) ?? [],
+)
 const members = useQuery({
   queryKey: ['users', 'assignees'],
   queryFn: () => api.request<Page<User>>('/users'),
 })
 watch(formId, () => {
+  packageVersionId.value = ''
   payload.value = initialPayload(selectedForm.value?.fields ?? [])
   errors.value = {}
+})
+watch(matchingPackages, (items) => {
+  if (!items.some((item) => item.id === packageVersionId.value))
+    packageVersionId.value = items[0]?.id ?? ''
 })
 watch([status, search], () => {
   cursor.value = null
@@ -105,6 +124,7 @@ async function create() {
       body: JSON.stringify({
         title: title.value,
         form_id: formId.value,
+        package_version_id: packageVersionId.value || null,
         payload: payload.value,
         file_ids: fileIds.value,
         priority: priority.value,
@@ -282,6 +302,14 @@ async function create() {
             ><small v-if="selectedForm?.description">{{
               selectedForm.description
             }}</small>
+          </div>
+          <div v-if="matchingPackages.length" class="field full-width">
+            <label for="case-package">Gói quy trình đã phát hành</label>
+            <select id="case-package" v-model="packageVersionId" required>
+              <option v-for="item in matchingPackages" :key="item.id" :value="item.id">
+                {{ item.package_name }} · phiên bản {{ item.version_no }}
+              </option>
+            </select>
           </div>
         </div>
         <div class="form-grid">

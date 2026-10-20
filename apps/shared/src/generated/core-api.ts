@@ -470,6 +470,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/core/v1/workflow-graphs/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Draft Graph */
+        post: operations["validate_draft_graph_core_v1_workflow_graphs_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/core/v1/workflow-simulations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Simulate Draft Graph */
+        post: operations["simulate_draft_graph_core_v1_workflow_simulations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/core/v1/simulation-runs/{simulation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Simulation Detail */
+        get: operations["simulation_detail_core_v1_simulation_runs__simulation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/core/v1/workflows/{workflow_id}/publish": {
         parameters: {
             query?: never;
@@ -530,6 +581,23 @@ export interface paths {
         };
         /** Run Detail */
         get: operations["run_detail_core_v1_workflow_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/core/v1/workflow-runs/{run_id}/decision-traces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Decision Traces */
+        get: operations["run_decision_traces_core_v1_workflow_runs__run_id__decision_traces_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -691,6 +759,21 @@ export interface components {
             name: string;
             /** Json Schema */
             json_schema: {
+                [key: string]: unknown;
+            };
+        };
+        /** SimulationInput */
+        SimulationInput: {
+            /** Graph */
+            graph: {
+                [key: string]: unknown;
+            };
+            /** Input */
+            input?: {
+                [key: string]: unknown;
+            };
+            /** Decisions */
+            decisions?: {
                 [key: string]: unknown;
             };
         };
@@ -1749,6 +1832,105 @@ export interface operations {
             };
         };
     };
+    validate_draft_graph_core_v1_workflow_graphs_validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulationInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    simulate_draft_graph_core_v1_workflow_simulations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulationInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    simulation_detail_core_v1_simulation_runs__simulation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                simulation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     publish_workflow_core_v1_workflows__workflow_id__publish_post: {
         parameters: {
             query?: never;
@@ -1854,6 +2036,37 @@ export interface operations {
         };
     };
     run_detail_core_v1_workflow_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_decision_traces_core_v1_workflow_runs__run_id__decision_traces_get: {
         parameters: {
             query?: never;
             header?: never;

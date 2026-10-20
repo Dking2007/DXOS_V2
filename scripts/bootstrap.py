@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 GENERATED = ROOT / "infra" / "identity" / "generated"
+LOCAL_HOSTS = {"localhost", "127.0.0.1"}
 
 
 def secret() -> str:
@@ -81,7 +82,7 @@ def browser_client(client_id: str, client_secret: str, base_url: str, prefix: st
         "redirectUris": [f"{base_url}/{prefix}/v1/auth/callback"],
         "webOrigins": [base_url],
         "attributes": {"pkce.code.challenge.method": "S256", "post.logout.redirect.uris": f"{base_url}/*"},
-        "defaultClientScopes": ["profile", "email", "roles"],
+        "defaultClientScopes": ["basic", "profile", "email", "roles"],
         "protocolMappers": [
             application_mapper("workspace"),
             audience_mapper("dx-core"),
@@ -90,7 +91,7 @@ def browser_client(client_id: str, client_secret: str, base_url: str, prefix: st
     }
 
 
-def create_files(base_url: str) -> list[Path]:
+def create_files(base_url: str, scheme: str = "http") -> list[Path]:
     env_path = ROOT / ".env"
     files = [
         env_path,
@@ -108,7 +109,7 @@ def create_files(base_url: str) -> list[Path]:
 
     values = {
         "PUBLIC_BASE_URL": base_url,
-        "GATEWAY_PORT": str(urlsplit(base_url).port or 8080),
+        "GATEWAY_PORT": str(urlsplit(base_url).port or (443 if scheme == "https" else 8080)),
         "POSTGRES_ADMIN_PASSWORD": secret(),
         "CORE_DB_PASSWORD": secret(),
         "WORKSPACE_DB_PASSWORD": secret(),
@@ -125,6 +126,10 @@ def create_files(base_url: str) -> list[Path]:
         "S3_SECRET_KEY": secret(),
         "ONLYOFFICE_JWT_SECRET": secret(),
         "ONLYOFFICE_ENABLED": "false",
+        # A named deployment terminates TLS at its reverse proxy, so the session cookie
+        # must be marked Secure or the browser drops it over HTTPS. Compose still needs
+        # ${COOKIE_SECURE:-false} for this to reach the containers.
+        "COOKIE_SECURE": "true" if scheme == "https" else "false",
     }
     fixtures = [
         ("director", "Ban giám đốc", "director", "administration"),
@@ -192,7 +197,7 @@ def create_files(base_url: str) -> list[Path]:
             "standardFlowEnabled": False,
             "directAccessGrantsEnabled": False,
             "serviceAccountsEnabled": True,
-            "defaultClientScopes": ["profile", "roles"],
+            "defaultClientScopes": ["basic", "profile", "roles"],
             "protocolMappers": [
                 application_mapper("workspace"),
                 audience_mapper("dx-core"),
@@ -208,7 +213,7 @@ def create_files(base_url: str) -> list[Path]:
             "standardFlowEnabled": False,
             "directAccessGrantsEnabled": False,
             "serviceAccountsEnabled": True,
-            "defaultClientScopes": ["profile", "roles"],
+            "defaultClientScopes": ["basic", "profile", "roles"],
             "protocolMappers": [application_mapper("equipment"), audience_mapper("dx-core")],
         },
     ]
@@ -273,26 +278,50 @@ def create_files(base_url: str) -> list[Path]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--base-url", default="http://localhost:8080", help="Public local HTTP origin; no trailing slash/path"
+        "--base-url",
+        default="http://localhost:8080",
+        help="Public origin users reach, e.g. http://localhost:8080 or https://host.example",
+    )
+    parser.add_argument(
+        "--public-host",
+        action="append",
+        default=[],
+        metavar="HOST",
+        help=(
+            "Extra hostname accepted for a named deployment, e.g. dxos.v1.ovncr.vn. "
+            "Only needed when --base-url is not a local origin."
+        ),
     )
     args = parser.parse_args()
     parts = urlsplit(args.base_url)
+    if parts.hostname in LOCAL_HOSTS:
+        # Dev default unchanged: a local HTTP origin, always with an explicit port.
+        if (
+            parts.scheme != "http"
+            or parts.port is None
+            or parts.path
+            or parts.query
+            or parts.fragment
+            or parts.username
+        ):
+            parser.error("Bootstrap is dev-only: use http://localhost:PORT (no path).")
+    else:
+        # A named deployment must be HTTPS and must be allowed explicitly, so a typo or
+        # an unexpected host cannot silently write a realm that users cannot log into.
+        if (
+            parts.scheme != "https"
+            or parts.hostname not in set(args.public_host)
+            or parts.path
+            or parts.query
+            or parts.fragment
+            or parts.username
+        ):
+            parser.error(
+                "For a non-local host use --base-url https://HOST plus --public-host HOST "
+                "(no path/query). Local dev still defaults to http://localhost:8080."
+            )
     try:
-        port = parts.port
-    except ValueError:
-        parser.error("Use a valid explicit port in http://localhost:PORT.")
-    if (
-        port is None
-        or parts.scheme != "http"
-        or parts.hostname not in {"localhost", "127.0.0.1"}
-        or parts.path
-        or parts.query
-        or parts.fragment
-        or parts.username
-    ):
-        parser.error("Bootstrap is dev-only: use http://localhost:PORT (no path).")
-    try:
-        for path in create_files(args.base_url):
+        for path in create_files(args.base_url, parts.scheme):
             print(f"Created {path.relative_to(ROOT)}")
     except (ValueError, OSError) as exc:
         print(str(exc), file=sys.stderr)

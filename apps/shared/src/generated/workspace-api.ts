@@ -565,6 +565,316 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/v1/business-packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Packages */
+        get: operations["packages_workspace_v1_business_packages_get"];
+        put?: never;
+        /** Create Package */
+        post: operations["create_package_workspace_v1_business_packages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/business-packages/active-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Active Versions */
+        get: operations["active_versions_workspace_v1_business_packages_active_versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/business-packages/from-template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Template */
+        post: operations["import_template_workspace_v1_business_packages_from_template_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/business-packages/{package_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Versions */
+        get: operations["versions_workspace_v1_business_packages__package_id__versions_get"];
+        put?: never;
+        /** Create Version */
+        post: operations["create_version_workspace_v1_business_packages__package_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/package-versions/{version_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Version Diff */
+        get: operations["version_diff_workspace_v1_package_versions__version_id__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/package-versions/{version_id}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Version */
+        post: operations["validate_version_workspace_v1_package_versions__version_id__validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/package-versions/{version_id}/test-suites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suites */
+        get: operations["suites_workspace_v1_package_versions__version_id__test_suites_get"];
+        put?: never;
+        /** Create Suite */
+        post: operations["create_suite_workspace_v1_package_versions__version_id__test_suites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/package-versions/{version_id}/simulation-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reports */
+        get: operations["reports_workspace_v1_package_versions__version_id__simulation_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/package-versions/{version_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview */
+        post: operations["preview_workspace_v1_package_versions__version_id__preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/package-versions/{version_id}/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Simulate */
+        post: operations["simulate_workspace_v1_package_versions__version_id__simulate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/simulation-reports/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Report */
+        get: operations["report_workspace_v1_simulation_reports__report_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/package-versions/{version_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish */
+        post: operations["publish_workspace_v1_package_versions__version_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/cases/{case_id}/explanation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Explanation */
+        get: operations["explanation_workspace_v1_cases__case_id__explanation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/cases/{case_id}/field-evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Field Evidence */
+        get: operations["field_evidence_workspace_v1_cases__case_id__field_evidence_get"];
+        put?: never;
+        /** Create Evidence */
+        post: operations["create_evidence_workspace_v1_cases__case_id__field_evidence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/cases/{case_id}/field-evidence/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Ai Evidence */
+        post: operations["import_ai_evidence_workspace_v1_cases__case_id__field_evidence_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/field-evidence/{evidence_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Evidence */
+        post: operations["review_evidence_workspace_v1_field_evidence__evidence_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/field-evidence/{evidence_id}/source-download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Source Download */
+        post: operations["source_download_workspace_v1_field_evidence__evidence_id__source_download_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/process-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Process Metrics */
+        get: operations["process_metrics_workspace_v1_process_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/drive/files/{file_id}/office-sessions": {
         parameters: {
             query?: never;
@@ -654,6 +964,27 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AiEvidenceImport */
+        AiEvidenceImport: {
+            /** Field Key */
+            field_key: string;
+            /** Source File Id */
+            source_file_id: string;
+            /** Source Page */
+            source_page: number;
+            /** Source Quote */
+            source_quote: string;
+            /** Suggested Value */
+            suggested_value: unknown;
+            /** Source Version Id */
+            source_version_id: string;
+            /** Extraction Job Id */
+            extraction_job_id: string;
+            /** Ai Profile Version */
+            ai_profile_version: string;
+            /** Prompt Version */
+            prompt_version: string;
+        };
         /** ApprovalStep */
         ApprovalStep: {
             /** Label */
@@ -683,6 +1014,8 @@ export interface components {
             title: string;
             /** Form Id */
             form_id: string;
+            /** Package Version Id */
+            package_version_id?: string | null;
             /** Payload */
             payload: {
                 [key: string]: unknown;
@@ -768,6 +1101,31 @@ export interface components {
             /** Manager Id */
             manager_id?: string | null;
         };
+        /** EvidenceCreate */
+        EvidenceCreate: {
+            /** Field Key */
+            field_key: string;
+            /** Source File Id */
+            source_file_id: string;
+            /** Source Page */
+            source_page: number;
+            /** Source Quote */
+            source_quote: string;
+            /** Suggested Value */
+            suggested_value: unknown;
+        };
+        /** EvidenceReview */
+        EvidenceReview: {
+            /** Expected Revision */
+            expected_revision: number;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "confirm" | "correct" | "reject";
+            /** Confirmed Value */
+            confirmed_value?: unknown;
+        };
         /**
          * FileCopy
          * @description Duplicate a document the caller can already read.
@@ -796,6 +1154,32 @@ export interface components {
             trashed?: boolean | null;
             /** Labels */
             labels?: string[] | null;
+        };
+        /** Fixture */
+        Fixture: {
+            /** Name */
+            name: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Decisions */
+            decisions?: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+            /**
+             * File Count
+             * @default 0
+             */
+            file_count: number;
+            /** Expected Path */
+            expected_path?: string[];
+            /** Expected Assignees */
+            expected_assignees?: string[];
+            /** Expected Error Code */
+            expected_error_code?: ("required_documents_missing" | "approval_configuration_error" | "form_validation_error" | "self_approval_denied") | null;
         };
         /** FolderCreate */
         FolderCreate: {
@@ -869,6 +1253,45 @@ export interface components {
             /** Folder Id */
             folder_id?: string | null;
         };
+        /** PackageCreate */
+        PackageCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Form Id */
+            form_id: string;
+            /** Approval Steps */
+            approval_steps?: components["schemas"]["ApprovalStep"][] | null;
+            /**
+             * Required File Count
+             * @default 0
+             */
+            required_file_count: number;
+            /** Allowed Roles */
+            allowed_roles?: ("staff" | "manager" | "director" | "technical_admin")[];
+        };
+        /** PreviewInput */
+        PreviewInput: {
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Decisions */
+            decisions?: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+            /**
+             * File Count
+             * @default 0
+             */
+            file_count: number;
+        };
         /** RestoreInput */
         RestoreInput: {
             /** Expected Revision */
@@ -901,6 +1324,18 @@ export interface components {
              * @enum {string}
              */
             access: "read" | "write" | "none";
+        };
+        /** SuiteCreate */
+        SuiteCreate: {
+            /** Cases */
+            cases: components["schemas"]["Fixture"][];
+        };
+        /** TemplateImport */
+        TemplateImport: {
+            /** Version Id */
+            version_id: string;
+            /** Name */
+            name: string;
         };
         /** UserCreate */
         UserCreate: {
@@ -935,6 +1370,18 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VersionCreate */
+        VersionCreate: {
+            /** Form Id */
+            form_id: string;
+            /** Approval Steps */
+            approval_steps?: components["schemas"]["ApprovalStep"][] | null;
+            /**
+             * Required File Count
+             * @default 0
+             */
+            required_file_count: number;
         };
     };
     responses: never;
@@ -1465,6 +1912,8 @@ export interface operations {
                 folder_id?: string | null;
                 q?: string;
                 trash?: boolean;
+                sort_by?: "created" | "name" | "size";
+                descending?: boolean;
                 limit?: number;
                 cursor?: string | null;
             };
@@ -2276,6 +2725,720 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    packages_workspace_v1_business_packages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    create_package_workspace_v1_business_packages_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PackageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    active_versions_workspace_v1_business_packages_active_versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    import_template_workspace_v1_business_packages_from_template_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateImport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    versions_workspace_v1_business_packages__package_id__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                package_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_version_workspace_v1_business_packages__package_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                package_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_diff_workspace_v1_package_versions__version_id__diff_get: {
+        parameters: {
+            query: {
+                against_id: string;
+            };
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_version_workspace_v1_package_versions__version_id__validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Revision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suites_workspace_v1_package_versions__version_id__test_suites_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_suite_workspace_v1_package_versions__version_id__test_suites_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuiteCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reports_workspace_v1_package_versions__version_id__simulation_reports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_workspace_v1_package_versions__version_id__preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    simulate_workspace_v1_package_versions__version_id__simulate_post: {
+        parameters: {
+            query: {
+                suite_id: string;
+            };
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_workspace_v1_simulation_reports__report_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_workspace_v1_package_versions__version_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Revision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    explanation_workspace_v1_cases__case_id__explanation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    field_evidence_workspace_v1_cases__case_id__field_evidence_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_evidence_workspace_v1_cases__case_id__field_evidence_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvidenceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_ai_evidence_workspace_v1_cases__case_id__field_evidence_import_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiEvidenceImport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_evidence_workspace_v1_field_evidence__evidence_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                evidence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvidenceReview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    source_download_workspace_v1_field_evidence__evidence_id__source_download_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                evidence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    process_metrics_workspace_v1_process_metrics_get: {
+        parameters: {
+            query?: {
+                days?: number;
             };
             header?: never;
             path?: never;

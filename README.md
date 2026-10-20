@@ -15,7 +15,7 @@ version, workflow generic và luồng hồ sơ/phê duyệt. Cơ sở thiết k�
 |---|---|---|
 | Core | FastAPI, worker, Core admin, Keycloak, Nginx | Principal/ACL, schema/record, storage/version, workflow |
 | Workspace | FastAPI, worker, web Vue | Tổ chức, Drive, form, hồ sơ, submission, quyết định |
-| Tích hợp | PostgreSQL, MinIO, ONLYOFFICE tùy chọn | DB riêng mỗi service; private bytes; editor riêng |
+| Tích hợp | PostgreSQL, RustFS, ONLYOFFICE tùy chọn | DB riêng mỗi service; private bytes; editor riêng |
 
 Không share ORM hoặc SQL xuyên database. Payload live ở Core; Workspace giữ
 snapshot đã trình, metadata và quyết định nghiệp vụ. Core phải phục vụ client
@@ -184,7 +184,7 @@ không tồn tại để làm tài liệu trông đầy đủ. Xem [checklist](d
 
 ## Phạm vi hoãn
 
-Chưa bao gồm task module độc lập, chat, feed, OCR/RAG/LLM, dashboard phân tích,
+Chưa bao gồm task module độc lập, chat, feed, OCR/RAG/LLM, dashboard phân tích nâng cao,
 automation canvas nâng cao, arbitrary HTTP/credential connector, phê duyệt quorum,
 SaaS đa tổ chức, chữ ký số pháp lý hoặc mobile native. Quyền tài khoản phê duyệt và
 audit không thay chữ ký số. Không cam kết hiệu năng/RPO/RTO khi chưa đo.
@@ -196,7 +196,8 @@ audit không thay chữ ký số. Không cam kết hiệu năng/RPO/RTO khi chư
 - [Bảo mật, session/revocation và cấu hình dev](docs/security.md)
 - [Inventory bên thứ ba](docs/third-party-inventory.md)
 - [Kịch bản demo](docs/demo.md)
+- [Gói nghiệp vụ, chạy thử và truy vết quy trình](docs/process-packages.md)
 
-Code tự viết: [Apache-2.0](LICENSE), xem [NOTICE](NOTICE). ONLYOFFICE, MinIO và các
+Code tự viết: [Apache-2.0](LICENSE), xem [NOTICE](NOTICE). ONLYOFFICE, RustFS và các
 service/dependency giữ giấy phép của họ. Cần rà soát artifact, notice, source offer
 và trademark đúng bản phát hành; tích hợp API không phải giấy miễn nghĩa vụ.

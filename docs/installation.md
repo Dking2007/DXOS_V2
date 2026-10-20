@@ -16,16 +16,16 @@ Hướng dẫn hai đường: **Docker Compose** (chạy được toàn bộ n�
 | Docker Engine + Compose v2 | Bắt buộc cho phương án A |
 | Python | **3.13** (bootstrap chỉ dùng stdlib; môi trường ảo dùng 3.13) |
 | Node.js | **22 LTS** + npm 10 |
-| Dung lượng | ≥ 8 GB trống (PostgreSQL, Keycloak, MinIO, ONLYOFFICE nếu bật) |
+| Dung lượng | ≥ 8 GB trống (PostgreSQL, Keycloak, RustFS, ONLYOFFICE nếu bật) |
 | RAM | ≥ 6 GB; ONLYOFFICE nên có ≥ 8 GB |
 | Cổng | `8080` trống (đổi được bằng `--base-url`) |
 
 Image được dùng cố định phiên bản, không dùng `latest`: PostgreSQL `17.5-alpine`,
-Keycloak `26.2.5`, MinIO `RELEASE.2025-04-22T22-12-26Z`, Valkey `8.1.1-alpine`,
+Keycloak `26.2.5`, RustFS `1.0.3`, Valkey `8.1.1-alpine`,
 Nginx `1.28.0-alpine`, ONLYOFFICE `8.3.3`, Python `3.13.5-slim`, Node `22.17.0-alpine`.
 
 Gateway chỉ bind `127.0.0.1:8080` nên **không** phơi ra mạng LAN theo mặc định. DB và
-MinIO không publish cổng host.
+RustFS không publish cổng host.
 
 ---
 
@@ -236,6 +236,8 @@ Kịch bản demo đầy đủ: [demo.md](demo.md).
 | Login lỗi sau khi regenerate secret | Realm cũ giữ secret cũ. Bootstrap không rotate dữ liệu đã lưu. |
 | Seed báo "Run bootstrap first" | Thiếu `.env` hoặc `demo-users.json`. Chạy bootstrap trước seed. |
 | Editor Office không lưu | Phân biệt URL public của browser và URL nội bộ container; `localhost` trong container không phải host. |
+| `No such image: postgres:17.5-alpine` / `nginx` / `alpine` sau một lần `up` bị lỗi | Hệ quả kép: một image khác pull thất bại nên `up --build` bị ngắt giữa đường và các image kia chưa kịp kéo. Sửa image lỗi trước rồi chạy lại đúng lệnh `up --build -d`. |
+| `pull access denied for minio/minio, repository does not exist or may require 'docker login'` | MinIO **không còn** publish image công khai trên Docker Hub lẫn `quay.io/minio/minio` — không phải lỗi đăng nhập. Repo hiện dùng RustFS (`rustfs/rustfs`), tương thích S3. Nếu bạn đang ở bản cũ hơn thì thay `image:` thành `rustfs/rustfs:1.0.3`, đổi `MINIO_ROOT_USER/PASSWORD` thành `RUSTFS_ACCESS_KEY/SECRET_KEY`, và dùng `command: [rustfs, --address, ":9000", --console-address, ":9001", /data]`. Nếu bạn tự đổi sang image khác, kiểm `docker manifest inspect <image>` trước. |
 | Migration job lỗi | API không được khởi động thành công giả. Đọc log `core-migrate`/`workspace-migrate`. |
 
 ---
