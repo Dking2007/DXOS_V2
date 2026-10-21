@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { onBeforeRouteLeave, RouterLink, useRoute } from 'vue-router'
+import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   ArrowLeft,
@@ -10,10 +10,13 @@ import {
   Download,
   FileText,
   History,
+  ListPlus,
+  MessagesSquare,
   Paperclip,
   Pencil,
   RotateCcw,
   Save,
+  Undo2,
   Send,
   ShieldCheck,
   XCircle,
@@ -30,6 +33,8 @@ import type { Page } from '@dx/web-shared/api.ts'
 import type {
   ApprovalTask,
   CaseDetail,
+  Conversation,
+  Task,
   DriveFile,
   HistoryEvent,
   User,
@@ -40,7 +45,9 @@ import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import SchemaForm from '@dx/web-shared/components/SchemaForm.vue'
+import TaskCreateDialog from '../components/TaskCreateDialog.vue'
 const route = useRoute()
+const router = useRouter()
 const queryClient = useQueryClient()
 const session = useSession()
 const id = String(route.params.id)
@@ -166,16 +173,43 @@ const canEdit = computed(
     ['draft', 'needs_revision'].includes(detail.data.value?.status ?? '') &&
     detail.data.value?.owner_id === session.user?.id,
 )
+// The approval inbox also lists tasks this user decides for someone who delegated to them.
+const inbox = useQuery({
+  queryKey: ['approvals', 'case', id],
+  queryFn: () => api.request<Page<ApprovalTask>>('/approval-tasks'),
+})
 const myTask = computed(() =>
-  detail.data.value?.approval_tasks.find(
+  inbox.data.value?.items.find(
     (task) =>
-      task.assignee_id === session.user?.id &&
-      ['pending', 'waiting', 'open'].includes(
-        task.status || task.state || 'pending',
-      ),
+      task.case_id === id &&
+      ['pending', 'waiting', 'open'].includes(task.status || task.state || 'pending'),
   ),
 )
-const confirmation = ref<'submit' | 'approve' | 'reject' | 'return' | null>(
+const canWithdraw = computed(
+  () =>
+    detail.data.value?.owner_id === session.user?.id &&
+    ['pending_workflow_start', 'processing'].includes(detail.data.value?.status ?? '') &&
+    !detail.data.value?.approval_tasks.some(
+      (task) => task.decision && (task.state || task.status) !== 'cancelled',
+    ),
+)
+const showTask = ref(false)
+async function taskCreated(task: Task) {
+  showTask.value = false
+  await router.push(`/tasks/${task.id}`)
+}
+async function discuss() {
+  try {
+    const conversation = await api.request<Conversation>('/conversations', {
+      method: 'POST',
+      body: JSON.stringify({ kind: 'case', ref_id: id }),
+    })
+    await router.push(`/chat?c=${conversation.id}`)
+  } catch (cause) {
+    error.value = cause
+  }
+}
+const confirmation = ref<'submit' | 'approve' | 'reject' | 'return' | 'withdraw' | null>(
   null,
 )
 const reason = ref('')
@@ -224,6 +258,7 @@ async function refresh() {
   await queryClient.invalidateQueries({ queryKey: ['cases'] })
   await queryClient.invalidateQueries({ queryKey: ['approvals'] })
   await queryClient.invalidateQueries({ queryKey: ['notifications'] })
+  await inbox.refetch()
 }
 async function save() {
   if (!detail.data.value) return
@@ -261,7 +296,12 @@ async function confirm() {
   busy.value = true
   error.value = null
   try {
-    if (confirmation.value === 'submit')
+    if (confirmation.value === 'withdraw')
+      await api.request(`/cases/${id}/withdraw`, {
+        method: 'POST',
+        body: JSON.stringify({ expected_revision: detail.data.value.revision, reason: reason.value }),
+      })
+    else if (confirmation.value === 'submit')
       await api.request(`/cases/${id}/submit`, {
         method: 'POST',
         headers: { 'Idempotency-Key': intent.value },
@@ -307,6 +347,7 @@ function eventLabel(event: HistoryEvent) {
     'case.created': 'Đã tạo hồ sơ',
     'case.updated': 'Đã cập nhật bản nháp',
     'case.submitted': 'Đã trình duyệt',
+    'case.withdrawn': 'Người tạo đã thu hồi hồ sơ',
     'case.approved': 'Hồ sơ được phê duyệt',
     'case.returned': 'Hồ sơ được trả lại',
     'case.rejected': 'Hồ sơ bị từ chối',
@@ -376,7 +417,19 @@ onBeforeRouteLeave(
           ><button class="button" :disabled="busy" @click="save">
             <Save :size="17" />{{ busy ? 'Đang lưu…' : 'Lưu bản nháp' }}
           </button></template
-        ><template v-else-if="canEdit"
+        ><template v-if="!editing"
+          ><button class="button secondary" @click="discuss">
+            <MessagesSquare :size="16" />Trao đổi</button
+          ><button
+            v-if="session.can('tasks.create')"
+            class="button secondary"
+            @click="showTask = true"
+          >
+            <ListPlus :size="16" />Tạo việc</button
+          ><button v-if="canWithdraw" class="button secondary" @click="ask('withdraw')">
+            <Undo2 :size="16" />Thu hồi
+          </button></template
+        ><template v-if="!editing && canEdit"
           ><button class="button secondary" @click="startEdit">
             <Pencil :size="16" />Chỉnh sửa</button
           ><button class="button" @click="ask('submit')">
@@ -433,7 +486,10 @@ onBeforeRouteLeave(
           >Bạn được phân công:
           <strong>{{
             myTask.label || myTask.step_label || 'Phê duyệt hồ sơ'
-          }}</strong></span
+          }}</strong
+          ><template v-if="myTask.on_behalf_of">
+            (duyệt thay {{ myTask.on_behalf_of }})</template
+          ></span
         >
       </div>
       <div class="inline-actions">
@@ -793,7 +849,9 @@ onBeforeRouteLeave(
           ? 'Phê duyệt hồ sơ'
           : confirmation === 'return'
             ? 'Trả hồ sơ để chỉnh sửa'
-            : 'Từ chối hồ sơ'
+            : confirmation === 'withdraw'
+              ? 'Thu hồi hồ sơ đã trình'
+              : 'Từ chối hồ sơ'
     "
     @close="
       () => {
@@ -842,23 +900,28 @@ onBeforeRouteLeave(
                 ? 'Xác nhận đã kiểm tra nội dung và các tài liệu của lần trình hiện tại.'
                 : confirmation === 'return'
                   ? 'Người tạo sẽ được chỉnh sửa và trình lại. Lịch sử và bản đã trình vẫn được giữ nguyên.'
-                  : 'Quyết định từ chối được lưu lại cùng hồ sơ và lý do.'
+                  : confirmation === 'withdraw'
+                    ? 'Hồ sơ trở về bản nháp để bạn chỉnh sửa và trình lại. Chỉ thu hồi được khi chưa ai ra quyết định; bản đã trình vẫn được giữ trong lịch sử.'
+                    : 'Quyết định từ chối được lưu lại cùng hồ sơ và lý do.'
             }}
           </p>
           <div class="field">
             <label for="decision-reason"
               >{{
-                confirmation === 'approve'
-                  ? 'Ý kiến phê duyệt (không bắt buộc)'
+                confirmation === 'approve' || confirmation === 'withdraw'
+                  ? 'Ghi chú (không bắt buộc)'
                   : 'Lý do'
-              }}<span v-if="confirmation !== 'approve'" class="required">
+              }}<span
+                v-if="confirmation !== 'approve' && confirmation !== 'withdraw'"
+                class="required"
+              >
                 *</span
               ></label
             ><textarea
               id="decision-reason"
               v-model="reason"
               rows="4"
-              :required="confirmation !== 'approve'"
+              :required="confirmation !== 'approve' && confirmation !== 'withdraw'"
               :disabled="busy"
               placeholder="Ghi rõ nội dung cần lưu ý…"
             /></div
@@ -888,10 +951,20 @@ onBeforeRouteLeave(
                   ? 'Xác nhận phê duyệt'
                   : confirmation === 'return'
                     ? 'Trả lại hồ sơ'
-                    : 'Xác nhận từ chối'
+                    : confirmation === 'withdraw'
+                      ? 'Thu hồi hồ sơ'
+                      : 'Xác nhận từ chối'
           }}
         </button>
       </div>
     </form></ModalDialog
   >
+  <TaskCreateDialog
+    v-if="showTask && detail.data.value"
+    heading="Tạo việc từ hồ sơ"
+    :case-id="id"
+    :default-title="detail.data.value.title"
+    @close="showTask = false"
+    @created="taskCreated"
+  />
 </template>

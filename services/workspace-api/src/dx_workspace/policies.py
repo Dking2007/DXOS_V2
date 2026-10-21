@@ -18,13 +18,55 @@ ROLE_TEMPLATES = {
             "cases.read.organization",
             "drive.use",
             "audit.read",
+            "tasks.create",
+            "tasks.assign.organization",
+            "feed.post",
+            "feed.official",
+            "feed.moderate",
+            "automations.manage",
         ],
     ),
-    "manager": ("Lãnh đạo phòng", ["forms.manage", "cases.create", "cases.read.department", "drive.use"]),
-    "staff": ("Cán bộ / nhân viên", ["cases.create", "drive.use"]),
-    "technical_admin": ("Quản trị kỹ thuật", ["organization.manage", "audit.read"]),
+    "manager": (
+        "Lãnh đạo phòng",
+        [
+            "forms.manage",
+            "cases.create",
+            "cases.read.department",
+            "drive.use",
+            "tasks.create",
+            "tasks.assign.department",
+            "feed.post",
+            "feed.official",
+        ],
+    ),
+    "staff": ("Cán bộ / nhân viên", ["cases.create", "drive.use", "tasks.create", "feed.post"]),
+    "technical_admin": ("Quản trị kỹ thuật", ["organization.manage", "audit.read", "automations.manage"]),
 }
 ALLOWED_PERMISSIONS = {value for _, permissions in ROLE_TEMPLATES.values() for value in permissions}
+# Permissions introduced after the first release; migration 0007 adds them to existing
+# default roles so an upgraded deployment gets the same defaults as a fresh seed.
+LATER_PERMISSIONS = {
+    "tasks.create",
+    "tasks.assign.department",
+    "tasks.assign.organization",
+    "feed.post",
+    "feed.official",
+    "feed.moderate",
+    "automations.manage",
+}
+
+
+def department_members(db: Session, department_id: str | None) -> list[User]:
+    if not department_id:
+        return []
+    return list(db.scalars(select(User).where(User.department_id == department_id, User.active.is_(True))))
+
+
+def manages_department(db: Session, user: User, department_id: str | None) -> bool:
+    if not department_id:
+        return False
+    department = db.get(Department, department_id)
+    return bool(department and department.manager_id == user.id)
 
 
 def current_user(db: Session, actor) -> User:
@@ -44,9 +86,33 @@ def require(db: Session, user: User, permission: str):
         raise AppError(403, "permission_denied", "Bạn chưa được cấp quyền thực hiện thao tác này.")
 
 
+def active_delegators(db: Session, user: User) -> list[str]:
+    """People whose approval tasks this user may currently decide on their behalf."""
+    from .models import Delegation, utcnow
+
+    now = utcnow()
+    rows = db.scalars(
+        select(Delegation).where(Delegation.delegate_id == user.id, Delegation.revoked_at.is_(None))
+    )
+    result = []
+    for row in rows:
+        starts = row.starts_at if row.starts_at.tzinfo else row.starts_at.replace(tzinfo=UTC)
+        ends = row.ends_at if row.ends_at.tzinfo else row.ends_at.replace(tzinfo=UTC)
+        delegator = db.get(User, row.delegator_id)
+        if starts <= now < ends and delegator and delegator.active:
+            result.append(row.delegator_id)
+    return result
+
+
+def approval_assignees(db: Session, user: User) -> list[str]:
+    return [user.id, *active_delegators(db, user)]
+
+
 def case_filter(db: Session, user: User):
     own = Case.owner_id == user.id
-    participating = Case.id.in_(select(ApprovalTask.case_id).where(ApprovalTask.assignee_id == user.id))
+    participating = Case.id.in_(
+        select(ApprovalTask.case_id).where(ApprovalTask.assignee_id.in_(approval_assignees(db, user)))
+    )
     perms = permissions(db, user)
     if "cases.read.organization" in perms:
         return True
@@ -86,7 +152,9 @@ def case_readable(db: Session, user: User, value: Case) -> bool:
     """
     own = value.owner_id == user.id
     participating = db.scalar(
-        select(ApprovalTask.id).where(ApprovalTask.case_id == value.id, ApprovalTask.assignee_id == user.id)
+        select(ApprovalTask.id).where(
+            ApprovalTask.case_id == value.id, ApprovalTask.assignee_id.in_(approval_assignees(db, user))
+        )
     )
     perms = permissions(db, user)
     if own or participating:

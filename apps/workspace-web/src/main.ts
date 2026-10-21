@@ -5,6 +5,7 @@ import App from './App.vue'
 import { router } from './router'
 import '@dx/web-shared/style.css'
 import './style.css'
+import './collab.css'
 
 const app = createApp(App)
 app.use(createPinia())

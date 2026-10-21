@@ -140,6 +140,9 @@ export interface ApprovalTask {
   reason?: string
   sequence?: number
   step_index?: number
+  on_behalf_of?: string | null
+  decided_by_id?: string | null
+  decided_by_name?: string
 }
 export interface HistoryEvent {
   id?: string
@@ -165,4 +168,129 @@ export interface Notification {
   read_at?: string | null
   resource_id?: string
   case_id?: string
+  link?: string | null
+}
+export type TaskStatus =
+  | 'draft'
+  | 'assigned'
+  | 'accepted'
+  | 'in_progress'
+  | 'blocked'
+  | 'submitted'
+  | 'returned'
+  | 'completed'
+  | 'cancelled'
+export type TaskAction =
+  | 'accept'
+  | 'start'
+  | 'submit'
+  | 'complete'
+  | 'return'
+  | 'block'
+  | 'unblock'
+  | 'cancel'
+  | 'assign'
+export interface ChecklistItem {
+  id?: string
+  text: string
+  done: boolean
+}
+export interface Task {
+  id: string
+  title: string
+  description: string
+  creator_id: string
+  creator_name: string
+  department_id: string | null
+  department_name: string
+  assignee_id: string | null
+  assignee_name: string
+  watcher_ids: string[]
+  priority: 'low' | 'normal' | 'high' | 'urgent'
+  due_at: string | null
+  status: TaskStatus
+  checklist: ChecklistItem[]
+  checklist_done: number
+  checklist_total: number
+  parent_id: string | null
+  labels: string[]
+  file_ids: string[]
+  case_id: string | null
+  source: { type: string; id?: string | null; label?: string }
+  result: string
+  revision: number
+  overdue: boolean
+  actions: TaskAction[]
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+}
+export interface TaskDetail extends Task {
+  watchers: { id: string; display_name: string }[]
+  events: {
+    id: string
+    action: string
+    actor_name: string
+    detail: Record<string, unknown>
+    created_at: string
+  }[]
+  comments: { id: string; author_name: string; body: string; created_at: string }[]
+  subtasks: { id: string; title: string; status: TaskStatus; assignee_name: string }[]
+  parent: { id: string; title: string } | null
+  case: { id: string; title: string; code: string } | null
+  files: { id: string; name: string | null; size?: number; restricted?: boolean }[]
+}
+export interface ChatMessage {
+  id: string
+  conversation_id: string
+  seq: number
+  sender_id: string
+  sender_name: string
+  body: string
+  mine: boolean
+  deleted: boolean
+  edited_at: string | null
+  created_at: string
+  reactions: Record<string, string[]>
+  mentions: string[]
+  reply_to?: { id: string; seq: number; body: string; sender_name: string } | null
+}
+export interface Conversation {
+  id: string
+  kind: 'direct' | 'group' | 'department' | 'task' | 'case'
+  title: string
+  ref_type: string | null
+  ref_id: string | null
+  last_seq: number
+  unread: number
+  my_role: string
+  member_count: number
+  updated_at: string
+  last_message: ChatMessage | null
+  members?: { user_id: string; display_name: string; role: string; last_read_seq: number }[]
+}
+export interface Post {
+  id: string
+  author_id: string
+  author_name: string
+  body: string
+  audience: 'organization' | 'department'
+  department_name: string
+  official: boolean
+  pinned_at: string | null
+  reactions: Record<string, number>
+  my_reaction: string | null
+  comment_count: number
+  saved: boolean
+  can_edit: boolean
+  can_moderate: boolean
+  revision: number
+  created_at: string
+}
+export interface PostComment {
+  id: string
+  author_name: string
+  body: string
+  created_at: string
+  can_delete: boolean
 }

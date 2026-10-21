@@ -49,8 +49,30 @@ def allowed_save_url(url: str, internal_url: str) -> bool:
         return False
 
 
+def save_source_url(url: str, public_url: str, internal_url: str) -> str | None:
+    """Where to download a save from, or None when the URL is not the configured Document Server.
+
+    Behind the gateway, Document Server builds save links from the address the browser used
+    (ONLYOFFICE_PUBLIC_URL, e.g. http://localhost:8080/office/...). That address is not
+    reachable from inside the Workspace container, so a link under exactly that prefix is
+    fetched from ONLYOFFICE_INTERNAL_URL instead; every other host stays refused.
+    """
+    if allowed_save_url(url, internal_url):
+        return url
+    try:
+        target, public = urlparse(url), urlparse(public_url)
+    except ValueError:
+        return None
+    prefix = public.path.rstrip("/") + "/"
+    if not (allowed_save_url(url, public_url) and target.path.startswith(prefix)):
+        return None
+    rest = target.path[len(prefix) :]
+    return internal_url.rstrip("/") + "/" + rest + (f"?{target.query}" if target.query else "")
+
+
 def fetch_document(url: str, settings) -> bytes:
-    if not allowed_save_url(url, settings.onlyoffice_internal_url):
+    url = save_source_url(url, settings.onlyoffice_public_url, settings.onlyoffice_internal_url)
+    if not url:
         raise AppError(403, "office_save_host_denied", "URL lưu không thuộc Document Server đã cấu hình.")
     data = bytearray()
     try:

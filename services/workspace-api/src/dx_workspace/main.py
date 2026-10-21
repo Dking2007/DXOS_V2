@@ -33,15 +33,27 @@ def create_app(settings=None, engine=None):
         allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", "Idempotency-Key", "X-Request-ID"],
     )
     app.include_router(auth.router("/workspace/v1"))
+    from .automations import build_router as automations_router
+    from .delegations import build_router as delegations_router
+    from .discovery import build_router as discovery_router
+    from .feed import build_router as feed_router
     from .insights import build_router as insights_router
+    from .messaging import build_router as messaging_router
     from .office import office_router
     from .packages import build_router as package_router
     from .routers import build_router
+    from .tasks import build_router as tasks_router
 
     app.include_router(build_router(app))
     app.include_router(package_router(app))
     app.include_router(insights_router(app))
     app.include_router(office_router(app))
+    app.include_router(tasks_router(app))
+    app.include_router(messaging_router(app))
+    app.include_router(feed_router(app))
+    app.include_router(discovery_router(app))
+    app.include_router(delegations_router(app))
+    app.include_router(automations_router(app))
 
     @app.get("/health/live", tags=["health"])
     def live():

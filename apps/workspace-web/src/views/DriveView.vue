@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   ArrowDownUp,
@@ -55,11 +55,22 @@ import type {
 } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
+import { useSession } from '../stores/session'
 const queryClient = useQueryClient()
+const session = useSession()
+/** Sharing and trashing belong to the owner only; the API refuses them for collaborators too. */
+function owns(item: { owner_id?: string }) {
+  return item.owner_id === session.user?.id
+}
+function ownerName(item: { owner_id?: string }) {
+  return users.data.value?.items.find((user) => user.id === item.owner_id)?.display_name ?? 'chủ sở hữu'
+}
 const folder = ref<string | null>(null)
 const crumbs = ref<Folder[]>([])
-const search = ref('')
-const searchQuery = ref('')
+// Global search links here with ?q= so the matching file is already filtered.
+const initialQuery = String(useRoute().query.q ?? '')
+const search = ref(initialQuery)
+const searchQuery = ref(initialQuery)
 let timer: ReturnType<typeof setTimeout> | undefined
 watch(search, (value) => {
   clearTimeout(timer)
@@ -481,7 +492,11 @@ function pickFile(event: Event) {
         :key="item.id"
         class="folder-card"
       >
-        <button class="folder-open" @click="enter(item)">
+        <button
+          class="folder-open"
+          :title="owns(item) ? item.name : `${item.name} · được chia sẻ bởi ${ownerName(item)}`"
+          @click="enter(item)"
+        >
           <FolderClosed :size="23" /><span>{{ item.name }}</span
           ><ChevronRight
             :size="14"
@@ -496,6 +511,7 @@ function pickFile(event: Event) {
           >
             <Pencil :size="15" /></button
           ><button
+            v-if="owns(item)"
             class="icon-button"
             :aria-label="`Chia sẻ quyền kế thừa cho ${item.name}`"
             @click="openFolder('folder-share', item)"
@@ -569,7 +585,7 @@ function pickFile(event: Event) {
             <td>
               <div class="drive-row-actions">
                 <button v-if="!trash" class="drive-control" :aria-label="`Tải ${item.name}`" @click="download(item)"><Download :size="17" /></button>
-                <button v-if="!trash" class="drive-control" :aria-label="`Chia sẻ ${item.name}`" @click="open('share', item)"><Share2 :size="17" /></button>
+                <button v-if="!trash && owns(item)" class="drive-control" :aria-label="`Chia sẻ ${item.name}`" @click="open('share', item)"><Share2 :size="17" /></button>
                 <button class="drive-control" :aria-label="`Thêm thao tác cho ${item.name}`" :aria-expanded="fileMenuId === item.id" @click="toggleFileMenu(item)"><MoreVertical :size="18" /></button>
               </div>
             </td>
@@ -592,8 +608,13 @@ function pickFile(event: Event) {
       <button v-if="!trash" @click="open('copy', activeFile)"><Copy :size="16" /> Sao chép</button>
       <button v-if="!trash" @click="open('versions', activeFile)"><History :size="16" /> Phiên bản</button>
       <button v-if="!trash" @click="open('rename', activeFile)"><Pencil :size="16" /> Đổi tên / di chuyển</button>
-      <button v-if="!trash" @click="open('share', activeFile)"><Share2 :size="16" /> Chia sẻ</button>
-      <button @click="open('trash', activeFile)"><Trash2 :size="16" /> {{ trash ? 'Khôi phục' : 'Xóa' }}</button>
+      <template v-if="owns(activeFile)">
+        <button v-if="!trash" @click="open('share', activeFile)"><Share2 :size="16" /> Chia sẻ</button>
+        <button @click="open('trash', activeFile)"><Trash2 :size="16" /> {{ trash ? 'Khôi phục' : 'Xóa' }}</button>
+      </template>
+      <span v-else class="drive-owner-note" :title="`Chỉ ${ownerName(activeFile)} được chia sẻ hoặc xóa tài liệu này`"
+        ><Share2 :size="14" /> Được chia sẻ bởi {{ ownerName(activeFile) }} · chỉ chủ sở hữu được chia sẻ, xóa</span
+      >
       <button aria-label="Đóng thao tác" @click="fileMenuId = null"><X :size="16" /></button>
     </div>
     <div v-if="files.data.value?.has_more || cursor" class="pagination">
@@ -1024,6 +1045,7 @@ function pickFile(event: Event) {
 .drive-action-bar > span { min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; }
 .drive-action-bar button { display: flex; align-items: center; gap: 5px; border: 0; border-radius: 7px; padding: 8px; color: #275363; background: transparent; cursor: pointer; font-size: 12px; }
 .drive-action-bar button:hover { background: #d2e8ef; }
+.drive-action-bar > .drive-owner-note { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 0 8px; color: #5a7486; font-size: 12px; font-weight: 500; }
 .drive-panel :deep(.pagination) { padding: 16px 23px; }
 @media (max-width: 1100px) { .drive-workspace { grid-template-columns: 155px minmax(0, 1fr); gap: 10px; } .drive-panel-head { flex-wrap: wrap; } }
 @media (max-width: 700px) { .drive-hero { flex-direction: column; align-items: stretch; } .drive-search { width: 100%; } .drive-workspace { display: block; } .drive-rail { position: static; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 0; } .drive-new-wrap { margin: 0; } .drive-nav { display: flex; flex: 1; } .drive-nav button { min-height: 45px; padding: 0 10px; border-radius: 10px; justify-content: center; } .drive-rail-folders, .drive-rail-note, .drive-rail-toggle { display: none; } .drive-panel-head { padding: 16px; } .drive-panel :deep(.folder-grid) { padding: 10px 16px 17px; } .drive-file-grid { padding: 15px; } .drive-sort select { max-width: 105px; } }

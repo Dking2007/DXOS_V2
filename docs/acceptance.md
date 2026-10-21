@@ -67,6 +67,38 @@ lệnh, ngày chạy và kết quả. Không suy ra test đạt chỉ vì đã c
   save dedupe/late callback; phục hồi retry sau Core run commit/upload complete. Office
   chỉ mock tải bytes từ Document Server trong các kịch bản callback. Đây không phải network
   deployment, PostgreSQL concurrency, Keycloak SSO hoặc Docs integration thật.
+- Đợt bổ sung giao việc, nhắn tin, bảng tin, tìm kiếm, báo cáo, ủy quyền, thu hồi hồ
+  sơ và luật tự động hóa (migration `workspace_0007`):
+  - `python -m pytest -q` (Workspace): **46 passed** — thêm 11 test trong
+    `tests/test_collaboration.py` qua Core HTTP thật trong cùng process với SQLite:
+    vòng đời công việc + checklist + nghiệm thu; phạm vi giao việc theo phòng/tổ chức và
+    trưởng đơn vị phân công; trả lại cần lý do, việc cha chờ việc con; chat chống trùng
+    `client_message_id`, phạm vi lịch sử khi thêm thành viên, mất quyền đọc khi bị xóa,
+    quản trị kỹ thuật không đọc được chat riêng; tạo việc từ tin nhắn cần tin đọc được;
+    bảng tin theo phạm vi, thông báo chính thức, ghim; tìm kiếm và báo cáo chỉ đếm dữ liệu
+    được phép; ủy quyền duyệt thay, thu hồi ủy quyền, `decided_by_id`; thu hồi hồ sơ hủy
+    run Core và trình lại được; luật tự động chạy một lần/sự kiện, chặn tự lặp, webhook
+    chỉ tới host được phép, timeout ghi `unknown` không gửi lại (HTTP webhook dùng mock).
+  - Test chuỗi Alembic được cập nhật cho 7 revision (trước đó còn ghi 4 revision và đang
+    lỗi). Upgrade → downgrade 0006 → upgrade bằng SQLite tạm đã đạt; chưa chạy PostgreSQL.
+  - `npm run lint`, `npm run typecheck`, `npm run test` (19 passed), `npm run build`: đạt.
+  - Chromium với API giả lập (Playwright route mock, không backend thật): các màn
+    `/tasks`, `/tasks/:id`, `/chat`, `/feed`, `/reports`, `/search`, `/automations`,
+    `/approvals` hiển thị ở 1440 px và 390 px, không page error, không tràn ngang.
+    **Chưa chạy E2E có đăng nhập với stack thật** cho các màn này.
+  - OpenAPI Workspace: **89 paths**; Core không đổi (38).
+- Đợt chuyển tự động hóa sang canvas kiểu n8n (migration `workspace_0008`, chuyển luật cũ
+  sang đồ thị):
+  - `python -m pytest -q` (Workspace): **48 passed**. Test luồng: chạy một lần/sự kiện,
+    chặn tự lặp, webhook theo node (mock bên nhận), kiểm tra đồ thị báo lỗi theo node (điều
+    kiện thiếu nhánh, node treo, vòng lặp), rẽ nhánh Đúng/Sai với chế độ "ít nhất một", node
+    Chờ giữ job tới hạn rồi tiếp tục (thời gian được dời trong test, không chờ thật).
+  - Alembic upgrade → downgrade 0007 → upgrade bằng SQLite tạm: đạt.
+  - `npm run test`: **24 passed** (thêm 5 test chuyển đổi đồ thị ↔ canvas và tóm tắt node);
+    lint, typecheck, build: đạt; `npm audit`: 0 vulnerabilities sau khi thêm Vue Flow.
+  - Chromium với API giả lập: danh sách luồng, chọn mẫu, canvas, panel cấu hình, chạy thử tô
+    đường, vẽ lại lượt chạy đang chờ, **kéo thả node từ bảng vào canvas** (6 → 7 node) ở
+    1440 px; mobile 390 px không tràn ngang. Chưa thử với backend thật.
 - Core outbox được lưu pending; chưa có external dispatcher/event-trigger delivery.
   Worker DB poll/reconciler của run không chứng minh pipeline broker đã hoạt động.
 
@@ -106,14 +138,17 @@ khác hoa/thường) và **sao chép**: bản sao là file Core độc lập v�
 riêng nên sửa bản sao không đụng version của bản gốc và share của bản gốc không lọ
 sang bản sao. Chưa kiểm ACL trên PostgreSQL với dữ liệu folder sâu và concurrent
 share/move. Form đã publish bất biến, tạo form/schema mới
-khi đổi; chưa form-version-chain API. Chưa multiple memberships/delegation hoặc
-workflow action/HTTP connector. Worker dùng DB polling, không Celery. Chưa scan/AV.
+khi đổi; chưa form-version-chain API. Chưa multiple memberships. Ủy quyền chỉ áp
+dụng cho phê duyệt hồ sơ. Webhook thuộc luật tự động Workspace; engine workflow Core
+vẫn chưa có action/HTTP connector. Chat giao nhận bằng polling REST, chưa WebSocket.
+Worker dùng DB polling, không Celery. Chưa scan/AV.
 Office content ticket TTL 8 giờ/session-scoped, không instant editor revocation.
 Submit yêu cầu close + final callback, chưa force-save barrier. Các giới hạn này
 không được mô tả là đã hoàn thiện chỉ vì happy path hồ sơ đã có test.
 
 ## Ngoài phạm vi đợt đầu
 
-Các mục OCR/RAG, chat/WS reconnect, feed privacy, advanced canvas/HTTP connector,
-parallel quorum, load p95, RPO/RTO mục tiêu trong thiết kế **chưa nghiệm thu** và
+Các mục OCR/RAG, WebSocket realtime/reconnect cho chat, kiểm duyệt bảng tin, advanced
+canvas/connector OAuth, parallel quorum, load p95, RPO/RTO mục tiêu trong thiết kế
+**chưa nghiệm thu** và
 không được coi đã hoàn thành bởi bản Core + e-Office này.

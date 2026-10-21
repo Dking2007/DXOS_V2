@@ -116,6 +116,39 @@ def test_bff_session_csrf_origin_and_local_revocation(context):
     assert client.get("/get").status_code == 401
 
 
+def test_login_moves_browser_to_public_host_before_setting_state():
+    """The state cookie is host-bound; set on 127.0.0.1 it never reaches a localhost callback."""
+    engine = make_engine("sqlite:///:memory:")
+    AuthBase.metadata.create_all(engine)
+    settings = Settings(
+        service_name="workspace",
+        public_base_url="http://localhost:8080",
+        oidc_issuer="http://localhost:8080/identity/realms/dx",
+        oidc_client_id="workspace",
+        oidc_client_secret="client-secret",
+        session_secret="s" * 40,
+        credential_encryption_key=Fernet.generate_key().decode(),
+    )
+    app = FastAPI()
+    install_handlers(app)
+    app.include_router(Auth(settings, engine).router("/workspace/v1"))
+
+    other = TestClient(app, base_url="http://127.0.0.1:8080")
+    moved = other.get("/workspace/v1/auth/login", follow_redirects=False)
+    assert moved.status_code == 302
+    assert moved.headers["location"] == "http://localhost:8080/workspace/v1/auth/login?canonical=1"
+    assert "set-cookie" not in moved.headers
+
+    # A proxy that rewrites Host would otherwise bounce forever; the second hop proceeds.
+    looped = other.get("/workspace/v1/auth/login?canonical=1", follow_redirects=False)
+    assert looped.headers["location"].startswith(settings.oidc_issuer)
+
+    public = TestClient(app, base_url="http://localhost:8080")
+    started = public.get("/workspace/v1/auth/login", follow_redirects=False)
+    assert started.headers["location"].startswith(settings.oidc_issuer)
+    assert "dx_workspace_session_state=" in started.headers["set-cookie"]
+
+
 def test_bearer_token_application_and_service_subject(context):
     auth, _, key, claims = context
     app = FastAPI()

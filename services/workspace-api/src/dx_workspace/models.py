@@ -224,6 +224,8 @@ class ApprovalTask(Base):
     decision: Mapped[str | None] = mapped_column(String(20))
     reason: Mapped[str | None] = mapped_column(Text)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Who actually decided; differs from assignee_id only under an active delegation.
+    decided_by_id: Mapped[str | None] = mapped_column(String(36))
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -317,5 +319,214 @@ class Notification(Base):
     event_key: Mapped[str] = mapped_column(String(160))
     title: Mapped[str] = mapped_column(String(250))
     case_id: Mapped[str | None] = mapped_column(String(36))
+    # In-app route the notification opens; case notifications predate it and fall back to case_id.
+    link: Mapped[str | None] = mapped_column(String(300))
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    title: Mapped[str] = mapped_column(String(250))
+    description: Mapped[str] = mapped_column(Text, default="")
+    creator_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    # Receiving unit. A task given to a department waits there until someone with the right
+    # to coordinate it picks the person in charge; membership alone does not make an assignee.
+    department_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"), index=True)
+    assignee_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    watcher_ids: Mapped[list] = mapped_column(JSON, default=list)
+    priority: Mapped[str] = mapped_column(String(20), default="normal")
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(30), default="draft", index=True)
+    checklist: Mapped[list] = mapped_column(JSON, default=list)
+    parent_id: Mapped[str | None] = mapped_column(ForeignKey("tasks.id"), index=True)
+    labels: Mapped[list] = mapped_column(JSON, default=list)
+    file_ids: Mapped[list] = mapped_column(JSON, default=list)
+    case_id: Mapped[str | None] = mapped_column(ForeignKey("cases.id"), index=True)
+    # Where the task came from (a message, a post, an automation); kept as a snapshot so the
+    # task stays meaningful after its source is deleted and grants no access to that source.
+    source: Mapped[dict] = mapped_column(JSON, default=dict)
+    result: Mapped[str] = mapped_column(Text, default="")
+    revision: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class TaskEvent(Base):
+    __tablename__ = "task_events"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), index=True)
+    actor_id: Mapped[str] = mapped_column(String(36))
+    action: Mapped[str] = mapped_column(String(60))
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class TaskComment(Base):
+    __tablename__ = "task_comments"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), index=True)
+    author_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    kind: Mapped[str] = mapped_column(String(20))
+    title: Mapped[str] = mapped_column(String(200), default="")
+    # A direct conversation has exactly one row per pair; the sorted pair is its key.
+    direct_key: Mapped[str | None] = mapped_column(String(80), unique=True)
+    ref_type: Mapped[str | None] = mapped_column(String(20))
+    ref_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    department_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"))
+    created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    last_seq: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ConversationMember(Base):
+    __tablename__ = "conversation_members"
+    __table_args__ = (UniqueConstraint("conversation_id", "user_id"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    role: Mapped[str] = mapped_column(String(20), default="member")
+    # Messages with seq <= history_from_seq stay hidden from this member.
+    history_from_seq: Mapped[int] = mapped_column(Integer, default=0)
+    last_read_seq: Mapped[int] = mapped_column(Integer, default=0)
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Message(Base):
+    __tablename__ = "messages"
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "seq"),
+        UniqueConstraint("conversation_id", "sender_id", "client_message_id"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"), index=True)
+    seq: Mapped[int] = mapped_column(Integer)
+    sender_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    client_message_id: Mapped[str] = mapped_column(String(80))
+    body: Mapped[str] = mapped_column(Text)
+    reply_to_id: Mapped[str | None] = mapped_column(String(36))
+    mentions: Mapped[list] = mapped_column(JSON, default=list)
+    # {emoji: [user_id, ...]}; small enough per message to keep inline.
+    reactions: Mapped[dict] = mapped_column(JSON, default=dict)
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Post(Base):
+    __tablename__ = "posts"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    author_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    body: Mapped[str] = mapped_column(Text)
+    audience: Mapped[str] = mapped_column(String(20), default="organization")
+    department_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"), index=True)
+    official: Mapped[bool] = mapped_column(Boolean, default=False)
+    pinned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PostComment(Base):
+    __tablename__ = "post_comments"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    post_id: Mapped[str] = mapped_column(ForeignKey("posts.id"), index=True)
+    author_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PostReaction(Base):
+    __tablename__ = "post_reactions"
+    __table_args__ = (UniqueConstraint("post_id", "user_id"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    post_id: Mapped[str] = mapped_column(ForeignKey("posts.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    kind: Mapped[str] = mapped_column(String(20))
+
+
+class PostSave(Base):
+    __tablename__ = "post_saves"
+    __table_args__ = (UniqueConstraint("post_id", "user_id"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    post_id: Mapped[str] = mapped_column(ForeignKey("posts.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Delegation(Base):
+    __tablename__ = "delegations"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    delegator_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    delegate_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    scope: Mapped[str] = mapped_column(String(30), default="approvals")
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    reason: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_by: Mapped[str | None] = mapped_column(String(36))
+
+
+class Connection(Base):
+    __tablename__ = "connections"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    name: Mapped[str] = mapped_column(String(200))
+    base_url: Mapped[str] = mapped_column(String(500))
+    auth_type: Mapped[str] = mapped_column(String(20), default="none")
+    # Encrypted with the deployment credential key; the API never returns it.
+    secret: Mapped[str | None] = mapped_column(Text)
+    headers: Mapped[dict] = mapped_column(JSON, default=dict)
+    timeout_seconds: Mapped[int] = mapped_column(Integer, default=10)
+    created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    revision: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AutomationRule(Base):
+    __tablename__ = "automation_rules"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    trigger: Mapped[str] = mapped_column(String(60), index=True)
+    # Pre-flow rules kept their logic in `conditions`/`actions`; flows store it all in `graph`.
+    conditions: Mapped[list] = mapped_column(JSON, default=list)
+    actions: Mapped[list] = mapped_column(JSON, default=list)
+    graph: Mapped[dict | None] = mapped_column(JSON)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    revision: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AutomationRun(Base):
+    __tablename__ = "automation_runs"
+    # One run per rule and event: a redelivered event finds its run instead of acting twice.
+    __table_args__ = (UniqueConstraint("rule_id", "event_id"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    rule_id: Mapped[str] = mapped_column(ForeignKey("automation_rules.id"), index=True)
+    rule_revision: Mapped[int] = mapped_column(Integer)
+    event_id: Mapped[str] = mapped_column(String(36))
+    event_type: Mapped[str] = mapped_column(String(60))
+    state: Mapped[str] = mapped_column(String(20))
+    steps: Mapped[list] = mapped_column(JSON, default=list)
+    # The flow as it was when the run started, so later edits never change a run in progress.
+    graph: Mapped[dict | None] = mapped_column(JSON)
+    data: Mapped[dict | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

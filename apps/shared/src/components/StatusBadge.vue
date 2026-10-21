@@ -24,6 +24,16 @@ const labels: Record<string, string> = {
   error: 'Lỗi đồng bộ',
   clean: 'Sẵn sàng',
   returned: 'Trả lại',
+  assigned: 'Đã giao',
+  accepted: 'Đã tiếp nhận',
+  in_progress: 'Đang thực hiện',
+  blocked: 'Vướng mắc',
+  not_matched: 'Không khớp điều kiện',
+  skipped: 'Bỏ qua (chống lặp)',
+  unknown: 'Chưa rõ kết quả',
+  scheduled: 'Chưa hiệu lực',
+  expired: 'Hết hạn',
+  revoked: 'Đã thu hồi',
 }
 </script>
 <template>

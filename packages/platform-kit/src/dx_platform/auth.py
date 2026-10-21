@@ -5,7 +5,7 @@ import logging
 import secrets
 import time
 from dataclasses import dataclass, field
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 import httpx
 import jwt
@@ -224,10 +224,22 @@ class Auth:
         router = APIRouter(prefix=(prefix or self.prefix) + "/auth", tags=["identity"])
 
         @router.get("/login")
-        def login():
+        def login(request: Request, canonical: bool = False):
             if len(self.settings.session_secret) < 32 or not self.settings.oidc_client_secret:
                 raise AppError(
                     503, "identity_not_configured", "Chưa cấu hình SSO. Chạy bootstrap và kiểm tra cấu hình."
+                )
+            # The state cookie belongs to the host the browser is on, while the identity
+            # provider returns to PUBLIC_BASE_URL. Opened through another name for the same
+            # server (127.0.0.1 vs localhost) the callback would never see the cookie, so move
+            # the browser to the public host first. `canonical` stops a proxy that rewrites
+            # Host from turning this into a redirect loop.
+            public = urlsplit(self.settings.public_base_url)
+            seen = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+            if not canonical and seen and seen.lower() != public.netloc.lower():
+                return RedirectResponse(
+                    self.settings.public_base_url.rstrip("/") + request.url.path + "?canonical=1",
+                    status_code=302,
                 )
             state, nonce, verifier = random_token(), random_token(), secrets.token_urlsafe(64)
             with Session(self.engine) as db:

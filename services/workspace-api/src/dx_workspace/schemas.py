@@ -230,6 +230,10 @@ class CasePatch(Revision):
         return value
 
 
+class WithdrawInput(Revision):
+    reason: str = Field(default="", max_length=2000)
+
+
 class DecisionInput(Revision):
     decision: Literal["approve", "reject", "return"]
     reason: str = Field(default="", max_length=3000)

@@ -1,0 +1,603 @@
+"""Tasks, chat, feed, search, reports, delegation, withdrawal and automation rules."""
+
+from datetime import UTC, datetime, timedelta
+from unittest.mock import patch
+
+import httpx
+from dx_workspace.models import AutomationRun, Outbox
+from dx_workspace.worker import process_once
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from test_workspace import drain, make_case, make_form
+from test_workspace import world as world  # Reuse the real two-service HTTP integration fixture.
+
+API = "/workspace/v1"
+
+
+def as_(env, name):
+    _, _, _, _, _, actors, current, _, _ = env
+    current[0] = actors[name]
+    return env[0]
+
+
+def titles(client):
+    return [n["title"] for n in client.get(API + "/notifications").json()["items"]]
+
+
+def new_task(env, by="manager", **body):
+    client = as_(env, by)
+    response = client.post(API + "/tasks", json={"title": "Báo cáo quý", **body})
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def transition(client, task, action, **extra):
+    return client.post(
+        f"{API}/tasks/{task['id']}/transitions",
+        json={"expected_revision": task["revision"], "action": action, **extra},
+    )
+
+
+def test_task_lifecycle_with_checklist_and_acceptance(world):  # noqa: F811
+    users = world[7]
+    task = new_task(
+        world,
+        assignee_id=users["staff"],
+        checklist=[{"text": "Thu thập số liệu"}],
+        due_at=(datetime.now(UTC) + timedelta(days=3)).isoformat(),
+    )
+    assert task["status"] == "assigned" and task["actions"] == ["cancel", "assign"]
+    client = as_(world, "outsider")
+    assert client.get(f"{API}/tasks/{task['id']}").status_code == 404
+    client = as_(world, "staff")
+    assert "Bạn được giao việc: Báo cáo quý" in titles(client)
+    task = transition(client, task, "accept").json()
+    assert task["status"] == "accepted"
+    refused = transition(client, task, "submit")
+    assert refused.status_code == 422 and refused.json()["code"] == "checklist_incomplete"
+    item = task["checklist"][0]
+    task = client.patch(
+        f"{API}/tasks/{task['id']}",
+        json={"expected_revision": task["revision"], "checklist": [{**item, "done": True}]},
+    ).json()
+    # Only the checklist is the assignee's to change.
+    denied = client.patch(
+        f"{API}/tasks/{task['id']}", json={"expected_revision": task["revision"], "title": "X"}
+    )
+    assert denied.status_code == 403
+    task = transition(client, task, "submit", result="Đã gửi số liệu").json()
+    assert task["status"] == "submitted" and task["result"] == "Đã gửi số liệu"
+    assert transition(client, task, "complete").status_code == 409
+    client = as_(world, "manager")
+    stale = transition(client, {**task, "revision": 1}, "complete")
+    assert stale.status_code == 409
+    task = transition(client, task, "complete").json()
+    assert task["status"] == "completed" and task["completed_at"]
+    assert [e["action"] for e in task["events"]] == ["created", "accept", "updated", "submit", "complete"]
+
+
+def test_task_assignment_respects_scope_and_department_coordination(world):  # noqa: F811
+    users = world[7]
+    client = as_(world, "staff")
+    denied = client.post(API + "/tasks", json={"title": "Việc", "assignee_id": users["manager"]})
+    assert denied.status_code == 403
+    own = client.post(API + "/tasks", json={"title": "Việc của tôi", "assignee_id": users["staff"]}).json()
+    assert own["status"] == "accepted"
+    client = as_(world, "manager")
+    assert (
+        client.post(API + "/tasks", json={"title": "Liên phòng", "assignee_id": users["staff_b"]}).status_code
+        == 403
+    )
+    options = client.get(API + "/tasks/assignable-users").json()
+    assert options["scope"] == "department" and users["staff_b"] not in {u["id"] for u in options["users"]}
+    # The director gives the task to the administration unit; its head picks the person.
+    task = new_task(world, by="director", department_id=world[0].get(API + "/me").json()["department_id"])
+    assert task["status"] == "assigned" and task["assignee_id"] is None
+    client = as_(world, "manager")
+    mine = client.get(API + "/tasks?scope=mine").json()["items"]
+    assert task["id"] in {t["id"] for t in mine}
+    picked = client.post(
+        f"{API}/tasks/{task['id']}/assign",
+        json={"expected_revision": task["revision"], "assignee_id": users["staff"]},
+    )
+    assert picked.status_code == 200, picked.text
+    assert picked.json()["assignee_id"] == users["staff"]
+    wrong = client.post(
+        f"{API}/tasks/{task['id']}/assign",
+        json={"expected_revision": picked.json()["revision"], "assignee_id": users["staff_b"]},
+    )
+    assert wrong.status_code in {403, 422}
+
+
+def test_return_needs_reason_and_parent_waits_for_children(world):  # noqa: F811
+    users = world[7]
+    parent = new_task(world, assignee_id=users["staff"])
+    child = new_task(world, title="Việc con", assignee_id=users["staff"], parent_id=parent["id"])
+    client = as_(world, "staff")
+    parent = transition(client, parent, "accept").json()
+    parent = transition(client, parent, "submit").json()
+    client = as_(world, "manager")
+    assert transition(client, parent, "return").status_code == 422
+    blocked = transition(client, parent, "complete")
+    assert blocked.status_code == 409 and blocked.json()["code"] == "subtasks_open"
+    returned = transition(client, parent, "return", reason="Thiếu phụ lục").json()
+    assert returned["status"] == "returned"
+    cancelled = transition(client, child, "cancel", reason="Không cần nữa").json()
+    assert cancelled["status"] == "cancelled"
+    assert client.get(f"{API}/tasks/{parent['id']}").json()["subtasks"][0]["status"] == "cancelled"
+
+
+def test_chat_membership_dedupe_history_and_unread(world):  # noqa: F811
+    users = world[7]
+    client = as_(world, "staff")
+    direct = client.post(
+        API + "/conversations", json={"kind": "direct", "member_ids": [users["manager"]]}
+    ).json()
+    again = client.post(
+        API + "/conversations", json={"kind": "direct", "member_ids": [users["manager"]]}
+    ).json()
+    assert direct["id"] == again["id"] and direct["title"] == "Trưởng phòng A"
+    sent = client.post(
+        f"{API}/conversations/{direct['id']}/messages",
+        json={"client_message_id": "m-1", "body": "Chào anh", "mention_ids": [users["manager"]]},
+    )
+    retry = client.post(
+        f"{API}/conversations/{direct['id']}/messages", json={"client_message_id": "m-1", "body": "Chào anh"}
+    )
+    assert sent.status_code == 201 and retry.json()["id"] == sent.json()["id"] and retry.json()["seq"] == 1
+    for name in ("outsider", "technical"):
+        assert as_(world, name).get(f"{API}/conversations/{direct['id']}/messages").status_code == 404
+    client = as_(world, "manager")
+    listed = client.get(API + "/conversations").json()
+    assert listed["unread_total"] == 1
+    assert any("nhắc đến bạn" in t for t in titles(client))
+    client.post(f"{API}/conversations/{direct['id']}/read-cursor", json={"seq": 1})
+    assert client.get(API + "/conversations").json()["unread_total"] == 0
+
+    group = client.post(
+        API + "/conversations", json={"kind": "group", "title": "Dự án", "member_ids": [users["staff"]]}
+    ).json()
+    client.post(
+        f"{API}/conversations/{group['id']}/messages", json={"client_message_id": "g-1", "body": "Cũ"}
+    )
+    client.post(
+        f"{API}/conversations/{group['id']}/members",
+        json={"user_ids": [users["staff_b"]], "include_history": False},
+    )
+    client.post(
+        f"{API}/conversations/{group['id']}/messages", json={"client_message_id": "g-2", "body": "Mới"}
+    )
+    outsider = as_(world, "outsider")
+    seen = outsider.get(f"{API}/conversations/{group['id']}/messages").json()["items"]
+    assert [m["body"] for m in seen] == ["Mới"]
+    client = as_(world, "manager")
+    client.delete(f"{API}/conversations/{group['id']}/members/{users['staff_b']}")
+    assert as_(world, "outsider").get(f"{API}/conversations/{group['id']}/messages").status_code == 404
+
+
+def test_task_from_message_needs_a_readable_message(world):  # noqa: F811
+    users = world[7]
+    client = as_(world, "staff")
+    conversation = client.post(
+        API + "/conversations", json={"kind": "direct", "member_ids": [users["manager"]]}
+    ).json()
+    message = client.post(
+        f"{API}/conversations/{conversation['id']}/messages",
+        json={"client_message_id": "x", "body": "Nhờ em soạn tờ trình"},
+    ).json()
+    client = as_(world, "manager")
+    task = client.post(
+        API + "/tasks",
+        json={
+            "title": "Soạn tờ trình",
+            "assignee_id": users["staff"],
+            "source": {"type": "message", "id": message["id"]},
+        },
+    )
+    assert task.status_code == 201 and task.json()["source"]["label"] == "Nhờ em soạn tờ trình"
+    client = as_(world, "outsider")
+    denied = client.post(
+        API + "/tasks", json={"title": "Lấy cắp", "source": {"type": "message", "id": message["id"]}}
+    )
+    assert denied.status_code == 422
+
+
+def test_feed_audience_official_notice_and_moderation(world):  # noqa: F811
+    client = as_(world, "staff")
+    public = client.post(API + "/posts", json={"body": "Chào cả công ty"}).json()
+    internal = client.post(API + "/posts", json={"body": "Lịch họp phòng", "audience": "department"}).json()
+    assert client.post(API + "/posts", json={"body": "x", "official": True}).status_code == 403
+    outsider = as_(world, "outsider")
+    seen = {p["id"] for p in outsider.get(API + "/posts").json()["items"]}
+    assert public["id"] in seen and internal["id"] not in seen
+    assert outsider.get(f"{API}/posts/{internal['id']}/comments").status_code == 404
+    outsider.post(f"{API}/posts/{public['id']}/comments", json={"body": "Chào bạn"})
+    outsider.put(f"{API}/posts/{public['id']}/reactions/me", json={"kind": "like"})
+    assert outsider.post(f"{API}/posts/{public['id']}/pin", json={"pinned": True}).status_code == 403
+    client = as_(world, "manager")
+    assert client.post(API + "/posts", json={"body": "Toàn công ty", "official": True}).status_code == 403
+    notice = client.post(
+        API + "/posts", json={"body": "Nghỉ lễ từ thứ Hai", "audience": "department", "official": True}
+    )
+    assert notice.status_code == 201
+    staff = as_(world, "staff")
+    assert any(t.startswith("Thông báo chính thức") for t in titles(staff))
+    assert any("bình luận bài viết" in t for t in titles(staff))
+    director = as_(world, "director")
+    director.post(f"{API}/posts/{public['id']}/pin", json={"pinned": True})
+    first = as_(world, "staff").get(API + "/posts").json()["items"][0]
+    assert first["id"] == public["id"] and first["reactions"] == {"like": 1} and first["comment_count"] == 1
+
+
+def test_search_and_reports_only_count_what_the_user_may_see(world):  # noqa: F811
+    users = world[7]
+    task = new_task(
+        world,
+        title="Kiểm kê thiết bị",
+        assignee_id=users["staff"],
+        due_at=(datetime.now(UTC) - timedelta(days=1)).isoformat(),
+    )
+    new_task(world, title="Kế hoạch đào tạo", assignee_id=users["staff"])
+    client = as_(world, "staff")
+    found = client.get(API + "/search?q=KIỂM KÊ").json()
+    assert [i["id"] for i in found["groups"]["task"]["items"]] == [task["id"]]
+    hidden = as_(world, "outsider").get(API + "/search?q=kiểm kê").json()
+    assert hidden["groups"]["task"]["total"] == 0
+    report = as_(world, "manager").get(API + "/reports/overview?scope=managed").json()
+    assert report["tasks"]["open"] == 2 and report["tasks"]["overdue"] == 1
+    assert report["tasks"]["overdue_rate"] == 1.0
+    assert as_(world, "outsider").get(API + "/reports/overview").json()["tasks"]["total"] == 0
+    csv = as_(world, "manager").get(API + "/reports/tasks.csv")
+    assert csv.status_code == 200 and "Kiểm kê thiết bị" in csv.text
+
+
+def test_delegate_decides_on_behalf_and_loses_access_after_revoke(world):  # noqa: F811
+    users = world[7]
+    client = as_(world, "manager")
+    now = datetime.now(UTC)
+    delegation = client.post(
+        API + "/delegations",
+        json={
+            "delegate_id": users["director"],
+            "starts_at": (now - timedelta(minutes=1)).isoformat(),
+            "ends_at": (now + timedelta(days=2)).isoformat(),
+            "reason": "Đi công tác",
+        },
+    ).json()
+    assert delegation["state"] == "active"
+    form = make_form(world)
+    case = make_case(world, form)
+    client = as_(world, "staff")
+    client.post(
+        f"{API}/cases/{case['id']}/submit",
+        json={"expected_revision": 1},
+        headers={"Idempotency-Key": "submit-d"},
+    )
+    drain(world)
+    director = as_(world, "director")
+    task = director.get(API + "/approval-tasks").json()["items"][0]
+    assert task["on_behalf_of"] == "Trưởng phòng A"
+    as_(world, "manager").post(f"{API}/delegations/{delegation['id']}/revoke")
+    director = as_(world, "director")
+    assert director.get(API + "/approval-tasks").json()["items"] == []
+    decision = director.post(
+        f"{API}/approval-tasks/{task['id']}/decisions",
+        json={"expected_revision": task["revision"], "decision": "approve"},
+        headers={"Idempotency-Key": "d-1"},
+    )
+    assert decision.status_code == 404
+
+
+def test_delegated_decision_keeps_real_actor(world):  # noqa: F811
+    users = world[7]
+    now = datetime.now(UTC)
+    as_(world, "manager").post(
+        API + "/delegations",
+        json={
+            "delegate_id": users["director"],
+            "starts_at": now.isoformat(),
+            "ends_at": (now + timedelta(days=1)).isoformat(),
+            "reason": "Nghỉ phép",
+        },
+    )
+    form = make_form(world)
+    case = make_case(world, form)
+    as_(world, "staff").post(
+        f"{API}/cases/{case['id']}/submit",
+        json={"expected_revision": 1},
+        headers={"Idempotency-Key": "submit-e"},
+    )
+    drain(world)
+    director = as_(world, "director")
+    task = director.get(API + "/approval-tasks").json()["items"][0]
+    decided = director.post(
+        f"{API}/approval-tasks/{task['id']}/decisions",
+        json={"expected_revision": task["revision"], "decision": "approve"},
+        headers={"Idempotency-Key": "d-2"},
+    ).json()
+    assert decided["assignee_id"] == users["manager"] and decided["decided_by_id"] == users["director"]
+    drain(world)
+    assert as_(world, "staff").get(f"{API}/cases/{case['id']}").json()["status"] == "approved"
+
+
+def test_withdraw_before_decision_cancels_run_and_allows_resubmit(world):  # noqa: F811
+    _, _, _, _, core_engine, _, _, _, _ = world
+    form = make_form(world)
+    case = make_case(world, form)
+    client = as_(world, "staff")
+    submitted = client.post(
+        f"{API}/cases/{case['id']}/submit", json={"expected_revision": 1}, headers={"Idempotency-Key": "s-1"}
+    ).json()
+    drain(world)
+    current = client.get(f"{API}/cases/{case['id']}").json()
+    withdrawn = client.post(
+        f"{API}/cases/{case['id']}/withdraw",
+        json={"expected_revision": current["revision"], "reason": "Bổ sung"},
+    )
+    assert withdrawn.status_code == 202, withdrawn.text
+    assert withdrawn.json()["status"] == "draft" and submitted["submission_id"]
+    drain(world)
+    from dx_core.models import Run
+
+    with Session(core_engine) as db:
+        assert {run.state for run in db.scalars(select(Run))} == {"cancelled"}
+    manager = as_(world, "manager")
+    assert manager.get(API + "/approval-tasks").json()["items"] == []
+    client = as_(world, "staff")
+    again = client.post(
+        f"{API}/cases/{case['id']}/submit",
+        json={"expected_revision": withdrawn.json()["revision"]},
+        headers={"Idempotency-Key": "s-2"},
+    )
+    assert again.status_code == 202 and again.json()["submission_no"] == 2
+
+
+def flow(trigger, conditions, actions):
+    """A straight-line flow: trigger → (if) → actions, the shape most rules take."""
+    from dx_workspace.automations import legacy_graph
+
+    return legacy_graph(trigger, conditions, actions)
+
+
+def node(node_id, kind, **data):
+    return {"id": node_id, "type": kind, "position": {"x": 0, "y": 0}, "data": data}
+
+
+def edge(source, target, branch=None):
+    return {"id": f"{source}-{target}", "source": source, "target": target, "branch": branch}
+
+
+def process_due(env):
+    """Run every job that is due now; a waiting flow legitimately leaves its resume job pending."""
+    _, app, engine, _, _, _, _, _, settings = env
+    while process_once(engine, settings, app.state.core_service):
+        pass
+
+
+def enable(client, rule):
+    response = client.post(
+        f"{API}/automations/{rule['id']}/enabled",
+        json={"expected_revision": rule["revision"], "enabled": True},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_automation_flow_runs_once_skips_loops_and_guards_webhooks(world):  # noqa: F811
+    client, _, engine, _, _, _, _, users, settings = world
+    assert as_(world, "staff").get(API + "/automations").status_code == 403
+    director = as_(world, "director")
+    rule = director.post(
+        API + "/automations",
+        json={
+            "name": "Việc gấp nộp xong thì báo",
+            "graph": flow(
+                "task.submitted",
+                [{"field": "priority", "operator": "eq", "value": "urgent"}],
+                [
+                    {
+                        "type": "notify",
+                        "recipients": ["creator", "department_manager"],
+                        "title": "Đã nộp việc gấp: {title}",
+                    }
+                ],
+            ),
+        },
+    ).json()
+    assert rule["enabled"] is False and rule["trigger"] == "task.submitted"
+    dry = director.post(f"{API}/automations/{rule['id']}/test", json={"data": {"priority": "low"}}).json()
+    assert dry["matched"] is False
+    assert [(s["node_id"], s.get("branch")) for s in dry["steps"]] == [("trigger", None), ("if_1", "false")]
+    rule = enable(director, rule)
+    task = new_task(world, by="director", title="Nộp báo cáo", priority="urgent", assignee_id=users["staff"])
+    staff = as_(world, "staff")
+    task = transition(staff, task, "accept").json()
+    transition(staff, task, "submit")
+    drain(world)
+    drain(world)
+    assert "Đã nộp việc gấp: Nộp báo cáo" in titles(as_(world, "director"))
+    runs = director.get(f"{API}/automations/{rule['id']}/runs").json()["items"]
+    assert [r["state"] for r in runs] == ["succeeded"]
+    assert [s["node_id"] for s in runs[0]["steps"]] == ["trigger", "if_1", "action_1"]
+    with Session(engine) as db:
+        # Redelivering the same event does not act twice.
+        event = next(
+            j
+            for j in db.scalars(select(Outbox))
+            if j.kind == "automation.dispatch" and j.payload["event_type"] == "task.submitted"
+        )
+        from dx_workspace.automations import dispatch
+
+        dispatch(db, event.payload)
+        db.commit()
+        assert len(list(db.scalars(select(AutomationRun)))) == 1
+
+    loop = director.post(
+        API + "/automations",
+        json={
+            "name": "Tạo việc theo dõi",
+            "graph": flow(
+                "task.created",
+                [],
+                [{"type": "create_task", "title": "Theo dõi: {title}", "assignee_id": users["director"]}],
+            ),
+        },
+    ).json()
+    enable(director, loop)
+    new_task(world, by="director", title="Gốc", assignee_id=users["staff"])
+    drain(world)
+    titles_now = [
+        t["title"] for t in as_(world, "director").get(API + "/tasks?scope=created").json()["items"]
+    ]
+    assert titles_now.count("Theo dõi: Gốc") == 1 and "Theo dõi: Theo dõi: Gốc" not in titles_now
+    with Session(engine) as db:
+        assert "skipped" in {
+            r.state for r in db.scalars(select(AutomationRun).where(AutomationRun.rule_id == loop["id"]))
+        }
+
+    blocked = director.post(
+        API + "/connections", json={"name": "Hook", "base_url": "https://hooks.example.test/"}
+    )
+    assert blocked.status_code == 422 and blocked.json()["code"] == "connection_host_denied"
+    settings.automation_allowed_hosts = "hooks.example.test"
+    connection = director.post(
+        API + "/connections",
+        json={
+            "name": "Hook",
+            "base_url": "https://hooks.example.test/",
+            "auth_type": "bearer",
+            "secret": "s3cret",
+        },
+    ).json()
+    assert "secret" not in connection and connection["has_secret"] is True
+    hook = director.post(
+        API + "/automations",
+        json={
+            "name": "Đẩy sang hệ thống khác",
+            "graph": flow(
+                "post.created", [], [{"type": "webhook", "connection_id": connection["id"], "path": "events"}]
+            ),
+        },
+    ).json()
+    enable(director, hook)
+    calls = []
+
+    def fake(url, headers, body, timeout):
+        calls.append((url, headers["Authorization"], headers["Idempotency-Key"], body["event_type"]))
+        return httpx.Response(200)
+
+    with patch("dx_workspace.automations.send_webhook", fake):
+        as_(world, "staff").post(API + "/posts", json={"body": "Tin mới"})
+        drain(world)
+    assert calls and calls[0][0] == "https://hooks.example.test/events" and calls[0][1] == "Bearer s3cret"
+    assert calls[0][2].endswith(":action_1")
+
+    def slow(*_args, **_kwargs):
+        raise httpx.ReadTimeout("slow")
+
+    with patch("dx_workspace.automations.send_webhook", slow):
+        as_(world, "staff").post(API + "/posts", json={"body": "Tin nữa"})
+        drain(world)
+    with Session(engine) as db:
+        rows = list(
+            db.scalars(
+                select(AutomationRun)
+                .where(AutomationRun.rule_id == hook["id"])
+                .order_by(AutomationRun.created_at)
+            )
+        )
+    assert [next(s["state"] for s in r.steps if s["type"] == "webhook") for r in rows] == [
+        "succeeded",
+        "unknown",
+    ]
+    assert [r.state for r in rows] == ["succeeded", "failed"]
+
+
+def test_flow_validation_reports_problems_per_node(world):  # noqa: F811
+    director = as_(world, "director")
+    graph = {
+        "nodes": [
+            node("start", "trigger", event="task.submitted"),
+            node("check", "if", conditions=[]),
+            node("tell", "notify", recipients=["creator"], title=""),
+            node("loose", "wait", minutes=5),
+        ],
+        "edges": [edge("start", "check"), edge("check", "tell")],
+    }
+    result = director.post(API + "/automations/validate", json=graph).json()
+    by_node = {e["node_id"]: e["message"] for e in result["errors"]}
+    assert result["valid"] is False
+    assert {"check", "tell", "loose"} <= set(by_node)
+    assert "Đúng hoặc Sai" in " ".join(e["message"] for e in result["errors"] if e["node_id"] == "check")
+    cycle = {
+        "nodes": [
+            node("start", "trigger", event="task.created"),
+            node("a", "wait", minutes=1),
+            node("b", "wait", minutes=1),
+        ],
+        "edges": [edge("start", "a"), edge("a", "b"), edge("b", "a")],
+    }
+    messages = [
+        e["message"] for e in director.post(API + "/automations/validate", json=cycle).json()["errors"]
+    ]
+    assert any("vòng lặp" in message for message in messages)
+    refused = director.post(API + "/automations", json={"name": "Sai", "graph": graph})
+    assert refused.status_code == 422 and refused.json()["code"] == "flow_invalid"
+
+
+def test_flow_branches_and_wait_resume(world):  # noqa: F811
+    client, _, engine, _, _, _, _, users, _ = world
+    director = as_(world, "director")
+    graph = {
+        "nodes": [
+            node("start", "trigger", event="task.submitted"),
+            node(
+                "urgent",
+                "if",
+                mode="any",
+                conditions=[
+                    {"field": "priority", "operator": "eq", "value": "urgent"},
+                    {"field": "labels", "operator": "contains", "value": "gấp"},
+                ],
+            ),
+            node("now", "notify", recipients=["creator"], title="Khẩn: {title}"),
+            node("later", "wait", minutes=30),
+            node("remind", "notify", recipients=["creator"], title="Nhắc xem: {title}"),
+        ],
+        "edges": [
+            edge("start", "urgent"),
+            edge("urgent", "now", "true"),
+            edge("urgent", "later", "false"),
+            edge("later", "remind"),
+        ],
+    }
+    preview = director.post(
+        API + "/automations/test",
+        json={"graph": graph, "data": {"title": "X", "priority": "low", "labels": []}},
+    ).json()
+    assert [s["node_id"] for s in preview["steps"]] == ["start", "urgent", "later", "remind"]
+    rule = director.post(API + "/automations", json={"name": "Phân nhánh", "graph": graph}).json()
+    enable(director, rule)
+    for title, priority in (("Việc khẩn", "urgent"), ("Việc thường", "normal")):
+        task = new_task(world, by="director", title=title, priority=priority, assignee_id=users["staff"])
+        staff = as_(world, "staff")
+        task = transition(staff, task, "accept").json()
+        transition(staff, task, "submit")
+    process_due(world)
+    seen = titles(as_(world, "director"))
+    assert "Khẩn: Việc khẩn" in seen and not any(t.startswith("Nhắc xem") for t in seen)
+    runs = {
+        r["steps"][-1]["node_id"]: r
+        for r in director.get(f"{API}/automations/{rule['id']}/runs").json()["items"]
+    }
+    assert runs["later"]["state"] == "waiting"
+    # The resume job is held until the wait elapses; move it forward instead of sleeping.
+    with Session(engine) as db:
+        job = next(j for j in db.scalars(select(Outbox)) if j.kind == "automation.resume")
+        assert job.available_at.replace(tzinfo=None) > datetime.now(UTC).replace(tzinfo=None)
+        job.available_at = datetime.now(UTC) - timedelta(seconds=1)
+        db.commit()
+    drain(world)
+    assert "Nhắc xem: Việc thường" in titles(as_(world, "director"))
+    finished = director.get(f"{API}/automations/{rule['id']}/runs").json()["items"]
+    assert sorted(r["state"] for r in finished) == ["succeeded", "succeeded"]

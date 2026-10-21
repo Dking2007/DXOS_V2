@@ -130,8 +130,9 @@ npm run dev --workspace apps/core-admin
 Worker hiện poll PostgreSQL và đối soát workflow run trong DB; Valkey trong Compose
 là hạ tầng dự phòng cho mở rộng broker/cache, chưa phải Celery integration đã nghiệm
 thu. Outbox Core hiện được ghi/giữ pending để truy vết, **chưa có external dispatcher
-hoặc event-trigger delivery**. Không xem event automation hay delivery qua broker là
-tính năng đã hoạt động. Trạng thái bền vững ở DB.
+hoặc event-trigger delivery**. Luật tự động hóa của Workspace chạy trong worker
+Workspace qua outbox của chính nó (xem bên dưới), không qua broker và không phải engine
+workflow của Core. Trạng thái bền vững ở DB.
 
 ## Kiểm thử và hợp đồng
 
@@ -173,19 +174,63 @@ không tồn tại để làm tài liệu trông đầy đủ. Xem [checklist](d
 - Sau khi thay đổi chia sẻ hoặc di chuyển thư mục, quyền được cấp lại trên từng tài
   liệu; trong cửa sổ đó tài liệu trả `409 permissions_syncing` thay vì phục vụ quyền cũ.
 - Form đã published là bất biến; thay đổi bằng form/schema mới, chưa có API chuỗi
-  phiên bản form. Chưa hỗ trợ nhiều membership hoặc ủy quyền phê duyệt.
+  phiên bản form. Chưa hỗ trợ nhiều membership.
+- **Giao việc** (`/tasks`): giao cho người hoặc đơn vị; trưởng đơn vị nhận việc giao cho
+  đơn vị rồi phân công người chịu trách nhiệm. Trạng thái `draft → assigned → accepted →
+  in_progress → submitted → completed`, nhánh `blocked/returned/cancelled`; trả lại, báo
+  vướng mắc, hủy và đổi hạn bắt buộc lý do và được ghi lịch sử. Checklist phải xong mới
+  nộp được; việc cha chỉ nghiệm thu khi mọi việc con đã xong/hủy. Lãnh đạo phòng giao
+  trong phòng mình, ban giám đốc giao liên phòng. UI có danh sách, Kanban và nhóm theo hạn
+  (chưa có lịch dạng tháng hay Gantt).
+- **Nhắn tin** (`/chat`): hội thoại riêng, nhóm, kênh phòng ban, trao đổi gắn công việc/hồ
+  sơ; reply, nhắc tên, cảm xúc, sửa/xóa tin của mình, read cursor, chống gửi trùng bằng
+  `client_message_id`. Khi thêm thành viên chọn được cho xem toàn lịch sử hay chỉ từ lúc
+  vào; rời/bị xóa khỏi nhóm thì API chặn đọc ngay. Quản trị không mặc định đọc chat riêng.
+  **Giao nhận bằng polling REST** (4–15 giây), chưa có WebSocket/presence/typing.
+- **Bảng tin** (`/feed`): bài toàn tổ chức hoặc phòng ban, thông báo chính thức (gửi
+  notification cho phạm vi nhận), ghim, bình luận, cảm xúc, lưu bài. Nội dung là văn bản
+  thuần, chưa có rich text/ảnh đính kèm hay kiểm duyệt trước khi đăng.
+- **Tìm kiếm chung** (`/search`, ô tìm ở header) trên công việc, hồ sơ, tài liệu, bài
+  viết, tin nhắn; lọc quyền trước khi đếm và cắt trang. Tìm trực tiếp trên bảng (không có
+  chỉ mục full-text riêng), phù hợp quy mô pilot.
+- **Báo cáo** (`/reports`): việc theo trạng thái, quá hạn, hoàn tất trễ, phân bổ theo
+  người, hồ sơ theo trạng thái, số lần trả lại; mỗi chỉ số có định nghĩa và thời điểm
+  tính. Xuất CSV công việc chạy đồng bộ, chưa có report job nền.
+- **Ủy quyền phê duyệt** (trong `/approvals`): có thời hạn (tối đa 90 ngày), có lý do,
+  thu hồi được; người được ủy quyền chỉ xử lý hồ sơ giao cho người ủy quyền, quyết định
+  lưu cả người duyệt thật (`decided_by_id`) và người được đại diện. Không cho ủy quyền
+  dây chuyền.
+- **Thu hồi hồ sơ đã trình** khi chưa ai ra quyết định: nhiệm vụ duyệt đang chờ bị đóng
+  ngay, worker hủy run Core, hồ sơ về bản nháp để trình lại.
+- **Tự động hóa** (`/automations`, quyền `automations.manage`): **trình thiết kế luồng
+  dạng canvas kiểu n8n** (Vue Flow). Kéo thả node Kích hoạt, Điều kiện (nhánh Đúng/Sai,
+  "tất cả" hoặc "ít nhất một"), Chờ, Gửi thông báo, Tạo công việc, Gọi webhook; nối dây,
+  cấu hình ở panel bên phải, chèn biến `{title}`… bằng một click; có 4 mẫu luồng. Lỗi cấu
+  hình hiện ngay trên từng node (thiếu kết nối, vòng lặp, node treo…). **Chạy thử** với dữ
+  liệu mẫu tô sáng đường đi trên canvas mà không tác động thật; **Lịch sử chạy** vẽ lại
+  từng lượt chạy thật lên canvas. Luồng lưu dạng đồ thị DAG; mỗi lượt chạy ghim bản đồ thị
+  lúc bắt đầu nên sửa luồng không ảnh hưởng lượt đang chạy; node Chờ tiếp tục qua outbox
+  (tối đa 7 ngày, luồng bị tắt trong lúc chờ thì lượt chạy bị hủy). Luồng mới ở trạng thái
+  tắt; mỗi sự kiện chạy một lần cho mỗi luồng; luồng không tự kích hoạt lại chính nó và
+  chuỗi bị chặn ở độ sâu 3. Tạo việc chạy dưới quyền hiện tại của người tạo luồng. Webhook chỉ gọi tới host trong `AUTOMATION_ALLOWED_HOSTS` (mặc định rỗng = tắt),
+  gửi `Idempotency-Key`, khóa bí mật mã hóa bằng `CREDENTIAL_ENCRYPTION_KEY` và không
+  trả lại qua API; quá thời gian chờ thì ghi "chưa rõ kết quả" và **không tự gửi lại**.
+  Chưa có node vòng lặp, gọi HTTP đọc dữ liệu về, biểu thức tùy ý hay connector OAuth;
+  editor dùng tốt nhất trên màn hình rộng (mobile xem và thêm node qua nút +).
 - Office chặn submit khi phiên chỉnh sửa còn mở; phải đóng editor và nhận callback
   cuối hợp lệ trước khi trình. Đây **không phải force-save barrier**. Content ticket
   Office có TTL 8 giờ và gắn session; thu hồi share không đẩy người đang mở editor
   ra ngay lập tức. Chưa kiểm Document Server thật hoặc cộng tác hai browser.
-- Workflow chưa có action/HTTP connector và external event dispatcher. File có
-  kiểm định dạng/giới hạn cơ bản, **chưa có quét antivirus/malware**.
+- Engine workflow Core chưa có action/HTTP connector và external event dispatcher (webhook
+  ở trên thuộc luật Workspace). File có kiểm định dạng/giới hạn cơ bản, **chưa có quét
+  antivirus/malware**.
 - PostgreSQL concurrency, SSO thật và cài sạch bằng Docker vẫn cần nghiệm thu.
 
 ## Phạm vi hoãn
 
-Chưa bao gồm task module độc lập, chat, feed, OCR/RAG/LLM, dashboard phân tích nâng cao,
-automation canvas nâng cao, arbitrary HTTP/credential connector, phê duyệt quorum,
+Chưa bao gồm OCR/RAG/LLM, WebSocket realtime cho chat, Gantt/lịch tháng cho công việc,
+dashboard tùy biến widget, node vòng lặp/biểu thức cho luồng tự động, connector OAuth2,
+phê duyệt quorum,
 SaaS đa tổ chức, chữ ký số pháp lý hoặc mobile native. Quyền tài khoản phê duyệt và
 audit không thay chữ ký số. Không cam kết hiệu năng/RPO/RTO khi chưa đo.
 

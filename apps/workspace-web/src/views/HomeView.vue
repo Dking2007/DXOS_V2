@@ -3,19 +3,22 @@ import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
 import {
+  AlarmClock,
   ArrowRight,
   CalendarDays,
   ClipboardCheck,
   FilePlus2,
   FolderClosed,
   History,
+  ListChecks,
   ShieldCheck,
+  Undo2,
 } from 'lucide-vue-next'
 import { api } from '../api'
 import { useSession } from '../stores/session'
 import type { Page } from '@dx/web-shared/api.ts'
 import { formatDate } from '@dx/web-shared/api.ts'
-import type { ApprovalTask, CaseItem } from '@dx/web-shared/types.ts'
+import type { ApprovalTask, CaseItem, Task } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 const session = useSession()
@@ -31,6 +34,13 @@ const firstName = computed(
 const approvals = useQuery({
   queryKey: ['approvals', 'home'],
   queryFn: () => api.request<Page<ApprovalTask>>('/approval-tasks'),
+})
+const myTasks = useQuery({
+  queryKey: ['tasks', 'home'],
+  queryFn: () =>
+    api.request<Page<Task>>(
+      '/tasks?scope=mine&status=assigned,accepted,in_progress,blocked,returned&limit=50',
+    ),
 })
 const cases = useQuery({
   queryKey: ['cases', 'home'],
@@ -51,6 +61,16 @@ const metrics = useQuery({
   queryKey: computed(() => ['process-metrics', metricDays.value]),
   queryFn: () => api.request<ProcessMetrics>(`/process-metrics?days=${metricDays.value}`),
 })
+const maxWait = computed(() =>
+  Math.max(
+    1,
+    ...(metrics.data.value?.steps.map((step) => step.average_wait_hours ?? 0) ?? []),
+  ),
+)
+function countLabel(count: number | undefined, more: boolean | undefined) {
+  if (count === undefined) return '—'
+  return more ? `${count}+` : String(count)
+}
 </script>
 <template>
   <section class="welcome-section">
@@ -59,15 +79,82 @@ const metrics = useQuery({
       <h1>Chào {{ firstName }}, bắt đầu công việc.</h1>
       <p>Những hồ sơ cần bạn xử lý, cùng tài liệu và hoạt động mới nhất.</p>
     </div>
-    <div class="date-block">
-      <CalendarDays
-        :size="18"
-        style="display: inline; vertical-align: middle; margin-right: 7px"
-      />{{ today }}
-    </div>
+    <div class="date-block"><CalendarDays :size="16" />{{ today }}</div>
   </section>
+  <div class="stat-grid">
+    <RouterLink to="/approvals" class="stat-tile"
+      ><span class="stat-icon"><ClipboardCheck :size="21" /></span>
+      <div>
+        <strong>{{
+          countLabel(
+            approvals.data.value?.items.length,
+            approvals.data.value?.has_more,
+          )
+        }}</strong
+        ><small>Chờ bạn duyệt</small>
+      </div></RouterLink
+    ><RouterLink to="/tasks?scope=mine" class="stat-tile"
+      ><span class="stat-icon blue"><ListChecks :size="21" /></span>
+      <div>
+        <strong>{{
+          countLabel(myTasks.data.value?.items.length, myTasks.data.value?.has_more)
+        }}</strong
+        ><small>Việc đang chờ bạn</small>
+      </div></RouterLink
+    >
+    <div class="stat-tile">
+      <span class="stat-icon red"><AlarmClock :size="21" /></span>
+      <div>
+        <strong>{{ metrics.data.value?.overdue_cases ?? '—' }}</strong
+        ><small>Hồ sơ quá hạn · {{ metricDays }} ngày</small>
+      </div>
+    </div>
+    <div class="stat-tile">
+      <span class="stat-icon amber"><Undo2 :size="21" /></span>
+      <div>
+        <strong>{{ metrics.data.value?.returns ?? '—' }}</strong
+        ><small>Lần trả lại · {{ metricDays }} ngày</small>
+      </div>
+    </div>
+  </div>
   <div class="home-columns">
     <div class="stack">
+      <section class="card">
+        <header class="card-header">
+          <div>
+            <span class="eyebrow">VIỆC HÔM NAY</span>
+            <h2>Việc của tôi</h2>
+          </div>
+          <RouterLink to="/tasks?scope=mine" class="button ghost small"
+            >Tất cả công việc <ArrowRight :size="15"
+          /></RouterLink>
+        </header>
+        <StatePanel
+          :loading="myTasks.isPending.value"
+          :error="myTasks.error.value"
+          :empty="myTasks.data.value?.items.length === 0"
+          title="Không có việc đang chờ bạn"
+          description="Việc được giao cho bạn hoặc đơn vị bạn điều phối sẽ xuất hiện tại đây."
+          @retry="myTasks.refetch()"
+        /><RouterLink
+          v-for="task in myTasks.data.value?.items.slice(0, 5)"
+          :key="task.id"
+          :to="`/tasks/${task.id}`"
+          class="list-row"
+          style="color: inherit; text-decoration: none"
+          ><span class="file-icon"><ListChecks :size="19" /></span>
+          <div class="grow">
+            <p>{{ task.title }}</p>
+            <small
+              >{{ task.creator_name }} ·
+              <span :class="{ 'overdue-text': task.overdue }">{{
+                task.due_at ? `hạn ${formatDate(task.due_at)}` : 'chưa đặt hạn'
+              }}</span></small
+            >
+          </div>
+          <StatusBadge :status="task.status"
+        /></RouterLink>
+      </section>
       <section class="card">
         <header class="card-header">
           <div>
@@ -151,6 +238,13 @@ const metrics = useQuery({
             ><small>Chọn mẫu, điền thông tin, chuyển duyệt</small>
           </div>
           <ArrowRight :size="17" /></RouterLink
+        ><RouterLink to="/tasks?create=1" class="home-launcher"
+          ><span><ListChecks :size="21" /></span>
+          <div>
+            <strong>Giao một việc</strong
+            ><small>Giao cho người hoặc đơn vị, đặt hạn và checklist</small>
+          </div>
+          <ArrowRight :size="17" /></RouterLink
         ><RouterLink to="/drive" class="home-launcher"
           ><span><FolderClosed :size="21" /></span>
           <div>
@@ -199,18 +293,21 @@ const metrics = useQuery({
   <section class="card" style="margin-top: 20px">
     <header class="card-header">
       <div><span class="eyebrow">CẢI TIẾN QUY TRÌNH</span><h2>Thời gian chờ theo bước</h2></div>
-      <label>Khoảng thời gian <select v-model.number="metricDays"><option :value="7">7 ngày</option><option :value="30">30 ngày</option><option :value="90">90 ngày</option></select></label>
+      <label class="period-select">Khoảng thời gian <select v-model.number="metricDays"><option :value="7">7 ngày</option><option :value="30">30 ngày</option><option :value="90">90 ngày</option></select></label>
     </header>
     <div class="card-body">
       <StatePanel :loading="metrics.isPending.value" :error="metrics.error.value"
         :empty="metrics.data.value?.sample_size === 0" title="Chưa có nhiệm vụ đủ dữ liệu thời gian"
         @retry="metrics.refetch()" />
       <template v-if="metrics.data.value?.sample_size">
-        <p>Hồ sơ quá hạn: {{ metrics.data.value.overdue_cases }} · Lần trả lại: {{ metrics.data.value.returns }}</p>
-        <p class="muted">{{ metrics.data.value.sample_size }} nhiệm vụ · cập nhật {{ formatDate(metrics.data.value.as_of, true) }}<span v-if="metrics.data.value.truncated"> · giới hạn 2.000 mẫu mới nhất</span></p>
-        <div v-for="step in metrics.data.value.steps" :key="`${step.package_version_id}:${step.step}`" class="list-row">
-          <div class="grow"><strong>{{ step.step }}</strong><small v-if="step.package_version_id">Gói {{ step.package_version_id.slice(0, 8) }}</small><small>{{ step.count }} lượt · {{ step.waiting }} đang chờ · trung bình {{ step.average_wait_hours === null ? 'chưa có' : `${step.average_wait_hours} giờ` }}</small>
-            <span v-for="caseId in step.case_ids" :key="caseId"><RouterLink :to="`/cases/${caseId}`" class="mono">Hồ sơ {{ caseId.slice(0, 8) }}</RouterLink> </span>
+        <p class="muted" style="font-size: 13px">{{ metrics.data.value.sample_size }} nhiệm vụ · cập nhật {{ formatDate(metrics.data.value.as_of, true) }}<span v-if="metrics.data.value.truncated"> · giới hạn 2.000 mẫu mới nhất</span></p>
+        <div v-for="step in metrics.data.value.steps" :key="`${step.package_version_id}:${step.step}`" class="metric-row">
+          <div><strong>{{ step.step }}</strong><small v-if="step.package_version_id">Gói {{ step.package_version_id.slice(0, 8) }}</small><small>{{ step.count }} lượt · {{ step.waiting }} đang chờ</small>
+            <div v-if="step.case_ids.length" class="metric-cases"><RouterLink v-for="caseId in step.case_ids" :key="caseId" :to="`/cases/${caseId}`" class="mono">Hồ sơ {{ caseId.slice(0, 8) }}</RouterLink></div>
+          </div>
+          <div>
+            <div class="metric-bar" aria-hidden="true"><span :style="{ width: `${((step.average_wait_hours ?? 0) / maxWait) * 100}%` }" /></div>
+            <span class="metric-bar-label">Trung bình {{ step.average_wait_hours === null ? 'chưa có' : `${step.average_wait_hours} giờ` }}</span>
           </div>
         </div>
         <div v-if="metrics.data.value.suggestions.length" class="notice" style="margin-top: 18px">

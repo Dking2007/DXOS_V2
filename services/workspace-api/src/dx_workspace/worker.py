@@ -10,11 +10,12 @@ from dx_platform.errors import AppError
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from .automations import deliver_webhook, dispatch, resume
 from .config import get_settings
 from .core_client import CoreClient
-from .models import ApprovalTask, Case, DriveFile, Folder, Outbox, Submission, User, utcnow
-from .policies import effective_access, subtree_files
-from .services import notify
+from .models import ApprovalTask, Case, Delegation, DriveFile, Folder, Outbox, Submission, User, utcnow
+from .policies import active_delegators, effective_access, subtree_files
+from .services import case_event, emit, notify
 
 logger = logging.getLogger("dx.workspace.worker")
 
@@ -91,6 +92,20 @@ def sync_tasks(db: Session, core: CoreClient, submission: Submission):
             db.add(task)
             db.flush()
             notify(db, assignee.id, "approval:" + task.id, "Hồ sơ cần duyệt: " + case.title, case.id)
+            for delegate in db.scalars(
+                select(Delegation.delegate_id).where(
+                    Delegation.delegator_id == assignee.id, Delegation.revoked_at.is_(None)
+                )
+            ):
+                delegate_user = db.get(User, delegate)
+                if delegate_user and assignee.id in active_delegators(db, delegate_user):
+                    notify(
+                        db,
+                        delegate,
+                        "approval:" + task.id,
+                        f"Hồ sơ cần duyệt thay {assignee.display_name}: {case.title}",
+                        case.id,
+                    )
         elif task.core_task_id is None:
             task.core_task_id = item["id"]
             task.core_revision = item.get("revision", 1)
@@ -106,7 +121,7 @@ def sync_tasks(db: Session, core: CoreClient, submission: Submission):
 
 def start_case(db: Session, core: CoreClient, submission_id: str):
     submission = db.scalar(select(Submission).where(Submission.id == submission_id).with_for_update())
-    if not submission:
+    if not submission or submission.state == "withdrawn":
         return
     for file in submission.files_snapshot:
         core.post(
@@ -166,6 +181,18 @@ def complete_approval(db: Session, core: CoreClient, task_id: str):
     case.revision += 1
     case.updated_at = utcnow()
     notify(db, case.owner_id, "decision:" + task.id, "Hồ sơ đã được xử lý: " + case.title, case.id)
+    if case.status in {"approved", "rejected", "needs_revision"}:
+        emit(db, "case." + case.status, case.id, case_event(case))
+
+
+def withdraw_case(db: Session, core: CoreClient, submission_id: str):
+    """Cancel the Core run of a withdrawn submission; a run never started needs nothing."""
+    submission = db.scalar(select(Submission).where(Submission.id == submission_id).with_for_update())
+    if not submission or not submission.core_run_id:
+        return
+    run = core.get(f"/workflow-runs/{submission.core_run_id}")
+    if run["state"] not in {"succeeded", "failed", "cancelled"}:
+        core.post(f"/workflow-runs/{submission.core_run_id}/cancel", {"expected_revision": run["revision"]})
 
 
 def resource_grants(db: Session, settings, file_id: str) -> tuple[list, int]:
@@ -251,6 +278,14 @@ def process_once(engine, settings, core=None) -> bool:
                 sync_grants(db, core, settings, job.aggregate_id)
             elif job.kind == "folder.sync_subtree":
                 sync_folder_subtree(db, core, settings, job.aggregate_id)
+            elif job.kind == "case.withdraw":
+                withdraw_case(db, core, job.aggregate_id)
+            elif job.kind == "automation.dispatch":
+                dispatch(db, job.payload)
+            elif job.kind == "automation.webhook":
+                deliver_webhook(db, settings, job.payload)
+            elif job.kind == "automation.resume":
+                resume(db, job.payload)
             else:
                 raise AppError(422, "unknown_outbox_event", "Loại sự kiện chưa được đăng ký.")
             job.state, job.error, job.lease_until = "sent", None, None

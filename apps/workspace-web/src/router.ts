@@ -46,6 +46,46 @@ export const router = createRouter({
       meta: { title: 'Thiết lập' },
     },
     {
+      path: '/tasks',
+      component: () => import('./views/TasksView.vue'),
+      meta: { title: 'Công việc' },
+    },
+    {
+      path: '/tasks/:id',
+      component: () => import('./views/TaskDetailView.vue'),
+      meta: { title: 'Chi tiết công việc' },
+    },
+    {
+      path: '/chat',
+      component: () => import('./views/ChatView.vue'),
+      meta: { title: 'Nhắn tin' },
+    },
+    {
+      path: '/feed',
+      component: () => import('./views/FeedView.vue'),
+      meta: { title: 'Bảng tin' },
+    },
+    {
+      path: '/reports',
+      component: () => import('./views/ReportsView.vue'),
+      meta: { title: 'Báo cáo' },
+    },
+    {
+      path: '/search',
+      component: () => import('./views/SearchView.vue'),
+      meta: { title: 'Tìm kiếm' },
+    },
+    {
+      path: '/automations',
+      component: () => import('./views/AutomationsView.vue'),
+      meta: { title: 'Tự động hóa', capability: 'automations.manage' },
+    },
+    {
+      path: '/automations/:id',
+      component: () => import('./views/AutomationEditorView.vue'),
+      meta: { title: 'Thiết kế luồng', capability: 'automations.manage', wide: true },
+    },
+    {
       path: '/packages',
       component: () => import('./views/PackagesView.vue'),
       meta: { title: 'Gói nghiệp vụ' },
@@ -69,5 +109,7 @@ router.beforeEach(async (to) => {
     }
   }
   if (!session.user) return { path: '/login', query: { next: to.fullPath } }
+  // Hiding a screen is convenience only; the API enforces the same permission.
+  if (to.meta.capability && !session.can(String(to.meta.capability))) return { path: '/home' }
   return true
 })

@@ -1,19 +1,69 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { useQuery } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   ArrowRight,
   CheckCheck,
   ClipboardCheck,
   ChevronRight,
+  UserRoundCheck,
 } from 'lucide-vue-next'
 import { api } from '../api'
-import { formatDate, queryString } from '@dx/web-shared/api.ts'
+import { useSession } from '../stores/session'
+import { errorText, formatDate, queryString } from '@dx/web-shared/api.ts'
 import type { Page } from '@dx/web-shared/api.ts'
-import type { ApprovalTask } from '@dx/web-shared/types.ts'
+import type { ApprovalTask, User } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
+import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
+const queryClient = useQueryClient()
+const session = useSession()
+interface Delegation {
+  id: string
+  delegator_id: string
+  delegator_name: string
+  delegate_name: string
+  starts_at: string
+  ends_at: string
+  reason: string
+  state: string
+}
+const delegations = useQuery({
+  queryKey: ['delegations'],
+  queryFn: () => api.request<Page<Delegation>>('/delegations'),
+})
+const users = useQuery({ queryKey: ['users'], queryFn: () => api.request<Page<User>>('/users') })
+const showDelegate = ref(false)
+const delegateId = ref('')
+const startsAt = ref('')
+const endsAt = ref('')
+const delegateReason = ref('')
+const delegationError = ref<unknown>(null)
+async function createDelegation() {
+  delegationError.value = null
+  try {
+    await api.request('/delegations', {
+      method: 'POST',
+      body: JSON.stringify({
+        delegate_id: delegateId.value,
+        starts_at: new Date(startsAt.value || Date.now()).toISOString(),
+        ends_at: new Date(endsAt.value).toISOString(),
+        reason: delegateReason.value,
+      }),
+    })
+    showDelegate.value = false
+    delegateReason.value = ''
+    await queryClient.invalidateQueries({ queryKey: ['delegations'] })
+  } catch (cause) {
+    delegationError.value = cause
+  }
+}
+async function revoke(item: Delegation) {
+  if (!window.confirm('Thu hồi ủy quyền này?')) return
+  await api.request(`/delegations/${item.id}/revoke`, { method: 'POST' })
+  await queryClient.invalidateQueries({ queryKey: ['delegations'] })
+}
 const cursor = ref<string | null>(null)
 const tasks = useQuery({
   queryKey: computed(() => ['approvals', cursor.value]),
@@ -76,7 +126,10 @@ const tasks = useQuery({
                   }}</RouterLink
                   ><small class="mono">{{
                     task.case_code || task.case_id.slice(0, 12)
-                  }}</small>
+                  }}</small
+                  ><small v-if="task.on_behalf_of" class="delegated-note"
+                    ><UserRoundCheck :size="12" /> Duyệt thay {{ task.on_behalf_of }}</small
+                  >
                 </div>
               </div>
             </td>
@@ -112,4 +165,83 @@ const tasks = useQuery({
       </button>
     </div>
   </section>
+  <section class="card" style="margin-top: 22px">
+    <header class="card-header">
+      <div>
+        <span class="eyebrow">ỦY QUYỀN PHÊ DUYỆT</span>
+        <h2>Khi bạn vắng mặt</h2>
+      </div>
+      <button class="button secondary small" @click="showDelegate = true">
+        <UserRoundCheck :size="15" />Ủy quyền
+      </button>
+    </header>
+    <p
+      v-if="!delegations.data.value?.items.length"
+      class="card-body muted"
+      style="font-size: 14px"
+    >
+      Ủy quyền cho đồng nghiệp duyệt thay trong một khoảng thời gian. Người nhận chỉ xử lý
+      hồ sơ được giao cho bạn, quyết định ghi rõ ai duyệt thay ai.
+    </p>
+    <div v-for="item in delegations.data.value?.items" :key="item.id" class="list-row">
+      <div class="grow">
+        <p>
+          {{ item.delegator_name }} → {{ item.delegate_name }}
+        </p>
+        <small
+          >{{ formatDate(item.starts_at, true) }} – {{ formatDate(item.ends_at, true) }} ·
+          {{ item.reason }}</small
+        >
+      </div>
+      <StatusBadge :status="item.state" />
+      <button
+        v-if="item.delegator_id === session.user?.id && ['active', 'scheduled'].includes(item.state)"
+        class="button secondary small"
+        @click="revoke(item)"
+      >
+        Thu hồi
+      </button>
+    </div>
+  </section>
+  <ModalDialog v-if="showDelegate" title="Ủy quyền phê duyệt" @close="showDelegate = false">
+    <div v-if="delegationError" class="notice error error-inline">
+      {{ errorText(delegationError) }}
+    </div>
+    <form class="stack" @submit.prevent="createDelegation">
+      <div class="field">
+        <label for="delegate">Người duyệt thay</label
+        ><select id="delegate" v-model="delegateId" required>
+          <option value="">Chọn đồng nghiệp</option>
+          <option
+            v-for="user in users.data.value?.items.filter((u) => u.id !== session.user?.id)"
+            :key="user.id"
+            :value="user.id"
+          >
+            {{ user.display_name }}
+          </option>
+        </select>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="delegate-start">Từ</label
+          ><input id="delegate-start" v-model="startsAt" type="datetime-local" />
+          <small>Để trống = ngay bây giờ.</small>
+        </div>
+        <div class="field">
+          <label for="delegate-end">Đến<span class="required"> *</span></label
+          ><input id="delegate-end" v-model="endsAt" type="datetime-local" required />
+          <small>Tối đa 90 ngày.</small>
+        </div>
+      </div>
+      <div class="field">
+        <label for="delegate-reason">Lý do<span class="required"> *</span></label
+        ><input id="delegate-reason" v-model="delegateReason" required maxlength="1000" />
+      </div>
+      <div class="form-actions">
+        <button type="button" class="button secondary" @click="showDelegate = false">
+          Hủy</button
+        ><button class="button">Ủy quyền</button>
+      </div>
+    </form>
+  </ModalDialog>
 </template>

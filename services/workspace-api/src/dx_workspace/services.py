@@ -67,11 +67,48 @@ def enqueue(db: Session, kind: str, aggregate_id: str, payload: dict | None = No
     db.add(Outbox(kind=kind, aggregate_id=aggregate_id, payload=payload or {}))
 
 
-def notify(db: Session, user_id: str, event_key: str, title: str, case_id: str | None = None):
+def notify(
+    db: Session,
+    user_id: str,
+    event_key: str,
+    title: str,
+    case_id: str | None = None,
+    link: str | None = None,
+):
     if not db.scalar(
         select(Notification.id).where(Notification.user_id == user_id, Notification.event_key == event_key)
     ):
-        db.add(Notification(user_id=user_id, event_key=event_key, title=title, case_id=case_id))
+        db.add(Notification(user_id=user_id, event_key=event_key, title=title, case_id=case_id, link=link))
+
+
+def emit(db: Session, event_type: str, aggregate_id: str, data: dict, origin: dict | None = None):
+    """Record a business event for automation rules, in the same transaction as the change.
+
+    `origin` carries the rule chain that produced the event, so a rule cannot trigger
+    itself and chains stop at a fixed depth.
+    """
+    from .models import uid
+
+    enqueue(
+        db,
+        "automation.dispatch",
+        aggregate_id,
+        {"event_id": uid(), "event_type": event_type, "data": data, "origin": origin or {"rules": []}},
+    )
+
+
+def case_event(case) -> dict:
+    """Event data for automation rules: references and routing facts, not the form payload."""
+    return {
+        "case_id": case.id,
+        "title": case.title,
+        "status": case.status,
+        "priority": case.priority,
+        "owner_id": case.owner_id,
+        "assignee_id": case.assignee_id or case.owner_id,
+        "department_id": case.department_id,
+        "form_id": case.form_id,
+    }
 
 
 def next_number(db: Session, key="case") -> int:

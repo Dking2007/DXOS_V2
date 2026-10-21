@@ -13,7 +13,7 @@ from dx_workspace.config import Settings
 from dx_workspace.core_client import CoreClient
 from dx_workspace.main import create_app
 from dx_workspace.models import Base, Outbox, User
-from dx_workspace.office import allowed_save_url, callback_claims
+from dx_workspace.office import allowed_save_url, callback_claims, save_source_url
 from dx_workspace.schemas import condition_matches
 from dx_workspace.seed import seed
 from dx_workspace.worker import process_once
@@ -350,6 +350,29 @@ def test_department_cycle_and_form_backend_validation(world):
         headers={"Idempotency-Key": "invalid"},
     )
     assert invalid.status_code == 422
+
+
+def test_office_save_url_from_public_address_is_fetched_internally():
+    """Behind the gateway, Document Server links saves through the browser-facing /office path."""
+    public, internal = "http://localhost:8080/office", "http://onlyoffice"
+    saved = "http://localhost:8080/office/cache/files/data/key_1/output.docx/output.docx?md5=x&expires=1"
+    assert save_source_url(saved, public, internal) == (
+        "http://onlyoffice/cache/files/data/key_1/output.docx/output.docx?md5=x&expires=1"
+    )
+    assert (
+        save_source_url("http://onlyoffice/cache/a.docx", public, internal)
+        == "http://onlyoffice/cache/a.docx"
+    )
+    # Same host but outside the Document Server path, another host, or a lookalike prefix: refused.
+    for url in (
+        "http://localhost:8080/workspace/v1/me",
+        "http://localhost:8080/officex/cache/a.docx",
+        "http://localhost:8081/office/cache/a.docx",
+        "https://localhost:8080/office/cache/a.docx",
+        "http://user:pw@localhost:8080/office/cache/a.docx",
+        "http://169.254.169.254/latest/meta-data",
+    ):
+        assert save_source_url(url, public, internal) is None, url
 
 
 def test_office_signature_url_and_open_barrier(world):

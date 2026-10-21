@@ -11,6 +11,9 @@ class Settings(PlatformSettings):
     workspace_service_subject: str = "workspace-service"
     worker_poll_seconds: float = 2.0
     worker_max_attempts: int = 12
+    # Comma-separated hostnames automation webhooks may call. Empty disables outbound calls,
+    # so a rule cannot reach arbitrary hosts from inside the deployment network.
+    automation_allowed_hosts: str = ""
 
 
 @lru_cache

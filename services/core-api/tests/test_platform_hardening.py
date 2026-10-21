@@ -103,7 +103,8 @@ def test_service_identity_requires_exact_registered_client_username(identity):
 
 def test_oidc_callback_rejects_different_access_and_identity_subject(identity, monkeypatch):
     auth, _, app, encode = identity
-    client = TestClient(app)
+    # The browser starts on the public host, where the state cookie and the callback live.
+    client = TestClient(app, base_url=auth.settings.public_base_url)
     response = client.get("/core/v1/auth/login", follow_redirects=False)
     assert response.status_code == 302
     state = client.cookies.get("dx_core_session_state")

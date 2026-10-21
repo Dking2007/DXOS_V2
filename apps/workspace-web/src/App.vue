@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRoute, RouterLink, RouterView } from 'vue-router'
+import { useRoute, useRouter, RouterLink, RouterView } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
+  BarChart3,
   Bell,
   CheckCheck,
   ChevronDown,
@@ -10,12 +11,18 @@ import {
   Files,
   FolderClosed,
   House,
+  ListChecks,
   LogOut,
   Menu,
+  MessagesSquare,
+  Newspaper,
+  PackageOpen,
   PanelLeftClose,
   PanelLeftOpen,
+  Search,
   Settings2,
   ShieldCheck,
+  Workflow,
   X,
 } from 'lucide-vue-next'
 import type { Notification } from '@dx/web-shared/types.ts'
@@ -26,20 +33,49 @@ import { api } from './api'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 const route = useRoute()
+const router = useRouter()
 const session = useSession()
 const queryClient = useQueryClient()
 const sidebar = ref(false)
 const sidebarCollapsed = ref(window.localStorage.getItem('dx-workspace-sidebar-collapsed') === '1')
 const notificationsOpen = ref(false)
 const sessionError = ref('')
-const links = [
+const allLinks = [
   { to: '/home', label: 'Không gian làm việc', icon: House },
+  { to: '/tasks', label: 'Công việc', icon: ListChecks },
+  { to: '/chat', label: 'Nhắn tin', icon: MessagesSquare, badge: 'chat' },
+  { to: '/feed', label: 'Bảng tin', icon: Newspaper },
   { to: '/drive', label: 'Tài liệu', icon: FolderClosed },
   { to: '/cases', label: 'Hồ sơ', icon: Files },
   { to: '/approvals', label: 'Cần phê duyệt', icon: ClipboardCheck },
-  { to: '/packages', label: 'Gói nghiệp vụ', icon: Files },
+  { to: '/reports', label: 'Báo cáo', icon: BarChart3 },
+  { to: '/automations', label: 'Tự động hóa', icon: Workflow, capability: 'automations.manage' },
+  { to: '/packages', label: 'Gói nghiệp vụ', icon: PackageOpen },
   { to: '/settings', label: 'Thiết lập', icon: Settings2 },
 ]
+const links = computed(() =>
+  allLinks.filter((link) => !link.capability || session.can(link.capability)),
+)
+const chat = useQuery({
+  queryKey: ['conversations'],
+  queryFn: () =>
+    api.request<Page<unknown> & { unread_total: number }>('/conversations'),
+  enabled: computed(() => !!session.user),
+  refetchInterval: 15_000,
+})
+const searchText = ref('')
+function search() {
+  const q = searchText.value.trim()
+  if (q.length >= 2) router.push({ path: '/search', query: { q } })
+}
+async function openNotification(item: Notification) {
+  const target = item.link || (item.case_id ? `/cases/${item.case_id}` : null)
+  if (!item.read_at) await markRead(item)
+  if (target) {
+    notificationsOpen.value = false
+    await router.push(target)
+  }
+}
 const initials = computed(
   () =>
     session.user?.display_name
@@ -78,7 +114,11 @@ function toggleSidebarCollapsed() {
 </script>
 <template>
   <RouterView v-if="route.meta.public" />
-  <div v-else class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+  <div
+    v-else
+    class="app-shell"
+    :class="{ 'sidebar-collapsed': sidebarCollapsed || route.meta.wide }"
+  >
     <a class="skip-link" href="#main-content">Đến nội dung chính</a>
     <div v-if="sidebar" class="sidebar-scrim" @click="sidebar = false" />
     <aside class="sidebar" :class="{ open: sidebar }">
@@ -110,7 +150,13 @@ function toggleSidebarCollapsed() {
           @click="sidebar = false"
           ><component :is="link.icon" :size="19" :stroke-width="1.7" /><span>{{
             link.label
-          }}</span></RouterLink
+          }}</span
+          ><i
+            v-if="link.badge === 'chat' && chat.data.value?.unread_total"
+            class="nav-badge"
+            :aria-label="`${chat.data.value.unread_total} tin chưa đọc`"
+            >{{ chat.data.value.unread_total }}</i
+          ></RouterLink
         >
       </nav>
       <div class="sidebar-bottom">
@@ -149,6 +195,14 @@ function toggleSidebarCollapsed() {
           ><span>Không gian nội bộ</span><span class="topbar-divider">/</span
           ><strong>{{ route.meta.title }}</strong>
         </div>
+        <form class="topbar-search" role="search" @submit.prevent="search">
+          <Search :size="16" /><input
+            v-model="searchText"
+            type="search"
+            placeholder="Tìm việc, hồ sơ, tài liệu…"
+            aria-label="Tìm kiếm toàn bộ"
+          />
+        </form>
         <div class="topbar-actions">
           <button
             class="icon-button notification-button"
@@ -177,13 +231,13 @@ function toggleSidebarCollapsed() {
           </button>
         </div>
       </header>
-      <main id="main-content" class="page-content">
+      <main id="main-content" class="page-content" :class="{ wide: route.meta.wide }">
         <div v-if="sessionError" class="notice error error-inline" role="alert">
           {{ sessionError }}
         </div>
         <RouterView :key="String(route.params.id ?? route.path)" />
       </main>
-      <footer class="app-footer">
+      <footer v-if="!route.meta.wide" class="app-footer">
         <span>DX Workspace</span
         ><span>Dữ liệu nghiệp vụ được kiểm soát theo quyền truy cập.</span>
       </footer>
@@ -205,11 +259,11 @@ function toggleSidebarCollapsed() {
         class="notification-item"
         :class="{ unread: !item.read_at }"
       >
-        <div>
+        <button class="notification-open" @click="openNotification(item)">
           <strong>{{ item.title }}</strong>
           <p v-if="item.body">{{ item.body }}</p>
           <small>{{ formatDate(item.created_at, true) }}</small>
-        </div>
+        </button>
         <button
           v-if="!item.read_at"
           class="icon-button"

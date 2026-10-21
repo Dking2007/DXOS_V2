@@ -17,6 +17,7 @@ from . import schemas as s
 from .core_client import CoreClient
 from .policies import (
     ALLOWED_PERMISSIONS,
+    approval_assignees,
     case_filter,
     case_readable,
     current_user,
@@ -32,7 +33,19 @@ from .policies import (
     resolve_steps,
     would_create_cycle,
 )
-from .services import audit, cas, check_revision, enqueue, idem_begin, next_number, page, serial
+from .services import (
+    audit,
+    cas,
+    case_event,
+    check_revision,
+    emit,
+    enqueue,
+    idem_begin,
+    next_number,
+    notify,
+    page,
+    serial,
+)
 
 
 def changes_require_owner(fields: dict) -> bool:
@@ -141,6 +154,8 @@ def build_router(app):
         data.update(
             case_title=case.title, case_number=case.number, assignee_name=user.display_name if user else ""
         )
+        decider = db.get(m.User, value.decided_by_id) if value.decided_by_id else None
+        data["decided_by_name"] = decider.display_name if decider else ""
         return data
 
     @router.get("/me", tags=["identity"])
@@ -1139,11 +1154,52 @@ def build_router(app):
         )
         enqueue(db, "case.start", submission.id)
         audit(db, user, "case.submitted", case_id, {"submission_id": submission.id, "number": number})
+        emit(db, "case.submitted", case_id, case_event(db.get(m.Case, case_id)))
         response = case_data(db, db.get(m.Case, case_id))
         response["submission_id"] = submission.id
         idem.response = response
         db.commit()
         return response
+
+    @router.post("/cases/{case_id}/withdraw", tags=["cases"], status_code=202)
+    def withdraw_case(
+        case_id: str,
+        body: s.WithdrawInput,
+        db: Session = Depends(db_dep),
+        actor: Actor = Depends(actor_dep),
+    ):
+        """Take a submitted dossier back before anyone has decided on it.
+
+        The submission snapshot stays in history; pending approval tasks are closed here at
+        once so nobody can decide on a dossier its owner has pulled back.
+        """
+        user = context(db, actor)
+        value = db.scalar(
+            select(m.Case).where(m.Case.id == case_id).with_for_update().execution_options(populate_existing=True)
+        )
+        value = get_case(db, user, case_id) if value else None
+        if not value or value.owner_id != user.id:
+            raise AppError(403, "case_owner_required", "Chỉ người tạo được thu hồi hồ sơ.")
+        check_revision(value, body.expected_revision)
+        if value.status not in {"pending_workflow_start", "processing"}:
+            raise AppError(409, "case_not_withdrawable", "Hồ sơ không ở trạng thái đang trình.")
+        submission = db.scalar(
+            select(m.Submission).where(m.Submission.case_id == case_id, m.Submission.number == value.submission_no)
+        )
+        tasks = list(db.scalars(select(m.ApprovalTask).where(m.ApprovalTask.submission_id == submission.id)))
+        if any(task.decision for task in tasks):
+            raise AppError(409, "case_already_decided", "Đã có người duyệt ra quyết định; không thể thu hồi.")
+        for task in tasks:
+            task.state, task.revision = "cancelled", task.revision + 1
+        submission.state = "withdrawn"
+        cas(db, m.Case, case_id, body.expected_revision, {"status": "draft", "updated_at": m.utcnow()})
+        # Cancelling the Core run happens in the worker; a run not started yet is never started.
+        enqueue(db, "case.withdraw", submission.id)
+        audit(db, user, "case.withdrawn", case_id, {"submission_id": submission.id, "reason": body.reason})
+        for task in tasks:
+            notify(db, task.assignee_id, "withdrawn:" + task.id, "Hồ sơ đã được thu hồi: " + value.title, case_id)
+        db.commit()
+        return case_data(db, db.get(m.Case, case_id))
 
     @router.get("/approval-tasks", tags=["approvals"])
     def approval_tasks(
@@ -1154,14 +1210,22 @@ def build_router(app):
         actor: Actor = Depends(actor_dep),
     ):
         user = context(db, actor)
-        statement = select(m.ApprovalTask).where(m.ApprovalTask.assignee_id == user.id)
+        # Tasks of people who delegated their approvals to this user appear here too,
+        # marked with whom they act for.
+        statement = select(m.ApprovalTask).where(m.ApprovalTask.assignee_id.in_(approval_assignees(db, user)))
         if state:
             statement = statement.where(m.ApprovalTask.state == state)
+
+        def transform(value):
+            data = task_data(db, value)
+            data["on_behalf_of"] = data["assignee_name"] if value.assignee_id != user.id else None
+            return data
+
         return page(
             list(db.scalars(statement.order_by(m.ApprovalTask.id))),
             limit,
             cursor,
-            transform=lambda v: task_data(db, v),
+            transform=transform,
         )
 
     @router.post("/approval-tasks/{task_id}/decisions", tags=["approvals"], status_code=202)
@@ -1180,7 +1244,7 @@ def build_router(app):
             return replay
         task = db.scalar(
             select(m.ApprovalTask)
-            .where(m.ApprovalTask.id == task_id, m.ApprovalTask.assignee_id == user.id)
+            .where(m.ApprovalTask.id == task_id, m.ApprovalTask.assignee_id.in_(approval_assignees(db, user)))
             .with_for_update()
         )
         if not task:
@@ -1195,15 +1259,27 @@ def build_router(app):
             m.ApprovalTask,
             task_id,
             body.expected_revision,
-            {"state": "syncing", "decision": body.decision, "reason": body.reason, "decided_at": m.utcnow()},
+            {
+                "state": "syncing",
+                "decision": body.decision,
+                "reason": body.reason,
+                "decided_at": m.utcnow(),
+                "decided_by_id": user.id,
+            },
         )
         enqueue(db, "approval.complete", task_id)
+        # Both the real actor and the person represented are kept for audit.
         audit(
             db,
             user,
             "case.decision",
             task.case_id,
-            {"task_id": task_id, "decision": body.decision, "reason": body.reason},
+            {
+                "task_id": task_id,
+                "decision": body.decision,
+                "reason": body.reason,
+                "on_behalf_of": task.assignee_id if task.assignee_id != user.id else None,
+            },
         )
         response = task_data(db, db.get(m.ApprovalTask, task_id))
         idem.response = response
