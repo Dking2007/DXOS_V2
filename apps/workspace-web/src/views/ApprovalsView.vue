@@ -10,6 +10,7 @@ import {
   UserRoundCheck,
 } from 'lucide-vue-next'
 import { api } from '../api'
+import { toast } from '../ui/toast'
 import { useSession } from '../stores/session'
 import { errorText, formatDate, queryString } from '@dx/web-shared/api.ts'
 import type { Page } from '@dx/web-shared/api.ts'
@@ -54,6 +55,7 @@ async function createDelegation() {
     })
     showDelegate.value = false
     delegateReason.value = ''
+    toast.success('Đã ủy quyền duyệt. Người nhận sẽ thấy hồ sơ trong hộp duyệt của họ.')
     await queryClient.invalidateQueries({ queryKey: ['delegations'] })
   } catch (cause) {
     delegationError.value = cause
@@ -61,7 +63,12 @@ async function createDelegation() {
 }
 async function revoke(item: Delegation) {
   if (!window.confirm('Thu hồi ủy quyền này?')) return
-  await api.request(`/delegations/${item.id}/revoke`, { method: 'POST' })
+  try {
+    await api.request(`/delegations/${item.id}/revoke`, { method: 'POST' })
+    toast.success('Đã thu hồi ủy quyền')
+  } catch (cause) {
+    toast.error(cause)
+  }
   await queryClient.invalidateQueries({ queryKey: ['delegations'] })
 }
 const cursor = ref<string | null>(null)
@@ -100,10 +107,11 @@ const tasks = useQuery({
       :loading="tasks.isPending.value"
       :error="tasks.error.value"
       :empty="tasks.data.value?.items.length === 0"
-      title="Không có hồ sơ đang chờ"
-      description="Mọi hồ sơ cần bạn phê duyệt sẽ được tập trung tại đây. Bạn không cần kiểm tra từng phòng ban."
+      title="Bạn đã duyệt hết hồ sơ"
+      description="Khi có hồ sơ cần bạn quyết định, nó sẽ hiện ở đây và trong mục Việc hôm nay. Sắp nghỉ phép? Bấm “Ủy quyền duyệt” để người khác duyệt thay."
       @retry="tasks.refetch()"
-    />
+      ><RouterLink to="/cases" class="button small secondary">Xem tất cả hồ sơ</RouterLink></StatePanel
+    >
     <div v-if="tasks.data.value?.items.length" class="table-wrap">
       <table>
         <thead>
@@ -125,7 +133,7 @@ const tasks = useQuery({
                     task.case_title || 'Hồ sơ cần phê duyệt'
                   }}</RouterLink
                   ><small class="mono">{{
-                    task.case_code || task.case_id.slice(0, 12)
+                    task.case_code || 'Hồ sơ'
                   }}</small
                   ><small v-if="task.on_behalf_of" class="delegated-note"
                     ><UserRoundCheck :size="12" /> Duyệt thay {{ task.on_behalf_of }}</small

@@ -1,28 +1,41 @@
 <script setup lang="ts">
-import { AlertCircle, Inbox, LoaderCircle } from 'lucide-vue-next'
+import { AlertCircle, Inbox } from 'lucide-vue-next'
 import { ApiError, errorText } from '../api'
-defineProps<{
-  loading?: boolean
-  error?: unknown
-  empty?: boolean
-  title?: string
-  description?: string
-}>()
+withDefaults(
+  defineProps<{
+    loading?: boolean
+    // eslint-disable-next-line vue/require-default-prop -- any thrown value; absent means no error
+    error?: unknown
+    empty?: boolean
+    title?: string
+    description?: string
+    compact?: boolean
+    rows?: number
+  }>(),
+  { rows: 3, title: '', description: '' },
+)
 defineEmits<{ retry: [] }>()
 </script>
 <template>
-  <div v-if="loading" class="state-panel" role="status">
-    <LoaderCircle class="spin" :size="25" /><strong>Đang tải dữ liệu…</strong
-    ><span>Vui lòng chờ trong giây lát.</span>
+  <div v-if="loading" class="skeleton-list" :class="{ compact }" role="status" aria-live="polite">
+    <span class="sr-only">Đang tải dữ liệu…</span>
+    <div v-for="row in rows" :key="row" class="skeleton-row" aria-hidden="true">
+      <span class="skeleton skeleton-avatar" />
+      <span class="skeleton-lines"
+        ><span class="skeleton" :style="{ width: `${78 - ((row * 13) % 30)}%` }" /><span
+          class="skeleton short"
+      /></span>
+    </div>
   </div>
-  <div v-else-if="error" class="state-panel state-error" role="alert">
-    <AlertCircle :size="27" /><strong>{{ errorText(error) }}</strong
+  <div v-else-if="error" class="state-panel state-error" :class="{ compact }" role="alert">
+    <AlertCircle :size="27" aria-hidden="true" /><strong>{{ errorText(error) }}</strong
     ><code v-if="error instanceof ApiError && error.traceId"
       >Mã theo dõi: {{ error.traceId }}</code
-    ><button class="button secondary" @click="$emit('retry')">Thử lại</button>
+    ><button class="button secondary" type="button" @click="$emit('retry')">Thử lại</button>
   </div>
-  <div v-else-if="empty" class="state-panel">
-    <Inbox :size="32" /><strong>{{ title || 'Chưa có dữ liệu' }}</strong
+  <div v-else-if="empty" class="state-panel" :class="{ compact }">
+    <span class="state-illustration" aria-hidden="true"><Inbox :size="28" /></span
+    ><strong>{{ title || 'Chưa có dữ liệu' }}</strong
     ><span>{{
       description || 'Dữ liệu sẽ xuất hiện tại đây khi có thay đổi.'
     }}</span

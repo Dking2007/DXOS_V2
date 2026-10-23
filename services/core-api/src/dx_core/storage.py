@@ -66,10 +66,51 @@ def inspect_content(data: bytes, name: str, claimed_mime: str) -> str:
         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+        ".mp4": "video/mp4",
+        ".m4v": "video/mp4",
+        ".mov": "video/quicktime",
+        ".webm": "video/webm",
+        ".mp3": "audio/mpeg",
+        ".ogg": "audio/ogg",
+        ".wav": "audio/wav",
+        ".zip": "application/zip",
     }
     if suffix not in allowed:
-        raise AppError(422, "unsupported_file_type", "Chỉ nhận PDF, ảnh PNG/JPEG, TXT/CSV và DOCX/XLSX/PPTX.")
+        raise AppError(
+            422,
+            "unsupported_file_type",
+            "Chỉ nhận PDF, ảnh PNG/JPEG/GIF/WebP, video MP4/MOV/WebM, âm thanh MP3/OGG/WAV, "
+            "TXT/CSV, DOCX/XLSX/PPTX và ZIP.",
+        )
     mime = allowed[suffix]
+    # Media is accepted by its container signature, never by the name alone.
+    signatures = {
+        ".gif": lambda d: d[:6] in {b"GIF87a", b"GIF89a"},
+        ".webp": lambda d: d[:4] == b"RIFF" and d[8:12] == b"WEBP",
+        ".mp4": lambda d: d[4:8] == b"ftyp",
+        ".m4v": lambda d: d[4:8] == b"ftyp",
+        ".mov": lambda d: d[4:8] in {b"ftyp", b"moov", b"wide", b"mdat"},
+        ".webm": lambda d: d[:4] == b"\x1aE\xdf\xa3",
+        ".mp3": lambda d: d[:3] == b"ID3" or (len(d) > 1 and d[0] == 0xFF and d[1] & 0xE0 == 0xE0),
+        ".ogg": lambda d: d[:4] == b"OggS",
+        ".wav": lambda d: d[:4] == b"RIFF" and d[8:12] == b"WAVE",
+    }
+    if suffix in signatures and not signatures[suffix](data):
+        raise AppError(422, "mime_mismatch", "Nội dung tệp không khớp với định dạng của tên tệp.")
+    if suffix == ".zip":
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                infos = archive.infolist()
+                if len(infos) > 5000 or sum(i.file_size for i in infos) > 500_000_000:
+                    raise ValueError("archive limit")
+                if any(i.filename.startswith("/") or ".." in Path(i.filename).parts for i in infos):
+                    raise ValueError("archive path")
+        except (zipfile.BadZipFile, ValueError):
+            raise AppError(
+                422, "invalid_archive", "Tệp ZIP hỏng, chứa đường dẫn không an toàn hoặc vượt giới hạn."
+            ) from None
     if suffix == ".pdf" and not data.startswith(b"%PDF-"):
         raise AppError(422, "mime_mismatch", "Nội dung không phải PDF hợp lệ.")
     if suffix == ".png" and not data.startswith(b"\x89PNG\r\n\x1a\n"):

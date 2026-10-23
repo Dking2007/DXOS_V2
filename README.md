@@ -187,6 +187,27 @@ không tồn tại để làm tài liệu trông đầy đủ. Xem [checklist](d
   `client_message_id`. Khi thêm thành viên chọn được cho xem toàn lịch sử hay chỉ từ lúc
   vào; rời/bị xóa khỏi nhóm thì API chặn đọc ngay. Quản trị không mặc định đọc chat riêng.
   **Giao nhận bằng polling REST** (4–15 giây), chưa có WebSocket/presence/typing.
+  Gửi được **ảnh, video, âm thanh và tệp** (chọn, kéo thả hoặc dán; tối đa 10 tệp, mỗi tệp
+  50 MB), xem ảnh phóng to, phát video ngay trong hội thoại, có đánh dấu "Đã xem". Tệp lưu
+  trong Core dưới service principal của Workspace; mỗi lần xem Workspace kiểm tra lại thành
+  viên, phạm vi lịch sử và tin nhắn chưa bị xóa. Chỉ ảnh/video/âm thanh hiển thị trực tiếp,
+  loại khác luôn tải về. Core nhận thêm GIF/WebP, MP4/MOV/WebM, MP3/OGG/WAV, ZIP — đều kiểm
+  tra chữ ký nội dung; SVG/HTML/tệp chạy được vẫn bị từ chối. Chưa có thumbnail/nén video
+  và chưa hỗ trợ tua video theo byte range.
+- **Khung làm việc dễ dùng hơn**: menu chia nhóm (Làm việc · Trao đổi · Tài liệu & báo cáo
+  · Quản trị) ẩn mục không có quyền và hiện số việc đang chờ; nút **+ Tạo mới** ở thanh
+  trên; **Ctrl + K** mở bảng lệnh tìm việc/hồ sơ/tài liệu và chạy lệnh; thông báo dạng
+  bảng thả xuống, lọc theo loại, chia "Hôm nay/Trước đó", đánh dấu tất cả đã đọc
+  (`POST /notifications/read-all`). Trang chủ là **Việc cần làm hôm nay**, lấy từ
+  `GET /me/overview` (việc được giao, việc phòng cần phân công, kết quả cần nghiệm thu, hồ
+  sơ chờ duyệt kể cả duyệt thay, lời nhắc), xếp quá hạn trước, có nút Nhận việc ngay trên
+  danh sách. Chi tiết hồ sơ chia tab và có thanh quyết định dính đáy. Thiết lập có **bảng
+  phân quyền theo vai trò** (`PATCH /roles/{key}`; không cho bỏ "Quản lý tổ chức" khỏi
+  vai trò của chính người sửa) và tab Giao diện. Có **chế độ tối** (sáng/tối/theo máy, nhớ
+  trên trình duyệt), thanh điều hướng dưới trên điện thoại, hướng dẫn lần đầu theo vai trò
+  (nhớ theo trình duyệt, xem lại trong Thiết lập), thông báo nhanh sau thao tác, khung
+  xương khi tải và hỏi lại trước khi bỏ thay đổi chưa lưu. Badge cập nhật mỗi 30 giây và
+  khi chuyển trang, chưa đẩy tức thời.
 - **Bảng tin** (`/feed`): bài toàn tổ chức hoặc phòng ban, thông báo chính thức (gửi
   notification cho phạm vi nhận), ghim, bình luận, cảm xúc, lưu bài. Nội dung là văn bản
   thuần, chưa có rich text/ảnh đính kèm hay kiểm duyệt trước khi đăng.
@@ -212,7 +233,13 @@ không tồn tại để làm tài liệu trông đầy đủ. Xem [checklist](d
   lúc bắt đầu nên sửa luồng không ảnh hưởng lượt đang chạy; node Chờ tiếp tục qua outbox
   (tối đa 7 ngày, luồng bị tắt trong lúc chờ thì lượt chạy bị hủy). Luồng mới ở trạng thái
   tắt; mỗi sự kiện chạy một lần cho mỗi luồng; luồng không tự kích hoạt lại chính nó và
-  chuỗi bị chặn ở độ sâu 3. Tạo việc chạy dưới quyền hiện tại của người tạo luồng. Webhook chỉ gọi tới host trong `AUTOMATION_ALLOWED_HOSTS` (mặc định rỗng = tắt),
+  chuỗi bị chặn ở độ sâu 3. Tạo việc chạy dưới quyền hiện tại của người tạo luồng.
+  Mỗi luồng về công việc (trừ "Công việc được tạo") chọn được **Áp dụng cho**: *Mọi công
+  việc* hoặc *Chỉ công việc được gắn*. Ở chế độ gắn, trang chi tiết công việc có khung
+  **Luồng tự động** để người giao, người phụ trách hoặc lãnh đạo đơn vị nhận bật/tắt từng
+  luồng đang bật cho việc đó; gắn/gỡ được ghi vào lịch sử công việc. Nút **Chạy ngay** chạy
+  thật một luồng với một công việc/hồ sơ/bài viết có sẵn, kể cả khi luồng đang tắt; lịch sử
+  chạy ghi rõ bản ghi và người chạy tay. Webhook chỉ gọi tới host trong `AUTOMATION_ALLOWED_HOSTS` (mặc định rỗng = tắt),
   gửi `Idempotency-Key`, khóa bí mật mã hóa bằng `CREDENTIAL_ENCRYPTION_KEY` và không
   trả lại qua API; quá thời gian chờ thì ghi "chưa rõ kết quả" và **không tự gửi lại**.
   Chưa có node vòng lặp, gọi HTTP đọc dữ liệu về, biểu thức tùy ý hay connector OAuth;

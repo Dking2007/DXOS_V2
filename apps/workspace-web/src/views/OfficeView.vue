@@ -118,15 +118,8 @@ onBeforeUnmount(() => {
       style="border-radius: 0 0 8px 8px; font-size: 12px"
     >
       <span
-        >Đóng trình soạn thảo và đợi phiên lưu hoàn tất trước khi trình hồ sơ.
-        Trạng thái lưu trong editor không thay thế xác nhận lưu bền vững của hệ
-        thống.<span v-if="error"> {{ errorText(error) }}</span
-        ><span
-          v-if="sessionId"
-          class="mono"
-          style="display: block; margin-top: 4px"
-          >Phiên {{ sessionId }}</span
-        ></span
+        >Sau khi sửa xong, hãy đóng trình soạn thảo và chờ vài giây để hệ thống
+        lưu bản mới trước khi trình hồ sơ.<span v-if="error"> {{ errorText(error) }}</span></span
       >
     </div>
   </section>

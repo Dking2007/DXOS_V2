@@ -6,6 +6,8 @@ import { api } from '../api'
 import { ApiError, errorText } from '@dx/web-shared/api.ts'
 import type { Task } from '@dx/web-shared/types.ts'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
+import { toast } from '../ui/toast'
+import { confirmDiscard } from '../ui/unsaved'
 const props = defineProps<{
   parentId?: string
   caseId?: string
@@ -40,6 +42,19 @@ const scopeHint = computed(
       organization: 'Bạn giao việc cho mọi người và đơn vị trong tổ chức.',
     })[options.data.value?.scope ?? 'self'],
 )
+const dirty = computed(
+  () =>
+    title.value !== (props.defaultTitle ?? '') ||
+    !!description.value.trim() ||
+    !!target.value ||
+    !!dueAt.value ||
+    priority.value !== 'normal' ||
+    checklist.value.some((item) => item.trim()) ||
+    watcherIds.value.length > 0,
+)
+function close() {
+  if (!busy.value && confirmDiscard(dirty.value)) emit('close')
+}
 async function submit() {
   busy.value = true
   error.value = null
@@ -63,6 +78,7 @@ async function submit() {
         source: props.source ?? null,
       }),
     })
+    toast.success(target.value ? `Đã giao việc “${task.title}”` : `Đã tạo việc “${task.title}”`)
     emit('created', task)
   } catch (cause) {
     error.value = cause
@@ -72,7 +88,7 @@ async function submit() {
 }
 </script>
 <template>
-  <ModalDialog :title="heading || 'Giao việc mới'" wide @close="emit('close')">
+  <ModalDialog :title="heading || 'Giao việc mới'" wide @close="close">
     <div v-if="error" class="notice error error-inline" role="alert">
       <div>
         {{ errorText(error)
@@ -183,7 +199,7 @@ async function submit() {
         </div>
       </div>
       <div class="form-actions">
-        <button type="button" class="button secondary" @click="emit('close')">
+        <button type="button" class="button secondary" @click="close">
           Hủy</button
         ><button class="button" :disabled="busy || !title.trim()">
           {{ busy ? 'Đang lưu…' : target ? 'Giao việc' : 'Lưu nháp' }}

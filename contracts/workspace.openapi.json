@@ -12,12 +12,34 @@
         ],
         "summary": "Login",
         "operationId": "login_workspace_v1_auth_login_get",
+        "parameters": [
+          {
+            "name": "canonical",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Canonical"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -2126,6 +2148,25 @@
         }
       }
     },
+    "/workspace/v1/notifications/read-all": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Read All Notifications",
+        "operationId": "read_all_notifications_workspace_v1_notifications_read_all_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/notifications/{notification_id}": {
       "patch": {
         "tags": [
@@ -4148,6 +4189,123 @@
         }
       }
     },
+    "/workspace/v1/conversations/{conversation_id}/attachments": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Upload Attachment",
+        "description": "Store a file for a message about to be sent; it stays private to the uploader until then.",
+        "operationId": "upload_attachment_workspace_v1_conversations__conversation_id__attachments_post",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_attachment_workspace_v1_conversations__conversation_id__attachments_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/chat-attachments/{attachment_id}/content": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Attachment Content",
+        "operationId": "attachment_content_workspace_v1_chat_attachments__attachment_id__content_get",
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Attachment Id"
+            }
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Download"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/messages/{message_id}": {
       "patch": {
         "tags": [
@@ -4880,6 +5038,26 @@
         }
       }
     },
+    "/workspace/v1/me/overview": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Overview For Me",
+        "description": "What needs this user now: counts for the menu and one agenda across modules.",
+        "operationId": "overview_for_me_workspace_v1_me_overview_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/search": {
       "get": {
         "tags": [
@@ -5496,6 +5674,254 @@
         }
       }
     },
+    "/workspace/v1/automations/{rule_id}/candidates": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Candidates",
+        "description": "Records a manual run can use: those of the trigger's kind that the user may see.",
+        "operationId": "candidates_workspace_v1_automations__rule_id__candidates_get",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/automations/{rule_id}/run": {
+      "post": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Run Now",
+        "description": "Run the saved flow now, for real, as if its event had just happened to that record.\n\nWorks whether the flow is switched on or not: it is how a flow is tried on real data,\nor applied to a record that existed before the flow was made.",
+        "operationId": "run_now_workspace_v1_automations__rule_id__run_post",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualRun"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/tasks/{task_id}/automations": {
+      "get": {
+        "tags": [
+          "automations",
+          "tasks"
+        ],
+        "summary": "List Task Automations",
+        "operationId": "list_task_automations_workspace_v1_tasks__task_id__automations_get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/tasks/{task_id}/automations/{rule_id}": {
+      "put": {
+        "tags": [
+          "automations",
+          "tasks"
+        ],
+        "summary": "Attach",
+        "operationId": "attach_workspace_v1_tasks__task_id__automations__rule_id__put",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "automations",
+          "tasks"
+        ],
+        "summary": "Detach",
+        "operationId": "detach_workspace_v1_tasks__task_id__automations__rule_id__delete",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/automations/{rule_id}/runs": {
       "get": {
         "tags": [
@@ -5753,6 +6179,20 @@
           "resolver"
         ],
         "title": "ApprovalStep"
+      },
+      "Body_upload_attachment_workspace_v1_conversations__conversation_id__attachments_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_attachment_workspace_v1_conversations__conversation_id__attachments_post"
       },
       "Body_upload_file_workspace_v1_drive_files_post": {
         "properties": {
@@ -6819,6 +7259,22 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "ManualRun": {
+        "properties": {
+          "ref_id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 1,
+            "title": "Ref Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ref_id"
+        ],
+        "title": "ManualRun"
+      },
       "MembersAdd": {
         "properties": {
           "user_ids": {
@@ -6854,8 +7310,8 @@
           "body": {
             "type": "string",
             "maxLength": 8000,
-            "minLength": 1,
-            "title": "Body"
+            "title": "Body",
+            "default": ""
           },
           "reply_to_id": {
             "anyOf": [
@@ -6875,13 +7331,20 @@
             "type": "array",
             "maxItems": 50,
             "title": "Mention Ids"
+          },
+          "attachment_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Attachment Ids"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "client_message_id",
-          "body"
+          "client_message_id"
         ],
         "title": "MessageCreate"
       },
@@ -7255,6 +7718,15 @@
           },
           "graph": {
             "$ref": "#/components/schemas/Graph"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "attached"
+            ],
+            "title": "Scope",
+            "default": "all"
           }
         },
         "additionalProperties": false,
@@ -7286,6 +7758,15 @@
           },
           "graph": {
             "$ref": "#/components/schemas/Graph"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "attached"
+            ],
+            "title": "Scope",
+            "default": "all"
           }
         },
         "additionalProperties": false,

@@ -22,13 +22,15 @@ from dx_platform.errors import AppError
 from dx_platform.security import SecretBox
 from fastapi import APIRouter, Depends, Query
 from pydantic import Field, ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import models as m
 from . import schemas as s
-from .policies import current_user, require
-from .services import audit, cas, enqueue, notify, page, serial
+from .feed import can_see as can_see_post
+from .feed import visibility_filter as post_visibility
+from .policies import case_filter, current_user, get_case, require
+from .services import audit, cas, case_event, enqueue, notify, page, serial
 
 TRIGGERS = {
     "task.created": "Công việc được tạo",
@@ -169,6 +171,7 @@ class RuleInput(s.Input):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2000)
     graph: Graph
+    scope: Literal["all", "attached"] = "all"
 
 
 class RulePatch(RuleInput, s.Revision):
@@ -181,6 +184,10 @@ class RuleToggle(s.Revision):
 
 class RuleTest(s.Input):
     data: dict = Field(default_factory=dict)
+
+
+class ManualRun(s.Input):
+    ref_id: str = Field(min_length=1, max_length=36)
 
 
 class GraphTest(s.Input):
@@ -428,6 +435,33 @@ def require_valid(db: Session, settings, graph: dict):
         raise AppError(422, "flow_invalid", errors[0]["message"])
 
 
+def attachable(trigger: str) -> bool:
+    """Flows people may attach to a task: task events that can happen after it exists."""
+    return trigger_family(trigger) == "task" and trigger != "task.created"
+
+
+def check_scope(scope: str, trigger: str):
+    if scope == "attached" and not attachable(trigger):
+        raise AppError(
+            422,
+            "scope_invalid",
+            "Chỉ luồng theo sự kiện công việc (trừ “Công việc được tạo”) mới để nhân viên tự gắn vào việc.",
+        )
+
+
+def applies(db: Session, rule: m.AutomationRule, data: dict) -> bool:
+    if rule.scope != "attached":
+        return True
+    return bool(
+        data.get("task_id")
+        and db.scalar(
+            select(m.TaskAutomation.id).where(
+                m.TaskAutomation.rule_id == rule.id, m.TaskAutomation.task_id == data["task_id"]
+            )
+        )
+    )
+
+
 class Execution:
     """Walks a flow from given nodes. With `dry_run` it only reports what would happen."""
 
@@ -604,38 +638,60 @@ def dispatch(db: Session, payload: dict):
             )
         ):
             continue
-        graph = graph_of(rule)
-        run = m.AutomationRun(
-            rule_id=rule.id,
-            rule_revision=rule.revision,
-            event_id=payload["event_id"],
-            event_type=event_type,
-            state="running",
-            graph=graph,
-            data=data,
-        )
-        db.add(run)
-        db.flush()
-        if rule.id in chain or len(chain) >= MAX_CHAIN:
-            # The event was caused by this flow (or a long chain); acting again would loop.
-            run.state, run.steps = (
-                "skipped",
-                [{"node_id": None, "type": "loop_guard", "state": "skipped", "chain": chain}],
-            )
+        # A flow limited to attached tasks stays silent for every other task.
+        if not applies(db, rule, data):
             continue
-        trigger = next(n["id"] for n in graph["nodes"] if n["type"] == "trigger")
-        execution = Execution(
-            db,
-            graph,
-            data,
-            dry_run=False,
-            run=run,
-            rule=rule,
-            chain=chain,
-            event={"event_type": event_type, "event_id": payload["event_id"]},
+        run_rule(db, rule, payload["event_id"], event_type, data, chain)
+
+
+def run_rule(
+    db: Session, rule: m.AutomationRule, event_id: str, event_type: str, data: dict, chain: list
+) -> m.AutomationRun:
+    """Run one flow for one event, recording a run; shared by events and manual runs."""
+    graph = graph_of(rule)
+    run = m.AutomationRun(
+        rule_id=rule.id,
+        rule_revision=rule.revision,
+        event_id=event_id,
+        event_type=event_type,
+        state="running",
+        graph=graph,
+        data=data,
+    )
+    db.add(run)
+    db.flush()
+    if rule.id in chain or len(chain) >= MAX_CHAIN:
+        # The event was caused by this flow (or a long chain); acting again would loop.
+        run.state, run.steps = (
+            "skipped",
+            [{"node_id": None, "type": "loop_guard", "state": "skipped", "chain": chain}],
         )
-        run.steps = execution.walk([trigger])
-        settle(run)
+        return run
+    trigger = next(n["id"] for n in graph["nodes"] if n["type"] == "trigger")
+    execution = Execution(
+        db,
+        graph,
+        data,
+        dry_run=False,
+        run=run,
+        rule=rule,
+        chain=chain,
+        event={"event_type": event_type, "event_id": event_id},
+    )
+    run.steps = execution.walk([trigger])
+    settle(run)
+    return run
+
+
+def subject_of(data: dict) -> dict | None:
+    """What a run was about, for the run history: the task, dossier or post in the event."""
+    if data.get("task_id"):
+        return {"type": "task", "id": data["task_id"], "title": data.get("title", ""), "link": link_for(data)}
+    if data.get("case_id"):
+        return {"type": "case", "id": data["case_id"], "title": data.get("title", ""), "link": link_for(data)}
+    if data.get("post_id"):
+        return {"type": "post", "id": data["post_id"], "title": "Bài viết trên bảng tin", "link": "/feed"}
+    return None
 
 
 def resume(db: Session, payload: dict):
@@ -789,12 +845,36 @@ def build_router(app):
             .limit(1)
         )
         data["last_run"] = run_data(last) if last else None
+        data["attached_count"] = db.scalar(
+            select(func.count(m.TaskAutomation.id)).where(m.TaskAutomation.rule_id == rule.id)
+        )
         return data
 
     def run_data(run):
         data = serial(run)
         data.pop("graph", None)
+        data["subject"] = subject_of(run.data or {})
+        data["manual_by"] = (run.data or {}).get("manual_by")
         return data
+
+    def event_source(db, user, family: str, ref_id: str) -> dict:
+        """Event data built from an existing record the user may see, as its real event would carry."""
+        if family == "task":
+            from .tasks import event_data, get_task
+
+            return event_data(get_task(db, user, ref_id))
+        if family == "case":
+            return case_event(get_case(db, user, ref_id))
+        post = db.get(m.Post, ref_id)
+        if not post or not can_see_post(db, user, post):
+            raise AppError(404, "post_not_found", "Không tìm thấy bài viết.")
+        return {
+            "post_id": post.id,
+            "author_id": post.author_id,
+            "audience": post.audience,
+            "department_id": post.department_id,
+            "official": post.official,
+        }
 
     def get_rule(db, rule_id):
         rule = db.get(m.AutomationRule, rule_id)
@@ -807,7 +887,13 @@ def build_router(app):
         admin(db, actor)
         return {
             "triggers": [
-                {"key": k, "label": v, "fields": fields_for(k), "sample": SAMPLES[trigger_family(k)]}
+                {
+                    "key": k,
+                    "label": v,
+                    "fields": fields_for(k),
+                    "sample": SAMPLES[trigger_family(k)],
+                    "attachable": attachable(k),
+                }
                 for k, v in TRIGGERS.items()
             ],
             "operators": ["eq", "ne", "gt", "gte", "lt", "lte", "contains", "in", "empty", "not_empty"],
@@ -857,10 +943,12 @@ def build_router(app):
         user = admin(db, actor)
         graph = body.graph.model_dump()
         require_valid(db, settings, graph)
+        check_scope(body.scope, trigger_event(graph))
         # New flows start disabled: they are tested before they act on real events.
         rule = m.AutomationRule(
             name=body.name,
             description=body.description,
+            scope=body.scope,
             trigger=trigger_event(graph),
             conditions=[],
             actions=[],
@@ -882,6 +970,7 @@ def build_router(app):
         get_rule(db, rule_id)
         graph = body.graph.model_dump()
         require_valid(db, settings, graph)
+        check_scope(body.scope, trigger_event(graph))
         cas(
             db,
             m.AutomationRule,
@@ -891,6 +980,7 @@ def build_router(app):
                 "name": body.name,
                 "description": body.description,
                 "trigger": trigger_event(graph),
+                "scope": body.scope,
                 "graph": graph,
                 "updated_at": m.utcnow(),
             },
@@ -928,6 +1018,168 @@ def build_router(app):
         trigger = next(n["id"] for n in graph["nodes"] if n["type"] == "trigger")
         steps = Execution(db, graph, body.data, dry_run=True).walk([trigger])
         return {"matched": any(step["type"] not in {"trigger", "if"} for step in steps), "steps": steps}
+
+    @router.get("/automations/{rule_id}/candidates")
+    def candidates(
+        rule_id: str,
+        q: str | None = Query(None, max_length=200),
+        db: Session = Depends(db_dep),
+        actor: Actor = Depends(actor_dep),
+    ):
+        """Records a manual run can use: those of the trigger's kind that the user may see."""
+        user = admin(db, actor)
+        family = trigger_family(get_rule(db, rule_id).trigger)
+        needle = (q or "").casefold().strip()
+        items = []
+        if family == "task":
+            from .tasks import visible
+
+            for task in db.scalars(select(m.Task).order_by(m.Task.updated_at.desc())):
+                if needle in task.title.casefold() and visible(db, user, task):
+                    items.append({"id": task.id, "title": task.title, "status": task.status})
+        elif family == "case":
+            for case in db.scalars(
+                select(m.Case).where(case_filter(db, user)).order_by(m.Case.updated_at.desc())
+            ):
+                if needle in case.title.casefold() or needle in f"hs-{case.number:06d}":
+                    items.append(
+                        {
+                            "id": case.id,
+                            "title": f"HS-{case.number:06d} · {case.title}",
+                            "status": case.status,
+                        }
+                    )
+        else:
+            for post in db.scalars(
+                select(m.Post).where(post_visibility(db, user)).order_by(m.Post.created_at.desc())
+            ):
+                if needle in post.body.casefold():
+                    items.append({"id": post.id, "title": post.body[:90], "status": None})
+        return {"family": family, "items": items[:20]}
+
+    @router.post("/automations/{rule_id}/run", status_code=201)
+    def run_now(
+        rule_id: str, body: ManualRun, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)
+    ):
+        """Run the saved flow now, for real, as if its event had just happened to that record.
+
+        Works whether the flow is switched on or not: it is how a flow is tried on real data,
+        or applied to a record that existed before the flow was made.
+        """
+        user = admin(db, actor)
+        rule = get_rule(db, rule_id)
+        require_valid(db, settings, graph_of(rule))
+        data = event_source(db, user, trigger_family(rule.trigger), body.ref_id)
+        data["manual_by"] = user.display_name
+        run = run_rule(db, rule, m.uid(), rule.trigger, data, [])
+        audit(db, user, "automation.run_manual", rule.id, {"run_id": run.id, "ref_id": body.ref_id})
+        db.commit()
+        return run_data(run)
+
+    def task_for(db, actor, task_id):
+        if actor.application != "workspace" or actor.service:
+            raise AppError(403, "workspace_user_required", "Cần phiên người dùng Workspace.")
+        from .tasks import get_task, manages
+
+        user = current_user(db, actor)
+        task = get_task(db, user, task_id)
+        # The people responsible for the task decide what runs on it; watchers only follow.
+        can_manage = task.assignee_id == user.id or manages(db, user, task)
+        return user, task, can_manage
+
+    def task_automations(db, task, can_manage):
+        attached = {
+            row.rule_id: row
+            for row in db.scalars(select(m.TaskAutomation).where(m.TaskAutomation.task_id == task.id))
+        }
+        rules = list(
+            db.scalars(
+                select(m.AutomationRule)
+                .where(m.AutomationRule.trigger.like("task.%"))
+                .order_by(m.AutomationRule.name)
+            )
+        )
+
+        def item(rule):
+            return {
+                "id": rule.id,
+                "name": rule.name,
+                "description": rule.description,
+                "trigger": rule.trigger,
+                "trigger_label": TRIGGERS.get(rule.trigger, rule.trigger),
+                "enabled": rule.enabled,
+                "attached": rule.id in attached,
+            }
+
+        return {
+            # Offered: switched-on flows limited to attached tasks, plus any already attached
+            # (a flow switched off later stays listed so it can be detached).
+            "available": [
+                item(r)
+                for r in rules
+                if r.scope == "attached" and attachable(r.trigger) and (r.enabled or r.id in attached)
+            ],
+            "always": [item(r) for r in rules if r.scope == "all" and r.enabled],
+            "can_manage": can_manage,
+        }
+
+    @router.get("/tasks/{task_id}/automations", tags=["tasks"])
+    def list_task_automations(task_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        _, task, can_manage = task_for(db, actor, task_id)
+        return task_automations(db, task, can_manage)
+
+    @router.put("/tasks/{task_id}/automations/{rule_id}", tags=["tasks"])
+    def attach(task_id: str, rule_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        user, task, can_manage = task_for(db, actor, task_id)
+        if not can_manage:
+            raise AppError(
+                403, "task_manager_required", "Chỉ người giao, người phụ trách hoặc điều phối được gắn luồng."
+            )
+        rule = db.get(m.AutomationRule, rule_id)
+        if not rule or rule.scope != "attached" or not rule.enabled or not attachable(rule.trigger):
+            raise AppError(
+                422, "rule_not_attachable", "Luồng này không bật hoặc không cho gắn vào công việc."
+            )
+        if not db.scalar(
+            select(m.TaskAutomation.id).where(
+                m.TaskAutomation.task_id == task.id, m.TaskAutomation.rule_id == rule.id
+            )
+        ):
+            from .tasks import log
+
+            db.add(m.TaskAutomation(task_id=task.id, rule_id=rule.id, attached_by=user.id))
+            log(db, task, user.id, "automation_attached", {"rule_id": rule.id, "name": rule.name})
+            audit(db, user, "automation.attached", task.id, {"rule_id": rule.id})
+        db.commit()
+        return task_automations(db, task, can_manage)
+
+    @router.delete("/tasks/{task_id}/automations/{rule_id}", tags=["tasks"])
+    def detach(task_id: str, rule_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        user, task, can_manage = task_for(db, actor, task_id)
+        if not can_manage:
+            raise AppError(
+                403, "task_manager_required", "Chỉ người giao, người phụ trách hoặc điều phối được gỡ luồng."
+            )
+        row = db.scalar(
+            select(m.TaskAutomation).where(
+                m.TaskAutomation.task_id == task.id, m.TaskAutomation.rule_id == rule_id
+            )
+        )
+        if row:
+            from .tasks import log
+
+            rule = db.get(m.AutomationRule, rule_id)
+            db.delete(row)
+            log(
+                db,
+                task,
+                user.id,
+                "automation_detached",
+                {"rule_id": rule_id, "name": rule.name if rule else ""},
+            )
+            audit(db, user, "automation.detached", task.id, {"rule_id": rule_id})
+        db.commit()
+        return task_automations(db, task, can_manage)
 
     @router.get("/automations/{rule_id}/runs")
     def runs(

@@ -21,7 +21,14 @@ from sqlalchemy.orm import Session
 
 from . import models as m
 from .feed import visibility_filter
-from .policies import case_filter, current_user, file_access, permissions
+from .policies import (
+    approval_assignees,
+    case_filter,
+    current_user,
+    file_access,
+    manages_department,
+    permissions,
+)
 from .tasks import FINAL, aware, is_overdue, manages, visible
 
 TYPES = ("task", "case", "file", "post", "message")
@@ -46,6 +53,133 @@ def build_router(app):
         if actor.application != "workspace" or actor.service:
             raise AppError(403, "workspace_user_required", "Cần phiên người dùng Workspace.")
         return current_user(db, actor)
+
+    @router.get("/me/overview", tags=["identity"])
+    def overview_for_me(db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        """What needs this user now: counts for the menu and one agenda across modules."""
+        user = user_for(db, actor)
+        now = m.utcnow()
+        agenda: list[dict] = []
+
+        def push(kind, item_id, title, action, link, due=None, detail="", status=None):
+            due = aware(due) if due else None
+            agenda.append(
+                {
+                    "kind": kind,
+                    "id": item_id,
+                    "title": title,
+                    "action": action,
+                    "link": link,
+                    "due_at": due,
+                    "overdue": bool(due and due < now),
+                    "detail": detail,
+                    "status": status,
+                }
+            )
+
+        tasks_mine = tasks_review = 0
+        for task in db.scalars(select(m.Task).where(m.Task.status.not_in(FINAL))):
+            people = db.get(m.User, task.creator_id)
+            if task.assignee_id == user.id and task.status != "submitted":
+                tasks_mine += 1
+                action = "accept" if task.status == "assigned" else "open"
+                push(
+                    "task",
+                    task.id,
+                    task.title,
+                    action,
+                    f"/tasks/{task.id}",
+                    task.due_at,
+                    f"Giao bởi {people.display_name if people else ''}",
+                    task.status,
+                )
+            elif (
+                not task.assignee_id
+                and task.status == "assigned"
+                and manages_department(db, user, task.department_id)
+            ):
+                tasks_mine += 1
+                push(
+                    "task",
+                    task.id,
+                    task.title,
+                    "assign",
+                    f"/tasks/{task.id}",
+                    task.due_at,
+                    "Đơn vị nhận việc, cần phân công người phụ trách",
+                    task.status,
+                )
+            elif task.status == "submitted" and task.assignee_id != user.id and manages(db, user, task):
+                tasks_review += 1
+                assignee = db.get(m.User, task.assignee_id) if task.assignee_id else None
+                push(
+                    "task",
+                    task.id,
+                    task.title,
+                    "review",
+                    f"/tasks/{task.id}",
+                    task.due_at,
+                    f"{assignee.display_name if assignee else ''} đã nộp kết quả",
+                    task.status,
+                )
+        approvals = list(
+            db.scalars(
+                select(m.ApprovalTask).where(
+                    m.ApprovalTask.assignee_id.in_(approval_assignees(db, user)),
+                    m.ApprovalTask.state == "pending",
+                )
+            )
+        )
+        for item in approvals:
+            case = db.get(m.Case, item.case_id)
+            on_behalf = item.assignee_id != user.id
+            push(
+                "approval",
+                item.id,
+                case.title if case else "Hồ sơ cần duyệt",
+                "decide",
+                f"/cases/{item.case_id}",
+                case.due_at if case else None,
+                item.label + (" · duyệt thay" if on_behalf else ""),
+                "pending",
+            )
+        unread = list(
+            db.scalars(
+                select(m.Notification).where(
+                    m.Notification.user_id == user.id, m.Notification.read_at.is_(None)
+                )
+            )
+        )
+        for note in unread:
+            if note.event_key.startswith("mention:"):
+                push("mention", note.id, note.title, "open", note.link or "/chat", None, "Nhắc đến bạn")
+        far = now + timedelta(days=36500)
+        agenda.sort(key=lambda i: (not i["overdue"], i["due_at"] or far, i["title"]))
+        chat_unread = 0
+        for member in db.scalars(
+            select(m.ConversationMember).where(
+                m.ConversationMember.user_id == user.id, m.ConversationMember.removed_at.is_(None)
+            )
+        ):
+            chat_unread += db.scalar(
+                select(func.count(m.Message.id)).where(
+                    m.Message.conversation_id == member.conversation_id,
+                    m.Message.seq > max(member.last_read_seq, member.history_from_seq),
+                    m.Message.sender_id != user.id,
+                    m.Message.deleted_at.is_(None),
+                )
+            )
+        return {
+            "counts": {
+                "tasks": tasks_mine,
+                "tasks_to_review": tasks_review,
+                "approvals": len(approvals),
+                "notifications": len(unread),
+                "chat": chat_unread,
+            },
+            "agenda": agenda[:50],
+            "as_of": now,
+        }
 
     @router.get("/search", tags=["search"])
     def search(

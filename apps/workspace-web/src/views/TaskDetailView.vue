@@ -19,6 +19,7 @@ import {
   UserRoundPlus,
 } from 'lucide-vue-next'
 import { api } from '../api'
+import { toast } from '../ui/toast'
 import { useSession } from '../stores/session'
 import { ApiError, errorText, formatDate } from '@dx/web-shared/api.ts'
 import type { Conversation, TaskAction, TaskDetail } from '@dx/web-shared/types.ts'
@@ -26,6 +27,7 @@ import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import TaskCreateDialog from '../components/TaskCreateDialog.vue'
+import TaskAutomations from '../components/TaskAutomations.vue'
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -94,6 +96,8 @@ const eventLabels: Record<string, string> = {
   unblock: 'Tiếp tục xử lý',
   cancel: 'Hủy việc',
   due_changed: 'Đổi hạn',
+  automation_attached: 'Gắn luồng tự động',
+  automation_detached: 'Gỡ luồng tự động',
   updated: 'Cập nhật',
 }
 async function run(work: () => Promise<unknown>) {
@@ -122,6 +126,16 @@ function ask(action: TaskAction) {
   assignTarget.value = ''
   error.value = null
 }
+const DONE: Record<Exclude<TaskAction, 'assign'>, string> = {
+  accept: 'Đã tiếp nhận việc',
+  start: 'Đã chuyển sang đang làm',
+  submit: 'Đã nộp kết quả, chờ người giao nghiệm thu',
+  complete: 'Đã nghiệm thu, việc hoàn tất',
+  return: 'Đã trả lại để làm tiếp',
+  block: 'Đã báo vướng mắc cho người giao',
+  unblock: 'Việc được tiếp tục',
+  cancel: 'Đã hủy việc',
+}
 async function transition(action: TaskAction) {
   if (!task.value) return
   const ok = await run(() =>
@@ -135,7 +149,10 @@ async function transition(action: TaskAction) {
       }),
     }),
   )
-  if (ok) pending.value = null
+  if (ok) {
+    pending.value = null
+    if (action !== 'assign') toast.success(DONE[action])
+  }
 }
 async function assign() {
   if (!task.value || !assignTarget.value) return
@@ -151,7 +168,10 @@ async function assign() {
       }),
     }),
   )
-  if (ok) pending.value = null
+  if (ok) {
+    pending.value = null
+    toast.success('Đã phân công lại')
+  }
 }
 async function toggle(index: number) {
   if (!task.value) return
@@ -177,7 +197,10 @@ async function changeDue() {
       }),
     }),
   )
-  if (ok) dueEdit.value = null
+  if (ok) {
+    dueEdit.value = null
+    toast.success('Đã đổi hạn')
+  }
 }
 async function addComment() {
   if (!comment.value.trim()) return
@@ -421,6 +444,7 @@ function localInput(value: string | null) {
             <div><dt>Tạo lúc</dt><dd>{{ formatDate(task.created_at, true) }}</dd></div>
           </dl>
         </section>
+        <TaskAutomations :task-id="task.id" :closed="['completed', 'cancelled'].includes(task.status)" />
         <section class="card">
           <header class="card-header"><h3>Hoạt động</h3></header>
           <div class="card-body">

@@ -26,7 +26,9 @@ def upgrade():
     if "department_id" not in package_columns:
         op.add_column("business_packages", sa.Column("department_id", sa.String(36), nullable=True))
     if "allowed_roles" not in package_columns:
-        op.add_column("business_packages", sa.Column("allowed_roles", sa.JSON(), nullable=False, server_default="[]"))
+        op.add_column(
+            "business_packages", sa.Column("allowed_roles", sa.JSON(), nullable=False, server_default="[]")
+        )
     case_columns = {column["name"] for column in sa.inspect(bind).get_columns("cases")}
     if "package_version_id" not in case_columns:
         op.add_column("cases", sa.Column("package_version_id", sa.String(36), nullable=True))
@@ -34,12 +36,17 @@ def upgrade():
     if "package_version_id" not in submission_columns:
         op.add_column("case_submissions", sa.Column("package_version_id", sa.String(36), nullable=True))
     if "routing_evidence" not in submission_columns:
-        op.add_column("case_submissions", sa.Column("routing_evidence", sa.JSON(), nullable=False, server_default="[]"))
+        op.add_column(
+            "case_submissions", sa.Column("routing_evidence", sa.JSON(), nullable=False, server_default="[]")
+        )
 
 
 def downgrade():
     bind = op.get_bind()
-    for table, columns in (("case_submissions", ("routing_evidence", "package_version_id")), ("cases", ("package_version_id",))):
+    for table, columns in (
+        ("case_submissions", ("routing_evidence", "package_version_id")),
+        ("cases", ("package_version_id",)),
+    ):
         existing = {column["name"] for column in sa.inspect(bind).get_columns(table)}
         for name in columns:
             if name in existing:

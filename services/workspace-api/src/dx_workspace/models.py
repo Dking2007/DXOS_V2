@@ -508,6 +508,8 @@ class AutomationRule(Base):
     conditions: Mapped[list] = mapped_column(JSON, default=list)
     actions: Mapped[list] = mapped_column(JSON, default=list)
     graph: Mapped[dict | None] = mapped_column(JSON)
+    # "all": runs for every matching event. "attached": runs only for tasks people attached it to.
+    scope: Mapped[str] = mapped_column(String(20), default="all")
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
     revision: Mapped[int] = mapped_column(default=1)
@@ -529,4 +531,33 @@ class AutomationRun(Base):
     # The flow as it was when the run started, so later edits never change a run in progress.
     graph: Mapped[dict | None] = mapped_column(JSON)
     data: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class TaskAutomation(Base):
+    """An automation flow someone responsible for a task chose to apply to it."""
+
+    __tablename__ = "task_automations"
+    __table_args__ = (UniqueConstraint("task_id", "rule_id"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), index=True)
+    rule_id: Mapped[str] = mapped_column(ForeignKey("automation_rules.id"), index=True)
+    attached_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ChatAttachment(Base):
+    """A file sent in a conversation. Readable only through the message that carries it."""
+
+    __tablename__ = "chat_attachments"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"), index=True)
+    # Null until sent: an upload belongs to its uploader alone until a message carries it.
+    message_id: Mapped[str | None] = mapped_column(ForeignKey("messages.id"), index=True)
+    uploader_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    core_file_id: Mapped[str] = mapped_column(String(36))
+    name: Mapped[str] = mapped_column(String(250))
+    mime: Mapped[str] = mapped_column(String(150))
+    size: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(10))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

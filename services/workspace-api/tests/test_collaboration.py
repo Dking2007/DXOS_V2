@@ -601,3 +601,258 @@ def test_flow_branches_and_wait_resume(world):  # noqa: F811
     assert "Nhắc xem: Việc thường" in titles(as_(world, "director"))
     finished = director.get(f"{API}/automations/{rule['id']}/runs").json()["items"]
     assert sorted(r["state"] for r in finished) == ["succeeded", "succeeded"]
+
+
+def test_manual_run_uses_a_visible_record_and_reports_what_it_ran_for(world):  # noqa: F811
+    users = world[7]
+    director = as_(world, "director")
+    rule = director.post(
+        API + "/automations",
+        json={
+            "name": "Nhắc người giao khi có kết quả",
+            "graph": flow(
+                "task.submitted",
+                [],
+                [{"type": "notify", "recipients": ["creator"], "title": "Chạy tay cho: {title}"}],
+            ),
+        },
+    ).json()
+    task = new_task(world, by="director", title="Báo cáo quý III", assignee_id=users["staff"])
+    picks = director.get(f"{API}/automations/{rule['id']}/candidates?q=quý").json()
+    assert picks["family"] == "task" and [p["id"] for p in picks["items"]] == [task["id"]]
+    # The flow is still switched off: a manual run is how it is tried on real data.
+    run = director.post(f"{API}/automations/{rule['id']}/run", json={"ref_id": task["id"]})
+    assert run.status_code == 201, run.text
+    body = run.json()
+    assert body["state"] == "succeeded" and body["manual_by"] == "Giám đốc"
+    assert body["subject"] == {
+        "type": "task",
+        "id": task["id"],
+        "title": "Báo cáo quý III",
+        "link": f"/tasks/{task['id']}",
+    }
+    assert "Chạy tay cho: Báo cáo quý III" in titles(as_(world, "director"))
+    history = director.get(f"{API}/automations/{rule['id']}/runs").json()["items"]
+    assert history[0]["subject"]["title"] == "Báo cáo quý III"
+
+    technical = as_(world, "technical")
+    assert technical.get(f"{API}/automations/{rule['id']}/candidates").json()["items"] == []
+    denied = technical.post(f"{API}/automations/{rule['id']}/run", json={"ref_id": task["id"]})
+    assert denied.status_code == 404
+    assert (
+        as_(world, "staff")
+        .post(f"{API}/automations/{rule['id']}/run", json={"ref_id": task["id"]})
+        .status_code
+        == 403
+    )
+
+
+def test_attached_flows_run_only_for_tasks_people_attach_them_to(world):  # noqa: F811
+    users = world[7]
+    director = as_(world, "director")
+    graph = flow(
+        "task.submitted", [], [{"type": "notify", "recipients": ["creator"], "title": "Đã gắn: {title}"}]
+    )
+    # Attaching only makes sense for events that happen after a task exists, and only for tasks.
+    for trigger in ("task.created", "case.submitted"):
+        bad = director.post(
+            API + "/automations",
+            json={
+                "name": "Sai",
+                "scope": "attached",
+                "graph": flow(trigger, [], [{"type": "notify", "recipients": ["creator"], "title": "x"}]),
+            },
+        )
+        assert bad.status_code == 422, trigger
+    rule = director.post(
+        API + "/automations", json={"name": "Báo khi nộp", "scope": "attached", "graph": graph}
+    ).json()
+    assert rule["scope"] == "attached"
+    mine = new_task(world, by="manager", title="Việc có gắn", assignee_id=users["staff"])
+    other = new_task(world, by="manager", title="Việc không gắn", assignee_id=users["staff"])
+    staff = as_(world, "staff")
+    # A disabled flow is not offered.
+    assert staff.get(f"{API}/tasks/{mine['id']}/automations").json()["available"] == []
+    enable(as_(world, "director"), rule)
+    staff = as_(world, "staff")
+    offer = staff.get(f"{API}/tasks/{mine['id']}/automations").json()
+    assert [r["id"] for r in offer["available"]] == [rule["id"]] and offer["can_manage"] is True
+    attached = staff.put(f"{API}/tasks/{mine['id']}/automations/{rule['id']}")
+    assert attached.status_code == 200, attached.text
+    assert attached.json()["available"][0]["attached"] is True
+    # Watchers and outsiders cannot attach.
+    assert as_(world, "outsider").put(f"{API}/tasks/{mine['id']}/automations/{rule['id']}").status_code == 404
+    for task in (mine, other):
+        staff = as_(world, "staff")
+        task = transition(staff, task, "accept").json()
+        transition(staff, task, "submit")
+    drain(world)
+    seen = titles(as_(world, "manager"))
+    assert "Đã gắn: Việc có gắn" in seen and "Đã gắn: Việc không gắn" not in seen
+    detached = as_(world, "staff").delete(f"{API}/tasks/{mine['id']}/automations/{rule['id']}")
+    assert detached.json()["available"][0]["attached"] is False
+    events = [e["action"] for e in as_(world, "staff").get(f"{API}/tasks/{mine['id']}").json()["events"]]
+    assert "automation_attached" in events and "automation_detached" in events
+
+
+PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+    b"\x00\x00\x00\rIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+def test_chat_attachments_follow_conversation_membership(world):  # noqa: F811
+    users = world[7]
+    client = as_(world, "staff")
+    group = client.post(
+        API + "/conversations", json={"kind": "group", "title": "Ảnh dự án", "member_ids": [users["manager"]]}
+    ).json()
+    upload = client.post(
+        f"{API}/conversations/{group['id']}/attachments", files={"file": ("so-do.png", PNG, "image/png")}
+    )
+    assert upload.status_code == 201, upload.text
+    attachment = upload.json()
+    assert attachment["kind"] == "image" and attachment["size"] == len(PNG)
+    # A message may carry only attachments; an empty message without any is refused.
+    empty = client.post(
+        f"{API}/conversations/{group['id']}/messages", json={"client_message_id": "e", "body": ""}
+    )
+    assert empty.status_code == 422
+    sent = client.post(
+        f"{API}/conversations/{group['id']}/messages",
+        json={"client_message_id": "img-1", "body": "", "attachment_ids": [attachment["id"]]},
+    )
+    assert sent.status_code == 201, sent.text
+    message = sent.json()
+    assert [a["name"] for a in message["attachments"]] == ["so-do.png"]
+    url = message["attachments"][0]["url"]
+    manager = as_(world, "manager")
+    shown = manager.get(url)
+    assert shown.status_code == 200 and shown.content == PNG
+    assert shown.headers["content-type"] == "image/png" and shown.headers["content-disposition"].startswith(
+        "inline"
+    )
+    # Members who joined later without history, outsiders and admins see nothing.
+    manager.post(
+        f"{API}/conversations/{group['id']}/members",
+        json={"user_ids": [users["staff_b"]], "include_history": False},
+    )
+    for name in ("outsider", "technical"):
+        assert as_(world, name).get(url).status_code == 404
+    # Someone else's upload cannot be slipped into another message.
+    reuse = as_(world, "manager").post(
+        f"{API}/conversations/{group['id']}/messages",
+        json={"client_message_id": "steal", "body": "x", "attachment_ids": [attachment["id"]]},
+    )
+    assert reuse.status_code == 422
+    # Active content is refused outright; other files are always downloaded, never rendered.
+    client = as_(world, "staff")
+    svg = client.post(
+        f"{API}/conversations/{group['id']}/attachments",
+        files={"file": ("x.svg", b"<svg xmlns='http://www.w3.org/2000/svg'/>", "image/svg+xml")},
+    )
+    assert svg.status_code == 422 and svg.json()["code"] == "unsupported_file_type"
+    import io
+    import zipfile
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("bao-cao.txt", "noi dung")
+    archive_file = client.post(
+        f"{API}/conversations/{group['id']}/attachments",
+        files={"file": ("tai-lieu.zip", buffer.getvalue(), "application/zip")},
+    ).json()
+    assert archive_file["kind"] == "file"
+    client.post(
+        f"{API}/conversations/{group['id']}/messages",
+        json={"client_message_id": "zip", "body": "", "attachment_ids": [archive_file["id"]]},
+    )
+    downloaded = client.get(archive_file["url"])
+    assert downloaded.headers["content-disposition"].startswith("attachment")
+    assert downloaded.headers["content-type"] == "application/octet-stream"
+    client.delete(f"{API}/messages/{message['id']}")
+    assert as_(world, "manager").get(url).status_code == 404
+
+
+def test_overview_counts_and_agenda_follow_what_needs_the_user(world):  # noqa: F811
+    users = world[7]
+    overdue = new_task(
+        world,
+        title="Việc quá hạn",
+        assignee_id=users["staff"],
+        due_at=(datetime.now(UTC) - timedelta(days=1)).isoformat(),
+    )
+    later = new_task(
+        world,
+        title="Việc tuần sau",
+        assignee_id=users["staff"],
+        due_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
+    )
+    to_review = new_task(world, title="Việc chờ nghiệm thu", assignee_id=users["staff"])
+    staff = as_(world, "staff")
+    to_review = transition(staff, to_review, "accept").json()
+    transition(staff, to_review, "submit")
+    overview = staff.get(API + "/me/overview").json()
+    assert overview["counts"]["tasks"] == 2
+    agenda = overview["agenda"]
+    assert [i["title"] for i in agenda][:2] == ["Việc quá hạn", "Việc tuần sau"]
+    assert agenda[0]["overdue"] is True and agenda[0]["action"] == "accept" and agenda[0]["kind"] == "task"
+    manager = as_(world, "manager").get(API + "/me/overview").json()
+    review = [i for i in manager["agenda"] if i["title"] == "Việc chờ nghiệm thu"]
+    assert review and review[0]["action"] == "review"
+    assert manager["counts"]["tasks_to_review"] == 1
+    # Nothing here belongs to an unrelated colleague.
+    assert as_(world, "outsider").get(API + "/me/overview").json()["agenda"] == []
+    assert {overdue["id"], later["id"]} <= {i["id"] for i in agenda}
+
+
+def test_notifications_have_categories_and_can_all_be_marked_read(world):  # noqa: F811
+    users = world[7]
+    new_task(world, title="Việc A", assignee_id=users["staff"])
+    new_task(world, title="Việc B", assignee_id=users["staff"])
+    staff = as_(world, "staff")
+    items = staff.get(API + "/notifications").json()["items"]
+    assert {i["category"] for i in items} == {"task"} and all(i["link"] for i in items)
+    assert staff.get(API + "/me/overview").json()["counts"]["notifications"] == 2
+    done = staff.post(API + "/notifications/read-all")
+    assert done.status_code == 200 and done.json()["updated"] == 2
+    assert all(i["read_at"] for i in staff.get(API + "/notifications").json()["items"])
+    assert staff.get(API + "/me/overview").json()["counts"]["notifications"] == 0
+
+
+def test_role_matrix_edits_permissions_but_never_locks_out_its_own_editor(world):  # noqa: F811
+    client = as_(world, "director")
+    roles = {r["key"]: r for r in client.get(API + "/roles").json()["items"]}
+    staff = roles["staff"]
+    changed = client.patch(
+        API + "/roles/staff",
+        json={
+            "expected_revision": staff["revision"],
+            "name": staff["name"],
+            "permissions": [*staff["permissions"], "feed.official"],
+        },
+    )
+    assert changed.status_code == 200
+    assert "feed.official" in changed.json()["permissions"]
+    as_(world, "staff")
+    assert "feed.official" in client.get(API + "/me").json()["capabilities"]
+
+    as_(world, "director")
+    own = roles["director"]
+    locked = client.patch(
+        API + "/roles/director",
+        json={
+            "expected_revision": own["revision"],
+            "name": own["name"],
+            "permissions": [p for p in own["permissions"] if p != "organization.manage"],
+        },
+    )
+    assert locked.status_code == 409
+    assert locked.json()["code"] == "role_self_lockout"
+    unknown = client.patch(
+        API + "/roles/staff",
+        json={"expected_revision": changed.json()["revision"], "name": "x", "permissions": ["root"]},
+    )
+    assert unknown.status_code == 422
+    as_(world, "staff")
+    assert client.get(API + "/roles").status_code == 403

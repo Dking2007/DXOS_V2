@@ -4,6 +4,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { ArrowRight, Plug, Plus, Workflow } from 'lucide-vue-next'
 import { api } from '../api'
+import { toast } from '../ui/toast'
 import { errorText, formatDate } from '@dx/web-shared/api.ts'
 import type { Page } from '@dx/web-shared/api.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
@@ -20,6 +21,8 @@ interface Rule {
   enabled: boolean
   revision: number
   graph: ApiGraph
+  scope: 'all' | 'attached'
+  attached_count: number
   updated_at: string
   last_run: { state: string; created_at: string } | null
 }
@@ -63,6 +66,7 @@ async function toggle(rule: Rule) {
       method: 'POST',
       body: JSON.stringify({ expected_revision: rule.revision, enabled: !rule.enabled }),
     })
+    toast.success(rule.enabled ? `Đã tắt “${rule.name}”` : `Đã bật “${rule.name}”`)
     await queryClient.invalidateQueries({ queryKey: ['automations'] })
   } catch (cause) {
     error.value = cause
@@ -130,6 +134,38 @@ async function saveConnection() {
       <button class="button" @click="showTemplates = true"><Plus :size="18" />Tạo luồng</button>
     </div>
   </header>
+  <section class="how-it-works" aria-label="Cách luồng tự động hoạt động">
+    <div>
+      <span class="how-step">1</span>
+      <div>
+        <strong>Chọn khi nào chạy</strong>
+        <small
+          >Mỗi luồng gắn với một sự kiện có sẵn: công việc được nộp kết quả, bị trả lại; hồ sơ được trình, được
+          duyệt; bài viết mới…</small
+        >
+      </div>
+    </div>
+    <div>
+      <span class="how-step">2</span>
+      <div>
+        <strong>Bật luồng — không cần bấm chạy</strong>
+        <small
+          >Luồng đang bật <b>tự chạy</b> mỗi khi sự kiện đó xảy ra ở bất kỳ công việc/hồ sơ nào. Luồng tắt thì không
+          chạy.</small
+        >
+      </div>
+    </div>
+    <div>
+      <span class="how-step">3</span>
+      <div>
+        <strong>Kiểm tra và theo dõi</strong>
+        <small
+          ><b>Chạy thử</b> xem đường đi mà không tác động thật; <b>Chạy ngay</b> áp dụng cho một bản ghi có sẵn;
+          <b>Lịch sử chạy</b> cho biết đã chạy cho việc nào.</small
+        >
+      </div>
+    </div>
+  </section>
   <div v-if="error && !connectionForm" class="notice error error-inline">{{ errorText(error) }}</div>
   <section v-if="rules.isPending.value || rules.error.value || !rules.data.value?.items.length" class="card">
     <StatePanel
@@ -178,10 +214,20 @@ async function saveConnection() {
               @change="toggle(rule)" /><span
           /></label>
         </div>
-        <small class="muted"
-          >Khi <strong>{{ triggerLabel[rule.trigger] ?? rule.trigger }}</strong> ·
-          {{ rule.graph.nodes.length }} bước</small
-        >
+        <small class="flow-card-when" :class="rule.enabled ? 'on' : 'off'">
+          <template v-if="rule.enabled && rule.scope === 'attached'"
+            >📎 Chạy cho {{ rule.attached_count }} công việc được gắn, mỗi khi
+            <strong>{{ triggerLabel[rule.trigger] ?? rule.trigger }}</strong></template
+          >
+          <template v-else-if="rule.enabled"
+            >⚡ Tự chạy mỗi khi <strong>{{ triggerLabel[rule.trigger] ?? rule.trigger }}</strong></template
+          >
+          <template v-else
+            >⏸ Đang tắt — sẽ không tự chạy khi
+            <strong>{{ triggerLabel[rule.trigger] ?? rule.trigger }}</strong></template
+          >
+          · {{ rule.graph.nodes.length }} bước
+        </small>
         <div class="flow-card-foot">
           <StatusBadge v-if="rule.last_run" :status="rule.last_run.state" />
           <small v-if="rule.last_run" class="muted">{{ formatDate(rule.last_run.created_at, true) }}</small>

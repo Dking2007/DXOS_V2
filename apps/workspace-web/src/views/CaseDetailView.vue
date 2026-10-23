@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   ArrowLeft,
@@ -9,7 +9,9 @@ import {
   ClipboardCheck,
   Download,
   FileText,
+  GitBranch,
   History,
+  Info,
   ListPlus,
   MessagesSquare,
   Paperclip,
@@ -46,6 +48,9 @@ import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import SchemaForm from '@dx/web-shared/components/SchemaForm.vue'
 import TaskCreateDialog from '../components/TaskCreateDialog.vue'
+import { OPERATORS } from '../flow/nodes'
+import { toast } from '../ui/toast'
+import { useUnsavedGuard } from '../ui/unsaved'
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -111,7 +116,7 @@ const evidenceField = ref('')
 const evidenceFile = ref('')
 const evidencePage = ref(1)
 const evidenceQuote = ref('')
-const evidenceValue = ref('null')
+const evidenceValue = ref('')
 const correctedValues = ref<Record<string, string>>({})
 async function addEvidence() {
   busy.value = true
@@ -121,7 +126,7 @@ async function addEvidence() {
       method: 'POST', headers: { 'Idempotency-Key': newIntent() },
       body: JSON.stringify({ field_key: evidenceField.value, source_file_id: evidenceFile.value,
         source_page: evidencePage.value, source_quote: evidenceQuote.value,
-        suggested_value: JSON.parse(evidenceValue.value) }),
+        suggested_value: parseValue(evidenceValue.value) }),
     })
     evidenceQuote.value = ''
     await queryClient.invalidateQueries({ queryKey: ['field-evidence', id] })
@@ -133,7 +138,7 @@ async function reviewEvidence(item: FieldEvidence, decision: 'confirm' | 'correc
   try {
     await api.request(`/field-evidence/${item.id}/review`, {
       method: 'POST', body: JSON.stringify({ expected_revision: item.revision, decision,
-        confirmed_value: decision === 'correct' ? JSON.parse(correctedValues.value[item.id] ?? 'null') : null }),
+        confirmed_value: decision === 'correct' ? parseValue(correctedValues.value[item.id] ?? '') : null }),
     })
     await queryClient.invalidateQueries({ queryKey: ['field-evidence', id] })
   } catch (cause) { error.value = cause } finally { busy.value = false }
@@ -247,10 +252,10 @@ function startEdit() {
   errors.value = {}
   error.value = null
   editing.value = true
+  tab.value = 'info'
 }
 function stopEdit() {
-  if (!dirty.value || window.confirm('Bỏ các thay đổi chưa lưu?'))
-    editing.value = false
+  if (confirmDiscard()) editing.value = false
 }
 async function refresh() {
   await queryClient.invalidateQueries({ queryKey: ['case', id] })
@@ -279,6 +284,7 @@ async function save() {
     })
     editing.value = false
     await refresh()
+    toast.success('Đã lưu bản nháp')
   } catch (cause) {
     error.value = cause
   } finally {
@@ -290,6 +296,13 @@ function ask(action: typeof confirmation.value) {
   reason.value = ''
   error.value = null
   intent.value = newIntent()
+}
+const DONE = {
+  submit: 'Đã chuyển hồ sơ đi duyệt',
+  approve: 'Đã phê duyệt hồ sơ',
+  reject: 'Đã từ chối hồ sơ',
+  return: 'Đã trả hồ sơ cho người tạo',
+  withdraw: 'Đã thu hồi hồ sơ về bản nháp',
 }
 async function confirm() {
   if (!detail.data.value) return
@@ -317,6 +330,7 @@ async function confirm() {
           reason: reason.value,
         } satisfies components['schemas']['DecisionInput']),
       })
+    toast.success(DONE[confirmation.value ?? 'submit'])
     confirmation.value = null
     await refresh()
   } catch (cause) {
@@ -359,16 +373,46 @@ function eventLabel(event: HistoryEvent) {
 function taskState(task: ApprovalTask) {
   return task.state || task.status || 'pending'
 }
-const beforeUnload = (event: BeforeUnloadEvent) => {
-  if (dirty.value) event.preventDefault()
+const { confirmDiscard } = useUnsavedGuard(dirty)
+function parseValue(text: string): unknown {
+  const value = text.trim()
+  if (!value) return null
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
 }
-window.addEventListener('beforeunload', beforeUnload)
-onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
-onBeforeRouteLeave(
-  () =>
-    !dirty.value ||
-    window.confirm('Hồ sơ có thay đổi chưa lưu. Bạn muốn rời trang?'),
-)
+function plainValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '(trống)'
+  if (typeof value === 'boolean') return value ? 'Có' : 'Không'
+  if (typeof value === 'number') return value.toLocaleString('vi-VN')
+  if (Array.isArray(value)) return value.map(plainValue).join(', ')
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+function fieldLabel(key: string) {
+  const name = key.replace(/^payload\./, '')
+  return detail.data.value?.form.fields.find((field) => field.key === name)?.label ?? name
+}
+type CaseTab = 'info' | 'files' | 'history' | 'route'
+const tab = ref<CaseTab>('info')
+const tabs = computed(() => {
+  const data = detail.data.value
+  const items: { key: CaseTab; label: string; icon: typeof Info; count?: number }[] = [
+    { key: 'info', label: 'Thông tin', icon: Info },
+    { key: 'files', label: 'Tài liệu', icon: Paperclip, count: data?.files?.length },
+    { key: 'history', label: 'Lịch sử & bản đã trình', icon: History, count: data?.submissions.length },
+  ]
+  if (data?.submissions.length) items.push({ key: 'route', label: 'Vì sao đi đường này', icon: GitBranch })
+  return items
+})
+function moveTab(step: number) {
+  const keys = tabs.value.map((item) => item.key)
+  const next = keys[(keys.indexOf(tab.value) + step + keys.length) % keys.length]
+  tab.value = next
+  document.getElementById(`case-tab-${next}`)?.focus()
+}
 </script>
 <template>
   <div class="breadcrumb">
@@ -378,7 +422,7 @@ onBeforeRouteLeave(
         style="vertical-align: middle; margin-right: 5px"
       />Hồ sơ</RouterLink
     ><span>/</span
-    ><span class="mono">{{ detail.data.value?.code || 'Chi tiết hồ sơ' }}</span>
+    ><span>{{ detail.data.value?.code || 'Chi tiết hồ sơ' }}</span>
   </div>
   <StatePanel
     v-if="detail.isPending.value || detail.error.value"
@@ -389,53 +433,26 @@ onBeforeRouteLeave(
   <template v-if="detail.data.value">
     <header class="page-head">
       <div>
-        <span class="eyebrow mono"
-          >{{ detail.data.value.code }} · r{{
-            detail.data.value.revision
-          }}</span
-        >
+        <span class="eyebrow">Mã hồ sơ {{ detail.data.value.code }}</span>
         <h1>{{ detail.data.value.title }}</h1>
-        <div
-          style="
-            margin-top: 12px;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-          "
-        >
-          <StatusBadge :status="detail.data.value.status" /><span
-            class="muted"
-            style="font-size: 13px"
-            >{{ detail.data.value.form.name }}</span
+        <div class="case-subline">
+          <StatusBadge :status="detail.data.value.status" /><span class="muted"
+            >{{ detail.data.value.form.name }} · tạo bởi {{ userName(detail.data.value.owner_id) }}</span
           >
         </div>
       </div>
-      <div class="page-actions">
-        <template v-if="editing"
-          ><button class="button secondary" :disabled="busy" @click="stopEdit">
-            Hủy chỉnh sửa</button
-          ><button class="button" :disabled="busy" @click="save">
-            <Save :size="17" />{{ busy ? 'Đang lưu…' : 'Lưu bản nháp' }}
-          </button></template
-        ><template v-if="!editing"
-          ><button class="button secondary" @click="discuss">
-            <MessagesSquare :size="16" />Trao đổi</button
-          ><button
-            v-if="session.can('tasks.create')"
-            class="button secondary"
-            @click="showTask = true"
-          >
-            <ListPlus :size="16" />Tạo việc</button
-          ><button v-if="canWithdraw" class="button secondary" @click="ask('withdraw')">
-            <Undo2 :size="16" />Thu hồi
-          </button></template
-        ><template v-if="!editing && canEdit"
-          ><button class="button secondary" @click="startEdit">
-            <Pencil :size="16" />Chỉnh sửa</button
-          ><button class="button" @click="ask('submit')">
-            <Send :size="16" />Chuyển duyệt
-          </button></template
+      <div v-if="!editing" class="page-actions">
+        <button class="button secondary" @click="discuss">
+          <MessagesSquare :size="16" />Trao đổi</button
+        ><button
+          v-if="session.can('tasks.create')"
+          class="button secondary"
+          @click="showTask = true"
         >
+          <ListPlus :size="16" />Tạo việc</button
+        ><button v-if="canWithdraw" class="button secondary" @click="ask('withdraw')">
+          <Undo2 :size="16" />Thu hồi
+        </button>
       </div>
     </header>
     <div
@@ -445,7 +462,7 @@ onBeforeRouteLeave(
     >
       <div>
         {{ errorText(error)
-        }}<code v-if="error instanceof ApiError && error.traceId">{{
+        }}<code v-if="error instanceof ApiError && error.traceId">Mã theo dõi: {{
           error.traceId
         }}</code
         ><button
@@ -468,109 +485,101 @@ onBeforeRouteLeave(
       class="notice warning error-inline"
     >
       <History :size="18" /><span
-        >Hồ sơ đã được tiếp nhận và đang chờ khởi tạo quy trình. Hệ thống sẽ tự
-        thử lại nếu Core chưa sẵn sàng; không cần gửi thêm lần nữa.</span
+        >Hồ sơ đã được tiếp nhận và đang chờ chuyển đến người duyệt. Hệ thống tự
+        thử lại nếu chưa kết nối được; bạn không cần gửi thêm lần nữa.</span
       >
     </div>
-    <div
-      v-if="myTask && !editing"
-      class="notice error-inline"
-      style="
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-      "
-    >
-      <div style="display: flex; gap: 10px; align-items: center">
-        <ClipboardCheck :size="18" /><span
-          >Bạn được phân công:
-          <strong>{{
-            myTask.label || myTask.step_label || 'Phê duyệt hồ sơ'
-          }}</strong
-          ><template v-if="myTask.on_behalf_of">
-            (duyệt thay {{ myTask.on_behalf_of }})</template
-          ></span
+    <section class="card case-progress">
+      <div class="processing-rail" aria-label="Tiến trình xử lý">
+        <div class="rail-step done">
+          <span class="rail-circle"><Check :size="14" /></span>
+          <div class="rail-content">
+            <strong>Tạo hồ sơ</strong
+            ><small>{{ userName(detail.data.value.owner_id) }}</small
+            ><small>{{ formatDate(detail.data.value.created_at) }}</small>
+          </div>
+        </div>
+        <div
+          v-for="task in detail.data.value.approval_tasks"
+          :key="task.id"
+          class="rail-step"
+          :class="{
+            done: !!task.decision,
+            current: ['pending', 'waiting'].includes(taskState(task)),
+          }"
         >
+          <span class="rail-circle"
+            ><Check
+              v-if="task.decision === 'approve'"
+              :size="14"
+            /><RotateCcw
+              v-else-if="task.decision === 'return'"
+              :size="12"
+            /><XCircle
+              v-else-if="task.decision === 'reject'"
+              :size="12"
+            /><span v-else>•</span></span
+          >
+          <div class="rail-content">
+            <strong>{{
+              task.label || task.step_label || 'Phê duyệt'
+            }}</strong
+            ><small>{{
+              task.assignee_name || userName(task.assignee_id)
+            }}</small
+            ><small>{{
+              task.decided_at
+                ? formatDate(task.decided_at)
+                : 'Chờ quyết định'
+            }}</small>
+          </div>
+        </div>
+        <div
+          class="rail-step"
+          :class="{ done: detail.data.value.status === 'approved' }"
+        >
+          <span class="rail-circle"><CheckCheck :size="13" /></span>
+          <div class="rail-content">
+            <strong>Hoàn tất</strong
+            ><small>{{
+              detail.data.value.status === 'approved'
+                ? 'Đã phê duyệt'
+                : 'Sau khi đủ quyết định'
+            }}</small>
+          </div>
+        </div>
       </div>
-      <div class="inline-actions">
-        <button class="button secondary small" @click="ask('return')">
-          <RotateCcw :size="14" />Trả lại</button
-        ><button class="button danger small" @click="ask('reject')">
-          Từ chối</button
-        ><button class="button small" @click="ask('approve')">
-          <Check :size="15" />Phê duyệt
-        </button>
-      </div>
+    </section>
+    <div class="tabs case-tabs" role="tablist" aria-label="Nội dung hồ sơ">
+      <button
+        v-for="item in tabs"
+        :id="`case-tab-${item.key}`"
+        :key="item.key"
+        class="tab"
+        :class="{ active: tab === item.key }"
+        role="tab"
+        :aria-selected="tab === item.key"
+        :aria-controls="`case-panel-${item.key}`"
+        :tabindex="tab === item.key ? 0 : -1"
+        @click="tab = item.key"
+        @keydown.right.prevent="moveTab(1)"
+        @keydown.left.prevent="moveTab(-1)"
+      >
+        <component :is="item.icon" :size="16" />{{ item.label
+        }}<span v-if="item.count" class="tab-count">{{ item.count }}</span>
+      </button>
     </div>
     <div class="split">
-      <div class="stack">
-        <section class="card">
-          <div class="processing-rail" aria-label="Tiến trình xử lý">
-            <div class="rail-step done">
-              <span class="rail-circle"><Check :size="14" /></span>
-              <div class="rail-content">
-                <strong>Tạo hồ sơ</strong
-                ><small>{{ userName(detail.data.value.owner_id) }}</small
-                ><small>{{ formatDate(detail.data.value.created_at) }}</small>
-              </div>
-            </div>
-            <div
-              v-for="task in detail.data.value.approval_tasks"
-              :key="task.id"
-              class="rail-step"
-              :class="{
-                done: !!task.decision,
-                current: ['pending', 'waiting'].includes(taskState(task)),
-              }"
-            >
-              <span class="rail-circle"
-                ><Check
-                  v-if="task.decision === 'approve'"
-                  :size="14"
-                /><RotateCcw
-                  v-else-if="task.decision === 'return'"
-                  :size="12"
-                /><XCircle
-                  v-else-if="task.decision === 'reject'"
-                  :size="12"
-                /><span v-else>•</span></span
-              >
-              <div class="rail-content">
-                <strong>{{
-                  task.label || task.step_label || 'Phê duyệt'
-                }}</strong
-                ><small>{{
-                  task.assignee_name || userName(task.assignee_id)
-                }}</small
-                ><small>{{
-                  task.decided_at
-                    ? formatDate(task.decided_at)
-                    : 'Chờ quyết định'
-                }}</small>
-              </div>
-            </div>
-            <div
-              class="rail-step"
-              :class="{ done: detail.data.value.status === 'approved' }"
-            >
-              <span class="rail-circle"><CheckCheck :size="13" /></span>
-              <div class="rail-content">
-                <strong>Hoàn tất</strong
-                ><small>{{
-                  detail.data.value.status === 'approved'
-                    ? 'Đã phê duyệt'
-                    : 'Sau khi đủ quyết định'
-                }}</small>
-              </div>
-            </div>
-          </div>
+      <div
+        :id="`case-panel-${tab}`"
+        class="stack"
+        role="tabpanel"
+        :aria-labelledby="`case-tab-${tab}`"
+      >
+        <section v-if="tab === 'info'" class="card">
           <header class="card-header">
             <h2>Thông tin hồ sơ</h2>
-            <span class="tag">{{
-              editing
-                ? 'Đang chỉnh sửa nháp'
-                : `Biểu mẫu v${detail.data.value.form.schema_version ?? 1}`
-            }}</span>
+            <span v-if="editing" class="tag">Đang chỉnh sửa bản nháp</span>
           </header>
           <div class="card-body">
             <div v-if="editing" class="field" style="margin-bottom: 22px">
@@ -596,172 +605,208 @@ onBeforeRouteLeave(
             />
           </div>
         </section>
-        <section class="card">
-          <header class="card-header">
-            <h2>Tài liệu đính kèm</h2>
-            <Paperclip :size="18" class="muted" />
-          </header>
-          <div v-if="editing" class="card-body">
-            <div class="case-document-list">
-              <label
-                v-for="file in files.data.value?.items"
+        <template v-if="tab === 'files'">
+          <section class="card">
+            <header class="card-header">
+              <h2>Tài liệu đính kèm</h2>
+              <Paperclip :size="18" class="muted" />
+            </header>
+            <div v-if="editing" class="card-body">
+              <div class="case-document-list">
+                <label
+                  v-for="file in files.data.value?.items"
+                  :key="file.id"
+                  class="case-selection"
+                  ><input
+                    v-model="fileIds"
+                    type="checkbox"
+                    :value="file.id"
+                  /><span>{{ file.name }}</span></label
+                >
+              </div>
+              <p v-if="!files.data.value?.items.length" class="muted">
+                Chưa có tệp. Tải tài liệu lên kho trước khi đính kèm.
+              </p>
+            </div>
+            <template v-else
+              ><div
+                v-for="file in detail.data.value.files || []"
                 :key="file.id"
-                class="case-selection"
-                ><input
-                  v-model="fileIds"
-                  type="checkbox"
-                  :value="file.id"
-                /><span>{{ file.name }}</span></label
+                class="list-row"
               >
-            </div>
-            <p v-if="!files.data.value?.items.length" class="muted">
-              Chưa có tệp. Tải tài liệu lên kho trước khi đính kèm.
-            </p>
-          </div>
-          <template v-else
-            ><div
-              v-for="file in detail.data.value.files || []"
-              :key="file.id"
-              class="list-row"
-            >
-              <span class="file-icon"><FileText :size="19" /></span>
-              <div class="grow">
-                <strong>{{ file.name }}</strong
-                ><small class="mono">{{
-                  file.current_version_id || file.id
-                }}</small>
-              </div>
-              <button
-                class="icon-button"
-                aria-label="Tải tài liệu đính kèm"
-                @click="download(file)"
-              >
-                <Download :size="17" />
-              </button>
-            </div>
-            <StatePanel
-              v-if="!detail.data.value.files?.length"
-              empty
-              title="Chưa đính kèm tài liệu"
-              description="Tài liệu được gắn từ kho và chốt phiên bản khi trình hồ sơ."
-          /></template>
-        </section>
-        <section class="card">
-          <header class="card-header"><div><span class="eyebrow">CĂN CỨ THEO TRƯỜNG</span><h2>Đối chiếu giá trị đề xuất</h2></div></header>
-          <div class="card-body">
-            <p class="muted">Giá trị nhập tại đây được đánh dấu là đề xuất nhập tay. Chỉ người tạo hồ sơ mới xác nhận; việc xác nhận không tự sửa biểu mẫu.</p>
-            <div v-if="canEdit" class="form-grid">
-              <div class="field"><label for="evidence-field">Trường</label><select id="evidence-field" v-model="evidenceField"><option value="">Chọn trường</option><option v-for="field in detail.data.value.form.fields" :key="field.key" :value="field.key">{{ field.label }}</option></select></div>
-              <div class="field"><label for="evidence-file">Tài liệu nguồn</label><select id="evidence-file" v-model="evidenceFile"><option value="">Chọn tài liệu</option><option v-for="file in detail.data.value.files" :key="file.id" :value="file.id">{{ file.name }}</option></select></div>
-              <div class="field"><label for="evidence-page">Trang</label><input id="evidence-page" v-model.number="evidencePage" type="number" min="1" /></div>
-              <div class="field"><label for="evidence-value">Giá trị đề xuất (JSON)</label><input id="evidence-value" v-model="evidenceValue" placeholder="12500000 hoặc &quot;văn bản&quot;" /></div>
-              <div class="field full-width"><label for="evidence-quote">Trích đoạn nguồn</label><textarea id="evidence-quote" v-model="evidenceQuote" rows="2" /></div>
-              <button class="button secondary" :disabled="busy || !evidenceField || !evidenceFile || !evidenceQuote" @click="addEvidence">Lưu căn cứ</button>
-            </div>
-            <StatePanel :loading="fieldEvidence.isPending.value" :error="fieldEvidence.error.value"
-              :empty="fieldEvidence.data.value?.items.length === 0" title="Chưa có căn cứ theo trường" @retry="fieldEvidence.refetch()" />
-            <div v-for="item in fieldEvidence.data.value?.items" :key="item.id" class="list-row">
-              <div class="grow"><strong>{{ item.field_key }} · {{ item.review_state === 'confirmed' ? 'Đã xác nhận' : item.review_state === 'rejected' ? 'Đã bác bỏ' : 'Cần kiểm tra' }}</strong>
-                <small>{{ item.source_kind === 'ai' ? 'Đề xuất AI cần xác nhận' : 'Đề xuất nhập tay' }}: {{ JSON.stringify(item.suggested_value.value) }} · trang {{ item.source_page }} · phiên bản {{ item.source_version_id.slice(0, 8) }}</small>
-                <small v-if="item.source_kind === 'ai'">Job {{ item.provenance.extraction_job_id }} · profile {{ item.provenance.ai_profile_version }}</small>
-                <small>Trích đoạn: {{ item.source_quote }}</small>
-                <small v-if="item.confirmed_value">Giá trị xác nhận: {{ JSON.stringify(item.confirmed_value.value) }} · {{ userName(item.reviewed_by_id || '') }}</small>
-                <div v-if="canEdit && item.review_state === 'needs_review'" class="inline-actions">
-                  <button class="button secondary small" :disabled="busy" @click="reviewEvidence(item, 'confirm')">Xác nhận</button>
-                  <input v-model="correctedValues[item.id]" :aria-label="`Giá trị sửa cho ${item.field_key}`" placeholder="Giá trị sửa (JSON)" />
-                  <button class="button secondary small" :disabled="busy || !correctedValues[item.id]" @click="reviewEvidence(item, 'correct')">Sửa và xác nhận</button>
-                  <button class="button ghost small" :disabled="busy" @click="reviewEvidence(item, 'reject')">Bác bỏ</button>
+                <span class="file-icon"><FileText :size="19" /></span>
+                <div class="grow">
+                  <strong>{{ file.name }}</strong
+                  ><small>Bản mới nhất trong kho · được chốt lại khi trình</small>
                 </div>
+                <button
+                  class="icon-button"
+                  :aria-label="`Tải ${file.name}`"
+                  title="Tải về"
+                  @click="download(file)"
+                >
+                  <Download :size="17" />
+                </button>
               </div>
-              <button class="button ghost small" @click="openEvidenceSource(item)">Mở trang nguồn</button>
-            </div>
-          </div>
-        </section>
-        <section v-if="detail.data.value.submissions.length" class="card">
-          <header class="card-header">
-            <div>
-              <span class="eyebrow">NGUỒN CĂN CỨ PHÊ DUYỆT</span>
-              <h2>Bản đã trình</h2>
-            </div>
-            <select
-              v-model="selectedSubmission"
-              aria-label="Chọn lần trình"
-              style="width: auto; min-height: 34px; font-size: 13px"
-            >
-              <option
-                v-for="item in detail.data.value.submissions"
-                :key="item.id"
-                :value="item.id"
-              >
-                Lần trình {{ item.number }}
-              </option>
-            </select>
-          </header>
-          <div v-if="submission" class="card-body">
-            <div class="notice" style="margin-bottom: 20px">
-              <ShieldCheck :size="18" /><span
-                >Snapshot bất biến · payload r{{
-                  submission.payload_revision ?? '—'
-                }}
-                ·
-                {{
-                  formatDate(
-                    submission.submitted_at || submission.created_at,
-                    true,
-                  )
-                }}</span
-              >
-            </div>
-            <SchemaForm
-              :model-value="submission.payload_snapshot || {}"
-              :fields="detail.data.value.form.fields"
-              readonly
-            />
-            <div
-              v-for="file in submission.files_snapshot"
-              :key="file.version_id || file.id"
-              class="list-row"
-              style="padding-left: 0; padding-right: 0"
-            >
-              <FileText :size="18" />
-              <div class="grow">
-                <p>{{ file.name || 'Tài liệu đã ghim' }}</p>
-                <small class="mono">{{ file.version_id }}</small
-                ><small class="mono">SHA256 {{ file.checksum }}</small>
+              <StatePanel
+                v-if="!detail.data.value.files?.length"
+                empty
+                compact
+                title="Chưa đính kèm tài liệu"
+                description="Gắn tài liệu từ kho khi chỉnh sửa bản nháp. Khi trình, bản đang có sẽ được chốt lại."
+            /></template>
+          </section>
+          <section class="card">
+            <header class="card-header"><div><span class="eyebrow">KIỂM TRA SỐ LIỆU</span><h2>Đối chiếu với tài liệu gốc</h2></div></header>
+            <div class="card-body">
+              <p class="muted">Ghi lại một giá trị lấy từ trang nào của tài liệu để người duyệt dễ đối chiếu. Chỉ người tạo hồ sơ xác nhận; việc xác nhận không tự sửa biểu mẫu.</p>
+              <div v-if="canEdit" class="form-grid">
+                <div class="field"><label for="evidence-field">Mục trong biểu mẫu</label><select id="evidence-field" v-model="evidenceField"><option value="">Chọn mục</option><option v-for="field in detail.data.value.form.fields" :key="field.key" :value="field.key">{{ field.label }}</option></select></div>
+                <div class="field"><label for="evidence-file">Tài liệu gốc</label><select id="evidence-file" v-model="evidenceFile"><option value="">Chọn tài liệu</option><option v-for="file in detail.data.value.files" :key="file.id" :value="file.id">{{ file.name }}</option></select></div>
+                <div class="field"><label for="evidence-page">Trang</label><input id="evidence-page" v-model.number="evidencePage" type="number" min="1" /></div>
+                <div class="field"><label for="evidence-value">Giá trị trong tài liệu</label><input id="evidence-value" v-model="evidenceValue" placeholder="Ví dụ: 12500000" /></div>
+                <div class="field full-width"><label for="evidence-quote">Câu trích từ tài liệu</label><textarea id="evidence-quote" v-model="evidenceQuote" rows="2" /></div>
+                <button class="button secondary" :disabled="busy || !evidenceField || !evidenceFile || !evidenceQuote" @click="addEvidence">Lưu đối chiếu</button>
               </div>
-              <button
-                v-if="file.file_id"
-                class="icon-button"
-                aria-label="Tải đúng phiên bản đã trình"
-                @click="downloadAttachment(file.file_id, submission.id)"
-              >
-                <Download :size="17" />
-              </button>
+              <StatePanel :loading="fieldEvidence.isPending.value" :error="fieldEvidence.error.value"
+                :empty="fieldEvidence.data.value?.items.length === 0" compact title="Chưa có đối chiếu nào" @retry="fieldEvidence.refetch()" />
+              <div v-for="item in fieldEvidence.data.value?.items" :key="item.id" class="list-row">
+                <div class="grow"><strong>{{ fieldLabel(item.field_key) }} · {{ item.review_state === 'confirmed' ? 'Đã xác nhận' : item.review_state === 'rejected' ? 'Đã bác bỏ' : 'Cần kiểm tra' }}</strong>
+                  <small>{{ item.source_kind === 'ai' ? 'Gợi ý tự động' : 'Nhập tay' }}: {{ plainValue(item.suggested_value.value) }} · trang {{ item.source_page }}</small>
+                  <small>Trích: “{{ item.source_quote }}”</small>
+                  <small v-if="item.confirmed_value">Giá trị xác nhận: {{ plainValue(item.confirmed_value.value) }} · {{ userName(item.reviewed_by_id || '') }}</small>
+                  <div v-if="canEdit && item.review_state === 'needs_review'" class="inline-actions">
+                    <button class="button secondary small" :disabled="busy" @click="reviewEvidence(item, 'confirm')">Xác nhận</button>
+                    <input v-model="correctedValues[item.id]" :aria-label="`Giá trị đúng cho ${fieldLabel(item.field_key)}`" placeholder="Giá trị đúng" />
+                    <button class="button secondary small" :disabled="busy || !correctedValues[item.id]" @click="reviewEvidence(item, 'correct')">Sửa và xác nhận</button>
+                    <button class="button ghost small" :disabled="busy" @click="reviewEvidence(item, 'reject')">Bác bỏ</button>
+                  </div>
+                </div>
+                <button class="button ghost small" @click="openEvidenceSource(item)">Mở trang gốc</button>
+              </div>
             </div>
-          </div>
-        </section>
-        <section v-if="submission" class="card">
-          <header class="card-header"><h2>Vì sao hồ sơ đi đường này?</h2></header>
+          </section>
+        </template>
+        <template v-if="tab === 'history'">
+          <section v-if="detail.data.value.submissions.length" class="card">
+            <header class="card-header">
+              <div>
+                <span class="eyebrow">CĂN CỨ ĐỂ DUYỆT</span>
+                <h2>Bản đã trình</h2>
+              </div>
+              <select
+                v-model="selectedSubmission"
+                aria-label="Chọn lần trình"
+                style="width: auto; min-height: 34px; font-size: 13px"
+              >
+                <option
+                  v-for="item in detail.data.value.submissions"
+                  :key="item.id"
+                  :value="item.id"
+                >
+                  Lần trình {{ item.number }}
+                </option>
+              </select>
+            </header>
+            <div v-if="submission" class="card-body">
+              <div class="notice" style="margin-bottom: 20px">
+                <ShieldCheck :size="18" /><span
+                  >Đây là nội dung đúng như lúc trình ngày
+                  {{ formatDate(submission.submitted_at || submission.created_at, true) }}.
+                  Sửa hồ sơ về sau không làm thay đổi bản này.</span
+                >
+              </div>
+              <SchemaForm
+                :model-value="submission.payload_snapshot || {}"
+                :fields="detail.data.value.form.fields"
+                readonly
+              />
+              <div
+                v-for="file in submission.files_snapshot"
+                :key="file.version_id || file.id"
+                class="list-row"
+                style="padding-left: 0; padding-right: 0"
+              >
+                <FileText :size="18" />
+                <div class="grow">
+                  <p>{{ file.name || 'Tài liệu đã chốt' }}</p>
+                  <small>Phiên bản đã chốt khi trình<template v-if="file.checksum"> · mã kiểm tra {{ String(file.checksum).slice(0, 10) }}</template></small>
+                </div>
+                <button
+                  v-if="file.file_id"
+                  class="icon-button"
+                  aria-label="Tải đúng phiên bản đã trình"
+                  title="Tải đúng phiên bản đã trình"
+                  @click="downloadAttachment(file.file_id, submission.id)"
+                >
+                  <Download :size="17" />
+                </button>
+              </div>
+            </div>
+          </section>
+          <section class="card">
+            <header class="card-header">
+              <h2>Lịch sử xử lý</h2>
+              <History :size="17" class="muted" />
+            </header>
+            <div class="card-body">
+              <ul class="timeline">
+                <li
+                  v-for="(event, index) in detail.data.value.history"
+                  :key="event.id || index"
+                >
+                  <p>{{ eventLabel(event) }}</p>
+                  <small
+                    >{{ userName(event.actor_id) }} ·
+                    {{ formatDate(event.created_at, true) }}</small
+                  >
+                  <p
+                    v-if="typeof event.detail === 'string'"
+                    class="muted"
+                    style="font-size: 13px; margin-top: 5px"
+                  >
+                    {{ event.detail }}
+                  </p>
+                  <p
+                    v-else-if="event.detail?.reason"
+                    class="muted"
+                    style="font-size: 13px; margin-top: 5px"
+                  >
+                    {{ event.detail.reason }}
+                  </p>
+                </li>
+              </ul>
+              <p v-if="!detail.data.value.history.length" class="muted">
+                Chưa có hoạt động.
+              </p>
+            </div>
+          </section>
+        </template>
+        <section v-if="tab === 'route'" class="card">
+          <header class="card-header"><h2>Vì sao hồ sơ được chuyển đến những người này?</h2></header>
           <div class="card-body">
+            <p class="muted" style="margin-bottom: 14px">
+              Quy trình chọn người duyệt dựa trên thông tin trong hồ sơ. Dưới đây là từng bước và lý do.
+            </p>
             <StatePanel :loading="explanation.isPending.value" :error="explanation.error.value"
-              :empty="!explanation.data.value?.submissions.length" title="Chưa có dữ liệu truy vết"
+              :empty="!submission || !explanation.data.value?.submissions.length" compact title="Hồ sơ chưa được trình"
+              description="Sau khi trình, phần này giải thích vì sao hồ sơ đi qua từng bước."
               @retry="explanation.refetch()" />
             <template v-for="item in explanation.data.value?.submissions" :key="item.submission_id">
-              <div v-if="item.submission_id === submission.id">
-                <p class="muted">Lần trình {{ item.number }} · dữ liệu r{{ item.payload_revision }}
-                  <span v-if="item.package_version_id"> · gói {{ item.package_version_id.slice(0, 8) }}</span></p>
+              <div v-if="item.submission_id === submission?.id">
+                <p class="muted">Lần trình {{ item.number }}</p>
                 <div v-for="(step, index) in item.routing_evidence" :key="index" class="list-row">
+                  <span class="route-mark" :class="{ on: step.selected }"><Check v-if="step.selected" :size="14" /><span v-else>–</span></span>
                   <div><strong>{{ step.label }}</strong><small>
-                    {{ step.selected ? `Chọn người xử lý: ${step.recipient}` : 'Bỏ qua bước này' }}
-                    <template v-if="step.condition"> · {{ step.condition.field }} {{ step.condition.operator }} {{ step.condition.value }}
-                      · giá trị: {{ step.evaluated_value }}</template>
+                    {{ step.selected ? `Chuyển đến ${step.recipient}` : 'Không áp dụng cho hồ sơ này' }}
+                    <template v-if="step.condition"> · vì “{{ fieldLabel(step.condition.field) }}” {{ OPERATORS[step.condition.operator] ?? step.condition.operator }} {{ plainValue(step.condition.value) }}
+                      (hồ sơ ghi: {{ plainValue(step.evaluated_value) }})</template>
                   </small></div>
                 </div>
                 <div v-for="trace in item.decision_traces" :key="trace.node_id" class="list-row">
-                  <div><strong>{{ trace.node_id }}: {{ trace.result ? 'Đúng' : 'Sai' }}</strong>
-                    <small>{{ trace.expression.path }} {{ trace.expression.operator }} {{ trace.expression.value }}
-                      · giá trị: {{ trace.evaluated_inputs[trace.expression.path] }}
-                      · đi tiếp: {{ trace.selected_edges.join(', ') }}</small></div>
+                  <span class="route-mark" :class="{ on: trace.result }"><Check v-if="trace.result" :size="14" /><span v-else>–</span></span>
+                  <div><strong>Điều kiện “{{ fieldLabel(trace.expression.path) }}” {{ OPERATORS[trace.expression.operator] ?? trace.expression.operator }} {{ plainValue(trace.expression.value) }}: {{ trace.result ? 'đúng' : 'không đúng' }}</strong>
+                    <small>Hồ sơ ghi: {{ plainValue(trace.evaluated_inputs[trace.expression.path]) }}</small></div>
                 </div>
               </div>
             </template>
@@ -770,7 +815,7 @@ onBeforeRouteLeave(
       </div>
       <aside class="stack" style="align-content: start">
         <section class="card">
-          <header class="card-header"><h3>Thông tin quản lý</h3></header>
+          <header class="card-header"><h3>Tóm tắt</h3></header>
           <dl class="detail-meta card-body">
             <div>
               <dt>Người tạo</dt>
@@ -785,59 +830,54 @@ onBeforeRouteLeave(
               <dd>{{ formatDate(detail.data.value.updated_at, true) }}</dd>
             </div>
             <div>
-              <dt>Revision hiện tại</dt>
-              <dd class="mono">{{ detail.data.value.revision }}</dd>
-            </div>
-            <div>
               <dt>Số lần trình</dt>
               <dd>{{ detail.data.value.submissions.length }}</dd>
             </div>
           </dl>
         </section>
-        <section class="card">
-          <header class="card-header">
-            <h3>Lịch sử xử lý</h3>
-            <History :size="17" class="muted" />
-          </header>
-          <div class="card-body">
-            <ul class="timeline">
-              <li
-                v-for="(event, index) in detail.data.value.history"
-                :key="event.id || index"
-              >
-                <p>{{ eventLabel(event) }}</p>
-                <small
-                  >{{ userName(event.actor_id) }} ·
-                  {{ formatDate(event.created_at, true) }}</small
-                >
-                <p
-                  v-if="typeof event.detail === 'string'"
-                  class="muted"
-                  style="font-size: 12px; margin-top: 5px"
-                >
-                  {{ event.detail }}
-                </p>
-                <p
-                  v-else-if="event.detail?.reason"
-                  class="muted"
-                  style="font-size: 12px; margin-top: 5px"
-                >
-                  {{ event.detail.reason }}
-                </p>
-              </li>
-            </ul>
-            <p v-if="!detail.data.value.history.length" class="muted">
-              Chưa có hoạt động.
-            </p>
-          </div>
-        </section>
         <div class="notice">
           <ShieldCheck :size="19" /><span
-            >Quyết định có hiệu lực sau khi được ghi nhận trên máy chủ. Dữ liệu
-            trên trang tự cập nhật theo tiến trình.</span
+            >Quyết định có hiệu lực khi hệ thống ghi nhận. Trang tự cập nhật theo
+            tiến trình xử lý.</span
           >
         </div>
       </aside>
+    </div>
+    <div v-if="editing" class="sticky-actions" role="region" aria-label="Lưu bản nháp">
+      <span><Pencil :size="16" />{{ dirty ? 'Có thay đổi chưa lưu' : 'Đang chỉnh sửa bản nháp' }}</span>
+      <button class="button secondary" :disabled="busy" @click="stopEdit">Hủy</button
+      ><button class="button" :disabled="busy" @click="save">
+        <Save :size="17" />{{ busy ? 'Đang lưu…' : 'Lưu bản nháp' }}
+      </button>
+    </div>
+    <div v-else-if="myTask" class="sticky-actions" role="region" aria-label="Quyết định của bạn">
+      <span
+        ><ClipboardCheck :size="17" /><span
+          >Bạn cần quyết định:
+          <strong>{{ myTask.label || myTask.step_label || 'Phê duyệt hồ sơ' }}</strong
+          ><template v-if="myTask.on_behalf_of"> (duyệt thay {{ myTask.on_behalf_of }})</template></span
+        ></span
+      >
+      <button class="button secondary" @click="ask('return')">
+        <RotateCcw :size="15" />Trả lại</button
+      ><button class="button danger" @click="ask('reject')">Từ chối</button
+      ><button class="button" @click="ask('approve')">
+        <Check :size="16" />Phê duyệt
+      </button>
+    </div>
+    <div v-else-if="canEdit" class="sticky-actions" role="region" aria-label="Bản nháp">
+      <span
+        ><Pencil :size="16" />{{
+          detail.data.value.status === 'needs_revision'
+            ? 'Hồ sơ được trả lại để sửa. Chỉnh rồi trình lại.'
+            : 'Bản nháp — kiểm tra lại trước khi trình.'
+        }}</span
+      >
+      <button class="button secondary" @click="startEdit">
+        <Pencil :size="16" />Chỉnh sửa</button
+      ><button class="button" @click="ask('submit')">
+        <Send :size="16" />Chuyển duyệt
+      </button>
     </div>
   </template>
   <ModalDialog

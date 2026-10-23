@@ -818,7 +818,9 @@ export type $defs = Record<string, never>;
 export interface operations {
     login_core_v1_auth_login_get: {
         parameters: {
-            query?: never;
+            query?: {
+                canonical?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -832,6 +834,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

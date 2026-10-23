@@ -86,6 +86,27 @@ def filtered_labels(labels: list[str] | None) -> list[str] | None:
     return sorted(cleaned.values())
 
 
+NOTIFICATION_CATEGORIES = {
+    "approval": "approval",
+    "decision": "approval",
+    "withdrawn": "approval",
+    "delegation": "approval",
+    "mention": "mention",
+    "post": "feed",
+    "post-comment": "feed",
+    "automation": "automation",
+}
+
+
+def notification_data(value) -> dict:
+    """A notification with the category the inbox filters by and a link it always opens."""
+    data = serial(value)
+    prefix = value.event_key.split(":", 1)[0]
+    data["category"] = "task" if prefix.startswith("task-") else NOTIFICATION_CATEGORIES.get(prefix, "other")
+    data["link"] = value.link or (f"/cases/{value.case_id}" if value.case_id else None)
+    return data
+
+
 def validate_payload(form, payload):
     """Validate a payload against the form, honouring defaults and field visibility.
 
@@ -302,6 +323,13 @@ def build_router(app):
         check_revision(value, body.expected_revision)
         if set(body.permissions) - ALLOWED_PERMISSIONS:
             raise AppError(422, "permission_invalid", "Có quyền chưa được đăng ký.")
+        # Removing it from your own role would leave nobody able to undo the change.
+        if role_key == user.role and "organization.manage" not in body.permissions:
+            raise AppError(
+                409,
+                "role_self_lockout",
+                "Không thể bỏ quyền quản lý tổ chức khỏi vai trò bạn đang dùng.",
+            )
         value.name, value.permissions, value.revision = (
             body.name,
             sorted(set(body.permissions)),
@@ -846,14 +874,24 @@ def build_router(app):
             .limit(1)
         )
         if active_for_form and not body.package_version_id:
-            raise AppError(422, "package_version_required", "Cần chọn gói quy trình đã phát hành cho biểu mẫu.")
-        package_version = db.get(m.PackageVersion, body.package_version_id) if body.package_version_id else None
+            raise AppError(
+                422, "package_version_required", "Cần chọn gói quy trình đã phát hành cho biểu mẫu."
+            )
+        package_version = (
+            db.get(m.PackageVersion, body.package_version_id) if body.package_version_id else None
+        )
         if body.package_version_id:
             package = db.get(m.BusinessPackage, package_version.package_id) if package_version else None
-            if (not package_version or package_version.state != "published" or
-                    not package or package.active_version_id != package_version.id or
-                    package_version.form_id != form.id):
-                raise AppError(422, "package_version_invalid", "Phiên bản gói không còn được phát hành cho biểu mẫu này.")
+            if (
+                not package_version
+                or package_version.state != "published"
+                or not package
+                or package.active_version_id != package_version.id
+                or package_version.form_id != form.id
+            ):
+                raise AppError(
+                    422, "package_version_invalid", "Phiên bản gói không còn được phát hành cho biểu mẫu này."
+                )
             if package.allowed_roles and user.role not in package.allowed_roles:
                 raise AppError(403, "package_use_denied", "Vai trò của bạn chưa được dùng gói nghiệp vụ này.")
         payload = validate_payload(form, body.payload)
@@ -1045,8 +1083,12 @@ def build_router(app):
         value = get_case(db, user, case_id)
         form = db.get(m.Form, value.form_id)
         payload = app.state.core_service.get(f"/records/{value.payload_record_id}")["payload"]
-        package_version = db.get(m.PackageVersion, value.package_version_id) if value.package_version_id else None
-        configured_form = SimpleNamespace(approval_steps=package_version.approval_steps) if package_version else form
+        package_version = (
+            db.get(m.PackageVersion, value.package_version_id) if value.package_version_id else None
+        )
+        configured_form = (
+            SimpleNamespace(approval_steps=package_version.approval_steps) if package_version else form
+        )
         steps = resolve_steps(db, value, configured_form, payload)
         return page(
             [
@@ -1092,12 +1134,17 @@ def build_router(app):
                 "Payload đã thay đổi ngoài hồ sơ. Tải lại và xác nhận dữ liệu trước khi trình.",
             )
         validate_payload(form, record["payload"])
-        package_version = db.get(m.PackageVersion, value.package_version_id) if value.package_version_id else None
+        package_version = (
+            db.get(m.PackageVersion, value.package_version_id) if value.package_version_id else None
+        )
         if package_version and len(value.file_ids) < package_version.required_file_count:
             raise AppError(422, "required_documents_missing", "Hồ sơ chưa đủ số tài liệu bắt buộc của gói.")
-        configured_form = SimpleNamespace(approval_steps=package_version.approval_steps) if package_version else form
+        configured_form = (
+            SimpleNamespace(approval_steps=package_version.approval_steps) if package_version else form
+        )
         steps = resolve_steps(db, value, configured_form, record["payload"])
         from .packages import step_evidence
+
         routing_evidence = step_evidence(configured_form.approval_steps, record["payload"], steps)
         snapshots = []
         # The same logical-file lock orders editor open/save and submission pinning.
@@ -1175,7 +1222,10 @@ def build_router(app):
         """
         user = context(db, actor)
         value = db.scalar(
-            select(m.Case).where(m.Case.id == case_id).with_for_update().execution_options(populate_existing=True)
+            select(m.Case)
+            .where(m.Case.id == case_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
         value = get_case(db, user, case_id) if value else None
         if not value or value.owner_id != user.id:
@@ -1184,7 +1234,9 @@ def build_router(app):
         if value.status not in {"pending_workflow_start", "processing"}:
             raise AppError(409, "case_not_withdrawable", "Hồ sơ không ở trạng thái đang trình.")
         submission = db.scalar(
-            select(m.Submission).where(m.Submission.case_id == case_id, m.Submission.number == value.submission_no)
+            select(m.Submission).where(
+                m.Submission.case_id == case_id, m.Submission.number == value.submission_no
+            )
         )
         tasks = list(db.scalars(select(m.ApprovalTask).where(m.ApprovalTask.submission_id == submission.id)))
         if any(task.decision for task in tasks):
@@ -1197,7 +1249,9 @@ def build_router(app):
         enqueue(db, "case.withdraw", submission.id)
         audit(db, user, "case.withdrawn", case_id, {"submission_id": submission.id, "reason": body.reason})
         for task in tasks:
-            notify(db, task.assignee_id, "withdrawn:" + task.id, "Hồ sơ đã được thu hồi: " + value.title, case_id)
+            notify(
+                db, task.assignee_id, "withdrawn:" + task.id, "Hồ sơ đã được thu hồi: " + value.title, case_id
+            )
         db.commit()
         return case_data(db, db.get(m.Case, case_id))
 
@@ -1304,7 +1358,24 @@ def build_router(app):
             ),
             limit,
             cursor,
+            transform=notification_data,
         )
+
+    @router.post("/notifications/read-all", tags=["notifications"])
+    def read_all_notifications(db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        user = context(db, actor)
+        unread = list(
+            db.scalars(
+                select(m.Notification).where(
+                    m.Notification.user_id == user.id, m.Notification.read_at.is_(None)
+                )
+            )
+        )
+        now = m.utcnow()
+        for item in unread:
+            item.read_at = now
+        db.commit()
+        return {"updated": len(unread)}
 
     @router.patch("/notifications/{notification_id}", tags=["notifications"])
     def read_notification(

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from typing import Literal
+from urllib.parse import quote
 
 from dx_platform.auth import Actor
 from dx_platform.errors import AppError
-from fastapi import APIRouter, Depends, Query
-from pydantic import Field
+from fastapi import APIRouter, Depends, File, Header, Query, UploadFile
+from fastapi.responses import Response
+from pydantic import Field, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -17,6 +19,22 @@ from .policies import case_readable, current_user, department_members, manages_d
 from .services import audit, notify, serial
 
 EMOJI = {"👍", "❤️", "😂", "🎉", "😮", "🙏"}
+# Shown inline in the chat. Anything else (SVG, HTML, PDF, office files…) is always downloaded,
+# so no uploaded file can run script on the application's own origin.
+INLINE = {
+    "image/png": "image",
+    "image/jpeg": "image",
+    "image/gif": "image",
+    "image/webp": "image",
+    "video/mp4": "video",
+    "video/webm": "video",
+    "video/quicktime": "video",
+    "audio/mpeg": "audio",
+    "audio/ogg": "audio",
+    "audio/wav": "audio",
+    "audio/webm": "audio",
+}
+MAX_ATTACHMENTS = 10
 
 
 class ConversationCreate(s.Input):
@@ -34,9 +52,16 @@ class MembersAdd(s.Input):
 
 class MessageCreate(s.Input):
     client_message_id: str = Field(min_length=1, max_length=80)
-    body: str = Field(min_length=1, max_length=8000)
+    body: str = Field(default="", max_length=8000)
     reply_to_id: str | None = None
     mention_ids: list[str] = Field(default_factory=list, max_length=50)
+    attachment_ids: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
+
+    @model_validator(mode="after")
+    def not_empty(self):
+        if not self.body.strip() and not self.attachment_ids:
+            raise ValueError("Tin nhắn cần nội dung hoặc tệp đính kèm.")
+        return self
 
 
 class MessageEdit(s.Input):
@@ -109,6 +134,7 @@ def build_router(app):
     router = APIRouter(prefix="/workspace/v1", tags=["chat"])
     db_dep = app.state.db_dependency
     actor_dep = app.state.auth.actor
+    settings = app.state.settings
 
     def user_for(db, actor):
         if actor.application != "workspace" or actor.service:
@@ -142,6 +168,18 @@ def build_router(app):
             data.update(body="", mentions=[], reactions={})
         data["deleted"] = message.deleted_at is not None
         data["mine"] = message.sender_id == user_id
+        data["attachments"] = (
+            []
+            if message.deleted_at
+            else [
+                attachment_data(a)
+                for a in db.scalars(
+                    select(m.ChatAttachment)
+                    .where(m.ChatAttachment.message_id == message.id)
+                    .order_by(m.ChatAttachment.created_at, m.ChatAttachment.id)
+                )
+            ]
+        )
         if message.reply_to_id:
             reply = db.get(m.Message, message.reply_to_id)
             data["reply_to"] = (
@@ -155,6 +193,16 @@ def build_router(app):
                 else None
             )
         return data
+
+    def attachment_data(value):
+        return {
+            "id": value.id,
+            "name": value.name,
+            "mime": value.mime,
+            "size": value.size,
+            "kind": value.kind,
+            "url": f"/workspace/v1/chat-attachments/{value.id}/content",
+        }
 
     def conversation_data(db, user, conversation, member, detail=False):
         data = serial(conversation)
@@ -420,6 +468,18 @@ def build_router(app):
             reply = message_readable(db, user, body.reply_to_id)
             if not reply or reply.conversation_id != conversation_id:
                 raise AppError(422, "reply_invalid", "Tin nhắn được trả lời không tồn tại trong hội thoại.")
+        attachments = []
+        for attachment_id in dict.fromkeys(body.attachment_ids):
+            attachment = db.get(m.ChatAttachment, attachment_id)
+            # Only the uploader's own, not-yet-sent files of this conversation can be attached.
+            if (
+                not attachment
+                or attachment.conversation_id != conversation_id
+                or attachment.uploader_id != user.id
+                or attachment.message_id
+            ):
+                raise AppError(422, "attachment_invalid", "Tệp đính kèm không hợp lệ hoặc đã được gửi.")
+            attachments.append(attachment)
         member_ids = {x.user_id for x in members_of(db, conversation_id)}
         mentions = [x for x in dict.fromkeys(body.mention_ids) if x in member_ids and x != user.id]
         conversation.last_seq += 1
@@ -437,6 +497,8 @@ def build_router(app):
         sender = membership(db, conversation_id, user.id)
         sender.last_read_seq = conversation.last_seq
         db.flush()
+        for attachment in attachments:
+            attachment.message_id = message.id
         for recipient in mentions:
             notify(
                 db,
@@ -447,6 +509,71 @@ def build_router(app):
             )
         db.commit()
         return message_data(db, message, user.id)
+
+    @router.post("/conversations/{conversation_id}/attachments", status_code=201)
+    async def upload_attachment(
+        conversation_id: str,
+        file: UploadFile = File(...),
+        idempotency_key: str | None = Header(None),
+        db: Session = Depends(db_dep),
+        actor: Actor = Depends(actor_dep),
+    ):
+        """Store a file for a message about to be sent; it stays private to the uploader until then."""
+        user = user_for(db, actor)
+        get_conversation(db, user, conversation_id)
+        data = bytearray()
+        while chunk := await file.read(1024 * 1024):
+            data.extend(chunk)
+            if len(data) > settings.max_upload_bytes:
+                raise AppError(413, "upload_too_large", "Tệp vượt giới hạn dung lượng.")
+        if not data:
+            raise AppError(422, "upload_size_invalid", "Tệp rỗng.")
+        name = (file.filename or "tep").replace("/", "_").replace("\\", "_")[:250]
+        mime = (file.content_type or "application/octet-stream").split(";")[0].strip().lower()
+        # Stored under the Workspace service principal: Workspace checks membership on every read.
+        stored = app.state.core_service.upload(name, mime, bytes(data), idempotency_key or m.uid())
+        value = m.ChatAttachment(
+            conversation_id=conversation_id,
+            uploader_id=user.id,
+            core_file_id=stored.get("file_id", stored.get("id")),
+            name=name,
+            mime=mime,
+            size=len(data),
+            kind=INLINE.get(mime, "file"),
+        )
+        db.add(value)
+        db.commit()
+        return attachment_data(value)
+
+    @router.get("/chat-attachments/{attachment_id}/content")
+    def attachment_content(
+        attachment_id: str,
+        download: bool = False,
+        db: Session = Depends(db_dep),
+        actor: Actor = Depends(actor_dep),
+    ):
+        user = user_for(db, actor)
+        value = db.get(m.ChatAttachment, attachment_id)
+        if value and value.message_id:
+            visible = message_readable(db, user, value.message_id) is not None
+        else:
+            visible = bool(
+                value and value.uploader_id == user.id and membership(db, value.conversation_id, user.id)
+            )
+        if not visible:
+            raise AppError(404, "attachment_not_found", "Không tìm thấy tệp đính kèm.")
+        _, version = app.state.core_service.file_version(value.core_file_id)
+        ticket = app.state.core_service.post(f"/storage/versions/{version['id']}/download-tickets", {})
+        content = app.state.core_service.get(f"/storage/download/{ticket['ticket']}", raw=True)
+        disposition = "attachment" if download or value.kind == "file" else "inline"
+        return Response(
+            content,
+            media_type=value.mime if value.kind != "file" else "application/octet-stream",
+            headers={
+                "Content-Disposition": f"{disposition}; filename*=UTF-8''{quote(value.name)}",
+                "Cache-Control": "private, max-age=300",
+            },
+        )
 
     def own_message(db, user, message_id):
         message = message_readable(db, user, message_id)

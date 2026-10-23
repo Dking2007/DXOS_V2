@@ -30,6 +30,12 @@ const search = ref('')
 const view = ref<'list' | 'board' | 'due'>('list')
 const cursor = ref<string | null>(null)
 const showCreate = ref(route.query.create === '1')
+watch(
+  () => route.query.create,
+  (value) => {
+    if (value) showCreate.value = true
+  },
+)
 watch([scope, status, search, overdueOnly], () => (cursor.value = null))
 const tasks = useQuery({
   queryKey: computed(() => [

@@ -169,6 +169,29 @@ export interface Notification {
   resource_id?: string
   case_id?: string
   link?: string | null
+  category?: 'approval' | 'task' | 'mention' | 'feed' | 'automation' | 'other'
+}
+export interface AgendaItem {
+  kind: 'task' | 'approval' | 'mention'
+  id: string
+  title: string
+  action: 'accept' | 'open' | 'assign' | 'review' | 'decide'
+  link: string
+  due_at: string | null
+  overdue: boolean
+  detail: string
+  status: string | null
+}
+export interface MeOverview {
+  counts: {
+    tasks: number
+    tasks_to_review: number
+    approvals: number
+    notifications: number
+    chat: number
+  }
+  agenda: AgendaItem[]
+  as_of: string
 }
 export type TaskStatus =
   | 'draft'
@@ -254,6 +277,16 @@ export interface ChatMessage {
   reactions: Record<string, string[]>
   mentions: string[]
   reply_to?: { id: string; seq: number; body: string; sender_name: string } | null
+  attachments: ChatAttachment[]
+}
+export interface ChatAttachment {
+  id: string
+  name: string
+  mime: string
+  size: number
+  kind: 'image' | 'video' | 'audio' | 'file'
+  /** Served by Workspace after checking conversation membership on every request. */
+  url: string
 }
 export interface Conversation {
   id: string

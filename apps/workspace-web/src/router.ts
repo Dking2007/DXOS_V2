@@ -13,12 +13,12 @@ export const router = createRouter({
     {
       path: '/home',
       component: () => import('./views/HomeView.vue'),
-      meta: { title: 'Tổng quan' },
+      meta: { title: 'Việc hôm nay' },
     },
     {
       path: '/drive',
       component: () => import('./views/DriveView.vue'),
-      meta: { title: 'Tài liệu' },
+      meta: { title: 'Kho tài liệu' },
     },
     {
       path: '/drive/:id/edit',
@@ -58,7 +58,8 @@ export const router = createRouter({
     {
       path: '/chat',
       component: () => import('./views/ChatView.vue'),
-      meta: { title: 'Nhắn tin' },
+      // Full-bleed like a messaging app, but the main navigation stays as the user left it.
+      meta: { title: 'Nhắn tin', bleed: true },
     },
     {
       path: '/feed',

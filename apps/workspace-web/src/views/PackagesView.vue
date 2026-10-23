@@ -1,65 +1,76 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import {
+  CheckCircle2,
+  ChevronDown,
+  ClipboardList,
+  FlaskConical,
+  GitCompare,
+  PackageOpen,
+  Paperclip,
+  Play,
+  Plus,
+  Rocket,
+  ShieldCheck,
+  Users,
+  XCircle,
+} from 'lucide-vue-next'
 import { api } from '../api'
+import { toast } from '../ui/toast'
 import { useSession } from '../stores/session'
-import { errorText, newIntent, type Page } from '@dx/web-shared/api.ts'
-import type { FormTemplate } from '@dx/web-shared/types.ts'
+import { errorText, formatDate, newIntent, type Page } from '@dx/web-shared/api.ts'
+import type { FormTemplate, User } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
+import ProcessDiagram from '../packages/ProcessDiagram.vue'
+import ScenarioEditor from '../packages/ScenarioEditor.vue'
+import PackageDialog from '../packages/PackageDialog.vue'
+import {
+  DECISION_LABEL,
+  ERROR_LABEL,
+  ROLE_LABEL,
+  VERSION_STATE,
+  choicesFrom,
+  latestReports,
+  pathStops,
+  readiness,
+} from '../packages/model'
+import type { PackageVersion, Report, ReportResult, Suite } from '../packages/model'
+import '../packages/packages.css'
 
 interface Package {
   id: string
   name: string
   description: string
   active_version_id: string | null
-}
-interface Version {
-  id: string
-  package_id: string
-  form_id: string
-  version_no: number
-  required_file_count: number
-  state: string
-  revision: number
-  config_hash: string
-}
-interface Preview {
-  execution_mode: string
-  effects_performed: boolean
-  path: string[]
-  state: string
-  assignees: { node_id: string; subject: string }[]
-  routing_evidence: { label: string; selected: boolean; recipient: string | null; evaluated_value: unknown }[]
-}
-interface Suite {
-  id: string
-  cases: { name: string }[]
-}
-interface Report {
-  id: string
-  suite_id: string
-  passed: boolean
-  results: { name: string; passed: boolean; error?: { detail: string }; actual_path?: string[] }[]
+  allowed_roles: string[]
+  created_at: string
 }
 interface VersionDiff {
   from_version: number
   to_version: number
   form_changed: boolean
-  fields: { key: string; before: unknown; after: unknown }[]
-  approval_steps: { before: unknown; after: unknown } | null
+  fields: { key: string; before: { label: string } | null; after: { label: string } | null }[]
+  approval_steps: { before: PackageVersion['approval_steps']; after: PackageVersion['approval_steps'] } | null
   required_file_count: { before: number; after: number } | null
 }
 const session = useSession()
 const client = useQueryClient()
 const canManage = computed(() => session.can('forms.manage'))
-const packages = useQuery({ queryKey: ['business-packages'], queryFn: () => api.request<Page<Package>>('/business-packages') })
+const packages = useQuery({
+  queryKey: ['business-packages'],
+  queryFn: () => api.request<Page<Package>>('/business-packages'),
+})
 const forms = useQuery({ queryKey: ['forms'], queryFn: () => api.request<Page<FormTemplate>>('/forms') })
+const users = useQuery({ queryKey: ['users'], queryFn: () => api.request<Page<User>>('/users') })
+function userName(id: string) {
+  return users.data.value?.items.find((u) => u.id === id)?.display_name ?? 'Người dùng đã khóa'
+}
 const selectedPackageId = ref('')
 const selectedVersionId = ref('')
 const versions = useQuery({
   queryKey: computed(() => ['business-package-versions', selectedPackageId.value]),
-  queryFn: () => api.request<Page<Version>>(`/business-packages/${selectedPackageId.value}/versions`),
+  queryFn: () => api.request<Page<PackageVersion>>(`/business-packages/${selectedPackageId.value}/versions`),
   enabled: computed(() => !!selectedPackageId.value),
 })
 const suites = useQuery({
@@ -72,249 +83,447 @@ const reports = useQuery({
   queryFn: () => api.request<Page<Report>>(`/package-versions/${selectedVersionId.value}/simulation-reports`),
   enabled: computed(() => canManage.value && !!selectedVersionId.value),
 })
-watch(() => packages.data.value?.items, items => {
-  if (items?.length && !selectedPackageId.value) selectedPackageId.value = items[0].id
+watch(
+  () => packages.data.value?.items,
+  (items) => {
+    if (items?.length && !items.some((p) => p.id === selectedPackageId.value)) selectedPackageId.value = items[0].id
+  },
+)
+watch(
+  () => versions.data.value?.items,
+  (items) => {
+    if (items?.length && !items.some((v) => v.id === selectedVersionId.value))
+      selectedVersionId.value = items.at(-1)!.id
+  },
+)
+watch(selectedPackageId, () => {
+  selectedVersionId.value = ''
+  tab.value = 'process'
 })
-watch(() => versions.data.value?.items, items => {
-  if (items?.length && !items.some(v => v.id === selectedVersionId.value))
-    selectedVersionId.value = items.at(-1)!.id
-})
-const selectedVersion = computed(() => versions.data.value?.items.find(v => v.id === selectedVersionId.value))
-const previousVersion = computed(() => versions.data.value?.items.filter(v => v.version_no < (selectedVersion.value?.version_no ?? 0)).at(-1))
+const selectedPackage = computed(() => packages.data.value?.items.find((p) => p.id === selectedPackageId.value))
+const selectedVersion = computed(() => versions.data.value?.items.find((v) => v.id === selectedVersionId.value))
+const versionForm = computed(() => forms.data.value?.items.find((f) => f.id === selectedVersion.value?.form_id))
+const previousVersion = computed(
+  () => versions.data.value?.items.filter((v) => v.version_no < (selectedVersion.value?.version_no ?? 0)).at(-1),
+)
 const versionDiff = useQuery({
   queryKey: computed(() => ['package-version-diff', selectedVersionId.value, previousVersion.value?.id]),
-  queryFn: () => api.request<VersionDiff>(`/package-versions/${selectedVersionId.value}/diff?against_id=${previousVersion.value!.id}`),
+  queryFn: () =>
+    api.request<VersionDiff>(`/package-versions/${selectedVersionId.value}/diff?against_id=${previousVersion.value!.id}`),
   enabled: computed(() => !!selectedVersionId.value && !!previousVersion.value),
 })
-const publishReady = computed(() => {
-  const savedSuites = suites.data.value?.items ?? []
-  const savedReports = reports.data.value?.items ?? []
-  return savedSuites.length > 0 && savedSuites.every(suite => savedReports.find(report => report.suite_id === suite.id)?.passed)
-})
-const newName = ref('')
-const newDescription = ref('')
-const formId = ref('')
-const requiredFileCount = ref(0)
-const allowedRoles = ref<string[]>([])
-const fixtureName = ref('Hồ sơ mẫu')
-const payloadText = ref('{}')
-const decisionsText = ref('{}')
-const fixtureFileCount = ref(0)
-const expectedErrorCode = ref('')
-const expectedPathText = ref('[]')
-const batchCasesText = ref('')
-const preview = ref<Preview | null>(null)
-const error = ref('')
+const state = computed(() =>
+  selectedVersion.value
+    ? readiness(selectedVersion.value, suites.data.value?.items ?? [], reports.data.value?.items ?? [])
+    : null,
+)
+const latest = computed(() =>
+  selectedVersion.value ? latestReports(reports.data.value?.items ?? [], selectedVersion.value.config_hash) : new Map(),
+)
+const currentSuites = computed(() =>
+  (suites.data.value?.items ?? []).filter((s) => s.config_hash === selectedVersion.value?.config_hash),
+)
+const staleSuites = computed(() =>
+  (suites.data.value?.items ?? []).filter((s) => s.config_hash !== selectedVersion.value?.config_hash),
+)
+const tab = ref<'process' | 'tests' | 'changes'>('process')
+const dialog = ref<'package' | 'version' | null>(null)
 const busy = ref(false)
-
-function parseObject(value: string): Record<string, unknown> {
-  const parsed: unknown = JSON.parse(value)
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Cần nhập JSON object.')
-  return parsed as Record<string, unknown>
-}
-function parsePath(): string[] {
-  const parsed: unknown = JSON.parse(expectedPathText.value)
-  if (!Array.isArray(parsed) || !parsed.length || !parsed.every(item => typeof item === 'string'))
-    throw new Error('Đường đi kỳ vọng cần là mảng tên bước, ví dụ ["start", "review_0"].')
-  return parsed
-}
-async function action(run: () => Promise<void>) {
+const error = ref('')
+const notice = ref('')
+const expanded = ref<string | null>(null)
+const editor = ref<InstanceType<typeof ScenarioEditor> | null>(null)
+async function action(run: () => Promise<void>, done?: string) {
   busy.value = true
   error.value = ''
-  try { await run() } catch (cause) { error.value = errorText(cause) } finally { busy.value = false }
+  notice.value = ''
+  try {
+    await run()
+    if (done) toast.success(done)
+  } catch (cause) {
+    error.value = errorText(cause)
+  } finally {
+    busy.value = false
+  }
 }
-async function createPackage() {
-  await action(async () => {
-    const result = await api.request<Package>('/business-packages', {
-      method: 'POST', headers: { 'Idempotency-Key': newIntent() },
-      body: JSON.stringify({ name: newName.value, description: newDescription.value, form_id: formId.value,
-        required_file_count: requiredFileCount.value, allowed_roles: allowedRoles.value }),
-    })
-    newName.value = ''
-    selectedPackageId.value = result.id
-    await client.invalidateQueries({ queryKey: ['business-packages'] })
-  })
+async function refreshVersion() {
+  await client.invalidateQueries({ queryKey: ['business-package-versions', selectedPackageId.value] })
+  await client.invalidateQueries({ queryKey: ['simulation-suites', selectedVersionId.value] })
+  await client.invalidateQueries({ queryKey: ['simulation-reports', selectedVersionId.value] })
 }
-async function importTemplate(item: Package) {
-  if (!item.active_version_id || !newName.value.trim()) return
-  await action(async () => {
-    const result = await api.request<Package>('/business-packages/from-template', {
-      method: 'POST', headers: { 'Idempotency-Key': newIntent() },
-      body: JSON.stringify({ version_id: item.active_version_id, name: newName.value.trim() }),
-    })
-    selectedPackageId.value = result.id
-    newName.value = ''
-    await client.invalidateQueries({ queryKey: ['business-packages'] })
-  })
-}
-async function createVersion() {
-  await action(async () => {
-    await api.request(`/business-packages/${selectedPackageId.value}/versions`, {
-      method: 'POST', headers: { 'Idempotency-Key': newIntent() },
-      body: JSON.stringify({ form_id: formId.value, required_file_count: requiredFileCount.value }),
-    })
-    await client.invalidateQueries({ queryKey: ['business-package-versions', selectedPackageId.value] })
-  })
-}
-async function validateVersion() {
-  if (!selectedVersion.value) return
-  await action(async () => {
+function validateVersion() {
+  return action(async () => {
     await api.request(`/package-versions/${selectedVersionId.value}/validate`, {
-      method: 'POST', body: JSON.stringify({ expected_revision: selectedVersion.value!.revision }),
+      method: 'POST',
+      body: JSON.stringify({ expected_revision: selectedVersion.value!.revision }),
     })
-    await client.invalidateQueries({ queryKey: ['business-package-versions', selectedPackageId.value] })
+    await refreshVersion()
+    tab.value = 'tests'
+  }, 'Cấu hình hợp lệ. Tiếp theo: tạo và chạy kịch bản thử.')
+}
+function runSuite(suiteId: string) {
+  return action(async () => {
+    const report = await api.request<Report>(
+      `/package-versions/${selectedVersionId.value}/simulate?suite_id=${encodeURIComponent(suiteId)}`,
+      { method: 'POST', headers: { 'Idempotency-Key': newIntent() } },
+    )
+    await refreshVersion()
+    expanded.value = suiteId
+    if (!report.passed) error.value = 'Có kịch bản chưa đạt — xem chi tiết bên dưới.'
   })
 }
-async function runPreview() {
-  await action(async () => {
-    preview.value = await api.request<Preview>(`/package-versions/${selectedVersionId.value}/preview`, {
-      method: 'POST', body: JSON.stringify({ payload: parseObject(payloadText.value), decisions: parseObject(decisionsText.value), file_count: fixtureFileCount.value }),
-    })
-    expectedPathText.value = JSON.stringify(preview.value.path)
-  })
+async function runAll() {
+  for (const suite of currentSuites.value) await runSuite(suite.id)
 }
-async function saveSuite() {
-  await action(async () => {
-    let cases: unknown[]
-    if (batchCasesText.value.trim()) {
-      const parsed: unknown = JSON.parse(batchCasesText.value)
-      if (!Array.isArray(parsed) || !parsed.length || parsed.length > 20)
-        throw new Error('Bộ thử cần từ 1 đến 20 hồ sơ mẫu.')
-      cases = parsed
-    } else {
-      cases = [{ name: fixtureName.value, payload: parseObject(payloadText.value),
-        decisions: parseObject(decisionsText.value), file_count: fixtureFileCount.value,
-        expected_path: expectedErrorCode.value ? [] : parsePath(), expected_error_code: expectedErrorCode.value || null }]
-    }
-    await api.request(`/package-versions/${selectedVersionId.value}/test-suites`, {
-      method: 'POST', headers: { 'Idempotency-Key': newIntent() },
-      body: JSON.stringify({ cases }),
-    })
-    await client.invalidateQueries({ queryKey: ['simulation-suites', selectedVersionId.value] })
-  })
-}
-async function runSuite(suiteId: string) {
-  await action(async () => {
-    await api.request(`/package-versions/${selectedVersionId.value}/simulate?suite_id=${encodeURIComponent(suiteId)}`, {
-      method: 'POST', headers: { 'Idempotency-Key': newIntent() },
-    })
-    await client.invalidateQueries({ queryKey: ['simulation-reports', selectedVersionId.value] })
-  })
-}
-async function publish() {
-  if (!selectedVersion.value) return
-  await action(async () => {
+function publish() {
+  return action(async () => {
     await api.request(`/package-versions/${selectedVersionId.value}/publish`, {
-      method: 'POST', body: JSON.stringify({ expected_revision: selectedVersion.value!.revision }),
+      method: 'POST',
+      body: JSON.stringify({ expected_revision: selectedVersion.value!.revision }),
     })
-    await client.invalidateQueries({ queryKey: ['business-package-versions', selectedPackageId.value] })
+    await refreshVersion()
     await client.invalidateQueries({ queryKey: ['business-packages'] })
-    await client.invalidateQueries({ queryKey: ['business-packages', 'active'] })
-  })
+  }, 'Đã phát hành. Hồ sơ mới tạo từ biểu mẫu này sẽ dùng phiên bản vừa phát hành.')
 }
+async function created(packageId: string) {
+  dialog.value = null
+  await client.invalidateQueries({ queryKey: ['business-packages'] })
+  if (packageId !== selectedPackageId.value) selectedPackageId.value = packageId
+  else await refreshVersion()
+  selectedVersionId.value = ''
+  toast.success('Đã tạo bản nháp. Bước tiếp theo: kiểm tra cấu hình.')
+}
+function reuseSuite(suite: Suite) {
+  tab.value = 'tests'
+  editor.value?.load(suite.cases)
+}
+function resultPath(result: ReportResult, which: 'expected_path' | 'actual_path') {
+  const evidence = (result as ReportResult & { result?: { routing_evidence?: { selected: boolean; label: string }[] } })
+    .result?.routing_evidence
+  const labels = evidence?.filter((e) => e.selected).map((e) => e.label) ?? []
+  return pathStops(result[which] ?? [], labels)
+    .map((s) => s.label)
+    .join(' → ')
+}
+const stages = computed(() => {
+  const version = selectedVersion.value
+  const ready = state.value
+  if (!version || !ready) return []
+  const published = version.state === 'published'
+  return [
+    { key: 'draft', title: 'Bản nháp', hint: 'Cấu hình đã ghim', done: true },
+    { key: 'validate', title: 'Kiểm tra cấu hình', hint: 'Người duyệt, đồ thị', done: ready.validated },
+    {
+      key: 'test',
+      title: 'Chạy thử đạt',
+      hint: ready.hasSuites ? `${currentSuites.value.length} bộ kịch bản` : 'Chưa có kịch bản',
+      done: published || ready.allPassed,
+    },
+    { key: 'publish', title: 'Phát hành', hint: published ? 'Đang dùng' : 'Áp dụng cho hồ sơ mới', done: published },
+  ]
+})
+const currentStage = computed(() => stages.value.findIndex((s) => !s.done))
 </script>
 
 <template>
   <header class="page-head">
-    <div><span class="eyebrow">THIẾT KẾ QUY TRÌNH</span><h1>Gói nghiệp vụ</h1>
-      <p>Thiết kế → kiểm chứng → phát hành. Chạy thử không thực hiện hành động thật.</p></div>
+    <div>
+      <span class="eyebrow">THIẾT KẾ QUY TRÌNH</span>
+      <h1>Gói nghiệp vụ</h1>
+      <p>Mỗi gói quy định một loại hồ sơ: biểu mẫu, ai duyệt theo thứ tự nào, cần tài liệu gì. Chạy thử trước khi áp dụng.</p>
+    </div>
+    <div v-if="canManage" class="page-actions">
+      <button class="button" @click="dialog = 'package'"><Plus :size="18" />Tạo gói</button>
+    </div>
   </header>
-  <div v-if="error" class="notice error" role="alert">{{ error }}</div>
-  <StatePanel :loading="packages.isPending.value" :error="packages.error.value"
-    :empty="packages.data.value?.items.length === 0" title="Chưa có gói nghiệp vụ" @retry="packages.refetch()" />
-  <section v-if="canManage" class="card" style="padding: 24px; margin-bottom: 20px">
-    <h2>Tạo gói hoặc phiên bản mới</h2>
-    <p class="muted">Tạo biểu mẫu và điều kiện duyệt trong <RouterLink to="/settings">Thiết lập</RouterLink>, rồi chọn mẫu ở đây.</p>
-    <div class="form-grid" style="margin-top: 16px">
-      <div class="field"><label for="package-name">Tên gói mới</label><input id="package-name" v-model="newName" placeholder="Ví dụ: Đề nghị mua sắm" /></div>
-      <div class="field"><label for="package-form">Biểu mẫu đã phát hành</label><select id="package-form" v-model="formId">
-        <option value="">Chọn biểu mẫu</option><option v-for="form in forms.data.value?.items" :key="form.id" :value="form.id">{{ form.name }}</option>
-      </select></div>
-      <div class="field"><label for="package-documents">Số tài liệu tối thiểu khi trình</label><input id="package-documents" v-model.number="requiredFileCount" type="number" min="0" max="30" /></div>
-      <div class="field"><label for="package-roles">Vai trò được sử dụng (để trống: mọi vai trò)</label>
-        <select id="package-roles" v-model="allowedRoles" multiple>
-          <option value="staff">Nhân viên</option><option value="manager">Lãnh đạo phòng</option>
-          <option value="director">Giám đốc</option><option value="technical_admin">Quản trị kỹ thuật</option>
-        </select></div>
-      <div class="field full-width"><label for="package-description">Mục đích</label><textarea id="package-description" v-model="newDescription" rows="2" /></div>
-    </div>
-    <div class="inline-actions" style="margin-top: 16px">
-      <button class="button" :disabled="busy || !formId || !newName" @click="createPackage">Tạo gói</button>
-      <button class="button secondary" :disabled="busy || !formId || !selectedPackageId" @click="createVersion">Tạo phiên bản cho gói đang chọn</button>
-    </div>
+  <div v-if="error" class="notice error error-inline" role="alert">
+    <XCircle :size="18" /><span>{{ error }}</span>
+  </div>
+  <div v-if="notice" class="notice success error-inline" role="status">
+    <CheckCircle2 :size="18" /><span>{{ notice }}</span>
+  </div>
+  <section v-if="packages.isPending.value || packages.error.value || !packages.data.value?.items.length" class="card">
+    <StatePanel
+      :loading="packages.isPending.value"
+      :error="packages.error.value"
+      :empty="packages.data.value?.items.length === 0"
+      title="Chưa có gói nghiệp vụ"
+      description="Tạo gói từ một biểu mẫu đã phát hành để quy định cách xử lý một loại hồ sơ."
+      @retry="packages.refetch()"
+      ><button v-if="canManage" class="button small" @click="dialog = 'package'">
+        <Plus :size="16" />Tạo gói
+      </button></StatePanel
+    >
   </section>
-  <section v-if="canManage" class="card" style="padding: 24px; margin-bottom: 20px">
-    <h2>Thư viện mẫu nội bộ</h2>
-    <p class="muted">Nhập tên gói mới ở trên, rồi sao chép cấu hình đã phát hành thành bản nháp riêng để kiểm chứng lại.</p>
-    <div v-for="item in packages.data.value?.items.filter(value => value.active_version_id)" :key="item.id" class="list-row">
-      <div class="grow"><strong>{{ item.name }}</strong><small>{{ item.description }}</small></div>
-      <button class="button secondary small" :disabled="busy || !newName.trim()" @click="importTemplate(item)">Sao chép làm gói mới</button>
-    </div>
-  </section>
-  <section class="card" style="padding: 24px; margin-bottom: 20px">
-    <div class="form-grid">
-      <div class="field"><label for="package-select">Gói</label><select id="package-select" v-model="selectedPackageId">
-        <option v-for="item in packages.data.value?.items" :key="item.id" :value="item.id">{{ item.name }}</option>
-      </select></div>
-      <div class="field"><label for="version-select">Phiên bản</label><select id="version-select" v-model="selectedVersionId">
-        <option v-for="item in versions.data.value?.items" :key="item.id" :value="item.id">v{{ item.version_no }} · {{ item.state }}</option>
-      </select></div>
-    </div>
-    <div v-if="selectedVersion" class="stack" style="margin-top: 20px">
-      <p>Trạng thái: <strong>{{ selectedVersion.state }}</strong> · tài liệu tối thiểu: {{ selectedVersion.required_file_count }}</p>
-      <small class="mono">Cấu hình: {{ selectedVersion.config_hash.slice(0, 16) }}…</small>
-      <div v-if="canManage" class="inline-actions">
-        <button class="button secondary" :disabled="busy || selectedVersion.state !== 'draft'" @click="validateVersion">Kiểm tra cấu hình</button>
-        <button class="button" :disabled="busy || selectedVersion.state !== 'validated' || !publishReady" @click="publish">Phát hành phiên bản</button>
+  <div v-else class="pkg-layout">
+    <aside class="pkg-list" aria-label="Danh sách gói">
+      <button
+        v-for="item in packages.data.value?.items"
+        :key="item.id"
+        class="pkg-item"
+        :class="{ active: item.id === selectedPackageId }"
+        :title="item.name"
+        @click="selectedPackageId = item.id"
+      >
+        <span class="pkg-item-icon"><PackageOpen :size="18" /></span>
+        <span class="grow">
+          <strong>{{ item.name }}</strong>
+          <small>{{ item.description || 'Chưa có mô tả' }}</small>
+        </span>
+        <span class="status-badge" :class="item.active_version_id ? 'status-published' : 'status-draft'"
+          ><span class="status-dot" />{{ item.active_version_id ? 'Đang dùng' : 'Nháp' }}</span
+        >
+      </button>
+    </aside>
+
+    <section v-if="selectedPackage" class="card pkg-detail">
+      <header class="pkg-detail-head">
+        <div class="grow">
+          <h2>{{ selectedPackage.name }}</h2>
+          <p class="muted">{{ selectedPackage.description || 'Chưa có mô tả.' }}</p>
+          <div class="pkg-meta">
+            <span><Users :size="14" />
+              {{ selectedPackage.allowed_roles.length ? selectedPackage.allowed_roles.map((r) => ROLE_LABEL[r] ?? r).join(', ') : 'Mọi vai trò có quyền tạo hồ sơ' }}</span>
+            <span v-if="selectedVersion"><Paperclip :size="14" /> Tối thiểu {{ selectedVersion.required_file_count }} tài liệu</span>
+            <span v-if="versionForm"><ClipboardList :size="14" /> Biểu mẫu: {{ versionForm.name }}</span>
+          </div>
+        </div>
+        <button v-if="canManage" class="button secondary small" @click="dialog = 'version'">
+          <Plus :size="15" />Phiên bản mới
+        </button>
+      </header>
+
+      <div class="version-chips" role="tablist" aria-label="Phiên bản">
+        <button
+          v-for="item in versions.data.value?.items"
+          :key="item.id"
+          role="tab"
+          :aria-selected="item.id === selectedVersionId"
+          class="version-chip"
+          :class="[item.state, { active: item.id === selectedVersionId }]"
+          @click="selectedVersionId = item.id"
+        >
+          v{{ item.version_no }} · {{ VERSION_STATE[item.state] ?? item.state }}
+        </button>
       </div>
-    </div>
-  </section>
-  <section v-if="previousVersion && versionDiff.data.value" class="card" style="padding: 24px; margin-bottom: 20px">
-    <h2>Thay đổi so với phiên bản {{ versionDiff.data.value.from_version }}</h2>
-    <p v-if="versionDiff.data.value.form_changed">Biểu mẫu đã thay đổi.</p>
-    <p v-if="versionDiff.data.value.required_file_count">Tài liệu tối thiểu: {{ versionDiff.data.value.required_file_count.before }} → {{ versionDiff.data.value.required_file_count.after }}</p>
-    <div v-for="field in versionDiff.data.value.fields" :key="field.key" class="list-row">
-      <strong>{{ field.key }}</strong><small>{{ field.before ? 'Đã sửa' : 'Đã thêm' }}{{ field.after ? '' : ' / đã xóa' }}</small>
-      <details><summary>Xem cấu hình trường</summary><pre>{{ JSON.stringify(field, null, 2) }}</pre></details>
-    </div>
-    <details v-if="versionDiff.data.value.approval_steps"><summary>Các bước duyệt đã thay đổi</summary>
-      <pre>{{ JSON.stringify(versionDiff.data.value.approval_steps, null, 2) }}</pre></details>
-    <p v-if="!versionDiff.data.value.form_changed && !versionDiff.data.value.required_file_count && !versionDiff.data.value.approval_steps && !versionDiff.data.value.fields.length">Không có thay đổi cấu hình.</p>
-  </section>
-  <section v-if="selectedVersion && canManage" class="card" style="padding: 24px; margin-bottom: 20px">
-    <span class="eyebrow">CHẠY THỬ — KHÔNG THỰC HIỆN HÀNH ĐỘNG THẬT</span><h2>Hồ sơ mẫu</h2>
-    <div class="form-grid" style="margin-top: 16px">
-      <div class="field"><label for="fixture-name">Tên kịch bản</label><input id="fixture-name" v-model="fixtureName" /></div>
-      <div class="field"><label for="fixture-payload">Dữ liệu biểu mẫu (JSON)</label><textarea id="fixture-payload" v-model="payloadText" rows="5" /></div>
-      <div class="field"><label for="fixture-decisions">Quyết định giả lập (JSON)</label><textarea id="fixture-decisions" v-model="decisionsText" rows="5" placeholder="{&quot;review_0&quot;:{&quot;decision&quot;:&quot;approve&quot;}}" /></div>
-      <div class="field"><label for="fixture-file-count">Số tài liệu mẫu</label><input id="fixture-file-count" v-model.number="fixtureFileCount" type="number" min="0" max="30" /></div>
-      <div class="field"><label for="fixture-error">Lỗi kỳ vọng</label><select id="fixture-error" v-model="expectedErrorCode">
-        <option value="">Không có lỗi</option><option value="required_documents_missing">Thiếu tài liệu bắt buộc</option>
-        <option value="approval_configuration_error">Không tìm thấy người duyệt</option><option value="self_approval_denied">Người tạo trùng người duyệt</option><option value="form_validation_error">Dữ liệu biểu mẫu không hợp lệ</option>
-      </select></div>
-      <div class="field"><label for="fixture-path">Đường đi kỳ vọng (JSON)</label><textarea id="fixture-path" v-model="expectedPathText" rows="5" /></div>
-      <div class="field full-width"><label for="batch-cases">Nhiều hồ sơ mẫu (JSON, tùy chọn, tối đa 20)</label><textarea id="batch-cases" v-model="batchCasesText" rows="5" placeholder="[{&quot;name&quot;:&quot;SC01&quot;,&quot;payload&quot;:{},&quot;decisions&quot;:{},&quot;expected_path&quot;:[&quot;start&quot;]}]" /><small>Nếu nhập danh sách này, nút lưu bộ thử dùng danh sách thay cho hồ sơ mẫu phía trên.</small></div>
-    </div>
-    <div class="inline-actions" style="margin-top: 16px">
-      <button class="button secondary" :disabled="busy" @click="runPreview">Xem đường đi giả lập</button>
-      <button class="button" :disabled="busy" @click="saveSuite">Lưu kịch bản và kỳ vọng</button>
-    </div>
-    <div v-if="preview" class="notice" style="margin-top: 18px">
-      <strong>Kết quả giả lập:</strong> {{ preview.path.join(' → ') }} · {{ preview.state }}
-      <p v-for="step in preview.routing_evidence" :key="step.label">
-        {{ step.label }}: {{ step.selected ? `chọn ${step.recipient}` : 'bỏ qua' }}
-        <span v-if="step.evaluated_value !== null"> · giá trị xét: {{ step.evaluated_value }}</span>
-      </p>
-      <small>Không tạo hồ sơ, nhiệm vụ hoặc thông báo sản xuất.</small>
-    </div>
-    <div v-for="suite in suites.data.value?.items" :key="suite.id" class="list-row">
-      <div class="grow">{{ suite.cases.map(item => item.name).join(', ') }}</div>
-      <button class="button secondary small" :disabled="busy" @click="runSuite(suite.id)">Chạy bộ thử</button>
-    </div>
-    <div v-for="report in reports.data.value?.items" :key="report.id" class="list-row">
-      <div class="grow"><strong>{{ report.passed ? 'Đạt' : 'Chưa đạt' }}</strong>
-        <small v-for="item in report.results" :key="item.name">{{ item.name }}: {{ item.passed ? (item.error ? `đúng lỗi ${item.error.detail}` : 'đúng đường đi') : item.error?.detail || `đường đi ${item.actual_path?.join(' → ')}` }}</small>
-      </div>
-    </div>
-  </section>
+
+      <template v-if="selectedVersion && state">
+        <ol v-if="canManage" class="lifecycle">
+          <li
+            v-for="(stage, index) in stages"
+            :key="stage.key"
+            :class="{ done: stage.done, current: index === currentStage }"
+          >
+            <span class="lifecycle-dot">{{ stage.done ? '✓' : index + 1 }}</span>
+            <div>
+              <strong>{{ stage.title }}</strong><small>{{ stage.hint }}</small>
+            </div>
+          </li>
+        </ol>
+        <div v-if="canManage && selectedVersion.state !== 'published'" class="next-action">
+          <template v-if="selectedVersion.state === 'draft'">
+            <span>Kiểm tra người duyệt còn hoạt động và đồ thị quy trình hợp lệ.</span>
+            <button class="button" :disabled="busy" @click="validateVersion">
+              <ShieldCheck :size="16" />Kiểm tra cấu hình
+            </button>
+          </template>
+          <template v-else-if="!state.allPassed">
+            <span>{{ state.blocker }}</span>
+            <button v-if="state.hasSuites" class="button" :disabled="busy" @click="runAll">
+              <Play :size="16" />Chạy tất cả kịch bản
+            </button>
+            <button v-else class="button" @click="tab = 'tests'"><FlaskConical :size="16" />Soạn kịch bản</button>
+          </template>
+          <template v-else>
+            <span>Mọi kịch bản đều đạt trên đúng cấu hình này.</span>
+            <button class="button" :disabled="busy || !state.canPublish" @click="publish">
+              <Rocket :size="16" />Phát hành phiên bản
+            </button>
+          </template>
+        </div>
+        <div v-else-if="selectedVersion.state === 'published'" class="notice success" style="margin: 0 22px 4px">
+          <CheckCircle2 :size="18" /><span
+            >Phiên bản này đang được dùng cho hồ sơ mới. Muốn thay đổi, tạo <strong>phiên bản mới</strong> — hồ sơ cũ
+            vẫn giữ phiên bản đã chọn.</span
+          >
+        </div>
+
+        <div class="tabs pkg-tabs">
+          <button class="tab" :class="{ active: tab === 'process' }" @click="tab = 'process'">
+            <ClipboardList :size="15" />Quy trình
+          </button>
+          <button v-if="canManage" class="tab" :class="{ active: tab === 'tests' }" @click="tab = 'tests'">
+            <FlaskConical :size="15" />Chạy thử
+            <span v-if="state.hasSuites" class="tab-count" :class="state.allPassed ? 'ok' : 'bad'">{{
+              currentSuites.length
+            }}</span>
+          </button>
+          <button v-if="previousVersion" class="tab" :class="{ active: tab === 'changes' }" @click="tab = 'changes'">
+            <GitCompare :size="15" />So với v{{ previousVersion.version_no }}
+          </button>
+        </div>
+
+        <div v-if="tab === 'process'" class="pkg-pane">
+          <ProcessDiagram
+            :steps="selectedVersion.approval_steps"
+            :fields="versionForm?.fields ?? []"
+            :required-files="selectedVersion.required_file_count"
+            :user-name="userName"
+          />
+          <div v-if="versionForm" class="form-fields-preview">
+            <span class="section-label">Thông tin người trình phải nhập</span>
+            <div class="field-chips">
+              <span v-for="field in versionForm.fields" :key="field.key" class="tag"
+                >{{ field.label }}<b v-if="field.required" class="required"> *</b></span
+              >
+            </div>
+          </div>
+          <small class="muted">Tạo lúc {{ formatDate(selectedVersion.created_at, true) }}</small>
+        </div>
+
+        <div v-else-if="tab === 'tests'" class="pkg-pane">
+          <div v-if="!currentSuites.length && !staleSuites.length" class="muted" style="font-size: 14px">
+            Chưa có bộ kịch bản. Soạn ít nhất một kịch bản bên dưới: hồ sơ đi hết quy trình, hồ sơ rẽ nhánh theo điều
+            kiện, hồ sơ thiếu tài liệu…
+          </div>
+          <article v-for="suite in currentSuites" :key="suite.id" class="suite-card">
+            <header>
+              <span
+                class="status-badge"
+                :class="latest.get(suite.id) ? (latest.get(suite.id)!.passed ? 'status-succeeded' : 'status-failed') : 'status-pending'"
+                ><span class="status-dot" />{{
+                  latest.get(suite.id) ? (latest.get(suite.id)!.passed ? 'Đạt' : 'Chưa đạt') : 'Chưa chạy'
+                }}</span
+              >
+              <span class="grow"
+                ><strong>{{ suite.cases.length }} kịch bản</strong
+                ><small>{{ suite.cases.map((c) => c.name).join(' · ') }}</small></span
+              >
+              <button
+                v-if="selectedVersion.state !== 'published'"
+                class="button secondary small"
+                :disabled="busy || selectedVersion.state === 'draft'"
+                :title="selectedVersion.state === 'draft' ? 'Kiểm tra cấu hình trước' : ''"
+                @click="runSuite(suite.id)"
+              >
+                <Play :size="14" />Chạy
+              </button>
+              <button
+                class="icon-button"
+                :aria-label="expanded === suite.id ? 'Thu gọn' : 'Xem chi tiết'"
+                @click="expanded = expanded === suite.id ? null : suite.id"
+              >
+                <ChevronDown :size="16" :style="{ transform: expanded === suite.id ? 'rotate(180deg)' : '' }" />
+              </button>
+            </header>
+            <div v-if="expanded === suite.id" class="suite-results">
+              <table>
+                <thead>
+                  <tr><th>Kịch bản</th><th>Quyết định</th><th>Kỳ vọng</th><th>Kết quả</th></tr>
+                </thead>
+                <tbody>
+                  <tr v-for="fixture in suite.cases" :key="fixture.name">
+                    <td><strong>{{ fixture.name }}</strong><small class="muted"> · {{ fixture.file_count }} tài liệu</small></td>
+                    <td class="muted">
+                      {{ choicesFrom(fixture.decisions, Object.keys(fixture.decisions).length).map((d) => DECISION_LABEL[d]).join(', ') || '—' }}
+                    </td>
+                    <td>
+                      {{ fixture.expected_error_code ? `Bị chặn: ${ERROR_LABEL[fixture.expected_error_code]}` : pathStops(fixture.expected_path, []).map((s) => s.label).join(' → ') }}
+                    </td>
+                    <td>
+                      <template v-for="result in latest.get(suite.id)?.results.filter((r: ReportResult) => r.name === fixture.name)" :key="result.name">
+                        <span :class="result.passed ? 'pass-text' : 'overdue-text'">{{ result.passed ? '✓ Đúng' : '✗ Sai' }}</span>
+                        <small v-if="!result.passed" class="muted" style="display: block">
+                          {{ result.error ? result.error.detail : `Thực tế: ${resultPath(result, 'actual_path')}` }}
+                        </small>
+                      </template>
+                      <span v-if="!latest.get(suite.id)" class="muted">—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <button v-if="selectedVersion.state !== 'published'" class="button ghost small" @click="reuseSuite(suite)">
+                Sửa lại thành bộ mới
+              </button>
+            </div>
+          </article>
+          <details v-if="staleSuites.length" class="stale-suites">
+            <summary>{{ staleSuites.length }} bộ kịch bản của cấu hình cũ (không tính khi phát hành)</summary>
+            <div v-for="suite in staleSuites" :key="suite.id" class="list-row">
+              <div class="grow"><p>{{ suite.cases.map((c) => c.name).join(' · ') }}</p></div>
+              <button class="button ghost small" @click="reuseSuite(suite)">Dùng lại</button>
+            </div>
+          </details>
+          <template v-if="selectedVersion.state !== 'published'">
+            <h3 class="pkg-subhead"><FlaskConical :size="16" /> Soạn bộ kịch bản mới</h3>
+            <ScenarioEditor
+              v-if="versionForm"
+              ref="editor"
+              :version-id="selectedVersion.id"
+              :fields="versionForm.fields"
+              :steps="selectedVersion.approval_steps"
+              :required-files="selectedVersion.required_file_count"
+              :user-name="userName"
+              @saved="refreshVersion().then(() => toast.success('Đã lưu bộ kịch bản. Bấm Chạy để kiểm chứng.'))"
+            />
+          </template>
+        </div>
+
+        <div v-else-if="tab === 'changes' && versionDiff.data.value" class="pkg-pane">
+          <p v-if="versionDiff.data.value.form_changed" class="notice">Phiên bản này dùng biểu mẫu khác.</p>
+          <p v-if="versionDiff.data.value.required_file_count">
+            Tài liệu tối thiểu:
+            <s>{{ versionDiff.data.value.required_file_count.before }}</s> →
+            <strong>{{ versionDiff.data.value.required_file_count.after }}</strong>
+          </p>
+          <div v-if="versionDiff.data.value.fields.length">
+            <span class="section-label">Trường thông tin</span>
+            <div class="field-chips">
+              <span v-for="field in versionDiff.data.value.fields" :key="field.key" class="tag" :class="!field.before ? 'added' : !field.after ? 'removed' : 'changed'">
+                {{ (field.after ?? field.before)?.label ?? field.key }} ·
+                {{ !field.before ? 'thêm mới' : !field.after ? 'đã bỏ' : 'đã sửa' }}
+              </span>
+            </div>
+          </div>
+          <div v-if="versionDiff.data.value.approval_steps" class="diff-columns">
+            <div>
+              <span class="section-label">Quy trình v{{ versionDiff.data.value.from_version }}</span>
+              <ProcessDiagram :steps="versionDiff.data.value.approval_steps.before" :fields="versionForm?.fields ?? []" :required-files="previousVersion!.required_file_count" :user-name="userName" />
+            </div>
+            <div>
+              <span class="section-label">Quy trình v{{ versionDiff.data.value.to_version }}</span>
+              <ProcessDiagram :steps="versionDiff.data.value.approval_steps.after" :fields="versionForm?.fields ?? []" :required-files="selectedVersion.required_file_count" :user-name="userName" />
+            </div>
+          </div>
+          <p
+            v-if="!versionDiff.data.value.form_changed && !versionDiff.data.value.required_file_count && !versionDiff.data.value.approval_steps && !versionDiff.data.value.fields.length"
+            class="muted"
+          >
+            Không có thay đổi cấu hình so với v{{ versionDiff.data.value.from_version }}.
+          </p>
+        </div>
+      </template>
+      <StatePanel
+        v-else
+        :loading="versions.isPending.value"
+        :error="versions.error.value"
+        :empty="versions.data.value?.items.length === 0"
+        title="Gói chưa có phiên bản"
+        @retry="versions.refetch()"
+      />
+    </section>
+  </div>
+
+  <PackageDialog
+    v-if="dialog"
+    :mode="dialog"
+    :package-id="selectedPackageId"
+    :forms="(forms.data.value?.items ?? []).filter((f) => !f.state || f.state === 'published')"
+    :templates="(packages.data.value?.items ?? []).filter((p) => p.active_version_id)"
+    :initial-form-id="dialog === 'version' ? selectedVersion?.form_id : undefined"
+    :initial-files="dialog === 'version' ? selectedVersion?.required_file_count : 0"
+    :user-name="userName"
+    @close="dialog = null"
+    @created="created"
+  />
 </template>

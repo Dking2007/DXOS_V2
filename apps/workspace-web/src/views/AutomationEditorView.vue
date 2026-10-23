@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import type { Ref } from 'vue'
-import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useUnsavedGuard } from '../ui/unsaved'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { VueFlow, useVueFlow } from '@vue-flow/core'
 import type { Connection, Edge, Node } from '@vue-flow/core'
@@ -22,9 +23,14 @@ import {
   Info,
   PanelBottomClose,
   Play,
+  PlayCircle,
+  Power,
   Save,
+  Search,
   X,
+  Zap,
 } from 'lucide-vue-next'
+import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import { api } from '../api'
 import { ApiError, errorText, formatDate } from '@dx/web-shared/api.ts'
 import type { Page } from '@dx/web-shared/api.ts'
@@ -52,6 +58,8 @@ interface Run {
   steps: Step[]
   data: Record<string, unknown> | null
   created_at: string
+  subject: { type: 'task' | 'case' | 'post'; id: string; title: string; link: string | null } | null
+  manual_by: string | null
 }
 interface Rule {
   id: string
@@ -60,6 +68,8 @@ interface Rule {
   enabled: boolean
   revision: number
   graph: ApiGraph
+  scope: 'all' | 'attached'
+  attached_count: number
 }
 interface Catalog {
   triggers: TriggerInfo[]
@@ -90,6 +100,8 @@ function userName(id: string) {
 
 const name = ref('Luồng tự động mới')
 const description = ref('')
+const scope = ref<'all' | 'attached'>('all')
+const attachedCount = ref(0)
 const enabled = ref(false)
 const revision = ref(0)
 // Typed through `Ref` directly: unwrapping Vue Flow's node type recursively is too deep for TS.
@@ -121,7 +133,12 @@ onNodesInitialized(() => {
   })
 })
 function snapshot() {
-  return JSON.stringify({ g: toApi(nodes.value, edges.value), n: name.value, d: description.value })
+  return JSON.stringify({
+    g: toApi(nodes.value, edges.value),
+    n: name.value,
+    d: description.value,
+    s: scope.value,
+  })
 }
 const dirty = computed(() => saved.value !== '' && snapshot() !== saved.value)
 if (ruleId.value) {
@@ -132,6 +149,8 @@ if (ruleId.value) {
       description.value = rule.description
       enabled.value = rule.enabled
       revision.value = rule.revision
+      scope.value = rule.scope
+      attachedCount.value = rule.attached_count
       load(rule.graph)
     })
     .catch((cause) => (error.value = cause))
@@ -147,6 +166,10 @@ watch(selectedId, (id) => id && (infoOpen.value = false))
 const triggerNode = computed(() => nodes.value.find((node) => node.data?.kind === 'trigger'))
 const trigger = computed(() => triggers.value.find((t) => t.key === triggerNode.value?.data?.config.event))
 const fields = computed(() => trigger.value?.fields ?? {})
+/** Only task events after creation can be limited to tasks people attach the flow to. */
+const attachable = computed(() => !!trigger.value?.attachable)
+watch(attachable, (value) => !value && (scope.value = 'all'))
+const attachedMode = computed(() => attachable.value && scope.value === 'attached')
 
 // ---- Editing ----
 let counter = 0
@@ -358,7 +381,55 @@ const runs = useQuery({
 const activeRun = ref<string | null>(null)
 function showRun(run: Run) {
   activeRun.value = run.id
-  paint(run.steps, `Lượt chạy ${formatDate(run.created_at, true)}`)
+  paint(
+    run.steps,
+    `Lượt chạy ${formatDate(run.created_at, true)}${run.subject ? ` · ${run.subject.title}` : ''}`,
+  )
+}
+
+// ---- Run now, for real, with an existing record ----
+const family = computed(() => (trigger.value?.key ?? '').split('.')[0] as 'task' | 'case' | 'post')
+const familyLabel = computed(
+  () => ({ task: 'công việc', case: 'hồ sơ', post: 'bài viết' })[family.value] ?? 'bản ghi',
+)
+const runDialog = ref(false)
+const pickQuery = ref('')
+const pickId = ref('')
+const candidates = useQuery({
+  queryKey: computed(() => ['automation-candidates', ruleId.value, pickQuery.value]),
+  queryFn: () =>
+    api.request<{ items: { id: string; title: string; status: string | null }[] }>(
+      `/automations/${ruleId.value}/candidates?q=${encodeURIComponent(pickQuery.value)}`,
+    ),
+  enabled: computed(() => runDialog.value && !!ruleId.value),
+})
+function openRunDialog() {
+  pickId.value = ''
+  pickQuery.value = ''
+  runDialog.value = true
+}
+async function runNow() {
+  busy.value = true
+  error.value = null
+  try {
+    const run = await api.request<Run>(`/automations/${ruleId.value}/run`, {
+      method: 'POST',
+      body: JSON.stringify({ ref_id: pickId.value }),
+    })
+    runDialog.value = false
+    drawer.value = 'runs'
+    await runs.refetch()
+    showRun(run)
+    notice.value =
+      run.state === 'not_matched'
+        ? 'Đã chạy: dữ liệu không thỏa điều kiện nên không hành động nào thực hiện.'
+        : 'Đã chạy thật — xem kết quả từng bước trên canvas.'
+    await queryClient.invalidateQueries({ queryKey: ['automations'] })
+  } catch (cause) {
+    error.value = cause
+  } finally {
+    busy.value = false
+  }
 }
 
 // ---- Save / enable ----
@@ -368,7 +439,12 @@ async function save() {
   error.value = null
   clearOverlay()
   try {
-    const body = { name: name.value, description: description.value, graph: toApi(nodes.value, edges.value) }
+    const body = {
+      name: name.value,
+      description: description.value,
+      graph: toApi(nodes.value, edges.value),
+      scope: attachable.value ? scope.value : 'all',
+    }
     const rule = ruleId.value
       ? await api.request<Rule>(`/automations/${ruleId.value}`, {
           method: 'PUT',
@@ -420,7 +496,7 @@ onBeforeUnmount(() => {
   clearTimeout(validateTimer)
 })
 watch(notice, (value) => value && setTimeout(() => (notice.value = ''), 2500))
-onBeforeRouteLeave(() => !dirty.value || window.confirm('Luồng có thay đổi chưa lưu. Rời trang?'))
+useUnsavedGuard(dirty)
 
 provide(FLOW_CONTEXT, { triggers, userName, overlay, addAfter })
 const palette = computed(() =>
@@ -493,6 +569,41 @@ const palette = computed(() =>
         </button>
       </div>
     </header>
+    <div class="flow-status" :class="{ on: enabled && ruleId, off: !enabled || !ruleId }">
+      <Zap v-if="enabled && ruleId" :size="16" /><Power v-else :size="16" />
+      <span v-if="!ruleId"
+        >Luồng mới chưa lưu. Lưu → <b>Chạy thử</b> với dữ liệu mẫu → bật công tắc để luồng
+        <b>tự chạy</b> mỗi khi “{{ trigger?.label ?? 'sự kiện' }}”.</span
+      >
+      <span v-else-if="enabled && attachedMode"
+        >Đang bật cho <b>công việc được gắn</b>: nhân viên tự gắn luồng vào việc của mình (hiện có
+        {{ attachedCount }} việc); mỗi khi <b>{{ trigger?.label }}</b> ở những việc đó, luồng tự chạy.</span
+      >
+      <span v-else-if="enabled"
+        >Đang tự chạy: mỗi khi <b>{{ trigger?.label ?? 'sự kiện' }}</b> ở bất kỳ {{ familyLabel }} nào, hệ thống tự
+        chạy luồng này — không cần bấm nút.</span
+      >
+      <span v-else
+        >Đang tắt: khi <b>{{ trigger?.label ?? 'sự kiện' }}</b> luồng <b>không</b> tự chạy. Bật công tắc ở góc phải
+        để áp dụng, hoặc chạy ngay với một {{ familyLabel }} có sẵn.</span
+      >
+      <label v-if="attachable" class="scope-select"
+        >Áp dụng cho
+        <select v-model="scope" aria-label="Phạm vi áp dụng">
+          <option value="all">Mọi công việc</option>
+          <option value="attached">Chỉ công việc được gắn</option>
+        </select></label
+      >
+      <button
+        v-if="ruleId"
+        class="button secondary small"
+        :disabled="dirty || busy"
+        :title="dirty ? 'Lưu thay đổi trước khi chạy' : ''"
+        @click="openRunDialog"
+      >
+        <PlayCircle :size="15" />Chạy ngay với {{ familyLabel }}…
+      </button>
+    </div>
     <div v-if="error" class="notice error flow-alert" role="alert">
       <span>{{ errorText(error) }}</span
       ><button v-if="error instanceof ApiError && error.status === 409" class="button secondary small" @click="router.go(0)">
@@ -593,17 +704,32 @@ const palette = computed(() =>
           </div>
           <div v-else class="drawer-runs">
             <p v-if="!runs.data.value?.items.length" class="muted">Luồng chưa chạy lần nào.</p>
-            <button
+            <div
               v-for="run in runs.data.value?.items"
               :key="run.id"
               class="run-item"
+              role="button"
+              tabindex="0"
               :class="{ active: activeRun === run.id }"
               @click="showRun(run)"
+              @keydown.enter="showRun(run)"
             >
               <StatusBadge :status="run.state" />
-              <span class="grow">{{ formatDate(run.created_at, true) }}</span>
-              <small class="muted">{{ run.steps.length }} bước</small>
-            </button>
+              <span class="grow run-subject">
+                <strong>{{ run.subject?.title || 'Sự kiện' }}</strong>
+                <small
+                  >{{ formatDate(run.created_at, true) }} ·
+                  {{ run.manual_by ? `chạy tay bởi ${run.manual_by}` : 'tự chạy theo sự kiện' }}</small
+                >
+              </span>
+              <RouterLink
+                v-if="run.subject?.link"
+                :to="run.subject.link"
+                class="button ghost small"
+                @click.stop
+                >Mở {{ { task: 'công việc', case: 'hồ sơ', post: 'bài viết' }[run.subject.type] }}</RouterLink
+              >
+            </div>
           </div>
         </section>
       </section>
@@ -668,5 +794,43 @@ const palette = computed(() =>
         </div>
       </aside>
     </div>
+    <ModalDialog v-if="runDialog" :title="`Chạy ngay với một ${familyLabel}`" @close="runDialog = false">
+      <div class="stack">
+        <p class="muted">
+          Luồng chạy như thể “{{ trigger?.label }}” vừa xảy ra với {{ familyLabel }} bạn chọn — kể cả khi luồng đang tắt.
+          Dùng để áp dụng cho {{ familyLabel }} đã có từ trước, hoặc thử trên dữ liệu thật.
+        </p>
+        <label class="search-box" style="min-width: 0"
+          ><Search :size="16" /><input
+            v-model="pickQuery"
+            type="search"
+            :placeholder="`Tìm ${familyLabel}…`"
+            :aria-label="`Tìm ${familyLabel}`"
+        /></label>
+        <div class="run-pick-list" role="radiogroup" :aria-label="`Chọn ${familyLabel}`">
+          <p v-if="candidates.isPending.value" class="muted">Đang tải…</p>
+          <p v-else-if="!candidates.data.value?.items.length" class="muted">
+            Không có {{ familyLabel }} nào bạn được xem khớp từ khóa.
+          </p>
+          <label v-for="item in candidates.data.value?.items" :key="item.id" class="run-pick" :class="{ active: pickId === item.id }">
+            <input v-model="pickId" type="radio" name="run-pick" :value="item.id" />
+            <span class="grow">{{ item.title }}</span>
+            <StatusBadge v-if="item.status" :status="item.status" />
+          </label>
+        </div>
+        <div class="notice warning">
+          <AlertTriangle :size="18" /><span
+            >Đây là <b>chạy thật</b>: thông báo được gửi, công việc được tạo, webhook được gọi như khi luồng tự chạy.
+            Muốn chỉ xem đường đi, dùng <b>Chạy thử</b>.</span
+          >
+        </div>
+        <div class="form-actions">
+          <button type="button" class="button secondary" @click="runDialog = false">Hủy</button
+          ><button type="button" class="button" :disabled="!pickId || busy" @click="runNow">
+            <PlayCircle :size="16" />{{ busy ? 'Đang chạy…' : 'Chạy ngay' }}
+          </button>
+        </div>
+      </div>
+    </ModalDialog>
   </div>
 </template>

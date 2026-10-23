@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { useUnsavedGuard } from '../ui/unsaved'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   Bookmark,
@@ -12,6 +14,7 @@ import {
   Trash2,
 } from 'lucide-vue-next'
 import { api } from '../api'
+import { toast } from '../ui/toast'
 import { useSession } from '../stores/session'
 import { errorText, formatDate, queryString } from '@dx/web-shared/api.ts'
 import type { Page } from '@dx/web-shared/api.ts'
@@ -35,6 +38,23 @@ const REACTIONS = [
   { kind: 'support', label: '🤝', name: 'Ủng hộ' },
 ]
 const body = ref('')
+const composer = ref<HTMLTextAreaElement>()
+useUnsavedGuard(() => !!body.value.trim())
+const route = useRoute()
+async function focusComposer() {
+  await nextTick()
+  composer.value?.scrollIntoView({ block: 'center' })
+  composer.value?.focus()
+}
+onMounted(() => {
+  if (route.query.compose) focusComposer()
+})
+watch(
+  () => route.query.compose,
+  (value) => {
+    if (value) focusComposer()
+  },
+)
 const audience = ref<'organization' | 'department'>('organization')
 const official = ref(false)
 const error = ref<unknown>(null)
@@ -69,6 +89,7 @@ async function publish() {
     })
     body.value = ''
     official.value = false
+    toast.success('Đã đăng bài')
   })
 }
 function react(post: Post, kind: string) {
@@ -149,6 +170,7 @@ function initials(name: string) {
       <section v-if="session.can('feed.post')" class="card">
         <form class="card-body stack" @submit.prevent="publish">
           <textarea
+            ref="composer"
             v-model="body"
             rows="3"
             maxlength="10000"
@@ -202,10 +224,11 @@ function initials(name: string) {
           :loading="posts.isPending.value"
           :error="posts.error.value"
           :empty="posts.data.value?.items.length === 0"
-          title="Chưa có bài viết"
-          description="Bài viết bạn được phép xem sẽ xuất hiện tại đây."
+          :title="filter === 'all' ? 'Bảng tin còn trống' : 'Không có bài trong mục này'"
+          description="Chia sẻ tin tức, kế hoạch hay lời cảm ơn với đồng nghiệp. Bài viết hiện cho phòng hoặc cả cơ quan tùy bạn chọn."
           @retry="posts.refetch()"
-        />
+          ><button v-if="session.can('feed.post')" class="button small" type="button" @click="focusComposer">Viết bài đầu tiên</button></StatePanel
+        >
       </section>
       <article
         v-for="post in posts.data.value?.items"

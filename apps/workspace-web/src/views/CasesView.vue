@@ -23,9 +23,13 @@ import type { components } from '@dx/web-shared/generated/workspace-api.ts'
 import { initialPayload, validatePayload } from '@dx/web-shared/forms.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
+import { toast } from '../ui/toast'
+import { useSession } from '../stores/session'
+import { confirmDiscard } from '../ui/unsaved'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import SchemaForm from '@dx/web-shared/components/SchemaForm.vue'
 const route = useRoute()
+const session = useSession()
 const router = useRouter()
 const queryClient = useQueryClient()
 const status = ref('')
@@ -56,7 +60,7 @@ const files = useQuery({
   queryKey: ['drive', 'case-picker'],
   queryFn: () => api.request<Page<DriveFile>>('/drive/files'),
 })
-const showCreate = ref(route.query.create === '1')
+const showCreate = ref(false)
 const title = ref('')
 const formId = ref('')
 const packageVersionId = ref('')
@@ -99,12 +103,25 @@ function openCreate() {
   dueAt.value = ''
   assigneeId.value = ''
 }
+const createDirty = computed(
+  () =>
+    !!title.value.trim() ||
+    fileIds.value.length > 0 ||
+    JSON.stringify(payload.value) !== JSON.stringify(initialPayload(selectedForm.value?.fields ?? [])),
+)
 function closeCreate() {
-  if (!busy.value) {
+  if (!busy.value && confirmDiscard(createDirty.value)) {
     showCreate.value = false
     if (route.query.create) router.replace('/cases')
   }
 }
+watch(
+  () => route.query.create,
+  (value) => {
+    if (value && !showCreate.value) openCreate()
+  },
+  { immediate: true },
+)
 /** The local datetime input value as the timezone-aware instant the API requires. */
 function dueInstant() {
   if (!dueAt.value) return null
@@ -134,6 +151,7 @@ async function create() {
     })
     await queryClient.invalidateQueries({ queryKey: ['cases'] })
     showCreate.value = false
+    toast.success('Đã tạo hồ sơ nháp. Kiểm tra lại rồi bấm “Chuyển duyệt”.')
     await router.push(`/cases/${item.id}`)
   } catch (cause) {
     error.value = cause
@@ -185,9 +203,13 @@ async function create() {
       :error="cases.error.value"
       :empty="cases.data.value?.items.length === 0"
       :title="status || search ? 'Chưa có hồ sơ phù hợp' : 'Tạo hồ sơ đầu tiên'"
-      description="Chọn một mẫu biểu, bổ sung thông tin và tài liệu để bắt đầu quy trình xử lý."
+      :description="
+        status || search
+          ? 'Thử bỏ bộ lọc hoặc tìm bằng từ khác.'
+          : 'Hồ sơ là đề nghị cần người có thẩm quyền duyệt: chọn mẫu, điền thông tin, đính kèm tài liệu rồi chuyển duyệt.'
+      "
       @retry="cases.refetch()"
-      ><button class="button small" @click="openCreate">
+      ><button v-if="session.can('cases.create')" class="button small" @click="openCreate">
         <FilePlus2 :size="16" />Tạo hồ sơ
       </button></StatePanel
     >
@@ -198,7 +220,7 @@ async function create() {
             <th>Hồ sơ</th>
             <th>Trạng thái</th>
             <th>Cập nhật</th>
-            <th>Phiên bản</th>
+            <th>Lần sửa</th>
             <th />
           </tr>
         </thead>
@@ -220,7 +242,7 @@ async function create() {
               {{ formatDate(item.updated_at || item.created_at, true) }}
             </td>
             <td>
-              <span class="tag mono">r{{ item.revision }}</span>
+              <span class="tag">{{ item.revision > 1 ? `${item.revision - 1} lần` : 'Chưa sửa' }}</span>
             </td>
             <td>
               <RouterLink

@@ -29,7 +29,7 @@ function login() {
         </div>
       </div>
       <p class="login-story-footer">
-        DX Workspace · Core + e-Office · Bản pilot
+        DX Workspace · Văn phòng điện tử · Bản thử nghiệm
       </p>
     </section>
     <section class="login-form-side">

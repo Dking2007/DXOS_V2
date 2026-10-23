@@ -35,6 +35,8 @@ export interface TriggerInfo {
   label: string
   fields: Record<string, string>
   sample: Record<string, unknown>
+  /** Whether people may attach a flow with this trigger to individual tasks. */
+  attachable?: boolean
 }
 
 interface KindMeta {

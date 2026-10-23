@@ -1,21 +1,17 @@
 /* Automation flow editor (n8n-style canvas). */
-.page-content.wide {
-  max-width: none;
-  padding: 0;
-}
 .flow-editor {
   display: flex;
   flex-direction: column;
   height: calc(100dvh - 72px);
   min-height: 560px;
-  background: #f4f7fa;
+  background: var(--surface-2);
 }
 .flow-topbar {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 18px;
-  background: #fff;
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
@@ -46,12 +42,12 @@
 }
 .flow-issues {
   color: var(--red);
-  background: #fdecef;
+  background: var(--red-soft);
   cursor: pointer;
 }
 .flow-ok {
-  color: #187454;
-  background: #e9f5ef;
+  color: var(--green-ink);
+  background: var(--green-soft);
 }
 .flow-topbar-actions {
   margin-left: auto;
@@ -63,7 +59,7 @@
 .flow-topbar .icon-button.active,
 .flow-topbar-actions .button.active {
   background: var(--teal-soft);
-  border-color: #9fd3d9;
+  border-color: var(--teal-line);
   color: var(--teal-strong);
 }
 .flow-toggle {
@@ -74,6 +70,92 @@
   font-weight: 600;
   color: var(--muted);
   margin-right: 6px;
+}
+.flow-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 18px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.flow-status > span {
+  flex: 1;
+  min-width: 240px;
+}
+.flow-status.on {
+  background: var(--green-soft);
+  color: var(--green-ink);
+}
+.flow-status.on > svg {
+  color: var(--green-ink);
+}
+.flow-status.off {
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+.flow-status.off > svg {
+  color: var(--amber-ink);
+}
+.scope-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.scope-select select {
+  width: auto;
+  min-height: 32px;
+  padding: 3px 8px;
+  font-size: 13px;
+  background: #ffffffcc;
+}
+.run-subject {
+  min-width: 0;
+}
+.run-subject strong,
+.run-subject small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.run-subject small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.run-item {
+  cursor: pointer;
+}
+.run-pick-list {
+  display: grid;
+  gap: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.run-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.run-pick.active {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+.run-pick input {
+  width: auto;
+  min-height: 0;
+}
+.run-pick .grow {
+  flex: 1;
+  min-width: 0;
 }
 .flow-alert {
   margin: 10px 18px 0;
@@ -90,7 +172,7 @@
   position: relative;
 }
 .flow-palette {
-  background: #fff;
+  background: var(--surface);
   border-right: 1px solid var(--border);
   padding: 14px 12px;
   overflow-y: auto;
@@ -112,9 +194,9 @@
   width: 100%;
   text-align: left;
   padding: 8px 10px;
-  border: 1px solid #e3e9ef;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
   color: var(--navy);
   cursor: grab;
   transition:
@@ -151,7 +233,7 @@
   min-height: 0;
 }
 .flow-canvas .vue-flow {
-  background: #f4f7fa;
+  background: var(--surface-2);
 }
 
 /* Nodes */
@@ -162,8 +244,8 @@
   gap: 12px;
   width: 250px;
   padding: 12px 14px;
-  background: #fff;
-  border: 1.5px solid #dbe3ea;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
   border-radius: 14px;
   box-shadow:
     0 1px 2px #0f2a410f,
@@ -175,7 +257,7 @@
     opacity 0.2s;
 }
 .flow-node:hover {
-  border-color: color-mix(in srgb, var(--node-color) 55%, #dbe3ea);
+  border-color: color-mix(in srgb, var(--node-color) 55%, var(--border));
 }
 .flow-node.selected {
   border-color: var(--node-color);
@@ -187,8 +269,8 @@
   border-radius: 28px 14px 14px 28px;
 }
 .flow-node.invalid {
-  border-color: #e4a1ad;
-  background: #fffafb;
+  border-color: var(--red-line);
+  background: var(--surface-2);
 }
 .flow-node.dimmed {
   opacity: 0.45;
@@ -267,7 +349,7 @@
   place-items: center;
   color: #fff;
   background: #3fae7d;
-  border: 2px solid #fff;
+  border: 2px solid var(--surface);
   box-shadow: 0 1px 3px #0003;
 }
 .flow-node-flag.error,
@@ -282,7 +364,7 @@
 .flow-node .flow-handle {
   width: 12px;
   height: 12px;
-  background: #fff;
+  background: var(--surface);
   border: 2px solid #8fa3b5;
   transition:
     transform 0.1s,
@@ -311,13 +393,13 @@
 }
 .tag-true {
   top: calc(32% - 9px);
-  color: #187454;
-  background: #e9f5ef;
+  color: var(--green-ink);
+  background: var(--green-soft);
 }
 .tag-false {
   top: calc(72% - 9px);
   color: var(--red);
-  background: #fdecef;
+  background: var(--red-soft);
 }
 .branch-tag.taken {
   outline: 2px solid currentColor;
@@ -330,8 +412,8 @@
   width: 22px;
   height: 22px;
   border-radius: 7px;
-  border: 1px dashed #9fb2c2;
-  background: #fff;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface);
   color: var(--muted);
   display: grid;
   place-items: center;
@@ -363,7 +445,7 @@
   stroke: #e08b99;
 }
 .vue-flow__edge.edge-active .vue-flow__edge-path {
-  stroke: #2c9c6b;
+  stroke: var(--green-ink);
   stroke-width: 3;
 }
 .vue-flow__edge-textbg {
@@ -415,14 +497,15 @@
   color: #8fd8de;
 }
 .flow-toast {
-  top: 14px;
+  /* Below the result bar, which also sits at the top of the canvas. */
+  top: 62px;
   background: #187454;
   color: #fff;
   padding: 8px 16px;
 }
 .flow-general-errors {
   bottom: 16px;
-  background: #fdecef;
+  background: var(--red-soft);
   color: var(--red);
   padding: 8px 16px;
   max-width: 80%;
@@ -437,7 +520,7 @@
   display: grid;
   gap: 6px;
   padding: 14px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   box-shadow: var(--shadow-lg);
@@ -455,7 +538,7 @@
   max-height: 46%;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   box-shadow: var(--shadow-lg);
@@ -515,10 +598,10 @@
   font-size: 13px;
 }
 .run-item:hover {
-  background: #f4f7fa;
+  background: var(--surface-2);
 }
 .run-item.active {
-  border-color: #9fd3d9;
+  border-color: var(--teal-line);
   background: var(--teal-soft);
 }
 .run-item .grow {
@@ -533,7 +616,7 @@
   bottom: 0;
   width: 340px;
   z-index: 9;
-  background: #fff;
+  background: var(--surface);
   border-left: 1px solid var(--border);
   box-shadow: -12px 0 32px #0f2a4114;
   overflow-y: auto;
@@ -562,7 +645,7 @@
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
-  background: #fff;
+  background: var(--surface);
   z-index: 1;
 }
 .inspector-head .grow {
@@ -570,7 +653,7 @@
 }
 .inspector-head small {
   display: block;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--node-color);
@@ -603,9 +686,9 @@
   display: grid;
   gap: 6px;
   padding: 10px;
-  border: 1px solid #e3e9ef;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fafcfd;
+  background: var(--surface-2);
 }
 .condition-row {
   display: flex;
@@ -619,33 +702,15 @@
 .condition-row > .icon-button {
   flex: 0 0 auto;
 }
-.chip-select {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.chip-select button {
-  border: 1px solid var(--border);
-  background: #fff;
-  border-radius: 999px;
-  padding: 4px 11px;
-  font-size: 12.5px;
-  color: var(--navy);
-}
-.chip-select button.active {
-  background: var(--teal);
-  border-color: var(--teal);
-  color: #fff;
-}
 .var-row {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
 }
 .var-chip {
-  border: 1px dashed #b9cbd8;
-  background: #f5f8fb;
-  color: #2c5368;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface-2);
+  color: var(--navy);
   border-radius: 6px;
   padding: 1px 6px;
   font-family: ui-monospace, Consolas, monospace;
@@ -682,10 +747,58 @@ kbd {
   border: 1px solid var(--border);
   border-bottom-width: 2px;
   border-radius: 5px;
-  background: #fff;
+  background: var(--surface);
 }
 
 /* Flow list */
+.how-it-works {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.how-it-works > div {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.how-it-works strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 3px;
+}
+.how-it-works small {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.how-step {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--teal-soft);
+  color: var(--teal-strong);
+  font-weight: 700;
+  font-size: 13px;
+}
+.flow-card-when {
+  font-size: 12.5px;
+}
+.flow-card-when.on {
+  color: var(--green-ink);
+}
+.flow-card-when.off {
+  color: var(--amber-ink);
+}
+
 .flow-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -700,8 +813,8 @@ kbd {
   padding: 12px 16px;
   background:
     radial-gradient(#0f2a4112 1px, transparent 1px) 0 0 / 12px 12px,
-    #f6f9fb;
-  border-bottom: 1px solid #e9eef3;
+    var(--surface-2);
+  border-bottom: 1px solid var(--border);
 }
 .flow-card-sketch svg {
   width: 100%;
@@ -737,7 +850,7 @@ kbd {
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
   color: var(--navy);
   transition:
     border-color 0.15s,
@@ -771,6 +884,9 @@ kbd {
   }
 }
 @media (max-width: 900px) {
+  .how-it-works {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .flow-editor {
     height: calc(100dvh - 72px);
   }

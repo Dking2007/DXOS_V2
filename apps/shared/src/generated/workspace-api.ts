@@ -554,6 +554,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/v1/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Read All Notifications */
+        post: operations["read_all_notifications_workspace_v1_notifications_read_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/notifications/{notification_id}": {
         parameters: {
             query?: never;
@@ -1143,6 +1160,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/v1/conversations/{conversation_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Attachment
+         * @description Store a file for a message about to be sent; it stays private to the uploader until then.
+         */
+        post: operations["upload_attachment_workspace_v1_conversations__conversation_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/chat-attachments/{attachment_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Attachment Content */
+        get: operations["attachment_content_workspace_v1_chat_attachments__attachment_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/messages/{message_id}": {
         parameters: {
             query?: never;
@@ -1314,6 +1368,26 @@ export interface paths {
         post?: never;
         /** Unsave */
         delete: operations["unsave_workspace_v1_posts__post_id__save_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/me/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Overview For Me
+         * @description What needs this user now: counts for the menu and one agenda across modules.
+         */
+        get: operations["overview_for_me_workspace_v1_me_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1535,6 +1609,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/v1/automations/{rule_id}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Candidates
+         * @description Records a manual run can use: those of the trigger's kind that the user may see.
+         */
+        get: operations["candidates_workspace_v1_automations__rule_id__candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/automations/{rule_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Now
+         * @description Run the saved flow now, for real, as if its event had just happened to that record.
+         *
+         *     Works whether the flow is switched on or not: it is how a flow is tried on real data,
+         *     or applied to a record that existed before the flow was made.
+         */
+        post: operations["run_now_workspace_v1_automations__rule_id__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/tasks/{task_id}/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Task Automations */
+        get: operations["list_task_automations_workspace_v1_tasks__task_id__automations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/tasks/{task_id}/automations/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Attach */
+        put: operations["attach_workspace_v1_tasks__task_id__automations__rule_id__put"];
+        post?: never;
+        /** Detach */
+        delete: operations["detach_workspace_v1_tasks__task_id__automations__rule_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/automations/{rule_id}/runs": {
         parameters: {
             query?: never;
@@ -1641,6 +1793,14 @@ export interface components {
             /** User Id */
             user_id?: string | null;
             condition?: components["schemas"]["Condition"] | null;
+        };
+        /** Body_upload_attachment_workspace_v1_conversations__conversation_id__attachments_post */
+        Body_upload_attachment_workspace_v1_conversations__conversation_id__attachments_post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
         };
         /** Body_upload_file_workspace_v1_drive_files_post */
         Body_upload_file_workspace_v1_drive_files_post: {
@@ -1987,6 +2147,11 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** ManualRun */
+        ManualRun: {
+            /** Ref Id */
+            ref_id: string;
+        };
         /** MembersAdd */
         MembersAdd: {
             /** User Ids */
@@ -2001,12 +2166,17 @@ export interface components {
         MessageCreate: {
             /** Client Message Id */
             client_message_id: string;
-            /** Body */
+            /**
+             * Body
+             * @default
+             */
             body: string;
             /** Reply To Id */
             reply_to_id?: string | null;
             /** Mention Ids */
             mention_ids?: string[];
+            /** Attachment Ids */
+            attachment_ids?: string[];
         };
         /** MessageEdit */
         MessageEdit: {
@@ -2161,6 +2331,12 @@ export interface components {
              */
             description: string;
             graph: components["schemas"]["Graph"];
+            /**
+             * Scope
+             * @default all
+             * @enum {string}
+             */
+            scope: "all" | "attached";
         };
         /** RulePatch */
         RulePatch: {
@@ -2174,6 +2350,12 @@ export interface components {
              */
             description: string;
             graph: components["schemas"]["Graph"];
+            /**
+             * Scope
+             * @default all
+             * @enum {string}
+             */
+            scope: "all" | "attached";
         };
         /** RuleTest */
         RuleTest: {
@@ -2407,7 +2589,9 @@ export type $defs = Record<string, never>;
 export interface operations {
     login_workspace_v1_auth_login_get: {
         parameters: {
-            query?: never;
+            query?: {
+                canonical?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2421,6 +2605,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -3733,6 +3926,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_all_notifications_workspace_v1_notifications_read_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
@@ -5090,6 +5303,76 @@ export interface operations {
             };
         };
     };
+    upload_attachment_workspace_v1_conversations__conversation_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_attachment_workspace_v1_conversations__conversation_id__attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attachment_content_workspace_v1_chat_attachments__attachment_id__content_get: {
+        parameters: {
+            query?: {
+                download?: boolean;
+            };
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_message_workspace_v1_messages__message_id__delete: {
         parameters: {
             query?: never;
@@ -5618,6 +5901,26 @@ export interface operations {
             };
         };
     };
+    overview_for_me_workspace_v1_me_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     search_workspace_v1_search_get: {
         parameters: {
             query: {
@@ -6053,6 +6356,169 @@ export interface operations {
                 "application/json": components["schemas"]["RuleTest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    candidates_workspace_v1_automations__rule_id__candidates_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_now_workspace_v1_automations__rule_id__run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualRun"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_task_automations_workspace_v1_tasks__task_id__automations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attach_workspace_v1_tasks__task_id__automations__rule_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detach_workspace_v1_tasks__task_id__automations__rule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

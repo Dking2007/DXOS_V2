@@ -99,6 +99,18 @@ lệnh, ngày chạy và kết quả. Không suy ra test đạt chỉ vì đã c
   - Chromium với API giả lập: danh sách luồng, chọn mẫu, canvas, panel cấu hình, chạy thử tô
     đường, vẽ lại lượt chạy đang chờ, **kéo thả node từ bảng vào canvas** (6 → 7 node) ở
     1440 px; mobile 390 px không tràn ngang. Chưa thử với backend thật.
+- Đợt chat có tệp đính kèm (migration `workspace_0010`): Workspace **52 passed**, Core **48
+  passed** (thêm 18 test kiểm tra chữ ký tệp: media/ZIP hợp lệ được nhận, sai chữ ký và
+  SVG/HTML/EXE bị từ chối). Test chat kiểm tra thành viên xem được ảnh, người ngoài/quản trị
+  kỹ thuật/thành viên vào sau không xem được, tin xóa thì tệp ẩn, không gắn được tệp của người
+  khác. Giao diện chat mới chỉ kiểm bằng API giả lập (Chromium 1440 px và 390 px).
+- Đợt dễ dùng toàn hệ thống (14 đề xuất, không thêm migration): Workspace **55 passed**
+  (thêm test `/me/overview`, phân loại thông báo + đọc tất cả, bảng phân quyền chặn tự khóa
+  quyền), Core **48 passed**; `npm run test` **36 passed** (thêm test menu theo quyền, nhãn
+  quyền khớp danh sách quyền của backend, tour theo vai trò, toast); lint, typecheck, build
+  đạt. Giao diện mới (menu, Tạo mới, thông báo, Ctrl + K, trang Việc hôm nay, tab hồ sơ,
+  bảng phân quyền, chế độ tối, tour, thanh dưới điện thoại) **chỉ kiểm bằng API giả lập**
+  trên Chromium 1440 px và 390 px (không tràn ngang); chưa chạy với backend thật hay Docker.
 - Core outbox được lưu pending; chưa có external dispatcher/event-trigger delivery.
   Worker DB poll/reconciler của run không chứng minh pipeline broker đã hoạt động.
 

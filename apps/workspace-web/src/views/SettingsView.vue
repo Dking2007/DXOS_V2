@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   ArrowDown,
@@ -30,9 +31,19 @@ import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import SchemaForm from '@dx/web-shared/components/SchemaForm.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
+import RoleMatrix from '../components/RoleMatrix.vue'
+import AppearanceSettings from '../components/AppearanceSettings.vue'
+import { permissionLabel, PERMISSIONS, roleLabel } from '../ui/labels'
+import { toast } from '../ui/toast'
+import { confirmDiscard } from '../ui/unsaved'
 const session = useSession()
 const queryClient = useQueryClient()
-const tab = ref<'forms' | 'organization' | 'permissions'>('forms')
+type SettingsTab = 'forms' | 'organization' | 'permissions' | 'appearance'
+const requestedTab = String(useRoute().query.tab ?? '')
+const tab = ref<SettingsTab>(
+  (['forms', 'organization', 'permissions', 'appearance'] as const).find((key) => key === requestedTab) ??
+    (['director', 'manager'].includes(session.user?.role ?? '') ? 'forms' : 'permissions'),
+)
 const forms = useQuery({
   queryKey: ['forms'],
   queryFn: () => api.request<Page<FormTemplate>>('/forms'),
@@ -70,6 +81,17 @@ const userName = ref('')
 const userRole = ref('staff')
 const userDepartment = ref('')
 const builderError = ref('')
+const opened = ref('')
+function modalState() {
+  if (modal.value === 'form') return JSON.stringify([formName.value, description.value, fields.value, steps.value])
+  if (modal.value === 'department') return JSON.stringify([depName.value, depCode.value, depParent.value, depManager.value])
+  if (modal.value === 'user') return JSON.stringify([userSubject.value, userName.value, userRole.value, userDepartment.value])
+  return ''
+}
+function closeModal() {
+  if (busy.value) return
+  if (confirmDiscard(modalState() !== opened.value)) modal.value = null
+}
 function open(type: typeof modal.value) {
   modal.value = type
   error.value = null
@@ -89,6 +111,7 @@ function open(type: typeof modal.value) {
     depParent.value = ''
     depManager.value = ''
   }
+  opened.value = modalState()
 }
 function addField() {
   fields.value.push({
@@ -128,6 +151,7 @@ function editDep(item: Department) {
   depCode.value = item.code ?? ''
   depParent.value = item.parent_id ?? ''
   depManager.value = item.manager_id ?? ''
+  opened.value = modalState()
 }
 async function save() {
   if (modal.value === 'form') {
@@ -139,7 +163,7 @@ async function save() {
       new Set(fields.value.map((field) => field.key)).size !==
       fields.value.length
     ) {
-      builderError.value = 'Khóa trường bị trùng. Mỗi trường cần khóa riêng.'
+      builderError.value = 'Có hai trường trùng mã. Đổi tên hoặc mã của một trường.'
       return
     }
     if (!steps.value.length) {
@@ -192,6 +216,15 @@ async function save() {
           department_id: userDepartment.value || null,
         }),
       })
+    toast.success(
+      modal.value === 'form'
+        ? 'Đã tạo mẫu hồ sơ'
+        : modal.value === 'user'
+          ? 'Đã thêm thành viên'
+          : editDepartment.value
+            ? 'Đã cập nhật phòng ban'
+            : 'Đã thêm phòng ban',
+    )
     modal.value = null
     await Promise.all(
       ['forms', 'users', 'departments'].map((key) =>
@@ -205,10 +238,10 @@ async function save() {
   }
 }
 const roleLabels: Record<string, string> = {
-  director: 'Ban giám đốc',
-  manager: 'Lãnh đạo phòng',
-  staff: 'Cán bộ / nhân viên',
-  technical_admin: 'Quản trị kỹ thuật',
+  director: roleLabel('director'),
+  manager: roleLabel('manager'),
+  staff: roleLabel('staff'),
+  technical_admin: roleLabel('technical_admin'),
 }
 </script>
 <template>
@@ -231,7 +264,12 @@ const roleLabels: Record<string, string> = {
       :class="{ active: tab === 'permissions' }"
       @click="tab = 'permissions'"
     >
-      Quyền của bạn
+      Vai trò & quyền</button
+    ><button
+      :class="{ active: tab === 'appearance' }"
+      @click="tab = 'appearance'"
+    >
+      Giao diện
     </button>
   </nav>
   <template v-if="tab === 'forms'"
@@ -419,11 +457,12 @@ const roleLabels: Record<string, string> = {
       </section>
     </div></template
   >
+  <template v-if="tab === 'appearance'"><div class="stack"><AppearanceSettings /></div></template>
   <template v-if="tab === 'permissions'"
-    ><section class="card">
+    ><RoleMatrix v-if="session.can('organization.manage')" style="margin-bottom: 20px" /><section class="card">
       <header class="card-header">
         <div>
-          <h2>Khả năng được cấp cho tài khoản</h2>
+          <h2>Quyền của bạn</h2>
           <p class="muted" style="font-size: 13px; margin-top: 5px">
             Máy chủ vẫn kiểm tra quyền ở từng tài nguyên và thao tác.
           </p>
@@ -447,9 +486,11 @@ const roleLabels: Record<string, string> = {
           class="list-row"
           style="padding: 11px 0"
         >
-          <Check :size="16" style="color: var(--teal)" /><code>{{
-            capability
-          }}</code>
+          <Check :size="16" style="color: var(--teal)" />
+          <div class="grow">
+            <strong>{{ permissionLabel(capability) }}</strong
+            ><small v-if="PERMISSIONS[capability]">{{ PERMISSIONS[capability].hint }}</small>
+          </div>
         </div>
         <p v-if="!session.user?.capabilities?.length" class="muted">
           Quyền được kiểm tra theo hành động trên từng tài nguyên.
@@ -475,11 +516,7 @@ const roleLabels: Record<string, string> = {
             : preview?.name || 'Xem biểu mẫu'
     "
     :wide="modal === 'form' || modal === 'preview'"
-    @close="
-      () => {
-        if (!busy) modal = null
-      }
-    "
+    @close="closeModal"
   >
     <div v-if="error" class="notice error error-inline" role="alert">
       <div>
@@ -615,7 +652,7 @@ const roleLabels: Record<string, string> = {
                   </select>
                 </div>
                 <div class="field">
-                  <label :for="`key-${index}`">Khóa dữ liệu ổn định</label
+                  <label :for="`key-${index}`">Mã trường (tự tạo từ tên, không dấu)</label
                   ><input
                     :id="`key-${index}`"
                     v-model="field.key"
@@ -821,11 +858,11 @@ const roleLabels: Record<string, string> = {
         >
         <template v-if="modal === 'user'"
           ><div class="notice warning">
-            Tạo tài khoản ở hệ thống SSO trước, sau đó nhập chính xác subject
-            (UUID) để liên kết hồ sơ Workspace. Thao tác này không tạo mật khẩu.
+            Tạo tài khoản đăng nhập trước (trong hệ thống đăng nhập một lần), rồi
+            dán mã tài khoản vào đây để nối với hồ sơ thành viên. Thao tác này không tạo mật khẩu.
           </div>
           <div class="field">
-            <label for="user-subject">Subject của tài khoản SSO</label
+            <label for="user-subject">Mã tài khoản đăng nhập</label
             ><input
               id="user-subject"
               v-model="userSubject"
@@ -870,7 +907,7 @@ const roleLabels: Record<string, string> = {
           type="button"
           class="button secondary"
           :disabled="busy"
-          @click="modal = null"
+          @click="closeModal"
         >
           Hủy</button
         ><button class="button" :disabled="busy">
