@@ -1,4 +1,4 @@
-name: Verify DX Workspace
+name: Verify Desktiny
 on: [push, pull_request]
 jobs:
   backend:

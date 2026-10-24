@@ -220,7 +220,7 @@ def create_files(base_url: str, scheme: str = "http") -> list[Path]:
     realm = {
         "realm": "dx",
         "enabled": True,
-        "displayName": "DX Workspace",
+        "displayName": "Desktiny",
         "registrationAllowed": False,
         "resetPasswordAllowed": False,
         "rememberMe": False,

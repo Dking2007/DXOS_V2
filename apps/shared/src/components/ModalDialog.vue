@@ -29,7 +29,7 @@ onBeforeUnmount(() => {
   >
     <header class="modal-header">
       <div>
-        <span class="eyebrow">DX Workspace</span>
+        <span class="eyebrow">Desktiny</span>
         <h2 id="dialog-title">{{ title }}</h2>
       </div>
       <button

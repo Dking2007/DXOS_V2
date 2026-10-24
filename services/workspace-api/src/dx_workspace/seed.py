@@ -17,7 +17,7 @@ def seed(engine, source):
     with Session(engine) as db:
         organization = db.scalar(select(Organization).limit(1))
         if not organization:
-            db.add(Organization(name=source.get("organization", "DX Workspace")))
+            db.add(Organization(name=source.get("organization", "Desktiny")))
         for key, (name, permissions) in ROLE_TEMPLATES.items():
             if not db.get(Role, key):
                 db.add(Role(key=key, name=name, permissions=permissions))

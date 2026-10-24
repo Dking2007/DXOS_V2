@@ -1,4 +1,4 @@
-# Cài đặt và chạy thử DX Workspace
+# Cài đặt và chạy thử Desktiny
 
 Hướng dẫn hai đường: **Docker Compose** (chạy được toàn bộ nền tảng, khuyên dùng) và
 **chạy cục bộ thuần** (chỉ cho phát triển/test, không có SSO thật). Các lệnh chạy từ

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dx-workspace"
 version = "0.1.0"
-description = "DX Workspace e-Office application service"
+description = "Desktiny e-Office application service"
 requires-python = ">=3.13"
 dependencies = [
   "dx-platform-kit==0.1.0",

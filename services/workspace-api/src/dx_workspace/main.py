@@ -13,7 +13,7 @@ def create_app(settings=None, engine=None):
     settings = settings or get_settings()
     engine = engine or make_engine(settings.database_url)
     app = FastAPI(
-        title="DX Workspace API",
+        title="Desktiny API",
         version="0.1.0",
         openapi_url="/workspace/v1/openapi.json",
         docs_url="/workspace/v1/docs",

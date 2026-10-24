@@ -99,7 +99,7 @@ export const router = createRouter({
   ],
 })
 router.beforeEach(async (to) => {
-  document.title = `${String(to.meta.title ?? 'Không gian làm việc')} · DX Workspace`
+  document.title = `${String(to.meta.title ?? 'Không gian làm việc')} · Desktiny`
   const session = useSession()
   if (to.meta.public) return true
   if (!session.ready) {

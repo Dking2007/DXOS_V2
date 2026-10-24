@@ -360,7 +360,7 @@ async function validate() {
   <div v-else class="console-shell">
     <aside class="console-nav">
       <a href="/console/" class="console-logo"
-        ><span>dx</span>
+        ><span>D</span>
         <div>Core<small>TECHNICAL CONSOLE</small></div></a
       ><span class="eyebrow" style="color: #8da5b9; padding-left: 13px"
         >NỀN TẢNG</span
@@ -377,7 +377,7 @@ async function validate() {
       </nav>
       <div class="console-bottom">
         <p>Core không chứa luật hồ sơ hay phòng ban.</p>
-        <a href="/">Mở Workspace ↗</a>
+        <a href="/">Mở Desktiny ↗</a>
         <p class="mono" style="margin-top: 15px">API /core/v1 · v0.1</p>
       </div>
     </aside>

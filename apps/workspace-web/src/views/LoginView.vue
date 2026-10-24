@@ -8,10 +8,10 @@ function login() {
 </script>
 <template>
   <main class="login-page">
-    <section class="login-story" aria-label="DX Workspace">
+    <section class="login-story" aria-label="Desktiny">
       <div class="brand">
-        <span class="brand-mark">dx<span /></span
-        ><span>Workspace<small>KHÔNG GIAN LÀM VIỆC SỐ</small></span>
+        <span class="brand-mark">D<span /></span
+        ><span>Desktiny<small>VĂN PHÒNG SỐ</small></span>
       </div>
       <div class="login-thesis">
         <span class="eyebrow">MỘT DÒNG CHẢY CÔNG VIỆC</span>
@@ -29,7 +29,7 @@ function login() {
         </div>
       </div>
       <p class="login-story-footer">
-        DX Workspace · Văn phòng điện tử · Bản thử nghiệm
+        Desktiny · Văn phòng điện tử · Bản thử nghiệm
       </p>
     </section>
     <section class="login-form-side">
@@ -53,7 +53,7 @@ function login() {
         </button>
         <div class="login-security">
           <LockKeyhole :size="20" /><span
-            >Đăng nhập an toàn qua hệ thống định danh của tổ chức. Workspace
+            >Đăng nhập an toàn qua hệ thống định danh của tổ chức. Desktiny
             không lưu mật khẩu của bạn.</span
           >
         </div>

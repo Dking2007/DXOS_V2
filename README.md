@@ -1,4 +1,7 @@
-# DX Workspace
+# Desktiny
+
+*Desk + destiny — văn phòng số cho cơ quan.* (Tên cũ: DX Workspace; tên nội bộ trong mã
+nguồn, cơ sở dữ liệu và container vẫn là `dx_workspace` / `dx-workspace`.)
 
 Nền tảng Core dùng chung và ứng dụng e-Office, viết bằng **FastAPI + Vue 3 /
 TypeScript**. Bản triển khai này tập trung một tổ chức: dữ liệu cấu trúc, file có

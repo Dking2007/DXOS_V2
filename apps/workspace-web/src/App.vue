@@ -86,8 +86,8 @@ function toggleSidebarCollapsed() {
     <div v-if="sidebar" class="sidebar-scrim" @click="sidebar = false" />
     <aside class="sidebar" :class="{ open: sidebar }">
       <RouterLink to="/home" class="brand" aria-label="Trang chủ"
-        ><span class="brand-mark">dx<span /></span
-        ><span>Workspace<small>KHÔNG GIAN LÀM VIỆC SỐ</small></span></RouterLink
+        ><span class="brand-mark">D<span /></span
+        ><span>Desktiny<small>VĂN PHÒNG SỐ</small></span></RouterLink
       >
       <button
         class="icon-button sidebar-close"
@@ -205,7 +205,7 @@ function toggleSidebarCollapsed() {
         <RouterView :key="String(route.params.id ?? route.path)" />
       </main>
       <footer v-if="!route.meta.wide && !route.meta.bleed" class="app-footer">
-        <span>DX Workspace</span
+        <span>Desktiny</span
         ><span>Dữ liệu nghiệp vụ được kiểm soát theo quyền truy cập.</span>
       </footer>
     </div>
