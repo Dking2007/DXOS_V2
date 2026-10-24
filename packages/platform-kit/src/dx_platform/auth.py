@@ -18,7 +18,6 @@ from .config import Settings
 from .errors import AppError
 from .security import SecretBox, random_token, token_hash
 
-
 logger = logging.getLogger("dx.auth")
 
 
