@@ -111,6 +111,20 @@ lệnh, ngày chạy và kết quả. Không suy ra test đạt chỉ vì đã c
   đạt. Giao diện mới (menu, Tạo mới, thông báo, Ctrl + K, trang Việc hôm nay, tab hồ sơ,
   bảng phân quyền, chế độ tối, tour, thanh dưới điện thoại) **chỉ kiểm bằng API giả lập**
   trên Chromium 1440 px và 390 px (không tràn ngang); chưa chạy với backend thật hay Docker.
+- Xem tệp trong ứng dụng (không đổi backend): `npm run test` **39 passed** (thêm test nhận
+  loại tệp, SVG/HTML/Office/ZIP không xem trước); lint, typecheck, build đạt; pdf.js tách
+  thành chunk riêng, worker build ra `.js`. Chromium với API giả lập: PDF 3 trang do trình
+  duyệt tạo hiện đủ 3 trang, lật trang, phóng to, Esc đóng; ảnh PNG hiện đúng kích thước;
+  390 px không tràn ngang. Chưa thử với Core/gateway thật. `npm audit` báo 2 lỗ hổng mức
+  trung bình ở `vitest`/`@vitest/mocker` (chỉ dùng khi chạy test, có từ trước, chưa nâng cấp).
+- Bảng tin mới và ảnh/video trong bài (migration `workspace_0011`): Workspace **56 passed**
+  (thêm test: trước khi đăng chỉ người tải xem được, PDF bị từ chối 415, người cùng phòng xem
+  được ảnh của bài phòng, phòng khác 404, không đăng lại/mượn ảnh người khác, xóa bài thì ảnh
+  404), Core **48 passed**; `npm run test` **45 passed**; lint, typecheck, build đạt; Alembic
+  upgrade → downgrade 0010 → upgrade bằng SQLite tạm: đạt. Chromium với API giả lập: chọn 2
+  ảnh + 1 PDF (PDF bị từ chối), nút Đăng khóa khi đang tải, bài gửi đúng 2 mã ảnh; lưới 4 ô
+  "+2", xem toàn màn hình lướt bằng phím; video WebM thật phát trong bài; 390 px không tràn.
+  Chưa thử với Core/gateway thật.
 - Core outbox được lưu pending; chưa có external dispatcher/event-trigger delivery.
   Worker DB poll/reconciler của run không chứng minh pipeline broker đã hoạt động.
 

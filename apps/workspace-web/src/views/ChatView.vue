@@ -39,6 +39,7 @@ import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import TaskCreateDialog from '../components/TaskCreateDialog.vue'
 import MessageAttachments from '../chat/MessageAttachments.vue'
+import FilePreview from '../components/FilePreview.vue'
 import {
   ACCEPT,
   MAX_FILE_BYTES,
@@ -377,6 +378,13 @@ async function taskCreated(task: Task) {
   await router.push(`/tasks/${task.id}`)
 }
 const lightbox = ref<ChatAttachment | null>(null)
+const filePreview = ref<ChatAttachment | null>(null)
+async function previewSource(item: ChatAttachment) {
+  return `${item.url}?download=1`
+}
+function downloadAttachment(item: ChatAttachment) {
+  window.location.assign(`${item.url}?download=1`)
+}
 function snippet(message: ChatMessage | null) {
   if (!message) return ''
   if (message.deleted) return 'Tin nhắn đã xóa'
@@ -605,6 +613,7 @@ const kindLabel: Record<Conversation['kind'], string> = {
                     :items="row.message.attachments"
                     :mine="row.message.mine"
                     @open="(item) => (lightbox = item)"
+                    @preview="(item) => (filePreview = item)"
                   />
                   <div v-if="row.message.body" class="chat-bubble">
                     <p>{{ row.message.body }}</p>
@@ -733,6 +742,15 @@ const kindLabel: Record<Conversation['kind'], string> = {
     </section>
   </div>
 
+  <FilePreview
+    v-if="filePreview"
+    :key="filePreview.id"
+    :name="filePreview.name"
+    :mime="filePreview.mime"
+    :source="() => previewSource(filePreview!)"
+    :download="() => downloadAttachment(filePreview!)"
+    @close="filePreview = null"
+  />
   <div v-if="lightbox" class="chat-lightbox" role="dialog" aria-label="Xem ảnh" @click.self="lightbox = null">
     <img :src="lightbox.url" :alt="lightbox.name" />
     <div class="chat-lightbox-bar">

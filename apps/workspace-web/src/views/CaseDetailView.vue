@@ -8,6 +8,7 @@ import {
   CheckCheck,
   ClipboardCheck,
   Download,
+  Eye,
   FileText,
   GitBranch,
   History,
@@ -50,6 +51,8 @@ import SchemaForm from '@dx/web-shared/components/SchemaForm.vue'
 import TaskCreateDialog from '../components/TaskCreateDialog.vue'
 import { OPERATORS } from '../flow/nodes'
 import { toast } from '../ui/toast'
+import { previewKind } from '../ui/preview'
+import FilePreview from '../components/FilePreview.vue'
 import { useUnsavedGuard } from '../ui/unsaved'
 const route = useRoute()
 const router = useRouter()
@@ -342,20 +345,25 @@ async function confirm() {
 async function download(file: DriveFile) {
   await downloadAttachment(file.id)
 }
+async function attachmentUrl(fileId: string, submissionId?: string) {
+  const suffix = submissionId
+    ? `?submission_id=${encodeURIComponent(submissionId)}`
+    : ''
+  const result = await api.request<{ url: string }>(
+    `/cases/${id}/files/${fileId}/download${suffix}`,
+    { method: 'POST' },
+  )
+  return result.url
+}
 async function downloadAttachment(fileId: string, submissionId?: string) {
   try {
-    const suffix = submissionId
-      ? `?submission_id=${encodeURIComponent(submissionId)}`
-      : ''
-    const result = await api.request<{ url: string }>(
-      `/cases/${id}/files/${fileId}/download${suffix}`,
-      { method: 'POST' },
-    )
-    window.location.assign(result.url)
+    window.location.assign(await attachmentUrl(fileId, submissionId))
   } catch (cause) {
     error.value = cause
   }
 }
+// Submitted files open at the exact version that was submitted.
+const preview = ref<{ fileId: string; name: string; submissionId?: string } | null>(null)
 function eventLabel(event: HistoryEvent) {
   const actions: Record<string, string> = {
     'case.created': 'Đã tạo hồ sơ',
@@ -640,6 +648,15 @@ function moveTab(step: number) {
                   ><small>Bản mới nhất trong kho · được chốt lại khi trình</small>
                 </div>
                 <button
+                  v-if="previewKind(file.name)"
+                  class="icon-button"
+                  :aria-label="`Xem ${file.name}`"
+                  title="Xem"
+                  @click="preview = { fileId: file.id, name: file.name }"
+                >
+                  <Eye :size="17" />
+                </button>
+                <button
                   class="icon-button"
                   :aria-label="`Tải ${file.name}`"
                   title="Tải về"
@@ -732,6 +749,15 @@ function moveTab(step: number) {
                   <p>{{ file.name || 'Tài liệu đã chốt' }}</p>
                   <small>Phiên bản đã chốt khi trình<template v-if="file.checksum"> · mã kiểm tra {{ String(file.checksum).slice(0, 10) }}</template></small>
                 </div>
+                <button
+                  v-if="file.file_id && previewKind(file.name || '')"
+                  class="icon-button"
+                  aria-label="Xem đúng phiên bản đã trình"
+                  title="Xem đúng phiên bản đã trình"
+                  @click="preview = { fileId: file.file_id, name: file.name || 'Tài liệu', submissionId: submission.id }"
+                >
+                  <Eye :size="17" />
+                </button>
                 <button
                   v-if="file.file_id"
                   class="icon-button"
@@ -999,6 +1025,14 @@ function moveTab(step: number) {
       </div>
     </form></ModalDialog
   >
+  <FilePreview
+    v-if="preview"
+    :key="`${preview.fileId}:${preview.submissionId ?? ''}`"
+    :name="preview.name"
+    :source="() => attachmentUrl(preview!.fileId, preview!.submissionId)"
+    :download="() => downloadAttachment(preview!.fileId, preview!.submissionId)"
+    @close="preview = null"
+  />
   <TaskCreateDialog
     v-if="showTask && detail.data.value"
     heading="Tạo việc từ hồ sơ"

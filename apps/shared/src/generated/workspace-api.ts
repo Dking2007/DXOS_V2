@@ -1373,6 +1373,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/v1/post-attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Media
+         * @description Store a picture or video for a post about to be published; private to the uploader until then.
+         */
+        post: operations["upload_media_workspace_v1_post_attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/post-attachments/{attachment_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Media Content */
+        get: operations["media_content_workspace_v1_post_attachments__attachment_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/me/overview": {
         parameters: {
             query?: never;
@@ -1811,6 +1848,14 @@ export interface components {
             file: string;
             /** Folder Id */
             folder_id?: string | null;
+        };
+        /** Body_upload_media_workspace_v1_post_attachments_post */
+        Body_upload_media_workspace_v1_post_attachments_post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
         };
         /** CaseCreate */
         CaseCreate: {
@@ -2254,7 +2299,10 @@ export interface components {
         };
         /** PostCreate */
         PostCreate: {
-            /** Body */
+            /**
+             * Body
+             * @default
+             */
             body: string;
             /**
              * Audience
@@ -2269,6 +2317,8 @@ export interface components {
              * @default false
              */
             official: boolean;
+            /** Attachment Ids */
+            attachment_ids?: string[];
         };
         /** PostEdit */
         PostEdit: {
@@ -5876,6 +5926,74 @@ export interface operations {
             header?: never;
             path: {
                 post_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_media_workspace_v1_post_attachments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_media_workspace_v1_post_attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    media_content_workspace_v1_post_attachments__attachment_id__content_get: {
+        parameters: {
+            query?: {
+                download?: boolean;
+            };
+            header?: never;
+            path: {
+                attachment_id: string;
             };
             cookie?: never;
         };

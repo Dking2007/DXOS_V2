@@ -6,19 +6,29 @@ export const ACCEPT =
   'image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/ogg,audio/wav,' +
   '.pdf,.txt,.csv,.docx,.xlsx,.pptx,.zip,.m4v,.mov'
 
-/**
- * Upload one chat attachment with progress. `fetch` cannot report upload progress, so this
- * uses XMLHttpRequest with the same cookie session and CSRF header as the API client.
- */
+/** Upload one chat attachment with progress. */
 export function uploadAttachment(
   conversationId: string,
   file: File,
   csrf: string,
   onProgress: (fraction: number) => void,
 ): { promise: Promise<ChatAttachment>; abort: () => void } {
+  return uploadWithProgress<ChatAttachment>(`/conversations/${conversationId}/attachments`, file, csrf, onProgress)
+}
+
+/**
+ * POST one file to a Workspace endpoint with progress. `fetch` cannot report upload progress,
+ * so this uses XMLHttpRequest with the same cookie session and CSRF header as the API client.
+ */
+export function uploadWithProgress<T>(
+  path: string,
+  file: File,
+  csrf: string,
+  onProgress: (fraction: number) => void,
+): { promise: Promise<T>; abort: () => void } {
   const xhr = new XMLHttpRequest()
-  const promise = new Promise<ChatAttachment>((resolve, reject) => {
-    xhr.open('POST', `/workspace/v1/conversations/${conversationId}/attachments`)
+  const promise = new Promise<T>((resolve, reject) => {
+    xhr.open('POST', `/workspace/v1${path}`)
     xhr.withCredentials = true
     xhr.setRequestHeader('X-CSRF-Token', csrf || csrfCookie('workspace'))
     xhr.setRequestHeader('Idempotency-Key', newIntent())
@@ -30,7 +40,7 @@ export function uploadAttachment(
       } catch {
         // A non-JSON error page still becomes a readable error below.
       }
-      if (xhr.status >= 200 && xhr.status < 300) resolve(body as unknown as ChatAttachment)
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body as unknown as T)
       else
         reject(
           new ApiError(

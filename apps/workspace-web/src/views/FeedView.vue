@@ -1,28 +1,32 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { useUnsavedGuard } from '../ui/unsaved'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import {
-  Bookmark,
-  BookmarkCheck,
-  Megaphone,
-  MessageCircle,
-  Pin,
-  PinOff,
-  SendHorizontal,
-  Trash2,
-} from 'lucide-vue-next'
+import { Bookmark, Megaphone, Newspaper, PenLine, UserRound } from 'lucide-vue-next'
 import { api } from '../api'
 import { toast } from '../ui/toast'
+import { useUnsavedGuard } from '../ui/unsaved'
 import { useSession } from '../stores/session'
-import { errorText, formatDate, queryString } from '@dx/web-shared/api.ts'
+import { formatDate, queryString } from '@dx/web-shared/api.ts'
 import type { Page } from '@dx/web-shared/api.ts'
 import type { Post, PostComment } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
+import PostCard from '../feed/PostCard.vue'
+import PostComposer from '../feed/PostComposer.vue'
+import { relativeTime } from '../feed/text'
+import '../feed/feed.css'
+
 const queryClient = useQueryClient()
 const session = useSession()
-const filter = ref<'all' | 'official' | 'saved' | 'mine'>('all')
+const route = useRoute()
+type Filter = 'all' | 'official' | 'saved' | 'mine'
+const FILTERS: { value: Filter; label: string; icon: typeof Newspaper }[] = [
+  { value: 'all', label: 'Tất cả', icon: Newspaper },
+  { value: 'official', label: 'Chính thức', icon: Megaphone },
+  { value: 'saved', label: 'Đã lưu', icon: Bookmark },
+  { value: 'mine', label: 'Bài của tôi', icon: UserRound },
+]
+const filter = ref<Filter>('all')
 const cursor = ref<string | null>(null)
 const posts = useQuery({
   queryKey: computed(() => ['posts', filter.value, cursor.value]),
@@ -30,20 +34,22 @@ const posts = useQuery({
     api.request<Page<Post>>(`/posts${queryString({ filter: filter.value, cursor: cursor.value })}`),
   refetchInterval: 30_000,
 })
-const REACTIONS = [
-  { kind: 'like', label: '👍', name: 'Thích' },
-  { kind: 'love', label: '❤️', name: 'Yêu thích' },
-  { kind: 'celebrate', label: '🎉', name: 'Chúc mừng' },
-  { kind: 'insightful', label: '💡', name: 'Hữu ích' },
-  { kind: 'support', label: '🤝', name: 'Ủng hộ' },
-]
+const announcements = useQuery({
+  queryKey: ['posts', 'official', 'side'],
+  queryFn: () => api.request<Page<Post>>('/posts?filter=official'),
+  refetchInterval: 60_000,
+})
+const items = computed(() => posts.data.value?.items ?? [])
+function setFilter(value: Filter) {
+  filter.value = value
+  cursor.value = null
+}
+
 const body = ref('')
-const composer = ref<HTMLTextAreaElement>()
-useUnsavedGuard(() => !!body.value.trim())
-const route = useRoute()
+const composer = ref<InstanceType<typeof PostComposer>>()
+useUnsavedGuard(() => !!body.value.trim() || !!composer.value?.hasMedia)
 async function focusComposer() {
   await nextTick()
-  composer.value?.scrollIntoView({ block: 'center' })
   composer.value?.focus()
 }
 onMounted(() => {
@@ -55,90 +61,84 @@ watch(
     if (value) focusComposer()
   },
 )
-const audience = ref<'organization' | 'department'>('organization')
-const official = ref(false)
-const error = ref<unknown>(null)
+
 const busy = ref(false)
-const canOfficial = computed(
-  () => session.can('feed.moderate') || (session.can('feed.official') && audience.value === 'department'),
-)
-async function refresh() {
-  await queryClient.invalidateQueries({ queryKey: ['posts'] })
-}
-async function act(work: () => Promise<unknown>) {
-  error.value = null
+async function act(work: () => Promise<unknown>, done?: string) {
   busy.value = true
   try {
     await work()
-    await refresh()
+    await queryClient.invalidateQueries({ queryKey: ['posts'] })
+    if (done) toast.success(done)
+    return true
   } catch (cause) {
-    error.value = cause
+    toast.error(cause)
+    return false
   } finally {
     busy.value = false
   }
 }
-async function publish() {
-  await act(async () => {
-    await api.request('/posts', {
-      method: 'POST',
-      body: JSON.stringify({
-        body: body.value,
-        audience: audience.value,
-        official: official.value && canOfficial.value,
+async function publish(audience: 'organization' | 'department', official: boolean, attachmentIds: string[]) {
+  const ok = await act(
+    () =>
+      api.request('/posts', {
+        method: 'POST',
+        body: JSON.stringify({ body: body.value, audience, official, attachment_ids: attachmentIds }),
       }),
-    })
+    official ? 'Đã đăng thông báo chính thức' : 'Đã đăng bài',
+  )
+  if (ok) {
     body.value = ''
-    official.value = false
-    toast.success('Đã đăng bài')
-  })
+    composer.value?.reset()
+    if (filter.value !== 'all' && filter.value !== 'mine') setFilter('all')
+  }
 }
 function react(post: Post, kind: string) {
   return act(() =>
     post.my_reaction === kind
       ? api.request(`/posts/${post.id}/reactions/me`, { method: 'DELETE' })
-      : api.request(`/posts/${post.id}/reactions/me`, {
-          method: 'PUT',
-          body: JSON.stringify({ kind }),
-        }),
+      : api.request(`/posts/${post.id}/reactions/me`, { method: 'PUT', body: JSON.stringify({ kind }) }),
   )
 }
 function toggleSave(post: Post) {
-  return act(() => api.request(`/posts/${post.id}/save`, { method: post.saved ? 'DELETE' : 'PUT' }))
+  return act(
+    () => api.request(`/posts/${post.id}/save`, { method: post.saved ? 'DELETE' : 'PUT' }),
+    post.saved ? 'Đã bỏ lưu bài' : 'Đã lưu bài — xem lại ở mục “Đã lưu”',
+  )
 }
 function togglePin(post: Post) {
-  return act(() =>
-    api.request(`/posts/${post.id}/pin`, {
-      method: 'POST',
-      body: JSON.stringify({ pinned: !post.pinned_at }),
-    }),
+  return act(
+    () =>
+      api.request(`/posts/${post.id}/pin`, {
+        method: 'POST',
+        body: JSON.stringify({ pinned: !post.pinned_at }),
+      }),
+    post.pinned_at ? 'Đã bỏ ghim' : 'Đã ghim bài lên đầu bảng tin',
   )
 }
 function remove(post: Post) {
-  if (window.confirm('Xóa bài viết này?'))
-    return act(() => api.request(`/posts/${post.id}`, { method: 'DELETE' }))
+  if (window.confirm('Xóa bài viết này? Bình luận và cảm xúc cũng bị xóa.'))
+    return act(() => api.request(`/posts/${post.id}`, { method: 'DELETE' }), 'Đã xóa bài')
 }
-const openComments = ref<Record<string, PostComment[]>>({})
-const commentDraft = ref<Record<string, string>>({})
+
+const comments = ref<Record<string, PostComment[]>>({})
 async function loadComments(post: Post) {
-  const page = await api.request<Page<PostComment>>(`/posts/${post.id}/comments`)
-  openComments.value = { ...openComments.value, [post.id]: page.items }
+  try {
+    const page = await api.request<Page<PostComment>>(`/posts/${post.id}/comments`)
+    comments.value = { ...comments.value, [post.id]: page.items }
+  } catch (cause) {
+    toast.error(cause)
+  }
 }
 function toggleComments(post: Post) {
-  if (openComments.value[post.id]) {
-    const next = { ...openComments.value }
+  if (comments.value[post.id]) {
+    const next = { ...comments.value }
     delete next[post.id]
-    openComments.value = next
+    comments.value = next
   } else void loadComments(post)
 }
-async function comment(post: Post) {
-  const text = commentDraft.value[post.id]?.trim()
-  if (!text) return
+async function comment(post: Post, text: string) {
   await act(async () => {
-    await api.request(`/posts/${post.id}/comments`, {
-      method: 'POST',
-      body: JSON.stringify({ body: text }),
-    })
-    commentDraft.value[post.id] = ''
+    await api.request(`/posts/${post.id}/comments`, { method: 'POST', body: JSON.stringify({ body: text }) })
     await loadComments(post)
   })
 }
@@ -148,13 +148,16 @@ async function removeComment(post: Post, item: PostComment) {
     await loadComments(post)
   })
 }
-function initials(name: string) {
-  return name
-    .split(' ')
-    .slice(-2)
-    .map((word) => word[0])
-    .join('')
-    .toUpperCase()
+function firstLine(text: string) {
+  const line = text.split('\n').find((value) => value.trim()) ?? ''
+  if (!line) return 'Ảnh/video'
+  return line.length > 90 ? `${line.slice(0, 90)}…` : line
+}
+async function openAnnouncement(post: Post) {
+  setFilter('official')
+  await posts.refetch()
+  await nextTick()
+  document.getElementById(`post-${post.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 </script>
 <template>
@@ -162,175 +165,120 @@ function initials(name: string) {
     <div>
       <span class="eyebrow">BẢNG TIN NỘI BỘ</span>
       <h1>Bảng tin</h1>
-      <p>Thông báo chính thức, chia sẻ và tương tác trong tổ chức.</p>
+      <p>Thông báo chính thức, tin tức và lời chia sẻ trong cơ quan.</p>
     </div>
   </header>
-  <div class="feed-layout">
-    <div class="stack">
-      <section v-if="session.can('feed.post')" class="card">
-        <form class="card-body stack" @submit.prevent="publish">
-          <textarea
-            ref="composer"
-            v-model="body"
-            rows="3"
-            maxlength="10000"
-            placeholder="Bạn muốn chia sẻ điều gì với đồng nghiệp?"
-            aria-label="Nội dung bài viết"
-          />
-          <div class="composer-row">
-            <select v-model="audience" aria-label="Phạm vi" class="compact-select">
-              <option value="organization">Toàn tổ chức</option>
-              <option value="department" :disabled="!session.user?.department_id">
-                Phòng của tôi
-              </option>
-            </select>
-            <label v-if="session.can('feed.official')" class="checkbox-label" style="margin: 0"
-              ><input v-model="official" type="checkbox" :disabled="!canOfficial" />Thông báo
-              chính thức</label
-            >
-            <button class="button" :disabled="busy || !body.trim()" style="margin-left: auto">
-              <SendHorizontal :size="16" />Đăng bài
-            </button>
-          </div>
-          <small v-if="official && canOfficial" class="muted"
-            >Thông báo chính thức gửi thông báo đến mọi người trong phạm vi đã chọn.</small
-          >
-        </form>
-      </section>
-      <div v-if="error" class="notice error">{{ errorText(error) }}</div>
-      <div class="tabs">
+  <div class="feed-page">
+    <div class="feed-main">
+      <PostComposer v-if="session.can('feed.post')" ref="composer" v-model="body" :busy="busy" @publish="publish" />
+      <nav class="feed-filters" aria-label="Lọc bài viết">
         <button
-          v-for="tab in [
-            { value: 'all', label: 'Tất cả' },
-            { value: 'official', label: 'Chính thức' },
-            { value: 'saved', label: 'Đã lưu' },
-            { value: 'mine', label: 'Bài của tôi' },
-          ] as const"
-          :key="tab.value"
-          class="tab"
-          :class="{ active: filter === tab.value }"
-          @click="
-            () => {
-              filter = tab.value
-              cursor = null
-            }
-          "
+          v-for="item in FILTERS"
+          :key="item.value"
+          type="button"
+          :class="{ active: filter === item.value }"
+          :aria-pressed="filter === item.value"
+          @click="setFilter(item.value)"
         >
-          {{ tab.label }}
+          <component :is="item.icon" :size="15" />{{ item.label }}
         </button>
-      </div>
-      <section v-if="posts.isPending.value || posts.error.value || !posts.data.value?.items.length" class="card">
+      </nav>
+      <section v-if="posts.isPending.value || posts.error.value || !items.length" class="card">
         <StatePanel
           :loading="posts.isPending.value"
           :error="posts.error.value"
-          :empty="posts.data.value?.items.length === 0"
-          :title="filter === 'all' ? 'Bảng tin còn trống' : 'Không có bài trong mục này'"
-          description="Chia sẻ tin tức, kế hoạch hay lời cảm ơn với đồng nghiệp. Bài viết hiện cho phòng hoặc cả cơ quan tùy bạn chọn."
+          :empty="items.length === 0"
+          :rows="3"
+          :title="
+            filter === 'saved'
+              ? 'Bạn chưa lưu bài nào'
+              : filter === 'mine'
+                ? 'Bạn chưa đăng bài nào'
+                : filter === 'official'
+                  ? 'Chưa có thông báo chính thức'
+                  : 'Bảng tin còn trống'
+          "
+          :description="
+            filter === 'saved'
+              ? 'Bấm “Lưu” dưới một bài để đọc lại sau.'
+              : 'Chia sẻ tin tức, kế hoạch hay lời cảm ơn với đồng nghiệp. Bạn chọn bài hiện cho phòng hay cả cơ quan.'
+          "
           @retry="posts.refetch()"
-          ><button v-if="session.can('feed.post')" class="button small" type="button" @click="focusComposer">Viết bài đầu tiên</button></StatePanel
+          ><button
+            v-if="session.can('feed.post') && filter !== 'saved'"
+            class="button small"
+            type="button"
+            @click="focusComposer"
+          >
+            <PenLine :size="15" />Viết bài
+          </button></StatePanel
         >
       </section>
-      <article
-        v-for="post in posts.data.value?.items"
+      <PostCard
+        v-for="post in items"
+        :id="`post-${post.id}`"
         :key="post.id"
-        class="card post-card"
-        :class="{ official: post.official }"
-      >
-        <header class="post-head">
-          <span class="avatar">{{ initials(post.author_name) }}</span>
-          <div class="grow">
-            <strong>{{ post.author_name }}</strong>
-            <small class="muted"
-              >{{ formatDate(post.created_at, true) }} ·
-              {{ post.audience === 'organization' ? 'Toàn tổ chức' : post.department_name }}</small
-            >
-          </div>
-          <span v-if="post.pinned_at" class="tag"><Pin :size="12" /> Đã ghim</span>
-          <span v-if="post.official" class="tag official-tag"><Megaphone :size="12" /> Chính thức</span>
-        </header>
-        <p class="post-body prewrap">{{ post.body }}</p>
-        <div class="post-actions">
-          <div class="reaction-bar">
-            <button
-              v-for="reaction in REACTIONS"
-              :key="reaction.kind"
-              :class="{ active: post.my_reaction === reaction.kind }"
-              :aria-label="reaction.name"
-              :title="reaction.name"
-              @click="react(post, reaction.kind)"
-            >
-              {{ reaction.label
-              }}<span v-if="post.reactions[reaction.kind]">{{ post.reactions[reaction.kind] }}</span>
-            </button>
-          </div>
-          <button class="button ghost small" @click="toggleComments(post)">
-            <MessageCircle :size="15" />{{ post.comment_count }} bình luận
-          </button>
-          <button
-            class="icon-button"
-            :aria-label="post.saved ? 'Bỏ lưu' : 'Lưu bài'"
-            :title="post.saved ? 'Bỏ lưu' : 'Lưu bài'"
-            @click="toggleSave(post)"
-          >
-            <BookmarkCheck v-if="post.saved" :size="17" /><Bookmark v-else :size="17" />
-          </button>
-          <button
-            v-if="post.can_moderate"
-            class="icon-button"
-            :aria-label="post.pinned_at ? 'Bỏ ghim' : 'Ghim'"
-            :title="post.pinned_at ? 'Bỏ ghim' : 'Ghim'"
-            @click="togglePin(post)"
-          >
-            <PinOff v-if="post.pinned_at" :size="17" /><Pin v-else :size="17" />
-          </button>
-          <button
-            v-if="post.can_edit || post.can_moderate"
-            class="icon-button"
-            aria-label="Xóa bài"
-            title="Xóa bài"
-            @click="remove(post)"
-          >
-            <Trash2 :size="17" />
-          </button>
-        </div>
-        <div v-if="openComments[post.id]" class="post-comments">
-          <div v-for="item in openComments[post.id]" :key="item.id" class="comment">
-            <span class="avatar">{{ initials(item.author_name) }}</span>
-            <div class="grow">
-              <strong>{{ item.author_name }}</strong>
-              <small class="muted"> · {{ formatDate(item.created_at, true) }}</small>
-              <p class="prewrap">{{ item.body }}</p>
-            </div>
-            <button
-              v-if="item.can_delete"
-              class="icon-button"
-              aria-label="Xóa bình luận"
-              @click="removeComment(post, item)"
-            >
-              <Trash2 :size="15" />
-            </button>
-          </div>
-          <form class="comment-form" @submit.prevent="comment(post)">
-            <input
-              v-model="commentDraft[post.id]"
-              placeholder="Viết bình luận…"
-              aria-label="Bình luận"
-              maxlength="3000"
-            /><button class="button small" :disabled="busy">Gửi</button>
-          </form>
-        </div>
-      </article>
-      <div v-if="posts.data.value?.has_more || cursor" class="pagination">
-        <button class="button secondary small" :disabled="!cursor" @click="cursor = null">
-          Mới nhất</button
-        ><button
+        :post="post"
+        :comments="comments[post.id]"
+        :busy="busy"
+        @react="(kind) => react(post, kind)"
+        @save="toggleSave(post)"
+        @pin="togglePin(post)"
+        @remove="remove(post)"
+        @toggle-comments="toggleComments(post)"
+        @comment="(text) => comment(post, text)"
+        @remove-comment="(item) => removeComment(post, item)"
+      />
+      <div v-if="posts.data.value?.has_more || cursor" class="feed-pager">
+        <button v-if="cursor" class="button secondary small" type="button" @click="cursor = null">Về bài mới nhất</button>
+        <button
+          v-if="posts.data.value?.has_more"
           class="button secondary small"
-          :disabled="!posts.data.value?.has_more"
+          type="button"
           @click="cursor = posts.data.value?.next_cursor ?? null"
         >
-          Cũ hơn
+          Xem bài cũ hơn
         </button>
       </div>
     </div>
+    <aside class="feed-side">
+      <section class="card feed-side-card">
+        <header><Megaphone :size="17" /><h2>Thông báo chính thức</h2></header>
+        <StatePanel
+          :loading="announcements.isPending.value"
+          :error="announcements.error.value"
+          :empty="!announcements.data.value?.items.length"
+          :rows="2"
+          compact
+          title="Chưa có thông báo"
+          description="Thông báo của lãnh đạo sẽ hiện ở đây."
+          @retry="announcements.refetch()"
+        />
+        <button
+          v-for="post in announcements.data.value?.items.slice(0, 4)"
+          :key="post.id"
+          type="button"
+          class="feed-side-item"
+          @click="openAnnouncement(post)"
+        >
+          <strong>{{ firstLine(post.body) }}</strong>
+          <small
+            >{{ post.author_name }} ·
+            <time :datetime="post.created_at" :title="formatDate(post.created_at, true)">{{
+              relativeTime(post.created_at)
+            }}</time></small
+          >
+        </button>
+      </section>
+      <section class="card feed-side-card feed-tips">
+        <header><PenLine :size="17" /><h2>Viết bài hay hơn</h2></header>
+        <ul>
+          <li>Viết ý chính ở câu đầu — mọi người đọc nó trước.</li>
+          <li>Dán đường dẫn <code>https://…</code> để đồng nghiệp bấm mở ngay.</li>
+          <li>Chọn <strong>Phòng của tôi</strong> khi tin chỉ liên quan đến phòng.</li>
+          <li><kbd>Ctrl</kbd> + <kbd>Enter</kbd> để đăng nhanh.</li>
+        </ul>
+      </section>
+    </aside>
   </div>
 </template>

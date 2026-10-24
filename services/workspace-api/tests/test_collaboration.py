@@ -856,3 +856,42 @@ def test_role_matrix_edits_permissions_but_never_locks_out_its_own_editor(world)
     assert unknown.status_code == 422
     as_(world, "staff")
     assert client.get(API + "/roles").status_code == 403
+
+
+def test_feed_posts_carry_pictures_visible_only_with_the_post(world):  # noqa: F811
+    client = as_(world, "staff")
+    upload = client.post(API + "/post-attachments", files={"file": ("hop-mat.png", PNG, "image/png")})
+    assert upload.status_code == 201, upload.text
+    picture = upload.json()
+    assert picture["kind"] == "image"
+    # Before publishing, only the uploader can open it.
+    assert client.get(picture["url"]).status_code == 200
+    assert as_(world, "manager").get(picture["url"]).status_code == 404
+    # Files other than pictures and videos never reach Core.
+    client = as_(world, "staff")
+    pdf = client.post(API + "/post-attachments", files={"file": ("a.pdf", b"%PDF-1.4", "application/pdf")})
+    assert pdf.status_code == 415 and pdf.json()["code"] == "media_type_invalid"
+    assert client.post(API + "/posts", json={"body": "  "}).status_code == 422
+    posted = client.post(
+        API + "/posts", json={"body": "", "audience": "department", "attachment_ids": [picture["id"]]}
+    )
+    assert posted.status_code == 201, posted.text
+    post = posted.json()
+    assert [a["id"] for a in post["attachments"]] == [picture["id"]]
+    # Colleagues in the department see it; another department does not.
+    shown = as_(world, "manager").get(picture["url"])
+    assert shown.status_code == 200 and shown.content == PNG
+    assert shown.headers["content-disposition"].startswith("inline")
+    assert as_(world, "outsider").get(picture["url"]).status_code == 404
+    listed = as_(world, "manager").get(API + "/posts").json()["items"]
+    assert next(p for p in listed if p["id"] == post["id"])["attachments"][0]["kind"] == "image"
+    # A published picture cannot be attached again, and nobody can borrow someone else's upload.
+    client = as_(world, "staff")
+    again = client.post(API + "/posts", json={"body": "x", "attachment_ids": [picture["id"]]})
+    assert again.status_code == 422
+    other = client.post(API + "/post-attachments", files={"file": ("b.png", PNG, "image/png")}).json()
+    stolen = as_(world, "manager").post(API + "/posts", json={"body": "x", "attachment_ids": [other["id"]]})
+    assert stolen.status_code == 422
+    # Deleting the post hides its pictures.
+    as_(world, "staff").delete(f"{API}/posts/{post['id']}")
+    assert as_(world, "manager").get(picture["url"]).status_code == 404

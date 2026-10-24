@@ -208,9 +208,20 @@ không tồn tại để làm tài liệu trông đầy đủ. Xem [checklist](d
   (nhớ theo trình duyệt, xem lại trong Thiết lập), thông báo nhanh sau thao tác, khung
   xương khi tải và hỏi lại trước khi bỏ thay đổi chưa lưu. Badge cập nhật mỗi 30 giây và
   khi chuyển trang, chưa đẩy tức thời.
+- **Xem tệp ngay trong ứng dụng**: PDF, ảnh (PNG/JPEG/GIF/WebP), video, âm thanh và
+  TXT/CSV mở trong khung xem ở Kho tài liệu, tab Tài liệu và bản đã trình của hồ sơ (đúng
+  phiên bản đã trình), và tệp đính kèm trong chat. PDF được pdf.js vẽ thành hình (lật
+  trang, phóng to, vừa khung) nên mã nhúng trong PDF không chạy; trình duyệt đọc tệp qua
+  liên kết tải ngắn hạn sẵn có, Core vẫn trả `attachment` và không có endpoint mới. Văn bản
+  chỉ hiện 512 KB đầu. Tệp Office vẫn mở bằng ONLYOFFICE; SVG/ZIP chỉ tải về.
 - **Bảng tin** (`/feed`): bài toàn tổ chức hoặc phòng ban, thông báo chính thức (gửi
   notification cho phạm vi nhận), ghim, bình luận, cảm xúc, lưu bài. Nội dung là văn bản
-  thuần, chưa có rich text/ảnh đính kèm hay kiểm duyệt trước khi đăng.
+  thuần (đường dẫn http/https tự thành liên kết). Bài đăng kèm được **tối đa 10 ảnh/video**
+  (PNG/JPEG/GIF/WebP, MP4/WebM/MOV; chọn, kéo thả hoặc dán; migration `workspace_0011`):
+  tệp tải lên trước và chỉ người tải xem được cho tới khi bài đăng; sau đó Workspace kiểm tra
+  quyền xem bài ở mỗi lần đọc, bài bị xóa thì ảnh/video cũng ẩn. Bài hiện lưới ảnh, xem toàn
+  màn hình có lướt ảnh. Chưa nén ảnh/tạo thumbnail, chưa tua video theo byte range, chưa có
+  rich text hay kiểm duyệt trước khi đăng.
 - **Tìm kiếm chung** (`/search`, ô tìm ở header) trên công việc, hồ sơ, tài liệu, bài
   viết, tin nhắn; lọc quyền trước khi đếm và cắt trang. Tìm trực tiếp trên bảng (không có
   chỉ mục full-text riêng), phù hợp quy mô pilot.

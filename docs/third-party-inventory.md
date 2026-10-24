@@ -39,6 +39,7 @@ before distribution; do not claim this short table exhausts transitive software.
 | Validation | jsonschema | MIT |
 | Frontend | Vue 3, Vue Router, Pinia, Vite, TypeScript, TanStack Vue Query | MIT per exact package/version |
 | Flow canvas | Vue Flow (`@vue-flow/core` 1.48.2, `background` 1.3.2, `controls` 1.1.3, `minimap` 1.5.4) | MIT |
+| Xem PDF trong ứng dụng | pdf.js (`pdfjs-dist` 4.10.38, tải khi mở PDF) | Apache-2.0 |
 | Tests | pytest, Playwright, Vitest if installed | MIT/Apache-2.0 per exact package |
 | Fonts/icons | Installed frontend assets only | Inspect bundled packages and retain font/icon notices |
 

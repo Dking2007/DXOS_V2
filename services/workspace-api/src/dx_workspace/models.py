@@ -561,3 +561,20 @@ class ChatAttachment(Base):
     size: Mapped[int] = mapped_column(Integer)
     kind: Mapped[str] = mapped_column(String(10))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PostAttachment(Base):
+    """An image or video shown in a feed post. Readable only by those who can see the post."""
+
+    __tablename__ = "post_attachments"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    # Null until published: an upload belongs to its uploader alone until a post carries it.
+    post_id: Mapped[str | None] = mapped_column(ForeignKey("posts.id"), index=True)
+    uploader_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    core_file_id: Mapped[str] = mapped_column(String(36))
+    name: Mapped[str] = mapped_column(String(250))
+    mime: Mapped[str] = mapped_column(String(150))
+    size: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(10))
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

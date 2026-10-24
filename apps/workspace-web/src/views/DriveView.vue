@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Copy,
   Download,
+  Eye,
   File,
   FilePlus2,
   FileSpreadsheet,
@@ -57,6 +58,8 @@ import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import { useSession } from '../stores/session'
 import { toast } from '../ui/toast'
+import { previewKind } from '../ui/preview'
+import FilePreview from '../components/FilePreview.vue'
 const queryClient = useQueryClient()
 const session = useSession()
 /** Sharing and trashing belong to the owner only; the API refuses them for collaborators too. */
@@ -417,6 +420,16 @@ async function save() {
     })
   }
 }
+const preview = ref<DriveFile | null>(null)
+/** Images, PDFs, media and text open in the viewer; everything else downloads. */
+function openFile(item: DriveFile) {
+  if (previewKind(item.name)) preview.value = item
+  else void download(item)
+}
+async function previewSource(item: DriveFile) {
+  const result = await api.request<{ url: string }>(`/drive/files/${item.id}/download`, { method: 'POST' })
+  return result.url
+}
 async function download(item: DriveFile) {
   error.value = null
   try {
@@ -590,7 +603,7 @@ function pickFile(event: Event) {
                     class="row-link"
                     :to="`/drive/${item.id}/edit`"
                     >{{ item.name }}</RouterLink
-                  ><button v-else-if="!trash" class="drive-file-name" @click="download(item)">{{ item.name }}</button
+                  ><button v-else-if="!trash" class="drive-file-name" :title="previewKind(item.name) ? 'Bấm để xem' : 'Bấm để tải về'" @click="openFile(item)">{{ item.name }}</button
                   ><strong v-else>{{ item.name }}</strong
                   ><small>{{ fileKind(item) }} · bản sửa {{ item.revision }}</small>
                   <ul v-if="item.labels?.length" class="label-chips">
@@ -621,11 +634,12 @@ function pickFile(event: Event) {
         <div class="drive-file-card-top"><span class="drive-file-icon" :class="fileTone(item)"><component :is="fileIcon(item)" :size="20" /></span>
           <button class="drive-control" :aria-label="`Thêm thao tác cho ${item.name}`" :aria-expanded="fileMenuId === item.id" @click="toggleFileMenu(item)"><MoreVertical :size="18" /></button></div>
         <div class="drive-file-preview" :class="fileTone(item)"><component :is="fileIcon(item)" :size="45" :stroke-width="1.3" /></div>
-        <div class="drive-file-card-bottom"><div class="grow"><RouterLink v-if="!trash && /\.(docx|xlsx|pptx|doc|xls|ppt|odt|ods|odp)$/i.test(item.name)" :to="`/drive/${item.id}/edit`" class="row-link">{{ item.name }}</RouterLink><button v-else-if="!trash" class="drive-file-name" @click="download(item)">{{ item.name }}</button><strong v-else>{{ item.name }}</strong><small>{{ formatDate(item.created_at) }} · {{ formatSize(item.size ?? 0) }}</small></div></div>
+        <div class="drive-file-card-bottom"><div class="grow"><RouterLink v-if="!trash && /\.(docx|xlsx|pptx|doc|xls|ppt|odt|ods|odp)$/i.test(item.name)" :to="`/drive/${item.id}/edit`" class="row-link">{{ item.name }}</RouterLink><button v-else-if="!trash" class="drive-file-name" :title="previewKind(item.name) ? 'Bấm để xem' : 'Bấm để tải về'" @click="openFile(item)">{{ item.name }}</button><strong v-else>{{ item.name }}</strong><small>{{ formatDate(item.created_at) }} · {{ formatSize(item.size ?? 0) }}</small></div></div>
       </article>
     </div>
     <div v-if="activeFile" class="drive-action-bar">
       <span class="grow">{{ activeFile.name }}</span>
+      <button v-if="!trash && previewKind(activeFile.name)" @click="preview = activeFile"><Eye :size="16" /> Xem</button>
       <button v-if="!trash" @click="download(activeFile)"><Download :size="16" /> Tải xuống</button>
       <button v-if="!trash" @click="open('labels', activeFile)"><Tags :size="16" /> Nhãn</button>
       <button v-if="!trash" @click="open('copy', activeFile)"><Copy :size="16" /> Sao chép</button>
@@ -985,6 +999,14 @@ function pickFile(event: Event) {
       </div></template
     >
   </ModalDialog>
+  <FilePreview
+    v-if="preview"
+    :key="preview.id"
+    :name="preview.name"
+    :source="() => previewSource(preview!)"
+    :download="() => download(preview!)"
+    @close="preview = null"
+  />
 </template>
 <style scoped>
 .drive-hero { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 25px; }

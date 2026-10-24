@@ -1,13 +1,19 @@
-"""Internal news feed. Bodies are stored and returned as plain text; the client never renders HTML."""
+"""Internal news feed. Bodies are stored and returned as plain text; the client never renders HTML.
+
+Posts may carry images and videos. They are stored in Core under the Workspace service
+principal and served only through Workspace, which checks the post is visible on every read.
+"""
 
 from __future__ import annotations
 
 from typing import Literal
+from urllib.parse import quote
 
 from dx_platform.auth import Actor
 from dx_platform.errors import AppError
-from fastapi import APIRouter, Depends, Query
-from pydantic import Field
+from fastapi import APIRouter, Depends, File, Header, Query, UploadFile
+from fastapi.responses import Response
+from pydantic import Field, model_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -19,11 +25,31 @@ from .services import audit, cas, emit, notify, page, serial
 REACTIONS = Literal["like", "love", "celebrate", "insightful", "support"]
 
 
+# Only pictures and videos: they are shown inline, so nothing that can run script is accepted.
+MEDIA = {
+    "image/png": "image",
+    "image/jpeg": "image",
+    "image/gif": "image",
+    "image/webp": "image",
+    "video/mp4": "video",
+    "video/webm": "video",
+    "video/quicktime": "video",
+}
+MAX_MEDIA = 10
+
+
 class PostCreate(s.Input):
-    body: str = Field(min_length=1, max_length=10000)
+    body: str = Field(default="", max_length=10000)
     audience: Literal["organization", "department"] = "organization"
     department_id: str | None = None
     official: bool = False
+    attachment_ids: list[str] = Field(default_factory=list, max_length=MAX_MEDIA)
+
+    @model_validator(mode="after")
+    def not_empty(self):
+        if not self.body.strip() and not self.attachment_ids:
+            raise ValueError("Bài viết cần nội dung hoặc ảnh/video.")
+        return self
 
 
 class PostEdit(s.Revision):
@@ -70,6 +96,7 @@ def build_router(app):
     router = APIRouter(prefix="/workspace/v1", tags=["feed"])
     db_dep = app.state.db_dependency
     actor_dep = app.state.auth.actor
+    settings = app.state.settings
 
     def user_for(db, actor):
         if actor.application != "workspace" or actor.service:
@@ -81,6 +108,16 @@ def build_router(app):
         if not post or not can_see(db, user, post):
             raise AppError(404, "post_not_found", "Không tìm thấy bài viết.")
         return post
+
+    def media_data(value):
+        return {
+            "id": value.id,
+            "name": value.name,
+            "mime": value.mime,
+            "size": value.size,
+            "kind": value.kind,
+            "url": f"/workspace/v1/post-attachments/{value.id}/content",
+        }
 
     def post_data(db, user, post):
         data = serial(post)
@@ -115,6 +152,14 @@ def build_router(app):
             ),
             can_edit=post.author_id == user.id,
             can_moderate=can_moderate(db, user, post),
+            attachments=[
+                media_data(a)
+                for a in db.scalars(
+                    select(m.PostAttachment)
+                    .where(m.PostAttachment.post_id == post.id)
+                    .order_by(m.PostAttachment.position, m.PostAttachment.created_at)
+                )
+            ],
         )
         return data
 
@@ -162,6 +207,12 @@ def build_router(app):
                 raise AppError(
                     403, "official_denied", "Bạn không có quyền đăng thông báo chính thức cho phạm vi này."
                 )
+        media = []
+        for attachment_id in dict.fromkeys(body.attachment_ids):
+            attachment = db.get(m.PostAttachment, attachment_id)
+            if not attachment or attachment.uploader_id != user.id or attachment.post_id:
+                raise AppError(422, "attachment_invalid", "Ảnh/video không hợp lệ hoặc đã được đăng.")
+            media.append(attachment)
         post = m.Post(
             author_id=user.id,
             body=body.body.strip(),
@@ -171,17 +222,25 @@ def build_router(app):
         )
         db.add(post)
         db.flush()
+        for position, attachment in enumerate(media):
+            attachment.post_id, attachment.position = post.id, position
         if post.official:
             audience = (
                 department_members(db, department_id)
                 if department_id
                 else list(db.scalars(select(m.User).where(m.User.active.is_(True))))
             )
-            excerpt = post.body[:80] + ("…" if len(post.body) > 80 else "")
+            excerpt = (post.body[:80] + ("…" if len(post.body) > 80 else "")) or "(ảnh/video)"
             for person in audience:
                 if person.id != user.id:
                     notify(db, person.id, f"post:{post.id}", "Thông báo chính thức: " + excerpt, link="/feed")
-        audit(db, user, "post.created", post.id, {"audience": post.audience, "official": post.official})
+        audit(
+            db,
+            user,
+            "post.created",
+            post.id,
+            {"audience": post.audience, "official": post.official, "media": len(media)},
+        )
         emit(
             db,
             "post.created",
@@ -337,5 +396,73 @@ def build_router(app):
             db.delete(existing)
         db.commit()
         return post_data(db, user, post)
+
+    @router.post("/post-attachments", status_code=201)
+    async def upload_media(
+        file: UploadFile = File(...),
+        idempotency_key: str | None = Header(None),
+        db: Session = Depends(db_dep),
+        actor: Actor = Depends(actor_dep),
+    ):
+        """Store a picture or video for a post about to be published; private to the uploader until then."""
+        user = user_for(db, actor)
+        require(db, user, "feed.post")
+        mime = (file.content_type or "").split(";")[0].strip().lower()
+        if mime not in MEDIA:
+            raise AppError(
+                415,
+                "media_type_invalid",
+                "Bảng tin chỉ nhận ảnh (PNG, JPEG, GIF, WebP) và video (MP4, WebM, MOV).",
+            )
+        data = bytearray()
+        while chunk := await file.read(1024 * 1024):
+            data.extend(chunk)
+            if len(data) > settings.max_upload_bytes:
+                raise AppError(413, "upload_too_large", "Tệp vượt giới hạn dung lượng.")
+        if not data:
+            raise AppError(422, "upload_size_invalid", "Tệp rỗng.")
+        name = (file.filename or "anh").replace("/", "_").replace("\\", "_")[:250]
+        # Core checks the bytes really are the claimed picture or video before storing them.
+        stored = app.state.core_service.upload(name, mime, bytes(data), idempotency_key or m.uid())
+        value = m.PostAttachment(
+            uploader_id=user.id,
+            core_file_id=stored.get("file_id", stored.get("id")),
+            name=name,
+            mime=mime,
+            size=len(data),
+            kind=MEDIA[mime],
+        )
+        db.add(value)
+        db.commit()
+        return media_data(value)
+
+    @router.get("/post-attachments/{attachment_id}/content")
+    def media_content(
+        attachment_id: str,
+        download: bool = False,
+        db: Session = Depends(db_dep),
+        actor: Actor = Depends(actor_dep),
+    ):
+        user = user_for(db, actor)
+        value = db.get(m.PostAttachment, attachment_id)
+        if value and value.post_id:
+            post = db.get(m.Post, value.post_id)
+            visible = bool(post and can_see(db, user, post))
+        else:
+            visible = bool(value and value.uploader_id == user.id)
+        if not visible:
+            raise AppError(404, "attachment_not_found", "Không tìm thấy ảnh/video.")
+        _, version = app.state.core_service.file_version(value.core_file_id)
+        ticket = app.state.core_service.post(f"/storage/versions/{version['id']}/download-tickets", {})
+        content = app.state.core_service.get(f"/storage/download/{ticket['ticket']}", raw=True)
+        disposition = "attachment" if download else "inline"
+        return Response(
+            content,
+            media_type=value.mime,
+            headers={
+                "Content-Disposition": f"{disposition}; filename*=UTF-8''{quote(value.name)}",
+                "Cache-Control": "private, max-age=300",
+            },
+        )
 
     return router

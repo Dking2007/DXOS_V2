@@ -5038,6 +5038,114 @@
         }
       }
     },
+    "/workspace/v1/post-attachments": {
+      "post": {
+        "tags": [
+          "feed"
+        ],
+        "summary": "Upload Media",
+        "description": "Store a picture or video for a post about to be published; private to the uploader until then.",
+        "operationId": "upload_media_workspace_v1_post_attachments_post",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_media_workspace_v1_post_attachments_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/post-attachments/{attachment_id}/content": {
+      "get": {
+        "tags": [
+          "feed"
+        ],
+        "summary": "Media Content",
+        "operationId": "media_content_workspace_v1_post_attachments__attachment_id__content_get",
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Attachment Id"
+            }
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Download"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/me/overview": {
       "get": {
         "tags": [
@@ -6218,6 +6326,20 @@
           "file"
         ],
         "title": "Body_upload_file_workspace_v1_drive_files_post"
+      },
+      "Body_upload_media_workspace_v1_post_attachments_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_media_workspace_v1_post_attachments_post"
       },
       "CaseCreate": {
         "properties": {
@@ -7534,8 +7656,8 @@
           "body": {
             "type": "string",
             "maxLength": 10000,
-            "minLength": 1,
-            "title": "Body"
+            "title": "Body",
+            "default": ""
           },
           "audience": {
             "type": "string",
@@ -7561,13 +7683,18 @@
             "type": "boolean",
             "title": "Official",
             "default": false
+          },
+          "attachment_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Attachment Ids"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": [
-          "body"
-        ],
         "title": "PostCreate"
       },
       "PostEdit": {

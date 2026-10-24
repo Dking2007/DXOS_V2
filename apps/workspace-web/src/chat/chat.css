@@ -894,3 +894,29 @@
     min-width: 260px;
   }
 }
+.chat-file-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+.chat-file-download {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-right: -4px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.chat-file-download:hover {
+  background: var(--surface-3);
+  color: var(--navy);
+}

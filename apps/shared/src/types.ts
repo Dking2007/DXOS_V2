@@ -319,6 +319,15 @@ export interface Post {
   can_moderate: boolean
   revision: number
   created_at: string
+  attachments?: PostMedia[]
+}
+export interface PostMedia {
+  id: string
+  name: string
+  mime: string
+  size: number
+  kind: 'image' | 'video'
+  url: string
 }
 export interface PostComment {
   id: string
