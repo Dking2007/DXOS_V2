@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-26
+
+### Fixed
+- `reuse lint` lỗi do `scripts/add_spdx_headers.mjs` và `CONTRIBUTING.md` chứa mẫu header SPDX bị đọc nhầm; bỏ khóa không hợp lệ trong `REUSE.toml` — `d31d057`, `fdc0e7c`. CI toàn bộ xanh từ bản này; `v0.2.0` giữ nguyên làm mốc lịch sử.
+
 ## [0.2.0] - 2026-10-26 — DXOS V2: sẵn sàng đối chiếu tiêu chí PoF
 
 Bản V2 giữ nguyên chức năng của V1 (0.1.0) và hoàn thiện phần kho mã nguồn: giấy phép, khai
@@ -45,6 +50,7 @@ Trạng thái kho trước khi bước vào V2, tag hồi tố tại `f089bfb`.
 ### Fixed
 - Thứ tự import trong `auth.py` để CI backend qua ruff — `d495abb`.
 
-[Unreleased]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Raphael-Fug/DXOS_V2/releases/tag/v0.1.0
