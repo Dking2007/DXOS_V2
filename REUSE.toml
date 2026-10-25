@@ -4,9 +4,6 @@
 # Khai báo giấy phép tập trung cho tệp không ghi chú header được (JSON, Markdown,
 # lockfile, HTML, văn bản). Tệp mã nguồn khác mang header SPDX trực tiếp.
 version = 1
-SPDX-PackageName = "Desktiny"
-SPDX-PackageSupplier = "Desktiny contributors"
-SPDX-PackageDownloadLocation = "https://github.com/Raphael-Fug/DXOS_V2"
 
 [[annotations]]
 path = [
