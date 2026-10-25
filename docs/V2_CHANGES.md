@@ -26,7 +26,7 @@ của ứng dụng; mọi thay đổi mã chỉ là chú thích header và khai 
 | 1 | Quản lý mã nguồn (5) | Repo GitHub, 8 commit nhưng **một tác giả duy nhất** | `.gitignore` đã đúng, không commit `.env`/`node_modules`; thêm quy ước commit | Mỗi thành viên commit bằng tài khoản riêng; bật public & kiểm ẩn danh |
 | 2 | Cấp phép OSI (10) | Có LICENSE, thiếu header từng tệp, thiếu REUSE | SPDX 180 tệp, `LICENSES/`, `REUSE.toml`, mục *Giấy phép* trong README | Chạy `reuse lint` (CI sẽ chạy) và ScanCode |
 | 3 | Release (5) | Chưa có | Tag SemVer + workflow tạo tar.gz/SHA256SUMS | Phát hành v0.1.x đều mỗi tuần; bản cuối trước 17:00 06/12/2026 |
-| 4 | Cài đặt & biên dịch (10) | Chỉ tài liệu dài, không có điểm vào thống nhất | `BUILD.md`, `Makefile`, cài ra `PREFIX`, cấu hình qua `.env` | Chạy thử trong container Ubuntu sạch (chưa làm được trên máy hiện tại) |
+| 4 | Cài đặt & biên dịch (10) | Chỉ tài liệu dài, không có điểm vào thống nhất | `BUILD.md`, `Makefile`, cài ra `PREFIX`, cấu hình qua `.env` | Chạy thử trong container Ubuntu sạch (chưa làm được trên máy hiện tại). Đã sửa: migration CSDL nay được cài kèm (`desktiny-migrate`) để chương trình chạy được ngoài thư mục mã nguồn |
 | 5 | Thư viện & gói (10) | Lockfile có; inventory chưa đầy đủ | `THIRD_PARTY.md`; xác nhận không vendor, không có thành phần ngoài OSI | Đối chiếu giấy phép Python bằng `pip-licenses`; xem lưu ý psycopg (LGPL), ONLYOFFICE (AGPL) |
 | 6 | Tài liệu & giao tiếp (10) | README tốt, thiếu CHANGELOG, mẫu issue | CHANGELOG, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, mẫu issue/PR | Tạo issue thật & milestone theo tuần trên GitHub |
 

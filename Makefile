@@ -21,7 +21,7 @@ help:
 	@echo "build       biên dịch frontend (apps/*/dist)"
 	@echo "test        pytest + vitest"
 	@echo "lint        ruff + eslint + typecheck"
-	@echo "install     cài vào $(DESTDIR)$(PREFIX) (gói Python + web tĩnh + cấu hình mẫu)"
+	@echo "install     cài vào $(DESTDIR)$(PREFIX) (gói Python + web tĩnh + migration + cấu hình mẫu)"
 	@echo "dist        đóng gói nguồn dist/dxos-<phiên bản>.tar.gz + SHA256SUMS"
 	@echo "up/down     chạy/dừng toàn bộ nền tảng bằng Docker Compose (tự bootstrap .env)"
 	@echo "reuse       reuse lint (cần: pipx install reuse)"
@@ -54,6 +54,9 @@ install: build
 	cp -r apps/workspace-web/dist/. "$(DESTDIR)$(PREFIX)/share/desktiny/workspace-web/"
 	cp -r apps/core-admin/dist/. "$(DESTDIR)$(PREFIX)/share/desktiny/core-admin/"
 	install -m 0644 .env.example "$(DESTDIR)$(PREFIX)/share/desktiny/config/env.example"
+	for svc in core-api workspace-api; do 	  install -d "$(DESTDIR)$(PREFIX)/share/desktiny/$svc" && 	  cp services/$svc/alembic.ini "$(DESTDIR)$(PREFIX)/share/desktiny/$svc/" && 	  cp -r services/$svc/migrations "$(DESTDIR)$(PREFIX)/share/desktiny/$svc/"; 	done
+	install -d "$(DESTDIR)$(PREFIX)/bin"
+	install -m 0755 scripts/desktiny-migrate.sh "$(DESTDIR)$(PREFIX)/bin/desktiny-migrate"
 
 dist:
 	mkdir -p dist

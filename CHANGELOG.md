@@ -6,6 +6,15 @@
 
 ## [Unreleased]
 
+### Added
+- `scripts/desktiny-migrate.sh` (cài thành `$PREFIX/bin/desktiny-migrate`): chạy migration CSDL từ bản đã cài, không cần thư mục mã nguồn.
+
+### Fixed
+- `make install` không cài `alembic.ini` và `migrations/`, nên bản cài ra `PREFIX` không thể khởi tạo CSDL khi xóa thư mục mã nguồn (tiêu chí PoF 4, mục "chạy được ngoài thư mục mã nguồn"). Nay cài vào `$PREFIX/share/desktiny/<service>-api/`.
+
+### Changed
+- BUILD.md: thêm mục Thư viện hệ thống (dùng libpq của hệ điều hành thay cho wheel đóng gói sẵn).
+
 ## [0.2.1] - 2026-10-26
 
 ### Fixed

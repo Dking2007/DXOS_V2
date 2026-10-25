@@ -40,12 +40,14 @@ make install PREFIX=$HOME/desktiny   # cài ra ngoài thư mục mã nguồn
 ```
 
 Sau `make install`, gói Python (`dx_core`, `dx_workspace`, `dx_platform_kit`) nằm dưới
-`$PREFIX/lib/python3.13/site-packages`, web tĩnh dưới `$PREFIX/share/desktiny/`, cấu hình
-mẫu ở `$PREFIX/share/desktiny/config/env.example`. Có thể xóa thư mục mã nguồn rồi chạy:
+`$PREFIX/lib/python3.13/site-packages`, web tĩnh dưới `$PREFIX/share/desktiny/`, migration
+CSDL ở `$PREFIX/share/desktiny/{core,workspace}-api/`, lệnh `$PREFIX/bin/desktiny-migrate`, cấu hình mẫu ở
+`$PREFIX/share/desktiny/config/env.example`. Có thể xóa thư mục mã nguồn rồi chạy:
 
 ```bash
 export PYTHONPATH=$HOME/desktiny/lib/python3.13/site-packages
 export DATABASE_URL=postgresql+psycopg://USER:PASS@HOST:5432/DB   # mỗi service một DB
+$HOME/desktiny/bin/desktiny-migrate core          # tạo/cập nhật bảng (alembic upgrade head)
 python3.13 -m uvicorn dx_core.main:app --host 127.0.0.1 --port 8001
 ```
 
@@ -53,6 +55,12 @@ Các biến cấu hình (URL, secret, issuer SSO…) liệt kê trong `.env.exam
 sinh giá trị ngẫu nhiên. Backend vẫn cần PostgreSQL, Keycloak và S3 cho tích hợp thật
 (xem README, mục *Phát triển local*). Chỉ xem giao diện: `npm run dev` rồi mở http://localhost:5173/
 (API sẽ lỗi nếu không có backend).
+
+### Thư viện hệ thống
+
+Bản dựng không đính kèm thư viện của dự án khác. `psycopg[binary]` (khai báo trong `packages/platform-kit/pyproject.toml`)
+tải wheel có sẵn libpq; nếu muốn dùng libpq của hệ điều hành thay vì bản đóng gói sẵn, cài `apt install libpq5` rồi
+`pip install "psycopg==3.2.10"` (không `[binary]`) thay cho gói binary. Việc đổi mặc định đang theo dõi trong issue backlog.
 
 ## 4. Kiểm thử và kiểm tra tuân thủ
 
