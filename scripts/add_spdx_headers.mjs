@@ -12,6 +12,8 @@ import { readFileSync, writeFileSync } from 'node:fs'
 
 const LICENSE_ID = 'Apache-2.0'
 const COPYRIGHT = '2026 Desktiny contributors'
+// Ghép chuỗi để reuse lint không đọc nhầm mẫu này như một header thật.
+const TAG = 'SPD' + 'X'
 const check = process.argv.includes('--check')
 
 const hash = (t) => `# ${t}`
@@ -45,8 +47,8 @@ for (const file of files) {
   }
   const eol = raw.includes('\r\n') ? '\r\n' : '\n'
   const header = [
-    comment(`SPDX-License-Identifier: ${LICENSE_ID}`),
-    comment(`SPDX-FileCopyrightText: ${COPYRIGHT}`),
+    comment(`${TAG}-License-Identifier: ${LICENSE_ID}`),
+    comment(`${TAG}-FileCopyrightText: ${COPYRIGHT}`),
   ].join(eol)
   let out
   if (raw.startsWith('#!')) {

@@ -24,7 +24,7 @@ reuse lint                                  # pipx install reuse
 ## Quy tắc giấy phép (bắt buộc)
 
 - Mã mới dùng **Apache-2.0**: chạy `node scripts/add_spdx_headers.mjs` để thêm header
-  (`SPDX-License-Identifier: Apache-2.0`, `SPDX-FileCopyrightText: 2026 Desktiny contributors`).
+  (dòng định danh giấy phép Apache-2.0 và dòng bản quyền "2026 Desktiny contributors").
 - **Không** sao chép mã từ web, từ đầu ra AI hay từ dự án khác khi chưa kiểm tra nguồn và giấy phép.
 - **Không** commit thư viện (`node_modules/`, `vendor/`, `.jar`, `.so`…). Thêm phụ thuộc qua manifest + lockfile,
   rồi chạy `make licenses` và commit `THIRD_PARTY.md`. Chỉ nhận giấy phép OSI; không dùng SSPL, BSL, Elastic, RSAL…
