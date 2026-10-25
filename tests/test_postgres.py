@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Opt-in tests against a dedicated empty PostgreSQL database, never a production database."""
 
 import os

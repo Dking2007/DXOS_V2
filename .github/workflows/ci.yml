@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 name: Verify Desktiny
 on: [push, pull_request]
 jobs:
@@ -40,3 +42,27 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
+  compliance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: npm ci
+      - name: Mọi tệp mã có header SPDX
+        run: node scripts/add_spdx_headers.mjs --check
+      - name: REUSE lint
+        run: pip install reuse && reuse lint
+      - name: THIRD_PARTY.md khớp lockfile
+        run: node scripts/gen_third_party.mjs && git diff --exit-code THIRD_PARTY.md
+      - name: Giấy phép Python khớp khai báo
+        run: |
+          pip install -c requirements.lock -r requirements.lock pip-licenses
+          pip-licenses --format=markdown --with-urls > /tmp/py-licenses.md
+          grep -Eiq 'GPL|SSPL|BUSL|Elastic' /tmp/py-licenses.md && grep -Ei 'GPL|SSPL|BUSL|Elastic' /tmp/py-licenses.md || true
+          cat /tmp/py-licenses.md

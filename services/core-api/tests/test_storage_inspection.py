@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Uploads are accepted by content signature, not by the name a client gives them."""
 
 import io

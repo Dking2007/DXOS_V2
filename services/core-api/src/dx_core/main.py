@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta

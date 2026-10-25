@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 [tool.pytest.ini_options]
 testpaths = ["tests", "services/core-api/tests", "services/workspace-api/tests"]
 addopts = "-ra"

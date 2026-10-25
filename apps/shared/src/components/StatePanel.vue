@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { AlertCircle, Inbox } from 'lucide-vue-next'
 import { ApiError, errorText } from '../api'

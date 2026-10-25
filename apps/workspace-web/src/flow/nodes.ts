@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 import type { Component } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { Bell, GitBranch, Hourglass, ListPlus, Webhook, Zap } from 'lucide-vue-next'

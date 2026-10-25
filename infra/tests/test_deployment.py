@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Offline deployment-contract checks; not container, PostgreSQL or SSO integration tests."""
 
 from __future__ import annotations

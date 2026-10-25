@@ -287,3 +287,23 @@ audit không thay chữ ký số. Không cam kết hiệu năng/RPO/RTO khi chư
 Code tự viết: [Apache-2.0](LICENSE), xem [NOTICE](NOTICE). ONLYOFFICE, RustFS và các
 service/dependency giữ giấy phép của họ. Cần rà soát artifact, notice, source offer
 và trademark đúng bản phát hành; tích hợp API không phải giấy miễn nghĩa vụ.
+
+## Giấy phép
+
+Mã nguồn do dự án tự viết phát hành theo **Apache License 2.0** (SPDX: `Apache-2.0`).
+
+- **Vì sao chọn Apache-2.0**: giấy phép OSI rộng rãi, có điều khoản cấp quyền bằng sáng chế, tương thích với
+  toàn bộ thư viện dùng trong dự án (MIT/BSD/Apache/MPL/PSF/OFL; psycopg LGPL-3.0 dùng như thư viện liên kết động,
+  không sửa). Dịch vụ copyleft (ONLYOFFICE AGPL-3.0, tùy chọn) chạy riêng qua HTTP, không liên kết vào mã.
+- Bản toàn văn: [LICENSE](LICENSE) (và [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt) theo chuẩn
+  [REUSE](https://reuse.software/)). Mỗi tệp mã mang header `SPDX-License-Identifier`; tệp không ghi chú được
+  khai báo trong [REUSE.toml](REUSE.toml). Kiểm bằng `reuse lint`.
+- Thành phần bên ngoài và giấy phép của chúng: [THIRD_PARTY.md](THIRD_PARTY.md), thông báo: [NOTICE](NOTICE).
+
+## Biên dịch, phát hành và đóng góp
+
+- Cài đặt/biên dịch từ mã nguồn: [BUILD.md](BUILD.md) (`make venv deps build test`, `make install PREFIX=...`).
+- Lịch sử phiên bản: [CHANGELOG.md](CHANGELOG.md); bản V2 khác V1 thế nào: [docs/V2_CHANGES.md](docs/V2_CHANGES.md).
+- Báo lỗi / đề xuất: tab **Issues** của repo. Cách đóng góp: [CONTRIBUTING.md](CONTRIBUTING.md),
+  [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), bảo mật: [SECURITY.md](SECURITY.md).
+- Tự rà soát tiêu chí PoF OLP PMNM 2026: [SELF_REVIEW.md](SELF_REVIEW.md).

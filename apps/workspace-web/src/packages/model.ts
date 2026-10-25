@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 import type { ApprovalStep, Condition, FormField } from '@dx/web-shared/types.ts'
 
 export interface PackageVersion {

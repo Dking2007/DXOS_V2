@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { describe, expect, it } from 'vitest'
 import { avatarHue, initials, isLong, linkify, relativeTime } from './text'
 

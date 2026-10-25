@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Add folder.acl_state so a folder reports whether subtree grants are current.
 
 Revision ID: workspace_0002

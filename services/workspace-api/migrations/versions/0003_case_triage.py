@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Add dossier triage fields: priority, due date and assignee.
 
 Revision ID: workspace_0003

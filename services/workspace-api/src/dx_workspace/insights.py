@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Evidence review and permission-scoped process metrics."""
 
 from __future__ import annotations

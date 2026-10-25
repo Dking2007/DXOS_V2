@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 // Plain-language names for permission codes and roles, shared by every screen that shows them.
 export interface PermissionInfo {
   label: string

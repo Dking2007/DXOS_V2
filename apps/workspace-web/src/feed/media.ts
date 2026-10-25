@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { computed, onBeforeUnmount, ref } from 'vue'
 import type { PostMedia } from '@dx/web-shared/types.ts'
 import { errorText } from '@dx/web-shared/api.ts'

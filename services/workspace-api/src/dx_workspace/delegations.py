@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Approval delegation: someone away hands their approval inbox to a colleague for a period.
 
 The delegate acts only on the delegator's approval tasks and never gains anything the

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 // Which files the in-app viewer can show, decided by name (and type when the server sent one).
 export type PreviewKind = 'image' | 'pdf' | 'video' | 'audio' | 'text'
 

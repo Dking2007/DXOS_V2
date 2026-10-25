@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-FileCopyrightText: 2026 Desktiny contributors */
 /* Internal news feed: composer, filters, post cards, comments and the side column. */
 .feed-page {
   display: grid;

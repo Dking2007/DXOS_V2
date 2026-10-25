@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 from dx_platform.auth import Actor
 from dx_platform.errors import AppError
 from sqlalchemy import and_, exists, or_, select

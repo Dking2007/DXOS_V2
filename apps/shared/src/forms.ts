@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 import type { FormField } from './types'
 
 export function initialPayload(fields: FormField[]): Record<string, unknown> {

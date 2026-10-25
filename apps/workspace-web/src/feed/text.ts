@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 // Formatting helpers for the feed: relative times, safe links and avatar colours.
 
 export const REACTIONS = [

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Task assignment: who gives work to whom, how it moves, and who may accept the result."""
 
 from __future__ import annotations

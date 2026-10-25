@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { ApiError, csrfCookie, newIntent } from '@dx/web-shared/api.ts'
 import type { ChatAttachment } from '@dx/web-shared/types.ts'
 

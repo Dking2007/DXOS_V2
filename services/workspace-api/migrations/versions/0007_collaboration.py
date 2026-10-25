@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Tasks, chat, feed, delegations and automation rules.
 
 Revision ID: workspace_0007

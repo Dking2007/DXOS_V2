@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { FilePlus2, Flag, GitBranch, Paperclip, UserCheck } from 'lucide-vue-next'
 import type { ApprovalStep, FormField } from '@dx/web-shared/types.ts'

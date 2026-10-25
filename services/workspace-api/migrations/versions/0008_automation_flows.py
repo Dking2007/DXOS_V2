@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Automation rules become node-graph flows; runs pin the graph they started with.
 
 Revision ID: workspace_0008

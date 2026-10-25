@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Automation flows can be limited to the tasks people attach them to.
 
 Revision ID: workspace_0009

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Migration chain checks that do not need a live PostgreSQL server."""
 
 from pathlib import Path

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 export type FieldType =
   'text' | 'textarea' | 'number' | 'date' | 'select' | 'checkbox'
 export interface FormField {

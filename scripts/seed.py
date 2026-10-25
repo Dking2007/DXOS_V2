@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Load synthetic organization data into the running development Workspace service."""
 
 from __future__ import annotations

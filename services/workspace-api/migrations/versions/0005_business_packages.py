@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Business package versions, simulation evidence and case pins.
 
 Revision ID: workspace_0005

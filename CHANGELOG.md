@@ -1,0 +1,50 @@
+# Changelog
+
+Định dạng theo [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/), đánh phiên bản theo
+[SemVer](https://semver.org/lang/vi/). Mỗi mục trỏ tới commit thật trong lịch sử Git; từ
+0.2.0 trở đi mỗi thay đổi đi kèm issue/PR. So sánh chi tiết V1 → V2: [docs/V2_CHANGES.md](docs/V2_CHANGES.md).
+
+## [Unreleased]
+
+## [0.2.0] - 2026-10-26 — DXOS V2: sẵn sàng đối chiếu tiêu chí PoF
+
+Bản V2 giữ nguyên chức năng của V1 (0.1.0) và hoàn thiện phần kho mã nguồn: giấy phép, khai
+báo thành phần ngoài, hướng dẫn biên dịch, phát hành và tài liệu cộng đồng.
+
+### Added
+- Header `SPDX-License-Identifier` + `SPDX-FileCopyrightText` cho 180 tệp mã/cấu hình; công cụ
+  `scripts/add_spdx_headers.mjs` (idempotent, có `--check`).
+- `LICENSES/Apache-2.0.txt` và `REUSE.toml` (khai báo tập trung cho JSON/Markdown/lockfile/HTML) — chuẩn REUSE.
+- `THIRD_PARTY.md` sinh bởi `scripts/gen_third_party.mjs`: 309 gói npm, 55 gói Python, 9 dịch vụ/image với SPDX, nguồn, cách dùng.
+- `Makefile` (venv, deps, build, test, lint, `install PREFIX=`, dist, up/down, reuse, licenses) và `BUILD.md`.
+- `CHANGELOG.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `SELF_REVIEW.md`.
+- Mẫu issue (bug, tính năng), mẫu pull request, nhãn & quy ước commit.
+- CI: job `compliance` (reuse lint, kiểm header, đối chiếu THIRD_PARTY.md, quét giấy phép), job build sạch.
+- Workflow `release.yml`: đẩy tag `v*` tự tạo Release có `.tar.gz` + `SHA256SUMS`.
+- `docs/V2_CHANGES.md`: bảng so sánh V1 → V2 và ánh xạ 6 tiêu chí PoF.
+- README: mục *Giấy phép* (lý do chọn Apache-2.0, trỏ LICENSE/THIRD_PARTY) và *Đóng góp*.
+
+### Changed
+- `package.json` (gốc và 3 workspace) khai báo `"license": "Apache-2.0"`.
+- README/docs trỏ về BUILD.md làm điểm vào cài đặt.
+
+## [0.1.0] - 2026-10-24 — DXOS V1 (đường cơ sở)
+
+Trạng thái kho trước khi bước vào V2, tag hồi tố tại `f089bfb`.
+
+### Added
+- Khung dự án, nền tảng Core + Workspace (FastAPI/Vue 3), SSO Keycloak, Docker Compose — `ded2d88`, `e29fa17`.
+- Cập nhật nghiệp vụ Drive, hồ sơ, workflow, giao việc — `0fd1ef0`.
+- Giao diện mới: banner chào, 4 ô số liệu, khối thời gian chờ theo bước — `15725c5`.
+- Gói nghiệp vụ trực quan, tự động hóa theo công việc (canvas luồng), chat đa phương tiện, khung làm việc dễ dùng — `abab487`.
+- Bảng tin có ảnh/video; xem PDF, ảnh, video, âm thanh ngay trong ứng dụng — `f949ab9`.
+
+### Changed
+- Đổi tên sản phẩm thành Desktiny — `f089bfb`.
+
+### Fixed
+- Thứ tự import trong `auth.py` để CI backend qua ruff — `d495abb`.
+
+[Unreleased]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Raphael-Fug/DXOS_V2/releases/tag/v0.1.0

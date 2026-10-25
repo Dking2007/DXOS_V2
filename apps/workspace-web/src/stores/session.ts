@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { User } from '@dx/web-shared/types.ts'

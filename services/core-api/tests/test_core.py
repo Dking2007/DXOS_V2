@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 import pytest
 from dx_core.main import create_app
 from dx_core.models import Base, Hold, Outbox, RecordVersion

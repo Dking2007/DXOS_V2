@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 FROM node:22.17.0-alpine AS build
 ARG APP
 WORKDIR /app

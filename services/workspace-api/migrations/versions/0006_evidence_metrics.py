@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Field evidence and accurate task wait timestamps.
 
 Revision ID: workspace_0006

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """DB-backed runtime reconciler. Safe to run multiple processes with PostgreSQL row locks."""
 
 import logging

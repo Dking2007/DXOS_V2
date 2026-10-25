@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { describe, expect, it, vi } from 'vitest'
 import { badgeText, visibleGroups } from './nav'
 import { PERMISSION_GROUPS, PERMISSIONS, permissionLabel, roleLabel } from './labels'

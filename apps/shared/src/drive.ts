@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 import type { Share, User } from './types'
 
 /** Vietnamese label for a share row, e.g. "Nguyễn A · được xem và tải". */

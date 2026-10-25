@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
+#
+# Khai báo giấy phép tập trung cho tệp không ghi chú header được (JSON, Markdown,
+# lockfile, HTML, văn bản). Tệp mã nguồn khác mang header SPDX trực tiếp.
+version = 1
+SPDX-PackageName = "Desktiny"
+SPDX-PackageSupplier = "Desktiny contributors"
+SPDX-PackageDownloadLocation = "https://github.com/Raphael-Fug/DXOS_V2"
+
+[[annotations]]
+path = [
+  "LICENSE",
+  "NOTICE",
+  "README.md",
+  "BUILD.md",
+  "CHANGELOG.md",
+  "CONTRIBUTING.md",
+  "CODE_OF_CONDUCT.md",
+  "SECURITY.md",
+  "SELF_REVIEW.md",
+  "THIRD_PARTY.md",
+  "Cai_thien_nen_tang_quy_trinh_so_DXOS.md",
+  "Thiet_ke_DX_Workspace_FastAPI_Vue3.md",
+  "docs/**",
+  "infra/identity/README.md",
+  "examples/**/*.md",
+  "**/*.json",
+  "**/*.html",
+  "package-lock.json",
+  "requirements.lock",
+  "requirements-dev.txt",
+  ".env.example",
+  ".github/ISSUE_TEMPLATE/**",
+  ".github/pull_request_template.md",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Desktiny contributors"
+SPDX-License-Identifier = "Apache-2.0"

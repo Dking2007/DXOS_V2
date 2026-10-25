@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { Compass, Monitor, Moon, Sun } from 'lucide-vue-next'
 import { applyTheme, theme, type ThemeChoice } from '../ui/theme'

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Explicit development bootstrap; never runs automatically when an API process starts."""
 
 import argparse

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 // Loaded on demand so pdf.js (~1 MB) only downloads when someone opens a PDF.
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist'
 // Bundled by Vite as a .js worker, so it is served with a JavaScript content type.

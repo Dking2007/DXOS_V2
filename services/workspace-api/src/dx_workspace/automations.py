@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Business automation flows drawn as a node graph: trigger → conditions → actions.
 
 This is the visual configurator Workspace offers business users. Flows run inside the

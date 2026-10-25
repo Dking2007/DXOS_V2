@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Internal news feed. Bodies are stored and returned as plain text; the client never renders HTML.
 
 Posts may carry images and videos. They are stored in Core under the Workspace service

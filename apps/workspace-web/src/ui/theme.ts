@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { ref } from 'vue'
 
 export type ThemeChoice = 'light' | 'dark' | 'system'

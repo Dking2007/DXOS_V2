@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Provision the private development bucket before Core readiness checks."""
 
 from __future__ import annotations

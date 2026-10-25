@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { computed } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import type { MeOverview } from '@dx/web-shared/types.ts'

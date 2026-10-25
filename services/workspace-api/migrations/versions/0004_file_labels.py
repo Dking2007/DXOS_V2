@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Add drive_files.labels so a document can carry the labels its owner set.
 
 Revision ID: workspace_0004

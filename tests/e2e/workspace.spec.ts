@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { expect, test, type Page } from '@playwright/test'
 
 async function signIn(page: Page, username: string, password: string) {

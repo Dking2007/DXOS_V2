@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Download, Eye, FileArchive, FileSpreadsheet, FileText, FileType2, Presentation } from 'lucide-vue-next'

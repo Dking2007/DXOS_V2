@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 from alembic import context
 from dx_core.models import Base
 from dx_platform.auth import AuthBase

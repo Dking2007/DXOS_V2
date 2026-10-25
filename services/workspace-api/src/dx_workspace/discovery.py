@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Permission-filtered search and dashboard aggregates.
 
 Both read live tables rather than a separate index, so a revoked permission takes effect on

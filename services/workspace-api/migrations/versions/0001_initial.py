@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Initial Workspace-owned schema and BFF sessions.
 
 Revision ID: workspace_0001

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 """Generate OpenAPI contracts from the same applications used by production entrypoints."""
 import json
 from pathlib import Path

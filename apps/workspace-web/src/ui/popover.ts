@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { onBeforeUnmount, onMounted, type Ref } from 'vue'
 
 // Closes a dropdown on a click outside it or on Escape, returning focus to its trigger.

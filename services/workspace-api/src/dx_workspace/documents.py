@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
 from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZipFile
 

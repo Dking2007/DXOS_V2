@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import { ArrowLeft, FileQuestion } from 'lucide-vue-next'
