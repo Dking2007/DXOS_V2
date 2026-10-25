@@ -1,0 +1,35 @@
+{
+  "milestones": [
+    { "title": "Tuần 26/10–01/11: nền PoF", "due": "2026-11-01" },
+    { "title": "Tuần 02/11–08/11: CI & kiểm chứng", "due": "2026-11-08" },
+    { "title": "Tuần 09/11–22/11: tính năng & release hằng tuần", "due": "2026-11-22" },
+    { "title": "Tuần 23/11–29/11: đóng băng phụ thuộc & rà soát 1", "due": "2026-11-29" },
+    { "title": "Tuần 30/11–06/12: rà soát 2 & nộp bài", "due": "2026-12-06" }
+  ],
+  "labels": [
+    { "name": "compliance", "color": "0e8a16" },
+    { "name": "docs", "color": "0075ca" },
+    { "name": "build", "color": "fbca04" },
+    { "name": "release", "color": "5319e7" },
+    { "name": "bug", "color": "d73a4a" },
+    { "name": "enhancement", "color": "a2eeef" }
+  ],
+  "issues": [
+    { "title": "Thêm header SPDX cho mọi tệp và REUSE.toml", "labels": ["compliance"], "milestone": 0, "state": "closed", "ref": "633b9ec", "body": "Tiêu chí 2. Đã thêm header cho 180 tệp, `LICENSES/Apache-2.0.txt`, `REUSE.toml`." },
+    { "title": "Lập THIRD_PARTY.md từ lockfile", "labels": ["compliance", "docs"], "milestone": 0, "state": "closed", "ref": "633b9ec", "body": "Tiêu chí 5. Script `scripts/gen_third_party.mjs` sinh 309 npm + 55 Python + 9 dịch vụ." },
+    { "title": "Thêm BUILD.md và Makefile (cài ra PREFIX)", "labels": ["build", "docs"], "milestone": 0, "state": "closed", "ref": "633b9ec", "body": "Tiêu chí 4." },
+    { "title": "CHANGELOG, CONTRIBUTING, SECURITY, mẫu issue/PR", "labels": ["docs"], "milestone": 0, "state": "closed", "ref": "633b9ec", "body": "Tiêu chí 6." },
+    { "title": "reuse lint lỗi trong CI do mẫu header trong script/tài liệu", "labels": ["bug", "compliance"], "milestone": 0, "state": "closed", "ref": "fdc0e7c", "body": "Chuỗi mẫu SPDX trong `add_spdx_headers.mjs` và `CONTRIBUTING.md` bị reuse đọc như header thật. Đã sửa; phát hành v0.2.1." },
+    { "title": "Phát hành v0.1.0 (V1) và v0.2.x kèm tar.gz + SHA256SUMS", "labels": ["release"], "milestone": 0, "state": "closed", "ref": "888c2c7", "body": "Tiêu chí 3. Workflow `release.yml`." },
+    { "title": "Chạy thử BUILD.md từng dòng trong container Ubuntu 24.04 sạch", "labels": ["build"], "milestone": 1, "body": "Chưa kiểm được trên máy Windows. Ghi lại mọi chỗ vấp vào issue này và sửa BUILD.md/Makefile." },
+    { "title": "Chạy ScanCode và đối chiếu giấy phép Python bằng pip-licenses", "labels": ["compliance"], "milestone": 1, "body": "Cột giấy phép Python trong THIRD_PARTY.md hiện theo metadata upstream. Mở LICENSE đúng phiên bản của `certifi`, `psycopg`." },
+    { "title": "Mỗi thành viên commit bằng tài khoản riêng", "labels": ["docs"], "milestone": 1, "body": "Lịch sử hiện chỉ có một tác giả. Mỗi thành viên nhận ít nhất một issue và gửi PR bằng tài khoản/email của mình." },
+    { "title": "Cấu hình pre-commit/commit lint (Conventional Commits)", "labels": ["enhancement"], "milestone": 1, "body": "Bổ sung kiểm tra thông điệp commit và reuse lint cục bộ." },
+    { "title": "Viết README song ngữ Anh–Việt", "labels": ["docs"], "milestone": 2, "body": "Thêm bản tiếng Anh cho README và BUILD để thu hút cộng đồng." },
+    { "title": "Phát hành v0.2.x hằng tuần kèm CHANGELOG", "labels": ["release"], "milestone": 2, "body": "Mỗi tuần một release, mục CHANGELOG trỏ đúng issue/commit." },
+    { "title": "Đóng băng phụ thuộc, không thêm thư viện mới", "labels": ["compliance"], "milestone": 3, "body": "Từ 23/11 chỉ sửa lỗi. Chạy lại `make licenses` và kiểm THIRD_PARTY.md." },
+    { "title": "Tự rà soát lần 1 và ký SELF_REVIEW.md", "labels": ["compliance", "docs"], "milestone": 3, "body": "Một thành viên chạy từng lệnh trong SELF_REVIEW.md rồi ký. Dùng phiên Opus mới, không kèm lịch sử trò chuyện." },
+    { "title": "Tự rà soát lần 2 (03/12) và nộp bài", "labels": ["compliance", "release"], "milestone": 4, "body": "Thành viên khác ký. Phát hành bản cuối trước 17:00 06/12/2026, gửi email tới olpvietnam@vaip.vn và thuky@vfossa.vn." },
+    { "title": "Xóa Release v0.2.0 hoặc ghi chú thay thế bằng v0.2.1", "labels": ["release"], "milestone": 1, "body": "v0.2.0 build từ commit có reuse lint lỗi; cập nhật SELF_REVIEW.md và docs/V2_CHANGES.md trỏ v0.2.1." }
+  ]
+}
