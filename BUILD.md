@@ -12,6 +12,7 @@ Bản chi tiết hơn (Windows, ONLYOFFICE, xử lý sự cố): [docs/installat
 | Python | 3.13 | `apt install python3.13 python3.13-venv` (hoặc deadsnakes) |
 | Node.js + npm | 22 LTS / 10 | https://nodejs.org hoặc NodeSource |
 | make | GNU Make ≥ 4 | `apt install make` |
+| libpq5 | bất kỳ | `apt install libpq5` — thư viện PostgreSQL mà `psycopg` nạp lúc chạy |
 | Docker Engine + Compose v2 | ≥ 24 | **chỉ** cho cách A (chạy cả nền tảng) |
 
 Phụ thuộc thư viện được khóa trong `requirements.lock` (pip) và `package-lock.json`
@@ -33,7 +34,7 @@ Mở http://localhost:8080/ . Tài khoản demo ngẫu nhiên nằm ở
 
 ```bash
 git clone https://github.com/Raphael-Fug/DXOS_V2.git && cd DXOS_V2
-make venv deps                # môi trường ảo Python + npm ci
+make venv deps PYTHON=python3.13   # môi trường ảo Python 3.13 + npm ci (Ubuntu 24.04: python3 mặc định là 3.12)
 make build                    # biên dịch frontend → apps/*/dist
 make test                     # pytest + vitest
 make install PREFIX=$HOME/desktiny   # cài ra ngoài thư mục mã nguồn
@@ -58,9 +59,9 @@ sinh giá trị ngẫu nhiên. Backend vẫn cần PostgreSQL, Keycloak và S3 c
 
 ### Thư viện hệ thống
 
-Bản dựng không đính kèm thư viện của dự án khác. `psycopg[binary]` (khai báo trong `packages/platform-kit/pyproject.toml`)
-tải wheel có sẵn libpq; nếu muốn dùng libpq của hệ điều hành thay vì bản đóng gói sẵn, cài `apt install libpq5` rồi
-`pip install "psycopg==3.2.10"` (không `[binary]`) thay cho gói binary. Việc đổi mặc định đang theo dõi trong issue backlog.
+Bản dựng không đính kèm thư viện của dự án khác. Từ bản 0.2.2, dự án dùng `psycopg==3.2.10` thuần Python
+(không `[binary]`, không còn wheel đóng gói sẵn libpq) và nạp `libpq5` của hệ điều hành lúc chạy. Cần `apt install libpq5`
+trước khi chạy backend; image Docker `api.Dockerfile` đã cài sẵn.
 
 ## 4. Kiểm thử và kiểm tra tuân thủ
 
@@ -82,12 +83,13 @@ make dist                     # dist/dxos-<phiên bản>.tar.gz + dist/SHA256SUM
 
 | Triệu chứng | Cách xử lý |
 |---|---|
-| `python3.13: not found` | Cài Python 3.13 (deadsnakes) hoặc `make venv PYTHON=python3.13` |
+| `python3.13: not found` | Cài Python 3.13 (deadsnakes): `add-apt-repository ppa:deadsnakes/ppa && apt install python3.13 python3.13-venv` |
+| `make install`: `No module named pip` | Chạy `make venv PYTHON=python3.13` trước; `make install` dùng pip trong `.venv`, không dùng pip hệ thống |
 | `permission denied` với docker | Thêm user vào group `docker`, đăng nhập lại |
 | Cổng 8080 bận | `make up BASE_URL=http://localhost:8090` ngay từ lần bootstrap đầu |
 | `bootstrap.py` từ chối ghi đè | `.env` đã tồn tại; xóa `.env` và `infra/identity/generated/` **và** volume nếu muốn tạo lại |
 | `npm ci` lệch lockfile | Dùng Node 22 + npm 10; không chạy `npm install` rồi commit lockfile mới tùy ý |
 
-> Ghi chú trung thực: các lệnh `make` ở trên chưa được chạy thử trong container Ubuntu sạch
-> ở lần cập nhật này (máy phát triển Windows không có Python/Docker/make). Mục
-> [SELF_REVIEW.md](SELF_REVIEW.md) ghi rõ việc cần chạy thử trước khi phát hành.
+> Ghi chú trung thực: cách B (`make venv deps`, `build`, `test`, `install`, `desktiny-migrate`, `uvicorn`) đã được chạy từng
+> dòng trong container `ubuntu:24.04` sạch ngày 27/10/2026. Cách A (`make up`, toàn bộ nền tảng với SSO) chưa được chạy thử
+> trong lần này. Mục [SELF_REVIEW.md](SELF_REVIEW.md) ghi rõ phần đã kiểm và chưa kiểm.

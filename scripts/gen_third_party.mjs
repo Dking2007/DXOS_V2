@@ -44,7 +44,7 @@ const pyRows = [
   py('jsonschema', '4.25.1', 'MIT'), py('jsonschema-specifications', '2025.9.1', 'MIT'),
   py('Mako', '1.4.3', 'MIT'), py('MarkupSafe', '3.0.4', 'BSD-3-Clause'),
   py('packaging', '26.3', 'Apache-2.0 OR BSD-2-Clause'), py('pluggy', '1.7.0', 'MIT'),
-  py('psycopg', '3.2.10', 'LGPL-3.0-only'), py('psycopg-binary', '3.2.10', 'LGPL-3.0-only'),
+  py('psycopg', '3.2.10', 'LGPL-3.0-only'),
   py('pycparser', '3.11', 'BSD-3-Clause'), py('pydantic', '2.14.1', 'MIT'),
   py('pydantic-settings', '2.11.0', 'MIT'), py('pydantic_core', '2.50.1', 'MIT'),
   py('Pygments', '2.21.0', 'BSD-2-Clause'), py('PyJWT', '2.10.1', 'MIT'), py('pytest', '8.4.2', 'MIT'),
@@ -94,7 +94,7 @@ out.push('MongoDB, HashiCorp Vault/Terraform, Camunda 8, Elasticsearch bản SSP
 out.push('')
 out.push('### Ghi chú giấy phép đáng chú ý')
 out.push('')
-out.push('- **psycopg / psycopg-binary — LGPL-3.0-only**: cài từ PyPI, liên kết động, không sửa, không đính kèm mã nguồn.')
+out.push('- **psycopg — LGPL-3.0-only**: cài từ PyPI (gói thuần Python, không `[binary]`), nạp libpq của hệ điều hành (`libpq5`, PostgreSQL License) qua liên kết động; không sửa, không đính kèm mã nguồn.')
 out.push('  Tương thích với Apache-2.0 khi dùng như thư viện; người phân phối image cần giữ thông báo LGPL.')
 out.push('- **ONLYOFFICE Docs — AGPL-3.0**: tùy chọn, mặc định tắt, chạy container riêng; giữ logo/thông báo của hãng.')
 out.push('- **certifi — MPL-2.0**: dùng nguyên bản, không sửa tệp.')

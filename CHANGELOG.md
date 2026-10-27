@@ -13,7 +13,10 @@
 - `make install` không cài `alembic.ini` và `migrations/`, nên bản cài ra `PREFIX` không thể khởi tạo CSDL khi xóa thư mục mã nguồn (tiêu chí PoF 4, mục "chạy được ngoài thư mục mã nguồn"). Nay cài vào `$PREFIX/share/desktiny/<service>-api/`.
 
 ### Changed
-- BUILD.md: thêm mục Thư viện hệ thống (dùng libpq của hệ điều hành thay cho wheel đóng gói sẵn).
+- `make install` dùng pip của `.venv` (cần `make venv` trước) thay vì `python3 -m pip` của hệ thống (kèm `--ignore-installed` để mọi phụ thuộc thật sự nằm trong `PREFIX`, không bị bỏ qua vì đã có trong `.venv`): Python 3.13 từ deadsnakes trên Ubuntu 24.04 không có pip, nên lệnh cũ thất bại. `desktiny-migrate` tự chọn đúng `python3.X` đã cài gói thay vì `python3` mặc định. BUILD.md gọi `make venv deps PYTHON=python3.13`. Cả ba lỗi tìm ra khi chạy BUILD.md từng dòng trong Ubuntu 24.04 sạch (27/10/2026).
+- Phụ thuộc `psycopg[binary]` đổi thành `psycopg` thuần Python: không còn đóng gói sẵn libpq trong wheel; hệ điều hành cung cấp `libpq5` (đã thêm vào `api.Dockerfile`, bước CI backend và BUILD.md). `psycopg-binary` bị loại khỏi `requirements.lock` và `THIRD_PARTY.md` (54 gói Python).
+- BUILD.md: thêm mục Thư viện hệ thống và `libpq5` vào bảng yêu cầu.
+- Tài liệu (`V2_CHANGES.md`, `SELF_REVIEW.md`) trỏ tới v0.2.1 là bản dùng để chấm.
 
 ## [0.2.1] - 2026-10-26
 

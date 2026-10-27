@@ -13,4 +13,7 @@ prefix=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 site=$(ls -d "$prefix"/lib/python3*/site-packages 2>/dev/null | head -n 1 || true)
 if [ -n "$site" ]; then PYTHONPATH="$site${PYTHONPATH:+:$PYTHONPATH}"; export PYTHONPATH; fi
 if [ "$#" -eq 0 ]; then set -- upgrade head; fi
-exec "${PYTHON:-python3}" -m alembic -c "$prefix/share/desktiny/$service-api/alembic.ini" "$@"
+# Dùng đúng phiên bản Python đã cài gói (lib/python3.X) thay vì python3 mặc định của hệ thống.
+if [ -n "$site" ]; then default_python=$(basename -- "$(dirname -- "$site")"); else default_python=python3; fi
+command -v "$default_python" >/dev/null 2>&1 || default_python=python3
+exec "${PYTHON:-$default_python}" -m alembic -c "$prefix/share/desktiny/$service-api/alembic.ini" "$@"

@@ -21,7 +21,7 @@ help:
 	@echo "build       biên dịch frontend (apps/*/dist)"
 	@echo "test        pytest + vitest"
 	@echo "lint        ruff + eslint + typecheck"
-	@echo "install     cài vào $(DESTDIR)$(PREFIX) (gói Python + web tĩnh + migration + cấu hình mẫu)"
+	@echo "install     cài vào $(DESTDIR)$(PREFIX) (gói Python + web tĩnh + migration + cấu hình mẫu); cần make venv trước"
 	@echo "dist        đóng gói nguồn dist/dxos-<phiên bản>.tar.gz + SHA256SUMS"
 	@echo "up/down     chạy/dừng toàn bộ nền tảng bằng Docker Compose (tự bootstrap .env)"
 	@echo "reuse       reuse lint (cần: pipx install reuse)"
@@ -49,7 +49,7 @@ lint: deps
 check: lint test
 
 install: build
-	$(PYTHON) -m pip install --prefix "$(DESTDIR)$(PREFIX)" -c requirements.lock ./packages/platform-kit ./services/core-api ./services/workspace-api
+	$(VENV)/bin/python -m pip install --ignore-installed --prefix "$(DESTDIR)$(PREFIX)" -c requirements.lock ./packages/platform-kit ./services/core-api ./services/workspace-api
 	install -d "$(DESTDIR)$(PREFIX)/share/desktiny/workspace-web" "$(DESTDIR)$(PREFIX)/share/desktiny/core-admin" "$(DESTDIR)$(PREFIX)/share/desktiny/config"
 	cp -r apps/workspace-web/dist/. "$(DESTDIR)$(PREFIX)/share/desktiny/workspace-web/"
 	cp -r apps/core-admin/dist/. "$(DESTDIR)$(PREFIX)/share/desktiny/core-admin/"

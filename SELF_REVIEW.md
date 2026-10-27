@@ -1,7 +1,7 @@
 # Tự rà soát PoF – Nhóm Desktiny (DXOS V2) – OLP PMNM 2026
 
 Ngày rà soát: 26/10/2026 (lần 1, bản nháp) · Người thực hiện: Claude (hỗ trợ) — **chưa có thành viên ký** ·
-Commit được rà: ghi bằng `git rev-parse HEAD` tại thời điểm tag `v0.2.0`.
+Commit được rà: ghi bằng `git rev-parse HEAD` tại thời điểm tag `v0.2.1` (bản `v0.2.0` có `reuse lint` lỗi, giữ làm mốc lịch sử).
 
 > Đây là bản nháp trung thực để thành viên nhóm kiểm lại, **không** phải xác nhận cuối. Mỗi dòng "Đã kiểm" nêu lệnh
 > đã chạy; dòng "Chưa kiểm" cần người chạy trước 23–29/11 và 03/12.
@@ -12,24 +12,25 @@ Commit được rà: ghi bằng `git rev-parse HEAD` tại thời điểm tag `v
 - **Chưa kiểm**: `reuse lint` và ScanCode (máy phát triển không có Python); CI job `compliance` chạy `reuse lint` — cần xác nhận xanh.
 
 ## 2. Thành phần bên ngoài
-Danh sách đầy đủ trong [THIRD_PARTY.md](THIRD_PARTY.md) (309 npm, 55 Python, 9 dịch vụ). Điểm cần chú ý:
+Danh sách đầy đủ trong [THIRD_PARTY.md](THIRD_PARTY.md) (309 npm, 54 Python, 9 dịch vụ). Điểm cần chú ý:
 
 | Thành phần | Phiên bản | Giấy phép (SPDX) | Nguồn | Cách dùng |
 |---|---|---|---|---|
-| psycopg(-binary) | 3.2.10 | LGPL-3.0-only | PyPI | thư viện pip, không sửa |
+| psycopg | 3.2.10 | LGPL-3.0-only | PyPI | thư viện pip thuần Python, không sửa; nạp libpq5 của hệ điều hành |
 | ONLYOFFICE Docs | 8.3.3 | AGPL-3.0-only | image chính thức | dịch vụ chạy riêng, mặc định tắt |
 | RustFS | 1.0.3 | Apache-2.0 | image chính thức | dịch vụ S3 chạy riêng (thay MinIO) |
 | Valkey | 8.1.1 | BSD-3-Clause | image chính thức | dịch vụ chạy riêng (thay Redis) |
 | @fontsource/* | 5.1.1 | OFL-1.1 | npm | font gói qua npm |
 
 - Đã kiểm: giấy phép npm đọc từ `node_modules` bằng `scripts/gen_third_party.mjs` — 0 gói ngoài danh sách OSI.
-- **Chưa kiểm**: giấy phép 55 gói Python (ghi theo metadata upstream) — cần `pip-licenses`; mở LICENSE đúng phiên bản cho `certifi`, `psycopg`.
+- **Chưa kiểm**: giấy phép 54 gói Python (ghi theo metadata upstream) — cần `pip-licenses`; mở LICENSE đúng phiên bản cho `certifi`, `psycopg`.
 - Không có `vendor/`, `node_modules/`, tệp nhị phân của bên khác trong Git (`git ls-files | grep node_modules` → 0).
 
 ## 3. Biên dịch, phát hành, tài liệu
 - Đã chạy trên Windows/Node 24: `npm run lint`, `typecheck`, `test` (45/45 đạt), `build` — đều thành công.
-- **Chưa kiểm**: `pytest`, `ruff`, Docker build, `make` trong Ubuntu 24.04 sạch (BUILD.md chưa được chạy thử từng dòng).
-- Release: tag `v0.1.0` (V1, hồi tố) và `v0.2.0`; workflow `release.yml` tạo `.tar.gz` + `SHA256SUMS`. **Chưa kiểm** trang Releases ẩn danh.
+- Đã kiểm 27/10 (Docker Desktop trên Windows, container Linux): `ruff check` sạch; `pytest` 108 đạt với PostgreSQL 17.5 thật; `python -m unittest discover -s infra/tests` 2 đạt; `export_contracts.py` sinh ra contract trùng bản đã commit; build image `api.Dockerfile` cho `core-api` và `workspace-api`; chạy BUILD.md cách B trong `ubuntu:24.04` sạch (`make venv deps`, `build`, `test`, `install PREFIX=`, xóa mã nguồn, `desktiny-migrate core` tạo 23 bảng, `uvicorn` khởi động từ bản đã cài). Lượt chạy này tìm ra và sửa 3 lỗi của `make install` (xem CHANGELOG).
+- **Chưa kiểm**: `make up` / `docker compose up` toàn bộ nền tảng (Keycloak, RustFS, gateway), Playwright E2E có đăng nhập, `make dist`/Release từ nhánh này.
+- Release: tag `v0.1.0` (V1, hồi tố), `v0.2.0` (mốc lịch sử) và `v0.2.1`; workflow `release.yml` tạo `.tar.gz` + `SHA256SUMS`. Đã kiểm 27/10: API công khai của GitHub (không đăng nhập) liệt kê cả hai Release kèm `.tar.gz` và `SHA256SUMS`.
 - Bug tracker: có mẫu issue; **chưa có issue thật/milestone** — cần tạo trên GitHub.
 
 ## 4. Rủi ro còn lại và cách xử lý
