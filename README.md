@@ -6,7 +6,7 @@ nguồn, cơ sở dữ liệu và container vẫn là `dx_workspace` / `dx-works
 Nền tảng Core dùng chung và ứng dụng e-Office, viết bằng **FastAPI + Vue 3 /
 TypeScript**. Bản triển khai này tập trung một tổ chức: dữ liệu cấu trúc, file có
 version, workflow generic và luồng hồ sơ/phê duyệt. Cơ sở thiết kế:
-[`Thiet_ke_DX_Workspace_FastAPI_Vue3.md`](Thiet_ke_DX_Workspace_FastAPI_Vue3.md).
+[`docs/design/Thiet_ke_DX_Workspace_FastAPI_Vue3.md`](docs/design/Thiet_ke_DX_Workspace_FastAPI_Vue3.md).
 
 > Đây là bản phát triển/pilot. Không coi danh sách thiết kế là tính năng đã được
 > nghiệm thu, không coi Compose dev là cấu hình production. Kết quả và những bước

@@ -17,8 +17,6 @@ path = [
   "SECURITY.md",
   "SELF_REVIEW.md",
   "THIRD_PARTY.md",
-  "Cai_thien_nen_tang_quy_trinh_so_DXOS.md",
-  "Thiet_ke_DX_Workspace_FastAPI_Vue3.md",
   "docs/**",
   "infra/identity/README.md",
   "examples/**/*.md",
