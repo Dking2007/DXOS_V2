@@ -44,7 +44,7 @@ nhiều dòng "chưa chạy" ở phần lịch sử bên dưới; phần lịch 
 - Chưa pull/build/chạy image, SSO hay callback Office thật. Docker daemon của môi
   trường phát triển ban đầu không sẵn sàng (`dockerDesktopLinuxEngine` missing).
 - `python -m pytest -q` (Core): **29 passed, 1 warning**.
-- `python -m pytest -q` (WorkMMODIARY): **35 passed, 2 warnings** — 28 test luồng
+- `python -m pytest -q` (Workspace): **35 passed, 2 warnings** — 28 test luồng
   Drive/hồ sơ, 2 test Office save, 3 test phục hồi retry, 2 test chuỗi Alembic.
   Test mới cho hồ sơ và Drive: hạn xử lý + mức độ + người phụ trách khi tạo hồ sơ;
   hiển thị/giá trị mặc định có điều kiện theo trường khác, kể cả trường không được tự
@@ -174,7 +174,7 @@ không thay kiểm tương thích văn bản tiếng Việt/font/editor edition.
 
 Drive đã có ACL kế thừa theo thư mục và API rename/move/xóa thư mục: folder share
 kế thừa xuống mọi tài liệu trong cây, người được cấp quyền ghi được đổi tên/di chuyển,
-còn trash và quản lý share folder chỉ chủ sở hữu. Test WorkMMODIARY kiểm inheritance,
+còn trash và quản lý share folder chỉ chủ sở hữu. Test Workspace kiểm inheritance,
 nested folder, cycle guard, move tính lại quyền và folder trashed chặn quyền ở mức
 SQLite/in-process. Tài liệu Drive cũng đã có **nhãn** (chuẩn hóa, không trùng khi
 khác hoa/thường) và **sao chép**: bản sao là file Core độc lập với resource và quota

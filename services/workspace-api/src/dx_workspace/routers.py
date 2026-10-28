@@ -124,7 +124,7 @@ def validate_payload(form, payload):
     )
     messages = [f"{'.'.join(map(str, e.path)) or 'payload'}: {e.message}" for e in errors[:8]]
     # The registered Core schema cannot know whether a conditional field is required, so
-    # WorkMMODIARY enforces it here, against the payload this submission actually produced.
+    # Workspace enforces it here, against the payload this submission actually produced.
     for field in s.visible_fields(form.fields, filled):
         if field.get("required") and filled.get(field["key"]) in (None, ""):
             messages.append(f"{field['key']}: là bắt buộc")

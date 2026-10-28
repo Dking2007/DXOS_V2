@@ -254,7 +254,7 @@ def json_schema(fields: list[dict], payload: dict | None = None) -> dict:
     field hidden by a condition is not demanded. Without one — the schema registered in Core
     for the whole form — a conditionally-required field is left out of `required` entirely,
     because whether it is required depends on the payload Core is only asked to store.
-    WorkMMODIARY enforces that condition itself before the payload ever reaches Core.
+    Workspace enforces that condition itself before the payload ever reaches Core.
     """
     properties = {}
     required = []
