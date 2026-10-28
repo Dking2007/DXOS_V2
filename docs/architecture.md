@@ -52,6 +52,15 @@ Nginx phân giải upstream qua Docker DNS tại request-time. Do đó profile `
 không cần có Workspace hoặc ONLYOFFICE vẫn khởi động được; tuyến tới module chưa
 bật sẽ không hoạt động, không có mock thay thế.
 
+## Quy ước phụ thuộc trong Workspace API
+
+Các module trong `services/workspace-api/src/dx_workspace` phụ thuộc theo một chiều, không vòng:
+`schemas`, `models`, `config`, `core_client` ở dưới cùng; `policies` và `services` dùng chung cho
+các module tính năng (`tasks`, `messaging`, `feed`, `packages`, `automations`...); `routers` và
+`main` ở trên cùng. Hàm cần cho nhiều module tính năng (ví dụ `validate_payload`, `membership`)
+đặt ở tầng dưới thay vì import ngược lên bằng import trong hàm. `tests/test_boundaries.py` kiểm
+vòng phụ thuộc, và kiểm Core không import Workspace (ngược lại cũng vậy).
+
 ## Các lựa chọn giới hạn có chủ ý
 
 Một tổ chức mỗi deployment; chưa SaaS đa tenant. Phê duyệt tuần tự/điều kiện/trả
