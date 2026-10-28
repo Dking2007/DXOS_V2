@@ -29,6 +29,8 @@ path = [
   "requirements-dev.txt",
   ".env.example",
   ".mailmap",
+  ".gitattributes",
+  ".editorconfig",
   ".github/ISSUE_TEMPLATE/**",
   ".github/pull_request_template.md",
 ]
