@@ -116,6 +116,9 @@ def validate_payload(form, payload):
     client left out is stored with the value the form intends, not as absent.
     """
     filled = s.apply_defaults(form.fields, payload)
+    # A blank optional field arrives as null (the web form starts numbers at null); it means
+    # "not provided", which the schema expresses by omitting the key, not by a null value.
+    filled = {key: value for key, value in filled.items() if value is not None}
     errors = sorted(
         Draft202012Validator(s.json_schema(form.fields, filled), format_checker=FormatChecker()).iter_errors(
             filled

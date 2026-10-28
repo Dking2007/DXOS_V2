@@ -1023,3 +1023,28 @@ def test_copying_refuses_an_extension_change(world):
     )
     assert response.status_code == 422, response.text
     assert response.json()["code"] == "file_extension_change_denied"
+
+
+def test_empty_optional_number_is_treated_as_absent(world):
+    client, _, _, _, _, actors, current, users, _ = world
+    current[0] = actors["manager"]
+    form = client.post(
+        "/workspace/v1/forms",
+        json={
+            "name": "Đề nghị có số tiền tùy chọn",
+            "fields": [
+                {"key": "reason", "label": "Lý do", "type": "text", "required": True},
+                {"key": "amount", "label": "Số tiền", "type": "number"},
+            ],
+            "approval_steps": [{"label": "Trưởng phòng", "resolver": "user", "user_id": users["manager"]}],
+        },
+    ).json()
+    current[0] = actors["staff"]
+    # The web form starts a number field at null and sends it as-is when left blank.
+    response = client.post(
+        "/workspace/v1/cases",
+        json={"title": "Số tiền để trống", "form_id": form["id"], "payload": {"reason": "Mua sắm", "amount": None}},
+        headers={"Idempotency-Key": "optional-number-null"},
+    )
+    assert response.status_code == 201, response.text
+    assert "amount" not in stored_payload(world, response.json())
