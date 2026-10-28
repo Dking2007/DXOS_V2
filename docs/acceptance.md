@@ -1,10 +1,27 @@
-# Kiểm chứng và checklist nghiệm thu
+Một phần 28/10: E2E tạo hồ sơ nháp và tải lại; luồng gửi/trả lại/duyệt mới kiểm bằng pytest |||
 
 ## Trạng thái tại thời điểm tạo bộ cài
 
 Đây là checklist thực thi, không phải báo cáo tích xanh theo thiết kế. Người chạy
 release phải ghi commit/source snapshot, dependency lock, image digest, cấu hình,
 lệnh, ngày chạy và kết quả. Không suy ra test đạt chỉ vì đã có endpoint hoặc UI.
+
+### Cập nhật 28/10/2026 (stack Docker Compose thật)
+
+Chạy trên Docker Desktop (Windows), stack 11 container từ một bản sao cục bộ (image dựng trước
+các nhánh PoF; **chưa phải** `make up` từ đúng commit phát hành). Các mục dưới đây thay cho
+nhiều dòng "chưa chạy" ở phần lịch sử bên dưới; phần lịch sử giữ nguyên để truy vết.
+
+- Tổng số test hiện tại: pytest **108 đạt** với PostgreSQL 17.5 thật (27/10), `npm run test` 45 đạt.
+- Playwright E2E có đăng nhập qua Keycloak và gateway (Chromium, tài khoản `staff`): **3/3 đạt**
+  (chuyển hướng khi chưa đăng nhập, tạo hồ sơ nháp rồi tải lại vẫn thấy, `staff` bị chặn truy cập
+  audit kỹ thuật). Lượt chạy đầu thất bại vì người dùng demo thiếu họ (Keycloak 26 chặn ở
+  `VERIFY_PROFILE`); đã sửa trong `scripts/bootstrap.py`.
+- I03 (Core độc lập): dừng `workspace-web`, `workspace-api`, `workspace-worker`; tuyến `/workspace/`
+  trả 502 nhưng `examples/core-client/main.py` (client `core-example`, namespace `equipment`) tạo
+  schema, record, file và chạy workflow thành công qua gateway. Sau đó khởi động lại Workspace.
+- Chưa chạy trong lượt này: ONLYOFFICE với Document Server thật (I11–I13), backup/restore (I15),
+  outbox fault injection (I10), đo thu hồi quyền (I14).
 
 ### Kết quả đã chạy trên máy phát triển
 
@@ -133,13 +150,13 @@ lệnh, ngày chạy và kết quả. Không suy ra test đạt chỉ vì đã c
 | Mã | Kịch bản | Điều kiện đạt | Kết quả deployment |
 |---|---|---|---|
 | I01 | Bootstrap/cài sạch | Không dùng credential riêng của tác giả, migration jobs thành công | Chưa chạy stack thật |
-| I02 | SSO Workspace/Core | State/nonce/PKCE, issuer/audience, CSRF/session hoạt động | Cần Keycloak thật |
-| I03 | Core độc lập | Dừng Workspace, generic schema/record/file/run vẫn dùng được | Cần stack |
+| I02 | SSO Workspace/Core | State/nonce/PKCE, issuer/audience, CSRF/session hoạt động | Đã chạy 28/10: đăng nhập SSO qua Keycloak + gateway bằng Playwright; chưa kiểm riêng state/nonce/PKCE |
+| I03 | Core độc lập | Dừng Workspace, generic schema/record/file/run vẫn dùng được | Đã chạy 28/10: dừng Workspace, `examples/core-client` vẫn tạo schema/record/file/run |
 | I04 | Namespace | Token equipment không thấy workspace, body không đổi namespace | Cần API integration |
 | I05 | ACL và metadata | User ngoài quyền không đọc tên/snippet/bytes/version | Cần test quyền |
 | I06 | Revision/idempotency | Retry cùng intent trả cùng kết quả; khác body 409 | Cần API tests |
 | I07 | File hold | File được submission pin không bị GC | Cần storage integration |
-| I08 | Hồ sơ | Tạo → gửi → trả lại → sửa → trình lại → duyệt có lịch sử/snapshot đúng | Cần E2E |
+| I08 | Hồ sơ | Tạo → gửi → trả lại → sửa → trình lại → duyệt có lịch sử/snapshot đúng | Một phần 28/10: E2E tạo hồ sơ nháp và tải lại; luồng gửi/trả lại/duyệt mới kiểm bằng pytest |
 | I09 | Concurrency | Hai decision cùng revision chỉ một có hiệu lực | Cần PostgreSQL thật |
 | I10 | Outbox crash | Kill sau tác động/trước ACK không tạo hai run/decision | Cần fault injection |
 | I11 | Office cộng tác | Hai user cùng document key, lưu bền vững đúng file/version | Cần Docs thật |

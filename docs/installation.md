@@ -264,8 +264,9 @@ deployment cần xóa.
 
 ## Còn chưa nghiệm thu
 
-Hướng dẫn này chạy được stack dev, nhưng các mục sau **chưa có bằng chứng trên máy
-phát triển ban đầu** (thiếu Docker Engine và PostgreSQL) và cần kiểm trên môi trường
-thật trước khi gọi là hoàn thiện: cài sạch idempotent, SSO qua gateway, concurrency
-PostgreSQL, outbox fault injection, ONLYOFFICE cộng tác hai người, backup/restore.
-Chi tiết: [acceptance.md](acceptance.md).
+Đã có bằng chứng (28/10/2026, Docker Desktop trên Windows): cài sạch trong Ubuntu 24.04 theo
+BUILD.md, stack Compose 11 container chạy và báo healthy, đăng nhập SSO qua gateway, E2E
+Playwright có đăng nhập, concurrency/migration với PostgreSQL 17.5 thật (pytest). Các mục
+sau **vẫn chưa có bằng chứng**: ONLYOFFICE cộng tác hai người với Document Server thật,
+backup/restore, outbox fault injection, `make up` chạy từ đúng commit phát hành. Chi tiết và
+kết quả từng mục: [acceptance.md](acceptance.md).

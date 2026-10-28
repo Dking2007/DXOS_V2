@@ -55,6 +55,8 @@ bật sẽ không hoạt động, không có mock thay thế.
 ## Các lựa chọn giới hạn có chủ ý
 
 Một tổ chức mỗi deployment; chưa SaaS đa tenant. Phê duyệt tuần tự/điều kiện/trả
-lại trước; chưa all/any/quorum hay canvas kéo-thả. UI là danh sách việc cần xử lý,
-không phải dashboard phân tích. Chưa AI/OCR/RAG, task module độc lập, chat hoặc feed.
+lại; chưa all/any/quorum. UI là danh sách việc cần xử lý và báo cáo cơ bản, không phải
+dashboard phân tích tùy chỉnh. Workspace đã có giao việc, nhắn tin (polling REST, chưa
+WebSocket), bảng tin, tìm kiếm, ủy quyền và tự động hóa dạng canvas kéo-thả; mô tả và giới
+hạn từng phần ở README. Chưa có AI/OCR/RAG.
 Các giới hạn thực tế của code và kiểm thử được ghi tại `acceptance.md` và README.
