@@ -33,6 +33,7 @@ from .feed import can_see as can_see_post
 from .feed import visibility_filter as post_visibility
 from .policies import case_filter, current_user, get_case, require
 from .services import audit, cas, case_event, enqueue, notify, page, serial
+from .tasks import TaskCreate, TaskSource, create_task, event_data, get_task, log, manages, visible
 
 TRIGGERS = {
     "task.created": "Công việc được tạo",
@@ -567,7 +568,6 @@ class Execution:
             title = render(data.get("title", ""), self.data)
             if self.dry_run:
                 return {"title": title}
-            from .tasks import TaskCreate, TaskSource, create_task
 
             owner = self.db.get(m.User, self.rule.created_by)
             if not owner or not owner.active:
@@ -862,7 +862,6 @@ def build_router(app):
     def event_source(db, user, family: str, ref_id: str) -> dict:
         """Event data built from an existing record the user may see, as its real event would carry."""
         if family == "task":
-            from .tasks import event_data, get_task
 
             return event_data(get_task(db, user, ref_id))
         if family == "case":
@@ -1034,7 +1033,6 @@ def build_router(app):
         needle = (q or "").casefold().strip()
         items = []
         if family == "task":
-            from .tasks import visible
 
             for task in db.scalars(select(m.Task).order_by(m.Task.updated_at.desc())):
                 if needle in task.title.casefold() and visible(db, user, task):
@@ -1081,7 +1079,6 @@ def build_router(app):
     def task_for(db, actor, task_id):
         if actor.application != "workspace" or actor.service:
             raise AppError(403, "workspace_user_required", "Cần phiên người dùng Workspace.")
-        from .tasks import get_task, manages
 
         user = current_user(db, actor)
         task = get_task(db, user, task_id)
@@ -1147,7 +1144,6 @@ def build_router(app):
                 m.TaskAutomation.task_id == task.id, m.TaskAutomation.rule_id == rule.id
             )
         ):
-            from .tasks import log
 
             db.add(m.TaskAutomation(task_id=task.id, rule_id=rule.id, attached_by=user.id))
             log(db, task, user.id, "automation_attached", {"rule_id": rule.id, "name": rule.name})
@@ -1168,7 +1164,6 @@ def build_router(app):
             )
         )
         if row:
-            from .tasks import log
 
             rule = db.get(m.AutomationRule, rule_id)
             db.delete(row)
