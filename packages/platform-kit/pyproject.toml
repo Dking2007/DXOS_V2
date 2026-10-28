@@ -7,6 +7,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dx-platform-kit"
 version = "0.2.2"
+license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [
   "fastapi==0.118.0", "uvicorn[standard]==0.37.0", "SQLAlchemy==2.0.43",
