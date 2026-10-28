@@ -28,6 +28,7 @@ path = [
   "requirements.lock",
   "requirements-dev.txt",
   ".env.example",
+  ".mailmap",
   ".github/ISSUE_TEMPLATE/**",
   ".github/pull_request_template.md",
 ]
