@@ -211,6 +211,8 @@
         "build"
       ],
       "milestone": 3,
+      "state": "closed",
+      "ref": "nhánh fix/psycopg-libpq-install-docs (5a61105)",
       "body": "Tiêu chí PoF 5: psycopg[binary] đính kèm sẵn libpq. Đánh giá chuyển sang psycopg thuần + libpq5 (cần cập nhật api.Dockerfile, requirements.lock và chạy lại test Postgres)."
     },
     {
