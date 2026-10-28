@@ -30,6 +30,8 @@ jobs:
       - run: python -m unittest discover -s infra/tests -v
       - run: pytest -q
       - run: python scripts/export_contracts.py
+      - name: Contract OpenAPI đã commit khớp với mã
+        run: git diff --exit-code contracts
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -43,6 +45,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
+      - name: Kiểu TypeScript sinh từ contract đã commit khớp
+        run: npm run generate:api && git diff --exit-code apps/shared/src/generated
   compliance:
     runs-on: ubuntu-latest
     steps:

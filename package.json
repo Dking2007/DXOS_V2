@@ -17,7 +17,7 @@
     "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
     "lint": "eslint --config apps/eslint.config.mjs apps tests/e2e",
     "format": "prettier --write \"apps/**/*.{ts,vue,css,json,mjs,html}\" \"tests/e2e/*.ts\" --ignore-path apps/.prettierignore --config apps/.prettierrc.json",
-    "generate:api": "openapi-typescript contracts/core.openapi.json -o apps/shared/src/generated/core-api.ts && openapi-typescript contracts/workspace.openapi.json -o apps/shared/src/generated/workspace-api.ts"
+    "generate:api": "openapi-typescript contracts/core.openapi.json -o apps/shared/src/generated/core-api.ts && openapi-typescript contracts/workspace.openapi.json -o apps/shared/src/generated/workspace-api.ts && node scripts/add_spdx_headers.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
