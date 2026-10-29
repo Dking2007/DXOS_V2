@@ -1,6 +1,6 @@
 # Gói nghiệp vụ và chạy thử quy trình
 
-Phần P0 của [đề xuất cải thiện](../Cai_thien_nen_tang_quy_trinh_so_DXOS.md) dùng biểu mẫu đã phát hành làm schema bất biến. Trong Workspace, người có quyền `forms.manage` mở **Gói nghiệp vụ**, chọn biểu mẫu, số tài liệu tối thiểu và vai trò được sử dụng. Điều kiện và người duyệt nằm trong biểu mẫu; muốn đổi chúng, tạo biểu mẫu mới rồi tạo phiên bản gói mới.
+Phần P0 của [đề xuất cải thiện](design/Cai_thien_nen_tang_quy_trinh_so_DXOS.md) dùng biểu mẫu đã phát hành làm schema bất biến. Trong Workspace, người có quyền `forms.manage` mở **Gói nghiệp vụ**, chọn biểu mẫu, số tài liệu tối thiểu và vai trò được sử dụng. Điều kiện và người duyệt nằm trong biểu mẫu; muốn đổi chúng, tạo biểu mẫu mới rồi tạo phiên bản gói mới.
 
 Mỗi phiên bản gói giữ bản sao các bước duyệt, tham chiếu biểu mẫu và hash cấu hình. Gói cần ít nhất một bước duyệt không có điều kiện để mọi hồ sơ luôn có đường xử lý. Trình tự phát hành: tạo draft → kiểm tra cấu hình → nhập fixture, số tài liệu mẫu và quyết định giả lập → lưu đường đi hoặc mã lỗi kỳ vọng → chạy tất cả bộ thử → phát hành. Các mã lỗi kỳ vọng gồm thiếu tài liệu, biểu mẫu không hợp lệ, thiếu người duyệt và tự duyệt. Cổng phát hành yêu cầu mọi bộ thử của đúng hash cấu hình đều có báo cáo mới nhất đạt. Một preview hoặc bộ thử đang chờ quyết định không được tính là đạt.
 

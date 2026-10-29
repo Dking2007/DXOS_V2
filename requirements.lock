@@ -27,7 +27,6 @@ MarkupSafe==3.0.4
 packaging==26.3
 pluggy==1.7.0
 psycopg==3.2.10
-psycopg-binary==3.2.10
 pycparser==3.11
 pydantic==2.14.1
 pydantic-settings==2.11.0

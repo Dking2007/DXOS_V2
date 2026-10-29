@@ -8,6 +8,9 @@ Cảm ơn bạn đã quan tâm. Tài liệu này mô tả cách báo lỗi, đ�
 2. Tạo nhánh từ `main`: `feat/<mô-tả>`, `fix/<mô-tả>`, `docs/<mô-tả>`.
 3. Commit nhỏ, theo [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `chore:`.
    Tham chiếu issue: `Fixes #12`. **Dùng tài khoản và email của chính bạn** để lịch sử phản ánh đúng người làm.
+   Trước commit đầu tiên: `git config user.name "Tên của bạn"` và `git config user.email "email-gắn-với-tài-khoản-GitHub"`
+   (đừng để git dùng tên mặc định như `unknown`). Kiểm tra: `git log --format="%an <%ae>" -3`. Nếu cùng một người xuất hiện
+   dưới nhiều tên, thêm một dòng vào [.mailmap](.mailmap).
 4. Cập nhật [CHANGELOG.md](CHANGELOG.md) mục `[Unreleased]` trong **cùng PR** với thay đổi.
 5. Mở Pull Request; CI phải xanh (lint, test, build, `compliance`). Cần ít nhất một người duyệt.
 

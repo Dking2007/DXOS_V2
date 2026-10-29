@@ -82,7 +82,7 @@ class DriveFile(Base):
     revision: Mapped[int] = mapped_column(default=1)
     grants_revision: Mapped[int] = mapped_column(default=1)
     acl_state: Mapped[str] = mapped_column(String(30), default="ready")
-    # Labels are plain sorted strings the owner sets; they travel with the WorkMMODIARY
+    # Labels are plain sorted strings the owner sets; they travel with the Workspace
     # metadata only, never into the Core object, so renaming a label needs no re-upload.
     labels: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -28,12 +28,12 @@ MongoDB, HashiCorp Vault/Terraform, Camunda 8, Elasticsearch bản SSPL. Workflo
 
 ### Ghi chú giấy phép đáng chú ý
 
-- **psycopg / psycopg-binary — LGPL-3.0-only**: cài từ PyPI, liên kết động, không sửa, không đính kèm mã nguồn.
+- **psycopg — LGPL-3.0-only**: cài từ PyPI (gói thuần Python, không `[binary]`), nạp libpq của hệ điều hành (`libpq5`, PostgreSQL License) qua liên kết động; không sửa, không đính kèm mã nguồn.
   Tương thích với Apache-2.0 khi dùng như thư viện; người phân phối image cần giữ thông báo LGPL.
 - **ONLYOFFICE Docs — AGPL-3.0**: tùy chọn, mặc định tắt, chạy container riêng; giữ logo/thông báo của hãng.
 - **certifi — MPL-2.0**: dùng nguyên bản, không sửa tệp.
 
-## 2. Thư viện Python (55) — nguồn: PyPI, khóa trong `requirements.lock`
+## 2. Thư viện Python (54) — nguồn: PyPI, khóa trong `requirements.lock`
 
 | Gói | Phiên bản | Giấy phép (SPDX) | Cách dùng |
 |---|---|---|---|
@@ -64,7 +64,6 @@ MongoDB, HashiCorp Vault/Terraform, Camunda 8, Elasticsearch bản SSPL. Workflo
 | packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | thư viện (pip) |
 | pluggy | 1.7.0 | MIT | thư viện (pip) |
 | psycopg | 3.2.10 | LGPL-3.0-only | thư viện (pip) |
-| psycopg-binary | 3.2.10 | LGPL-3.0-only | thư viện (pip) |
 | pycparser | 3.11 | BSD-3-Clause | thư viện (pip) |
 | pydantic | 2.14.1 | MIT | thư viện (pip) |
 | pydantic-settings | 2.11.0 | MIT | thư viện (pip) |

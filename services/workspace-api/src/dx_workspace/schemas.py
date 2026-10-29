@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
+from dx_platform.errors import AppError
+from jsonschema import Draft202012Validator, FormatChecker
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
@@ -254,7 +256,7 @@ def json_schema(fields: list[dict], payload: dict | None = None) -> dict:
     field hidden by a condition is not demanded. Without one — the schema registered in Core
     for the whole form — a conditionally-required field is left out of `required` entirely,
     because whether it is required depends on the payload Core is only asked to store.
-    WorkMMODIARY enforces that condition itself before the payload ever reaches Core.
+    Workspace enforces that condition itself before the payload ever reaches Core.
     """
     properties = {}
     required = []
@@ -318,3 +320,46 @@ def apply_defaults(fields: list[dict], payload: dict) -> dict:
         if field.get("default") is not None and result.get(field["key"]) is None:
             result[field["key"]] = field["default"]
     return result
+
+
+def validate_payload(form, payload):
+    """Validate a payload against the form, honouring defaults and field visibility.
+
+    Returns the payload with defaults applied, which is what must be persisted: a field the
+    client left out is stored with the value the form intends, not as absent.
+    """
+    filled = apply_defaults(form.fields, payload)
+    # A blank optional field arrives as null (the web form starts numbers at null); it means
+    # "not provided", which the schema expresses by omitting the key, not by a null value.
+    filled = {key: value for key, value in filled.items() if value is not None}
+    errors = sorted(
+        Draft202012Validator(json_schema(form.fields, filled), format_checker=FormatChecker()).iter_errors(
+            filled
+        ),
+        key=lambda e: str(e.path),
+    )
+    messages = [f"{'.'.join(map(str, e.path)) or 'payload'}: {e.message}" for e in errors[:8]]
+    # The registered Core schema cannot know whether a conditional field is required, so
+    # Workspace enforces it here, against the payload this submission actually produced.
+    for field in visible_fields(form.fields, filled):
+        if field.get("required") and filled.get(field["key"]) in (None, ""):
+            messages.append(f"{field['key']}: là bắt buộc")
+    if messages:
+        raise AppError(422, "form_validation_error", "; ".join(messages))
+    return filled
+
+
+def step_evidence(steps: list, payload: dict, resolved: list) -> list:
+    evidence = []
+    recipients = iter(resolved)
+    for step in steps:
+        condition = step.get("condition")
+        selected = condition_matches(condition, payload)
+        recipient = next(recipients) if selected else None
+        evidence.append({
+            "label": step["label"], "condition": condition,
+            "evaluated_value": payload.get(condition["field"]) if condition else None,
+            "selected": selected,
+            "recipient": recipient["display_name"] if recipient else None,
+        })
+    return evidence

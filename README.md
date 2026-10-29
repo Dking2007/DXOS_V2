@@ -6,7 +6,7 @@ nguồn, cơ sở dữ liệu và container vẫn là `dx_workspace` / `dx-works
 Nền tảng Core dùng chung và ứng dụng e-Office, viết bằng **FastAPI + Vue 3 /
 TypeScript**. Bản triển khai này tập trung một tổ chức: dữ liệu cấu trúc, file có
 version, workflow generic và luồng hồ sơ/phê duyệt. Cơ sở thiết kế:
-[`Thiet_ke_DX_Workspace_FastAPI_Vue3.md`](Thiet_ke_DX_Workspace_FastAPI_Vue3.md).
+[`docs/design/Thiet_ke_DX_Workspace_FastAPI_Vue3.md`](docs/design/Thiet_ke_DX_Workspace_FastAPI_Vue3.md).
 
 > Đây là bản phát triển/pilot. Không coi danh sách thiết kế là tính năng đã được
 > nghiệm thu, không coi Compose dev là cấu hình production. Kết quả và những bước
@@ -307,3 +307,14 @@ Mã nguồn do dự án tự viết phát hành theo **Apache License 2.0** (SPD
 - Báo lỗi / đề xuất: tab **Issues** của repo. Cách đóng góp: [CONTRIBUTING.md](CONTRIBUTING.md),
   [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), bảo mật: [SECURITY.md](SECURITY.md).
 - Tự rà soát tiêu chí PoF OLP PMNM 2026: [SELF_REVIEW.md](SELF_REVIEW.md).
+
+## Đóng góp ngược cho cộng đồng nguồn mở
+
+Mục này ghi **trạng thái thật** của từng việc; sẽ cập nhật khi có link và kết quả. Chưa có mục nào
+dưới đây được gửi lên dự án bên ngoài tại thời điểm ghi (29/10/2026).
+
+| Việc | Dự án nhận | Link | Trạng thái | Ghi chú |
+|---|---|---|---|---|
+| Bổ sung 2 ghi chú còn thiếu cho mục "Migrating to 26.7.5" của hướng dẫn nâng cấp | Keycloak | Issue [keycloak#53650](https://github.com/keycloak/keycloak/issues/53650); PR: chưa có | **Đã chuẩn bị, chưa gửi** | Sửa tài liệu +16 dòng. Đã build tài liệu và kiểm đủ 4 ghi chú, liên kết hoạt động. Cần một thành viên fork, ký DCO và mở PR |
+| `dx-flowkit`: kiểm tra và chạy thử đồ thị quy trình JSON, không phụ thuộc thư viện ngoài | Gói độc lập tách từ Desktiny ([`packages/flowkit`](packages/flowkit)) | Chưa công bố ngoài kho này | **Chưa công bố** | 56 test đạt; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên. Chưa lên PyPI hay kho riêng; chưa kiểm xem đã có gói tương tự |
+| Lỗi quyền volume khi nâng RustFS lên image chạy non-root (uid 10001) | RustFS ([#8992](https://github.com/rustfs/rustfs/issues/8992)) | Không gửi | **Đã xem xét, không gửi** | Nhóm tự tái hiện lỗi, nhưng người bảo trì đã xử lý độc lập ngày 29/10/2026 (PR #9056) nên không còn gì để bổ sung. Bản vá `chown` cho compose của Desktiny đã soạn nhưng chưa áp dụng vào kho này |

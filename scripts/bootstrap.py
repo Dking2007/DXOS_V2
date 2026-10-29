@@ -165,7 +165,8 @@ def create_files(base_url: str, scheme: str = "http") -> list[Path]:
                 "email": f"{username}@demo.invalid",
                 "emailVerified": True,
                 "firstName": display_name,
-                "lastName": "",
+                # Keycloak 26 bắt buộc họ; để trống thì đăng nhập bị chặn ở bước VERIFY_PROFILE.
+                "lastName": "Demo",
                 "realmRoles": [role],
                 "credentials": [{"type": "password", "value": password, "temporary": False}],
             }

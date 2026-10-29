@@ -117,7 +117,9 @@
         "build"
       ],
       "milestone": 1,
-      "body": "Chưa kiểm được trên máy Windows. Ghi lại mọi chỗ vấp vào issue này và sửa BUILD.md/Makefile."
+      "body": "Chưa kiểm được trên máy Windows. Ghi lại mọi chỗ vấp vào issue này và sửa BUILD.md/Makefile.",
+      "state": "closed",
+      "ref": "chạy 27/10/2026 trong ubuntu:24.04 sạch, sửa 3 lỗi make install (nhánh fix/psycopg-libpq-install-docs)"
     },
     {
       "title": "Chạy ScanCode và đối chiếu giấy phép Python bằng pip-licenses",
@@ -211,6 +213,8 @@
         "build"
       ],
       "milestone": 3,
+      "state": "closed",
+      "ref": "nhánh fix/psycopg-libpq-install-docs (5a61105)",
       "body": "Tiêu chí PoF 5: psycopg[binary] đính kèm sẵn libpq. Đánh giá chuyển sang psycopg thuần + libpq5 (cần cập nhật api.Dockerfile, requirements.lock và chạy lại test Postgres)."
     },
     {
@@ -221,6 +225,86 @@
       ],
       "milestone": 1,
       "body": "Tiêu chí PoF 3 trừ 3 điểm nếu dùng định dạng đóng như zip. Release notes đã nêu tar.gz là bản chính; hỏi BTC xem tệp zip tự sinh có bị tính không."
+    },
+    {
+      "title": "Người dùng demo không có họ nên Keycloak 26 chặn đăng nhập lần đầu",
+      "labels": [
+        "bug"
+      ],
+      "milestone": 0,
+      "body": "Keycloak 26 buộc điền họ ở bước VERIFY_PROFILE; scripts/bootstrap.py sinh lastName rỗng nên E2E có đăng nhập không qua được. Đặt lastName = Demo.",
+      "state": "closed",
+      "ref": "1f30a87 (nhánh chore/v0.2.2-version-and-authors)"
+    },
+    {
+      "title": "Trường số không bắt buộc để trống bị API từ chối (422)",
+      "labels": [
+        "bug"
+      ],
+      "milestone": 0,
+      "body": "Form web gửi null cho trường số bỏ trống, schema JSON chỉ nhận số. Coi null là chưa nhập trong validate_payload; có test hồi quy.",
+      "state": "closed",
+      "ref": "f4c1b23 (nhánh fix/optional-number-null-payload)"
+    },
+    {
+      "title": "Thống nhất số phiên bản 0.2.2 ở package.json, pyproject, OpenAPI",
+      "labels": [
+        "release"
+      ],
+      "milestone": 0,
+      "body": "Các tệp còn ghi 0.1.0 trong khi bản phát hành là 0.2.x. Đã đồng bộ và sinh lại contracts.",
+      "state": "closed",
+      "ref": "51c2799 (nhánh chore/v0.2.2-version-and-authors)"
+    },
+    {
+      "title": "Tài liệu architecture/installation/acceptance lệch với mã hiện tại",
+      "labels": [
+        "docs"
+      ],
+      "milestone": 0,
+      "body": "architecture.md ghi chưa có chat, bảng tin, canvas; installation.md và acceptance.md ghi chưa chạy Docker/E2E. Cập nhật theo kết quả kiểm 28/10/2026.",
+      "state": "closed",
+      "ref": "nhánh docs/poF-consistency"
+    },
+    {
+      "title": "Chạy ONLYOFFICE Document Server thật: cộng tác hai người, callback, submit barrier (I11–I13)",
+      "labels": [
+        "enhancement"
+      ],
+      "milestone": 2,
+      "body": "Mới kiểm bằng mô phỏng. Bật profile office, kiểm hai trình duyệt cùng sửa, callback lặp/muộn, đóng editor rồi gửi duyệt đúng version. Ghi kết quả vào docs/acceptance.md."
+    },
+    {
+      "title": "Diễn tập backup/restore và ghi RPO/RTO đo được (I15)",
+      "labels": [
+        "docs"
+      ],
+      "milestone": 2,
+      "body": "docs/operations.md mới có lệnh mẫu, chưa từng restore. Backup DB + object storage + khóa, restore sang môi trường sạch, đối chiếu tham chiếu hồ sơ/file/run."
+    },
+    {
+      "title": "`make up` từ đúng commit phát hành thay cho stack bản sao cục bộ",
+      "labels": [
+        "build"
+      ],
+      "milestone": 1,
+      "body": "Stack kiểm thử hiện dựng từ một bản sao khác thư mục và image cũ. Chạy bootstrap + compose + seed từ checkout sạch của tag phát hành, rồi lặp lại E2E."
+    },
+    {
+      "title": "Bộ phát sự kiện ra ngoài (external dispatcher) cho outbox của Core",
+      "labels": [
+        "enhancement"
+      ],
+      "milestone": 2,
+      "body": "Outbox mới được ghi và giữ pending; Valkey được cấp nhưng chưa dùng. Thiết kế dispatcher có idempotency, retry, đối soát unknown outcome."
+    },
+    {
+      "title": "AI/OCR/RAG gắn với biểu mẫu và tìm kiếm (tùy chọn, sau khi hoàn tất PoF)",
+      "labels": [
+        "enhancement"
+      ],
+      "milestone": 3,
+      "body": "Yêu cầu R09 của thiết kế. Chỉ làm sau khi các mục PoF và kiểm chứng ONLYOFFICE/restore xong; phải có bộ thử chất lượng và tôn trọng quyền truy cập."
     }
   ]
 }
