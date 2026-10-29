@@ -310,8 +310,8 @@ Mã nguồn do dự án tự viết phát hành theo **Apache License 2.0** (SPD
 
 ## Đóng góp ngược cho cộng đồng nguồn mở
 
-Mục này ghi **trạng thái thật** của từng việc; sẽ cập nhật khi có link và kết quả. Chưa có mục nào
-dưới đây được gửi lên dự án bên ngoài tại thời điểm ghi (29/10/2026).
+Mục này ghi **trạng thái thật** của từng việc; sẽ cập nhật khi có link và kết quả. Tại thời điểm ghi (30/10/2026)
+mới có một mục được gửi lên dự án bên ngoài (Keycloak) và chưa được người bảo trì xét.
 
 | Việc | Dự án nhận | Link | Trạng thái | Ghi chú |
 |---|---|---|---|---|
