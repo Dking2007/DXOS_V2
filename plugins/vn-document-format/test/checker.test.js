@@ -50,6 +50,20 @@ test("margins at the edges of each allowed range pass, just outside fails", () =
   assert.deepEqual(margins.map((f) => f.params.edge).sort(), ["left", "right", "top"]);
 });
 
+test("margins that the editor cannot report are one info line, not errors", () => {
+  const doc = goodDocument();
+  doc.sections = [{ widthTw: tw(210), heightTw: tw(297) }];
+  const found = checkDocument(doc);
+  assert.deepEqual(found.filter((f) => f.severity !== "info"), []);
+  assert.ok(found.some((f) => f.code === "margin_unavailable"));
+});
+
+test("a section with no readable paper size is skipped, not reported as wrong", () => {
+  const doc = goodDocument();
+  doc.sections = [{}];
+  assert.equal(codes(doc).includes("page_size"), false);
+});
+
 test("paper must be A4; landscape A4 is reported as info, not error", () => {
   const letter = goodDocument();
   letter.sections = [goodSection({ widthTw: tw(215.9), heightTw: tw(279.4) })];

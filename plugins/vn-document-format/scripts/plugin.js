@@ -6,20 +6,27 @@
 (function (window) {
   "use strict";
 
-  // Runs inside the editor. It cannot see anything declared outside this function.
+  // Runs inside the editor. It cannot see anything declared outside this function, and a
+  // failure must come back as { error } so it never looks like "the document is fine".
   function readDocument() {
+    try {
     var doc = Api.GetDocument();
     var model = { sections: [], paragraphs: [] };
 
+    // The margin getters are missing in older editors (not in 8.3.3): leave them undefined
+    // and the checker reports that margins could not be checked.
+    function twips(section, method) {
+      return typeof section[method] === "function" ? section[method]() : undefined;
+    }
     var sections = doc.GetSections();
     for (var s = 0; s < sections.length; s++) {
       model.sections.push({
-        widthTw: sections[s].GetPageWidth(),
-        heightTw: sections[s].GetPageHeight(),
-        marginLeftTw: sections[s].GetPageMarginLeft(),
-        marginTopTw: sections[s].GetPageMarginTop(),
-        marginRightTw: sections[s].GetPageMarginRight(),
-        marginBottomTw: sections[s].GetPageMarginBottom()
+        widthTw: twips(sections[s], "GetPageWidth"),
+        heightTw: twips(sections[s], "GetPageHeight"),
+        marginLeftTw: twips(sections[s], "GetPageMarginLeft"),
+        marginTopTw: twips(sections[s], "GetPageMarginTop"),
+        marginRightTw: twips(sections[s], "GetPageMarginRight"),
+        marginBottomTw: twips(sections[s], "GetPageMarginBottom")
       });
     }
 
@@ -60,6 +67,9 @@
       if (element && element.GetClassType() === "paragraph") model.paragraphs.push(readParagraph(element));
     }
     return model;
+    } catch (e) {
+      return { error: String(e && e.message ? e.message : e) };
+    }
   }
 
   function language() {
@@ -68,8 +78,8 @@
   }
 
   var LABELS = {
-    vi: { ok: "Không phát hiện lỗi thể thức.", count: "Lỗi: {e}, cảnh báo: {w}, lưu ý: {i}", at: "Đoạn {n}: ", button: "Kiểm tra lại" },
-    en: { ok: "No formatting problems found.", count: "Errors: {e}, warnings: {w}, notes: {i}", at: "Paragraph {n}: ", button: "Check again" }
+    vi: { unreadable: "Không đọc được tài liệu: ", ok: "Không phát hiện lỗi thể thức.", count: "Lỗi: {e}, cảnh báo: {w}, lưu ý: {i}", at: "Đoạn {n}: ", button: "Kiểm tra lại" },
+    en: { unreadable: "Could not read the document: ", ok: "No formatting problems found.", count: "Errors: {e}, warnings: {w}, notes: {i}", at: "Paragraph {n}: ", button: "Check again" }
   };
 
   function render(findings) {
@@ -94,9 +104,17 @@
       : labels.ok;
   }
 
+  function showError(detail) {
+    var labels = LABELS[language()];
+    document.getElementById("findings").textContent = "";
+    document.getElementById("summary").textContent = labels.unreadable + detail;
+    document.getElementById("recheck").textContent = labels.button;
+  }
+
   function run() {
     window.Asc.plugin.callCommand(readDocument, false, false, function (model) {
-      render(window.VnDocChecker.checkDocument(model || {}));
+      if (!model || model.error) showError(model ? model.error : "no result");
+      else render(window.VnDocChecker.checkDocument(model));
     });
   }
 

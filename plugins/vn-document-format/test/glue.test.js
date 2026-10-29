@@ -35,14 +35,19 @@ function fakeParagraph(runs) {
     GetElement: (i) => runs[i],
   };
 }
-function fakeApi(paragraphs) {
-  const section = {
-    GetPageWidth: () => tw(210), GetPageHeight: () => tw(297),
-    GetPageMarginLeft: () => tw(30), GetPageMarginTop: () => tw(20),
-    GetPageMarginRight: () => tw(15), GetPageMarginBottom: () => tw(20),
-  };
+function fakeApi(paragraphs, { margins = true, fail = false } = {}) {
+  const section = { GetPageWidth: () => tw(210), GetPageHeight: () => tw(297) };
+  // Editors up to 8.3.3 have no margin getters at all.
+  if (margins)
+    Object.assign(section, {
+      GetPageMarginLeft: () => tw(30), GetPageMarginTop: () => tw(20),
+      GetPageMarginRight: () => tw(15), GetPageMarginBottom: () => tw(20),
+    });
   const doc = {
-    GetSections: () => [section],
+    GetSections: () => {
+      if (fail) throw new Error("boom");
+      return [section];
+    },
     GetElementsCount: () => paragraphs.length + 1,
     // A table or other non-paragraph block must be skipped, not crash the reader.
     GetElement: (i) => (i < paragraphs.length ? paragraphs[i] : { GetClassType: () => "table" }),
@@ -50,7 +55,7 @@ function fakeApi(paragraphs) {
   return { GetDocument: () => doc };
 }
 
-function load(lang, fakeParagraphs) {
+function load(lang, fakeParagraphs, apiOptions) {
   const elements = {};
   const el = (id) => (elements[id] ??= { id, textContent: "", children: [], appendChild(c) { this.children.push(c); } });
   const document = { getElementById: el, createElement: () => ({ className: "", textContent: "" }) };
@@ -58,7 +63,7 @@ function load(lang, fakeParagraphs) {
   const window = {
     Asc: { plugin: { info: { lang }, callCommand(fn, _close, _calc, cb) { command = fn; callback = cb; } } },
   };
-  const context = { window, document, Api: fakeApi(fakeParagraphs) };
+  const context = { window, document, Api: fakeApi(fakeParagraphs, apiOptions) };
   context.window.VnDocChecker = require("../src/checker");
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(root, "scripts/plugin.js"), "utf8"), context);
@@ -100,6 +105,24 @@ test("a wrong font is listed, with the paragraph number, in English for other lo
   assert.match(elements.summary.textContent, /Errors: 1/);
   const texts = elements.findings.children.map((c) => c.textContent);
   assert.ok(texts.some((t) => t.startsWith("Paragraph 3: ") && t.includes("Arial")), texts.join("\n"));
+});
+
+test("an editor without margin getters still reads the document and says margins were skipped", () => {
+  const { model, elements } = load("en-US", [
+    fakeParagraph([fakeRun("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", { sizeHp: 26, bold: true })]),
+    fakeParagraph([fakeRun("Độc lập - Tự do - Hạnh phúc", { sizeHp: 28, bold: true })]),
+  ], { margins: false });
+  assert.equal(model.paragraphs.length, 2);
+  assert.equal(model.sections[0].marginLeftTw, undefined);
+  assert.match(elements.summary.textContent, /Errors: 0, warnings: 0, notes: 1/);
+  assert.ok(elements.findings.children[0].textContent.includes("margins were not checked"));
+});
+
+test("a failure inside the editor is shown as an error, never as a clean result", () => {
+  const { model, elements } = load("en-US", [], { fail: true });
+  assert.equal(model.error, "boom");
+  assert.match(elements.summary.textContent, /^Could not read the document: boom/);
+  assert.equal(elements.findings.children.length, 0);
 });
 
 test("document text is shown as text, never parsed as markup", () => {

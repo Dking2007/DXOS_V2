@@ -12,8 +12,9 @@ auto-formatter: it never changes the document.
 *(Tiếng Việt: plugin ONLYOFFICE kiểm tra thể thức văn bản hành chính theo Nghị định
 30/2020/NĐ-CP, Phụ lục I. Plugin chỉ báo lỗi, không tự sửa tài liệu.)*
 
-**Status: version 0.1.0, not yet submitted to any marketplace, not yet run in a real
-ONLYOFFICE editor.** See "What has and has not been verified".
+**Status: version 0.1.0, not yet submitted to any marketplace. Run once in a real
+ONLYOFFICE Document Server 8.3.3 (Docker) on two sample documents.** See "What has and has
+not been verified".
 
 ## What it checks
 
@@ -50,7 +51,7 @@ If the national title and motto are absent, the header checks are skipped with a
 
 ## What has and has not been verified
 
-Verified (`npm test`, Node 22, 22 tests):
+Verified (`npm test`, Node 22, 26 tests):
 - Every rule above against boundary values and violations, including wording with
   different dash characters, and that Verdana is not mistaken for a legacy font.
 - The ONLYOFFICE glue against a **fake** editor API: it builds the model the checker
@@ -58,12 +59,29 @@ Verified (`npm test`, Node 22, 22 tests):
   `config.json` is valid and points at files that exist.
 - The rule values were read from a PDF copy of Phụ lục I on 2026-10-30.
 
+Verified by hand in ONLYOFFICE Document Server 8.3.3 (Docker image `onlyoffice/documentserver:8.3.3`,
+2026-10-30), with two .docx files made by a script:
+- A document that follows the rules (A4, Times New Roman, correct national title and motto):
+  0 errors, 0 warnings, plus one note that margins were not checked.
+- A document with deliberate faults (Letter paper, national title not upper case and not
+  bold, motto at 12 pt, Arial text, a `.VnTime` run, 11 pt body text, red text): the plugin
+  reported 6 errors and 3 warnings, one for each fault except the margins.
+- This run found a real bug that the fake API had hidden: the margin getters do not exist in
+  8.3.3, so the plugin failed and showed a misleading "header not found" note. It now
+  detects the missing getters and shows an explicit note, and a failure inside the editor
+  is shown as an error.
+It was run once, on two small documents, in one editor version.
+
 Not verified:
-- **Running in a real ONLYOFFICE editor.** The fake API follows the Document Builder API
-  documentation (`ApiSection`, `ApiTextPr`, units in twips and half-points). The real editor
-  may return different values for inherited properties.
-- **Colour** relies on `ApiColor.GetRGB`, available from ONLYOFFICE 9.1. On older editors,
-  including 8.3.3, colour is not checked.
+- **Other editor versions, other browsers, and real-world documents** (Word files with styles,
+  tables, headers). Text whose font comes only from a style is reported as a note, not
+  checked.
+- **Margins need a newer editor than 8.3.3.** In a real ONLYOFFICE 8.3.3 the section
+  object has no margin getters (only page width and height), so the plugin reports one note
+  ("margins were not checked") instead of guessing. The margin check works only where
+  `ApiSection.GetPageMarginLeft` and its siblings exist.
+- **Colour** uses `ApiColor.GetRGB`, documented as available from ONLYOFFICE 9.1. It did detect
+  red text on 8.3.3, but on other older builds the check may be skipped silently.
 - **Icons are placeholders** (solid squares) and the marketplace needs real light and dark
   icons plus screenshots.
 - The rule values against the official gazette text, and with a records-management

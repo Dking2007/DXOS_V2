@@ -33,7 +33,11 @@
   }
 
   function checkSections(sections, out) {
+    const marginKeys = ["marginTopTw", "marginBottomTw", "marginLeftTw", "marginRightTw"];
+    if (sections.length && sections.every((s) => marginKeys.every((k) => typeof s[k] !== "number")))
+      out.push(finding("info", "margin_unavailable", {}));
     sections.forEach((section, i) => {
+      if (typeof section.widthTw !== "number" || typeof section.heightTw !== "number") return;
       const width = mm(section.widthTw);
       const height = mm(section.heightTw);
       const { widthMm, heightMm, toleranceMm } = RULES.page;
@@ -148,6 +152,7 @@
 
   const MESSAGES = {
     vi: {
+      margin_unavailable: () => "Phiên bản ONLYOFFICE này không cho plugin đọc lề trang nên chưa kiểm lề (cần bản mới hơn 8.3.3).",
       page_size: (p) => `Mục ${p.section}: khổ giấy ${p.widthMm} x ${p.heightMm} mm, cần A4 (210 x 297 mm).`,
       page_landscape: (p) => `Mục ${p.section}: trang nằm ngang. Chỉ nên dùng khi nội dung có bảng, biểu không làm thành phụ lục riêng.`,
       margin: (p) => `Mục ${p.section}: lề ${{ top: "trên", bottom: "dưới", left: "trái", right: "phải" }[p.edge]} ${p.valueMm} mm, cần ${p.min}-${p.max} mm.`,
@@ -169,6 +174,7 @@
       header_not_found: () => "Không thấy Quốc hiệu và Tiêu ngữ; bỏ qua phần kiểm tra đầu văn bản.",
     },
     en: {
+      margin_unavailable: () => "This ONLYOFFICE version does not let plugins read page margins, so margins were not checked (needs a version newer than 8.3.3).",
       page_size: (p) => `Section ${p.section}: paper is ${p.widthMm} x ${p.heightMm} mm, expected A4 (210 x 297 mm).`,
       page_landscape: (p) => `Section ${p.section}: landscape page. Allowed only for tables that are not a separate annex.`,
       margin: (p) => `Section ${p.section}: ${p.edge} margin is ${p.valueMm} mm, expected ${p.min}-${p.max} mm.`,
