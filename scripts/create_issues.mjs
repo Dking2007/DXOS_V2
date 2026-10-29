@@ -44,7 +44,22 @@ if (!dry) {
   }
 }
 
+// Bỏ qua issue đã có (so theo tiêu đề) để chạy lại không tạo trùng.
+const existing = new Set()
+for (let page = 1; ; page++) {
+  const res = await fetch(`https://api.github.com/repos/${REPO}/issues?state=all&per_page=100&page=${page}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  const list = res.ok ? await res.json() : []
+  for (const x of list) if (!x.pull_request) existing.add(x.title)
+  if (list.length < 100) break
+}
+
 for (const i of data.issues) {
+  if (existing.has(i.title)) {
+    console.log(`bỏ qua (đã có): ${i.title}`)
+    continue
+  }
   const body = i.ref ? `${i.body}\n\nCommit liên quan: ${i.ref}` : i.body
   const created = await api('POST', '/issues', {
     title: i.title, body, labels: i.labels, milestone: milestoneNumbers[i.milestone],
