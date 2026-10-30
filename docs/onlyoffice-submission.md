@@ -42,6 +42,20 @@ read on 2026-10-30. Re-read them before submitting; they may have changed.
 
 ## Steps
 
+A ready-made commit exists, so steps 2-4 below are already done locally: a clone of the
+marketplace repository on branch `add-vn-document-format` at `C:\kcwork\mk`, with one signed-off
+commit (plugin folder without `test/` and `package.json`, plus the `store/config.json` entry).
+A copy as a patch is at `C:\kcwork\vn-plugin-pr.patch`. These are scratch paths; copy them if
+you want to keep them. What is left is to fork on GitHub, push, and open the pull request:
+
+```bash
+cd /c/kcwork/mk
+git remote add fork https://github.com/<your-github-name>/onlyoffice.github.io.git
+git push -u fork add-vn-document-format
+```
+
+Then open the pull request from that branch to `ONLYOFFICE/onlyoffice.github.io` `master`.
+
 1. Test in ONLYOFFICE Desktop Editors (pack the plugin files into a zip renamed `.plugin`
    and add it through the Plugin Manager), light and dark theme. Note the versions.
 2. Fork `ONLYOFFICE/onlyoffice.github.io` and clone it.
@@ -69,7 +83,10 @@ Times New Roman and legacy-encoding fonts, text colour, font sizes, and the
 national title and motto. It only reports problems; it never edits the document.
 
 Why: every Vietnamese school and agency writes documents to this layout, and the
-editor has no way to check it. There is a similar tool for Chinese official
+editor has no way to check it. We hit this while building Desktiny, an open-source
+(Apache-2.0) workflow platform for Vietnamese organisations
+(https://github.com/Raphael-Fug/DXOS_V2) that uses ONLYOFFICE Docs for editing
+approval documents. The plugin started as a check for those documents. There is a similar tool for Chinese official
 documents (chineseautoformattool) but none for Vietnamese ones, as far as I could
 tell from the plugin list.
 
