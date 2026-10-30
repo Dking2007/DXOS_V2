@@ -1,0 +1,10 @@
+{
+  "name": "vn-document-format",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ONLYOFFICE plugin that checks Vietnamese administrative documents against Nghị định 30/2020/NĐ-CP, Phụ lục I.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node --test test/checker.test.js test/glue.test.js"
+  }
+}

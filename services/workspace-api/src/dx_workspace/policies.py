@@ -8,7 +8,18 @@ from dx_platform.errors import AppError
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from .models import ApprovalTask, Case, Department, DriveFile, Folder, Role, Share, User
+from .models import (
+    ApprovalTask,
+    Case,
+    ConversationMember,
+    Department,
+    DriveFile,
+    Folder,
+    Message,
+    Role,
+    Share,
+    User,
+)
 
 ROLE_TEMPLATES = {
     "director": (
@@ -334,3 +345,23 @@ def resolve_steps(db: Session, case: Case, form, payload: dict) -> list[dict]:
     if not result:
         raise AppError(422, "approval_configuration_error", "Không có bước duyệt phù hợp với dữ liệu hồ sơ.")
     return result
+
+
+def membership(db: Session, conversation_id: str, user_id: str) -> ConversationMember | None:
+    return db.scalar(
+        select(ConversationMember).where(
+            ConversationMember.conversation_id == conversation_id,
+            ConversationMember.user_id == user_id,
+            ConversationMember.removed_at.is_(None),
+        )
+    )
+
+
+def message_readable(db: Session, user: User, message_id: str) -> Message | None:
+    message = db.get(Message, message_id)
+    if not message or message.deleted_at:
+        return None
+    member = membership(db, message.conversation_id, user.id)
+    if not member or message.seq <= member.history_from_seq:
+        return None
+    return message

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from . import models as m
 from . import schemas as s
-from .policies import current_user, get_case, get_file, manages_department, permissions
+from .policies import current_user, get_case, get_file, manages_department, message_readable, permissions
 from .services import audit, cas, emit, notify, page, serial
 
 FINAL = {"completed", "cancelled"}
@@ -253,8 +253,6 @@ def create_task(db: Session, user: m.User, body: TaskCreate, origin: dict | None
     if "tasks.create" not in permissions(db, user):
         raise AppError(403, "permission_denied", "Bạn chưa được cấp quyền tạo công việc.")
     if body.source and body.source.type == "message":
-        from .messaging import message_readable
-
         # A task made from a message records it as its source; the message must be one the
         # creator can read, and creating the task gives nobody else access to it.
         message = message_readable(db, user, body.source.id or "")

@@ -10,7 +10,6 @@ from dx_platform.auth import Actor
 from dx_platform.errors import AppError
 from fastapi import APIRouter, Depends, File, Header, Query, Request, UploadFile
 from fastapi import Form as MultipartForm
-from jsonschema import Draft202012Validator, FormatChecker
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -107,30 +106,6 @@ def notification_data(value) -> dict:
     data["category"] = "task" if prefix.startswith("task-") else NOTIFICATION_CATEGORIES.get(prefix, "other")
     data["link"] = value.link or (f"/cases/{value.case_id}" if value.case_id else None)
     return data
-
-
-def validate_payload(form, payload):
-    """Validate a payload against the form, honouring defaults and field visibility.
-
-    Returns the payload with defaults applied, which is what must be persisted: a field the
-    client left out is stored with the value the form intends, not as absent.
-    """
-    filled = s.apply_defaults(form.fields, payload)
-    errors = sorted(
-        Draft202012Validator(s.json_schema(form.fields, filled), format_checker=FormatChecker()).iter_errors(
-            filled
-        ),
-        key=lambda e: str(e.path),
-    )
-    messages = [f"{'.'.join(map(str, e.path)) or 'payload'}: {e.message}" for e in errors[:8]]
-    # The registered Core schema cannot know whether a conditional field is required, so
-    # WorkMMODIARY enforces it here, against the payload this submission actually produced.
-    for field in s.visible_fields(form.fields, filled):
-        if field.get("required") and filled.get(field["key"]) in (None, ""):
-            messages.append(f"{field['key']}: là bắt buộc")
-    if messages:
-        raise AppError(422, "form_validation_error", "; ".join(messages))
-    return filled
 
 
 def build_router(app):
@@ -896,7 +871,7 @@ def build_router(app):
                 )
             if package.allowed_roles and user.role not in package.allowed_roles:
                 raise AppError(403, "package_use_denied", "Vai trò của bạn chưa được dùng gói nghiệp vụ này.")
-        payload = validate_payload(form, body.payload)
+        payload = s.validate_payload(form, body.payload)
         if body.assignee_id:
             assignee = db.get(m.User, body.assignee_id)
             if not assignee or not assignee.active:
@@ -1060,7 +1035,7 @@ def build_router(app):
                 )
         if body.payload is not None:
             form = db.get(m.Form, value.form_id)
-            payload = validate_payload(form, body.payload)
+            payload = s.validate_payload(form, body.payload)
             record = core(actor).patch(
                 f"/records/{value.payload_record_id}",
                 {"expected_revision": value.payload_revision, "payload": payload},
@@ -1135,7 +1110,7 @@ def build_router(app):
                 "payload_revision_conflict",
                 "Payload đã thay đổi ngoài hồ sơ. Tải lại và xác nhận dữ liệu trước khi trình.",
             )
-        validate_payload(form, record["payload"])
+        s.validate_payload(form, record["payload"])
         package_version = (
             db.get(m.PackageVersion, value.package_version_id) if value.package_version_id else None
         )
@@ -1145,9 +1120,7 @@ def build_router(app):
             SimpleNamespace(approval_steps=package_version.approval_steps) if package_version else form
         )
         steps = resolve_steps(db, value, configured_form, record["payload"])
-        from .packages import step_evidence
-
-        routing_evidence = step_evidence(configured_form.approval_steps, record["payload"], steps)
+        routing_evidence = s.step_evidence(configured_form.approval_steps, record["payload"], steps)
         snapshots = []
         # The same logical-file lock orders editor open/save and submission pinning.
         for file_id in sorted(value.file_ids):

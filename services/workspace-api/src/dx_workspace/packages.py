@@ -71,22 +71,6 @@ def config_hash(form: m.Form, steps: list, required_count: int) -> str:
     return hashlib.sha256(json.dumps(data, sort_keys=True, default=str).encode()).hexdigest()
 
 
-def step_evidence(steps: list, payload: dict, resolved: list) -> list:
-    evidence = []
-    recipients = iter(resolved)
-    for step in steps:
-        condition = step.get("condition")
-        selected = s.condition_matches(condition, payload)
-        recipient = next(recipients) if selected else None
-        evidence.append({
-            "label": step["label"], "condition": condition,
-            "evaluated_value": payload.get(condition["field"]) if condition else None,
-            "selected": selected,
-            "recipient": recipient["display_name"] if recipient else None,
-        })
-    return evidence
-
-
 def build_router(app):
     router = APIRouter(prefix="/workspace/v1", tags=["business-packages"])
     db_dep = app.state.db_dependency
@@ -133,12 +117,10 @@ def build_router(app):
         return version
 
     def simulate_one(db, version, fixture):
-        from .routers import validate_payload
-
         if fixture.file_count < version.required_file_count:
             raise AppError(422, "required_documents_missing", "Hồ sơ chưa đủ số tài liệu bắt buộc của gói.")
         form = db.get(m.Form, version.form_id)
-        payload = validate_payload(form, fixture.payload)
+        payload = s.validate_payload(form, fixture.payload)
         temporary_case = SimpleNamespace(owner_id=fixture.owner_id, department_id=fixture.department_id)
         configured_form = SimpleNamespace(approval_steps=version.approval_steps)
         steps = resolve_steps(db, temporary_case, configured_form, payload)
@@ -148,7 +130,7 @@ def build_router(app):
         }
         intent = hashlib.sha256(json.dumps(request, sort_keys=True, default=str).encode()).hexdigest()
         result = app.state.core_service.post("/workflow-simulations", request, key="simulation:" + intent)
-        return {**result, "routing_evidence": step_evidence(version.approval_steps, payload, steps)}
+        return {**result, "routing_evidence": s.step_evidence(version.approval_steps, payload, steps)}
 
     @router.get("/business-packages")
     def packages(db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):

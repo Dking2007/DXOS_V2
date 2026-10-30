@@ -1,5 +1,10 @@
 # Third-party inventory — bản triển khai đầu
 
+> **Phạm vi hai tài liệu.** [THIRD_PARTY.md](../THIRD_PARTY.md) là danh sách gói npm/Python và dịch vụ,
+> sinh tự động từ lockfile bằng `scripts/gen_third_party.mjs` — nguồn chính khi cần số phiên bản và
+> giấy phép từng gói. Tệp này giữ phần không sinh tự động được: ghi chú về image/dịch vụ chạy riêng,
+> điều kiện sử dụng và hồ sơ rà soát trước khi phát hành.
+
 Không có mã ONLYOFFICE/Keycloak/RustFS được sao chép vào source ứng dụng. Những
 service này chạy bằng image riêng. Tách process không tự miễn nghĩa vụ phân phối,
 giấy phép hoặc thương hiệu. Bảng dưới là inventory kỹ thuật, **không phải tư vấn

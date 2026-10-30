@@ -7,18 +7,35 @@
 ## [Unreleased]
 
 ### Added
+- `packages/flowkit` (`dx-flowkit` 0.1.0): kiểm tra và chạy thử đồ thị quy trình JSON, tách từ `dx_core.workflow`, không phụ thuộc thư viện ngoài. 56 test; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên. `dx_core.workflow` chưa dùng gói này.
+- `plugins/vn-document-format` (0.1.0): plugin ONLYOFFICE kiểm tra thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP, Phụ lục I. 29 test; đã chạy thử trong ONLYOFFICE 8.3.3 trên hai tệp mẫu. Có icon, ảnh chụp và CHANGELOG theo hướng dẫn marketplace. Chưa kiểm lề trên 8.3.3 (thiếu hàm đọc lề); chưa gửi lên marketplace.
+- Mục "Đóng góp ngược cho cộng đồng nguồn mở" trong README, ghi trạng thái thật từng việc.
 - `scripts/desktiny-migrate.sh` (cài thành `$PREFIX/bin/desktiny-migrate`): chạy migration CSDL từ bản đã cài, không cần thư mục mã nguồn.
 
 ### Fixed
+- Sửa chữ `WorkMMODIARY` (lỗi thay chuỗi) thành `Workspace` trong chú thích mã và `docs/acceptance.md`.
+- Tạo hồ sơ với trường số không bắt buộc để trống bị từ chối (`amount: None is not of type number`): form web gửi `null`, nay `validate_payload` coi giá trị `null` là chưa nhập. Có test hồi quy.
+- Người dùng demo do `scripts/bootstrap.py` sinh có họ (`lastName`) trống; Keycloak 26 buộc điền họ ở bước `VERIFY_PROFILE`, nên lần đăng nhập đầu của mọi tài khoản demo bị chặn và Playwright E2E có đăng nhập không qua được. Nay `lastName` là `Demo`.
 - `make install` không cài `alembic.ini` và `migrations/`, nên bản cài ra `PREFIX` không thể khởi tạo CSDL khi xóa thư mục mã nguồn (tiêu chí PoF 4, mục "chạy được ngoài thư mục mã nguồn"). Nay cài vào `$PREFIX/share/desktiny/<service>-api/`.
 
 ### Changed
-- BUILD.md: thêm mục Thư viện hệ thống (dùng libpq của hệ điều hành thay cho wheel đóng gói sẵn).
+- Cấu trúc Workspace API: bỏ hai vòng phụ thuộc bị che bằng import trong hàm (`tasks` ↔ `messaging`, `routers` ↔ `packages`). `validate_payload` và `step_evidence` chuyển vào `schemas.py`; `membership` và `message_readable` chuyển vào `policies.py`; các import cục bộ giữa `automations`, `messaging` và `tasks` đưa lên đầu tệp. Không đổi hành vi hay API (contract OpenAPI không đổi; 105 test dịch vụ + 4 test ranh giới đạt). `tests/test_boundaries.py` có thêm test chặn vòng phụ thuộc mới.
+- Thêm `.gitattributes` và `.editorconfig` (LF thống nhất giữa Windows/Linux/macOS).
+- `npm run generate:api` giữ header SPDX của hai tệp sinh ra (trước đây xóa mất, làm job `compliance` đỏ). CI so sánh `contracts/` và `apps/shared/src/generated/` với bản đã commit.
+- Chuyển hai tài liệu thiết kế vào `docs/design/`; `docs/third-party-inventory.md` ghi rõ phạm vi so với `THIRD_PARTY.md`.
+- Ba `pyproject.toml` khai báo `license = "Apache-2.0"` (trước đây `pip-licenses` báo UNKNOWN cho gói tự viết). Quét `pip-licenses` trên image runtime ngày 28/10/2026: 47 gói, không có GPL/SSPL/BUSL/Elastic; chỉ psycopg là LGPL-3.0 (đúng khai báo, nạp libpq của hệ điều hành).
+- Cập nhật `docs/architecture.md`, `docs/installation.md`, `docs/acceptance.md` theo trạng thái thật (chat, bảng tin, canvas đã có; Docker/E2E đã chạy ngày 28/10/2026; ghi rõ mục chưa kiểm). `docs/issues-backlog.json` bổ sung các việc đã xong và việc còn mở.
+- Thống nhất số phiên bản 0.2.2 ở `package.json` (gốc và 3 workspace), `package-lock.json`, 3 `pyproject.toml` (kèm ràng buộc `dx-platform-kit==`), tiêu đề OpenAPI của hai dịch vụ và `contracts/*.openapi.json` (trước đây còn ghi 0.1.0).
+- Thêm `.mailmap` gộp tên hiển thị "unknown" của các commit cũ về `Dking2007` (cùng email; không viết lại lịch sử); CONTRIBUTING.md hướng dẫn cấu hình `user.name`/`user.email` trước khi commit.
+- `make install` dùng pip của `.venv` (cần `make venv` trước) thay vì `python3 -m pip` của hệ thống (kèm `--ignore-installed` để mọi phụ thuộc thật sự nằm trong `PREFIX`, không bị bỏ qua vì đã có trong `.venv`): Python 3.13 từ deadsnakes trên Ubuntu 24.04 không có pip, nên lệnh cũ thất bại. `desktiny-migrate` tự chọn đúng `python3.X` đã cài gói thay vì `python3` mặc định. BUILD.md gọi `make venv deps PYTHON=python3.13`. Cả ba lỗi tìm ra khi chạy BUILD.md từng dòng trong Ubuntu 24.04 sạch (27/10/2026).
+- Phụ thuộc `psycopg[binary]` đổi thành `psycopg` thuần Python: không còn đóng gói sẵn libpq trong wheel; hệ điều hành cung cấp `libpq5` (đã thêm vào `api.Dockerfile`, bước CI backend và BUILD.md). `psycopg-binary` bị loại khỏi `requirements.lock` và `THIRD_PARTY.md` (54 gói Python).
+- BUILD.md: thêm mục Thư viện hệ thống và `libpq5` vào bảng yêu cầu.
+- Tài liệu (`V2_CHANGES.md`, `SELF_REVIEW.md`) trỏ tới v0.2.1 là bản dùng để chấm.
 
 ## [0.2.1] - 2026-10-26
 
 ### Fixed
-- `reuse lint` lỗi do `scripts/add_spdx_headers.mjs` và `CONTRIBUTING.md` chứa mẫu header SPDX bị đọc nhầm; bỏ khóa không hợp lệ trong `REUSE.toml` — `d31d057`, `fdc0e7c`. CI toàn bộ xanh từ bản này; `v0.2.0` giữ nguyên làm mốc lịch sử.
+- `reuse lint` lỗi do `scripts/add_spdx_headers.mjs` và `CONTRIBUTING.md` chứa mẫu header SPDX bị đọc nhầm; bỏ khóa không hợp lệ trong `REUSE.toml` — `d31d057`, `fdc0e7c`. CI toàn bộ xanh từ bản này; `v0.2.0` giữ nguyên làm mốc lịch sử. **Lưu ý:** `v0.2.0` được build từ commit `633b9ec` khi `reuse lint` còn lỗi, vì vậy bản dùng để chấm/cài đặt là `v0.2.1` trở lên, không phải `v0.2.0`.
 
 ## [0.2.0] - 2026-10-26 — DXOS V2: sẵn sàng đối chiếu tiêu chí PoF
 

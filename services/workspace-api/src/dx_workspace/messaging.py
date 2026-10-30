@@ -17,8 +17,17 @@ from sqlalchemy.orm import Session
 
 from . import models as m
 from . import schemas as s
-from .policies import case_readable, current_user, department_members, manages_department, permissions
+from .policies import (
+    case_readable,
+    current_user,
+    department_members,
+    manages_department,
+    membership,
+    message_readable,
+    permissions,
+)
 from .services import audit, notify, serial
+from .tasks import get_task
 
 EMOJI = {"👍", "❤️", "😂", "🎉", "😮", "🙏"}
 # Shown inline in the chat. Anything else (SVG, HTML, PDF, office files…) is always downloaded,
@@ -78,16 +87,6 @@ class ReadCursor(s.Input):
     seq: int = Field(ge=0)
 
 
-def membership(db: Session, conversation_id: str, user_id: str) -> m.ConversationMember | None:
-    return db.scalar(
-        select(m.ConversationMember).where(
-            m.ConversationMember.conversation_id == conversation_id,
-            m.ConversationMember.user_id == user_id,
-            m.ConversationMember.removed_at.is_(None),
-        )
-    )
-
-
 def get_conversation(db: Session, user: m.User, conversation_id: str):
     conversation = db.get(m.Conversation, conversation_id)
     member = membership(db, conversation_id, user.id) if conversation else None
@@ -95,16 +94,6 @@ def get_conversation(db: Session, user: m.User, conversation_id: str):
     if not conversation or not member:
         raise AppError(404, "conversation_not_found", "Không tìm thấy hội thoại bạn tham gia.")
     return conversation, member
-
-
-def message_readable(db: Session, user: m.User, message_id: str) -> m.Message | None:
-    message = db.get(m.Message, message_id)
-    if not message or message.deleted_at:
-        return None
-    member = membership(db, message.conversation_id, user.id)
-    if not member or message.seq <= member.history_from_seq:
-        return None
-    return message
 
 
 def add_member(db, conversation, user_id, role="member", include_history=True):
@@ -319,8 +308,6 @@ def build_router(app):
                 )
             )
             if kind == "task":
-                from .tasks import get_task
-
                 ref = get_task(db, user, body.ref_id)
                 participants = {ref.creator_id, ref.assignee_id, *(ref.watcher_ids or [])}
                 title = ref.title

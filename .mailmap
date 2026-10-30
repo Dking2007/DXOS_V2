@@ -1,0 +1,4 @@
+# Gộp tên hiển thị của cùng một người (chỉ ảnh hưởng git log/shortlog/blame, không viết lại lịch sử).
+# Các commit cũ mang tên "unknown" là do git chưa cấu hình user.name; cùng email với Dking2007.
+Dking2007 <nduy34540@gmail.com>
+Raphael-Fug <nguyendoandong5@gmail.com>
