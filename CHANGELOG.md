@@ -8,7 +8,7 @@
 
 ### Added
 - `packages/flowkit` (`dx-flowkit` 0.1.0): kiểm tra và chạy thử đồ thị quy trình JSON, tách từ `dx_core.workflow`, không phụ thuộc thư viện ngoài. 56 test; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên. `dx_core.workflow` chưa dùng gói này.
-- `plugins/vn-document-format` (0.1.0): plugin ONLYOFFICE kiểm tra thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP, Phụ lục I. 26 test; đã chạy thử trong ONLYOFFICE 8.3.3 trên hai tệp mẫu. Chưa kiểm lề trên 8.3.3 (thiếu hàm đọc lề); icon tạm; chưa gửi lên marketplace.
+- `plugins/vn-document-format` (0.1.0): plugin ONLYOFFICE kiểm tra thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP, Phụ lục I. 29 test; đã chạy thử trong ONLYOFFICE 8.3.3 trên hai tệp mẫu. Có icon, ảnh chụp và CHANGELOG theo hướng dẫn marketplace. Chưa kiểm lề trên 8.3.3 (thiếu hàm đọc lề); chưa gửi lên marketplace.
 - Mục "Đóng góp ngược cho cộng đồng nguồn mở" trong README, ghi trạng thái thật từng việc.
 - `scripts/desktiny-migrate.sh` (cài thành `$PREFIX/bin/desktiny-migrate`): chạy migration CSDL từ bản đã cài, không cần thư mục mã nguồn.
 
