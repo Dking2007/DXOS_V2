@@ -137,3 +137,30 @@ test("config.json is valid and names files that exist", () => {
   for (const file of [variation.url, ...variation.icons]) assert.ok(fs.existsSync(path.join(root, file)), file);
   assert.deepEqual(variation.EditorsSupport, ["word"]);
 });
+
+test("every icon and store asset named in config.json exists", () => {
+  const variation = JSON.parse(fs.readFileSync(path.join(root, "config.json"), "utf8")).variations[0];
+  const files = [];
+  for (const set of variation.icons2)
+    for (const [scale, value] of Object.entries(set)) if (scale.endsWith("%")) files.push(value.normal);
+  files.push(...variation.store.screenshots);
+  for (const name of ["icon.png", "icon@1.25x.png", "icon@1.5x.png", "icon@1.75x.png", "icon@2x.png", "icon.svg"])
+    files.push(path.join(variation.store.icons.light, name));
+  assert.equal(files.length, 18, "expected 10 toolbar icons, 6 store icons and 2 screenshots");
+  for (const file of files) assert.ok(fs.existsSync(path.join(root, file)), file);
+});
+
+test("a changelog entry exists for the version in config.json", () => {
+  const version = JSON.parse(fs.readFileSync(path.join(root, "config.json"), "utf8")).version;
+  const changelog = fs.readFileSync(path.join(root, "CHANGELOG.md"), "utf8");
+  assert.ok(changelog.includes("## " + version), "CHANGELOG.md has no '## " + version + "' heading");
+});
+
+test("toolbar icons have the sizes ONLYOFFICE expects for each scale", () => {
+  const sizes = { "icon.png": 28, "icon@1.25x.png": 35, "icon@1.5x.png": 42, "icon@1.75x.png": 49, "icon@2x.png": 56 };
+  for (const theme of ["light", "dark"])
+    for (const [name, px] of Object.entries(sizes)) {
+      const png = fs.readFileSync(path.join(root, "resources", theme, name));
+      assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [px, px], theme + "/" + name);
+    }
+});

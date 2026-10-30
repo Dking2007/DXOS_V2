@@ -51,7 +51,7 @@ If the national title and motto are absent, the header checks are skipped with a
 
 ## What has and has not been verified
 
-Verified (`npm test`, Node 22, 26 tests):
+Verified (`npm test`, Node 22, 29 tests):
 - Every rule above against boundary values and violations, including wording with
   different dash characters, and that Verdana is not mistaken for a legacy font.
 - The ONLYOFFICE glue against a **fake** editor API: it builds the model the checker
@@ -82,8 +82,9 @@ Not verified:
   `ApiSection.GetPageMarginLeft` and its siblings exist.
 - **Colour** uses `ApiColor.GetRGB`, documented as available from ONLYOFFICE 9.1. It did detect
   red text on 8.3.3, but on other older builds the check may be skipped silently.
-- **Icons are placeholders** (solid squares) and the marketplace needs real light and dark
-  icons plus screenshots.
+- **Icons and screenshots are first versions** drawn by the authors (a page with a check mark,
+  light and dark, five scales, plus store icons). Screenshots were taken from the real editor
+  in Docker (8.3.3) and are checked only for size, not for how the marketplace card renders.
 - The rule values against the official gazette text, and with a records-management
   specialist.
 
@@ -105,11 +106,16 @@ The marketplace takes a pull request to
 [`ONLYOFFICE/onlyoffice.github.io`](https://github.com/ONLYOFFICE/onlyoffice.github.io),
 adding a folder under `sdkjs-plugins/content/`. Before submitting:
 
-- Replace the placeholder icons and add store screenshots, as in other plugins' `resources/`.
-- Read that repository's contributing notes and license requirements. Plugins published by
-  ONLYOFFICE carry AGPL headers; third-party plugins have their own license, and this one is
-  Apache-2.0. Confirm the marketplace accepts that.
-- Run the plugin in a real editor and note the versions tested.
+- Add the plugin folder to `sdkjs-plugins/content/vn-document-format` and an entry
+  `{ "name": "vn-document-format", "discussion": "" }` to the repository's `store/config.json`
+  (the maintainers fill in `discussion`). Their `pack-plugins` workflow builds `deploy/*.plugin`,
+  so no packed file is committed.
+- The marketplace repository is AGPL-3.0. Other third-party plugins there carry their own
+  `offered` name and license files; this plugin is Apache-2.0 (one-way compatible with AGPL-3.0).
+  The pull request should state the license and ask whether it is acceptable.
+- Test in ONLYOFFICE Desktop Editors and in the Plugin Manager's dark theme, as their guide
+  asks (done here only on Document Server 8.3.3 in a browser, light theme).
+- Full checklist and pull request text: [docs/onlyoffice-submission.md](../../docs/onlyoffice-submission.md).
 
 ## License
 
