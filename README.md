@@ -312,6 +312,7 @@ Mã nguồn do dự án tự viết phát hành theo **Apache License 2.0** (SPD
 
 Mục này ghi **trạng thái thật** của từng việc; sẽ cập nhật khi có link và kết quả. Tại thời điểm ghi (30/10/2026)
 có hai mục được gửi lên dự án bên ngoài (Keycloak và ONLYOFFICE) và cả hai chưa được người bảo trì xét.
+Từng bước đã làm, link và trạng thái nằm ở [docs/contribution-log.md](docs/contribution-log.md).
 
 | Việc | Dự án nhận | Link | Trạng thái | Ghi chú |
 |---|---|---|---|---|
