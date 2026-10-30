@@ -1,6 +1,6 @@
 # Submitting `vn-document-format` to the ONLYOFFICE marketplace
 
-Status on 2026-10-30: **prepared, not submitted.** Nothing has been posted to GitHub.
+Status on 2026-10-30: **submitted** as [PR #730](https://github.com/ONLYOFFICE/onlyoffice.github.io/pull/730), waiting for review. The steps below record how it was prepared.
 The plugin is in [`plugins/vn-document-format`](../plugins/vn-document-format).
 
 Source of the process: the marketplace repository's
