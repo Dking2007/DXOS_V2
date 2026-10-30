@@ -211,6 +211,20 @@ không tồn tại để làm tài liệu trông đầy đủ. Xem [checklist](d
   (nhớ theo trình duyệt, xem lại trong Thiết lập), thông báo nhanh sau thao tác, khung
   xương khi tải và hỏi lại trước khi bỏ thay đổi chưa lưu. Badge cập nhật mỗi 30 giây và
   khi chuyển trang, chưa đẩy tức thời.
+- **Trợ lý AI** (nút góc màn hình, Ctrl + K › "Hỏi trợ lý AI"; quản trị ở `/assistant`): trả lời
+  câu hỏi về quy trình nghiệp vụ và cách dùng phần mềm **chỉ từ kho kiến thức** do người có quyền
+  `assistant.manage` nhập (viết tay, tệp `.md/.txt`, hoặc sinh từ gói nghiệp vụ đang áp dụng). Mỗi
+  câu hỏi tìm đoạn liên quan bằng BM25 trên chữ đã bỏ dấu (không cần dịch vụ tìm kiếm riêng) rồi
+  gửi kèm câu hỏi tới dịch vụ AI đang chọn: Claude (SDK chính thức, mặc định `claude-opus-5-5`,
+  effort thấp, bật fallback khi bị từ chối), OpenAI, Gemini hoặc DeepSeek, hoặc **cổng riêng** nói
+  giao thức Anthropic Messages / OpenAI Chat Completions / OpenAI Responses (ví dụ LiteLLM,
+  OpenRouter; model `auto` được). Dịch vụ chính hãng có địa chỉ cố định trong mã; cổng riêng phải
+  là HTTPS trên địa chỉ công khai, còn cổng nội bộ hoặc HTTP chỉ dùng được khi tên máy có trong
+  `ASSISTANT_ALLOWED_HOSTS` (kiểm khi lưu và trước mỗi lần gọi, không theo chuyển hướng); khóa API mã hóa bằng `CREDENTIAL_ENCRYPTION_KEY`, không bao
+  giờ trả về. Trợ lý không đọc dữ liệu nghiệp vụ của ai; lịch sử hội thoại chỉ giữ trong tab trình
+  duyệt. Giới hạn câu hỏi/người/ngày, chỉ trừ lượt khi có câu trả lời. Container `workspace-api`
+  cần được ra Internet tới máy chủ của dịch vụ đã chọn. Chưa có trả lời dạng stream, chưa có
+  nhúng vector, chưa đọc tệp PDF/Word làm kiến thức.
 - **Xem tệp ngay trong ứng dụng**: PDF, ảnh (PNG/JPEG/GIF/WebP), video, âm thanh và
   TXT/CSV mở trong khung xem ở Kho tài liệu, tab Tài liệu và bản đã trình của hồ sơ (đúng
   phiên bản đã trình), và tệp đính kèm trong chat. PDF được pdf.js vẽ thành hình (lật

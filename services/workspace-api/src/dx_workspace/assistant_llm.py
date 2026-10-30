@@ -1,0 +1,333 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
+"""Calls to the LLM services the help assistant can use.
+
+Claude goes through the official Anthropic SDK; OpenAI, DeepSeek and Gemini through their
+REST APIs, at endpoints fixed here.
+
+An administrator may also point the assistant at their own gateway that speaks the Anthropic
+Messages, OpenAI Chat Completions or OpenAI Responses protocol. Such a URL must be HTTPS on a
+public address; private, loopback and link-local addresses (and plain HTTP) are refused unless
+the host is listed in ASSISTANT_ALLOWED_HOSTS. The check runs when the URL is saved and again
+before every call, and redirects are never followed.
+"""
+
+from __future__ import annotations
+
+import ipaddress
+import re
+import socket
+from dataclasses import dataclass
+from urllib.parse import quote, urlsplit
+
+import anthropic
+import httpx
+
+TIMEOUT_SECONDS = 60
+MODEL_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,120}$")
+# Gateways often route by names such as "openrouter/anthropic/claude" or "auto"; the model is
+# only ever sent in the JSON body for these, never placed in a URL.
+CUSTOM_MODEL_PATTERN = re.compile(r"^[A-Za-z0-9._:/@-]{1,120}$")
+
+# Shown in the settings screen. Suggested models are only a starting point; the
+# administrator types the model their account has access to.
+KINDS = {
+    "anthropic": {"label": "Claude (Anthropic)", "suggested_model": "claude-opus-5-5"},
+    "openai": {"label": "OpenAI (ChatGPT)", "suggested_model": ""},
+    "gemini": {"label": "Google Gemini", "suggested_model": ""},
+    "deepseek": {"label": "DeepSeek", "suggested_model": "deepseek-chat"},
+    "custom_anthropic": {
+        "label": "Cổng tương thích Anthropic Messages",
+        "suggested_model": "auto",
+        "custom": True,
+    },
+    "custom_chat": {
+        "label": "Cổng tương thích OpenAI Chat Completions",
+        "suggested_model": "auto",
+        "custom": True,
+    },
+    "custom_responses": {
+        "label": "Cổng tương thích OpenAI Responses",
+        "suggested_model": "auto",
+        "custom": True,
+    },
+}
+CUSTOM_PATHS = {
+    "custom_anthropic": "/messages",
+    "custom_chat": "/chat/completions",
+    "custom_responses": "/responses",
+}
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+# Claude models that accept the server-side refusal fallback and the effort setting.
+CLAUDE_FALLBACK_MODELS = {"claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"}
+CLAUDE_EFFORT_PREFIXES = (
+    "claude-fable-5",
+    "claude-opus-5",
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-opus-4-6",
+    "claude-sonnet-5",
+    "claude-sonnet-4-6",
+    "claude-haiku-5",
+)
+
+
+class LlmError(Exception):
+    """A failure worth showing to people, in plain Vietnamese."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+@dataclass
+class Reply:
+    text: str
+    truncated: bool = False
+
+
+def is_custom(kind: str) -> bool:
+    return kind in CUSTOM_PATHS
+
+
+def check_model(kind: str, model: str) -> None:
+    pattern = CUSTOM_MODEL_PATTERN if is_custom(kind) else MODEL_PATTERN
+    if not pattern.match(model):
+        raise LlmError(
+            "assistant_model_invalid", "Tên model chỉ gồm chữ, số và . _ : - (cổng riêng cho phép thêm / @)."
+        )
+
+
+def resolve_host(host: str) -> list[str]:
+    """Every address a host name points to. Kept separate so tests can replace it."""
+    return list({info[4][0] for info in socket.getaddrinfo(host, None)})
+
+
+def check_base_url(url: str, allowed_hosts: set[str]) -> str:
+    """The gateway base URL, normalised to end in its API version (".../v1")."""
+    value = url.strip().rstrip("/")
+    try:
+        parts = urlsplit(value)
+    except ValueError as exc:
+        raise LlmError("assistant_url_invalid", "Địa chỉ cổng không hợp lệ.") from exc
+    host = (parts.hostname or "").lower()
+    if parts.scheme not in {"https", "http"} or not host or parts.username or parts.password:
+        raise LlmError("assistant_url_invalid", "Nhập địa chỉ dạng https://ten-may-chu/v1.")
+    if parts.query or parts.fragment:
+        raise LlmError("assistant_url_invalid", "Địa chỉ cổng không được chứa ? hay #.")
+    trusted = host in allowed_hosts
+    if parts.scheme == "http" and not trusted:
+        raise LlmError(
+            "assistant_url_insecure",
+            "Cổng phải dùng HTTPS. Muốn dùng HTTP trong mạng nội bộ, thêm máy chủ vào ASSISTANT_ALLOWED_HOSTS.",
+        )
+    if not trusted:
+        try:
+            addresses = [ipaddress.ip_address(a.split("%")[0]) for a in resolve_host(host)]
+        except (OSError, ValueError) as exc:
+            raise LlmError("assistant_url_unresolved", f"Không tìm thấy máy chủ “{host}”.") from exc
+        if not addresses or any(not a.is_global for a in addresses):
+            raise LlmError(
+                "assistant_url_private",
+                f"“{host}” là địa chỉ nội bộ. Chỉ dùng được khi quản trị hệ thống thêm nó vào ASSISTANT_ALLOWED_HOSTS.",
+            )
+    if not re.search(r"/v\d+$", parts.path):
+        value += "/v1"
+    return value
+
+
+def endpoint(kind: str, base_url: str) -> str:
+    return base_url + CUSTOM_PATHS[kind]
+
+
+def complete(
+    kind: str,
+    model: str,
+    api_key: str,
+    system: str,
+    messages: list[dict],
+    max_tokens: int,
+    transport=None,
+    base_url: str | None = None,
+    allowed_hosts: set[str] | None = None,
+) -> Reply:
+    """Send one chat turn. `messages` alternate user/assistant and end with the user's question."""
+    if kind not in KINDS:
+        raise LlmError("assistant_kind_invalid", "Loại dịch vụ AI không được hỗ trợ.")
+    check_model(kind, model)
+    if not api_key:
+        raise LlmError("assistant_key_missing", "Dịch vụ AI chưa có khóa API.")
+    if is_custom(kind):
+        # Checked again here: a name that was public when saved may point elsewhere now.
+        base = check_base_url(base_url or "", allowed_hosts or set())
+        if kind == "custom_anthropic":
+            return _anthropic(model, api_key, system, messages, max_tokens, transport, base_url=base)
+        if kind == "custom_responses":
+            return _responses(endpoint(kind, base), model, api_key, system, messages, max_tokens, transport)
+        return _openai_style(
+            endpoint(kind, base), kind, model, api_key, system, messages, max_tokens, transport
+        )
+    if kind == "anthropic":
+        return _anthropic(model, api_key, system, messages, max_tokens, transport)
+    if kind == "gemini":
+        return _gemini(model, api_key, system, messages, max_tokens, transport)
+    url = OPENAI_URL if kind == "openai" else DEEPSEEK_URL
+    return _openai_style(url, kind, model, api_key, system, messages, max_tokens, transport)
+
+
+def _anthropic(model, api_key, system, messages, max_tokens, transport, base_url: str | None = None) -> Reply:
+    client = anthropic.Anthropic(
+        api_key=api_key,
+        # The SDK adds "/v1/messages" itself, so a gateway's ".../v1" base is passed without it.
+        base_url=base_url.removesuffix("/v1") if base_url else None,
+        # The SDK authenticates with a bearer token; gateways that follow the Messages API
+        # read x-api-key, so it is sent too.
+        default_headers={"x-api-key": api_key} if base_url else None,
+        timeout=TIMEOUT_SECONDS,
+        max_retries=1,
+        http_client=anthropic.DefaultHttpxClient(transport=transport, follow_redirects=False)
+        if transport or base_url
+        else None,
+    )
+    params = {"model": model, "max_tokens": max_tokens, "system": system, "messages": messages}
+    # A help chat does not need deep reasoning; low effort keeps answers quick and cheap.
+    # Gateways get a plain request: they may not know these Claude-specific options.
+    if not base_url and model.startswith(CLAUDE_EFFORT_PREFIXES):
+        params["output_config"] = {"effort": "low"}
+    try:
+        if not base_url and model in CLAUDE_FALLBACK_MODELS:
+            # If a safety classifier declines, the API retries on a suitable model itself.
+            response = client.beta.messages.create(
+                **params, betas=["server-side-fallback-2026-07-01"], fallbacks="default"
+            )
+        else:
+            response = client.messages.create(**params)
+    except anthropic.AuthenticationError as exc:
+        raise LlmError("assistant_key_invalid", "Khóa API Anthropic không hợp lệ.") from exc
+    except anthropic.PermissionDeniedError as exc:
+        raise LlmError("assistant_forbidden", "Khóa API không được phép dùng model này.") from exc
+    except anthropic.NotFoundError as exc:
+        raise LlmError("assistant_model_not_found", f"Không tìm thấy model “{model}”.") from exc
+    except anthropic.RateLimitError as exc:
+        raise LlmError("assistant_rate_limited", "Dịch vụ AI đang quá tải hoặc đã hết hạn mức.") from exc
+    except anthropic.BadRequestError as exc:
+        raise LlmError("assistant_bad_request", f"Dịch vụ AI từ chối yêu cầu: {exc.message}") from exc
+    except anthropic.APIStatusError as exc:
+        raise LlmError("assistant_upstream_error", "Dịch vụ AI đang gặp sự cố. Thử lại sau.") from exc
+    except anthropic.APIConnectionError as exc:
+        raise LlmError("assistant_unreachable", "Không kết nối được tới dịch vụ AI.") from exc
+    if response.stop_reason == "refusal":
+        raise LlmError("assistant_refused", "Trợ lý không thể trả lời câu hỏi này.")
+    text = "".join(block.text for block in response.content if block.type == "text").strip()
+    return Reply(text=text, truncated=response.stop_reason == "max_tokens")
+
+
+def _http_error(kind: str, response: httpx.Response, model: str) -> LlmError:
+    try:
+        body = response.json()
+        detail = body.get("error", {}).get("message") if isinstance(body.get("error"), dict) else ""
+    except ValueError:
+        detail = ""
+    status = response.status_code
+    if status in (401, 403):
+        return LlmError("assistant_key_invalid", "Khóa API không hợp lệ hoặc không có quyền.")
+    if status == 404:
+        return LlmError("assistant_model_not_found", f"Không tìm thấy model “{model}”.")
+    if status == 429:
+        return LlmError("assistant_rate_limited", "Dịch vụ AI đang quá tải hoặc đã hết hạn mức.")
+    if 400 <= status < 500:
+        return LlmError("assistant_bad_request", f"Dịch vụ AI từ chối yêu cầu: {detail or status}")
+    return LlmError("assistant_upstream_error", "Dịch vụ AI đang gặp sự cố. Thử lại sau.")
+
+
+def _post(url: str, headers: dict, body: dict, transport) -> httpx.Response:
+    try:
+        with httpx.Client(timeout=TIMEOUT_SECONDS, transport=transport, follow_redirects=False) as client:
+            return client.post(url, headers=headers, json=body)
+    except httpx.TimeoutException as exc:
+        raise LlmError("assistant_timeout", "Dịch vụ AI phản hồi quá lâu.") from exc
+    except httpx.TransportError as exc:
+        raise LlmError("assistant_unreachable", "Không kết nối được tới dịch vụ AI.") from exc
+
+
+def _openai_style(url, kind, model, api_key, system, messages, max_tokens, transport) -> Reply:
+    body = {"model": model, "messages": [{"role": "system", "content": system}, *messages]}
+    # OpenAI's newer models only accept max_completion_tokens; DeepSeek and gateways keep max_tokens.
+    body["max_completion_tokens" if kind == "openai" else "max_tokens"] = max_tokens
+    response = _post(url, {"Authorization": f"Bearer {api_key}"}, body, transport)
+    if response.status_code != 200:
+        raise _http_error(kind, response, model)
+    try:
+        choice = response.json()["choices"][0]
+        text = choice["message"].get("content") or ""
+    except (ValueError, KeyError, IndexError, TypeError) as exc:
+        raise LlmError("assistant_bad_response", "Dịch vụ AI trả về dữ liệu không đọc được.") from exc
+    if choice.get("finish_reason") == "content_filter":
+        raise LlmError("assistant_refused", "Trợ lý không thể trả lời câu hỏi này.")
+    return Reply(text=text.strip(), truncated=choice.get("finish_reason") == "length")
+
+
+def _gemini(model, api_key, system, messages, max_tokens, transport) -> Reply:
+    body = {
+        "systemInstruction": {"parts": [{"text": system}]},
+        "contents": [
+            {"role": "model" if m["role"] == "assistant" else "user", "parts": [{"text": m["content"]}]}
+            for m in messages
+        ],
+        "generationConfig": {"maxOutputTokens": max_tokens},
+    }
+    url = GEMINI_URL.format(model=quote(model, safe=""))
+    response = _post(url, {"x-goog-api-key": api_key}, body, transport)
+    if response.status_code != 200:
+        raise _http_error("gemini", response, model)
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise LlmError("assistant_bad_response", "Dịch vụ AI trả về dữ liệu không đọc được.") from exc
+    if data.get("promptFeedback", {}).get("blockReason"):
+        raise LlmError("assistant_refused", "Trợ lý không thể trả lời câu hỏi này.")
+    candidates = data.get("candidates") or []
+    if not candidates:
+        raise LlmError("assistant_bad_response", "Dịch vụ AI không trả về câu trả lời.")
+    candidate = candidates[0]
+    if candidate.get("finishReason") in {"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST"}:
+        raise LlmError("assistant_refused", "Trợ lý không thể trả lời câu hỏi này.")
+    parts = candidate.get("content", {}).get("parts") or []
+    text = "".join(part.get("text", "") for part in parts if not part.get("thought"))
+    return Reply(text=text.strip(), truncated=candidate.get("finishReason") == "MAX_TOKENS")
+
+
+def _responses(url, model, api_key, system, messages, max_tokens, transport) -> Reply:
+    """OpenAI Responses protocol: instructions + input items, text in output message items."""
+    body = {
+        "model": model,
+        "instructions": system,
+        "input": [{"role": m["role"], "content": m["content"]} for m in messages],
+        "max_output_tokens": max_tokens,
+    }
+    response = _post(url, {"Authorization": f"Bearer {api_key}"}, body, transport)
+    if response.status_code != 200:
+        raise _http_error("custom_responses", response, model)
+    try:
+        data = response.json()
+        text = data.get("output_text") or "".join(
+            part.get("text", "")
+            for item in data.get("output") or []
+            if item.get("type") == "message"
+            for part in item.get("content") or []
+            if part.get("type") == "output_text"
+        )
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise LlmError("assistant_bad_response", "Dịch vụ AI trả về dữ liệu không đọc được.") from exc
+    for item in data.get("output") or []:
+        for part in item.get("content") or []:
+            if part.get("type") == "refusal":
+                raise LlmError("assistant_refused", "Trợ lý không thể trả lời câu hỏi này.")
+    reason = (data.get("incomplete_details") or {}).get("reason")
+    if reason == "content_filter":
+        raise LlmError("assistant_refused", "Trợ lý không thể trả lời câu hỏi này.")
+    return Reply(text=text.strip(), truncated=reason == "max_output_tokens")

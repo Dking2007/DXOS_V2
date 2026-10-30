@@ -37,6 +37,7 @@ ROLE_TEMPLATES = {
             "feed.official",
             "feed.moderate",
             "automations.manage",
+            "assistant.manage",
         ],
     ),
     "manager": (
@@ -53,7 +54,10 @@ ROLE_TEMPLATES = {
         ],
     ),
     "staff": ("Cán bộ / nhân viên", ["cases.create", "drive.use", "tasks.create", "feed.post"]),
-    "technical_admin": ("Quản trị kỹ thuật", ["organization.manage", "audit.read", "automations.manage"]),
+    "technical_admin": (
+        "Quản trị kỹ thuật",
+        ["organization.manage", "audit.read", "automations.manage", "assistant.manage"],
+    ),
 }
 ALLOWED_PERMISSIONS = {value for _, permissions in ROLE_TEMPLATES.values() for value in permissions}
 # Permissions introduced after the first release; migration 0007 adds them to existing

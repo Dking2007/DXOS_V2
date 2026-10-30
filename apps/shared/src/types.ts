@@ -338,3 +338,70 @@ export interface PostComment {
   created_at: string
   can_delete: boolean
 }
+export interface AssistantStatus {
+  enabled: boolean
+  ready: boolean
+  welcome: string
+  suggestions: string[]
+  provider: string | null
+  remaining: number | null
+  daily_limit: number
+  can_manage: boolean
+}
+export interface AssistantSource {
+  n: number
+  id: string
+  title: string
+  category: string
+}
+export interface AssistantReply {
+  answer: string
+  truncated: boolean
+  sources: AssistantSource[]
+  remaining: number | null
+}
+export interface AssistantProvider {
+  id: string
+  name: string
+  kind: 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'custom_anthropic' | 'custom_chat' | 'custom_responses'
+  kind_label: string
+  model: string
+  base_url: string | null
+  endpoint: string | null
+  key_hint: string
+  max_output_tokens: number
+  active: boolean
+  last_test_ok: boolean | null
+  last_test_at: string | null
+  revision: number
+  updated_at: string
+}
+export interface AssistantArticle {
+  id: string
+  title: string
+  category: 'process' | 'guide' | 'faq' | 'other'
+  category_label: string
+  published: boolean
+  source: 'manual' | 'package'
+  source_ref: string | null
+  revision: number
+  updated_at: string
+  excerpt: string
+  length: number
+  body?: string
+}
+export interface AssistantAdmin {
+  config: {
+    enabled: boolean
+    welcome: string
+    instructions: string
+    suggestions: string[]
+    daily_limit: number
+    revision: number
+  }
+  providers: AssistantProvider[]
+  kinds: { kind: AssistantProvider['kind']; label: string; suggested_model: string; custom?: boolean }[]
+  categories: { key: AssistantArticle['category']; label: string }[]
+  article_count: number
+  published_count: number
+}

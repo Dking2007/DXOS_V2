@@ -35,6 +35,7 @@ def create_app(settings=None, engine=None):
         allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", "Idempotency-Key", "X-Request-ID"],
     )
     app.include_router(auth.router("/workspace/v1"))
+    from .assistant import build_router as assistant_router
     from .automations import build_router as automations_router
     from .delegations import build_router as delegations_router
     from .discovery import build_router as discovery_router
@@ -56,6 +57,7 @@ def create_app(settings=None, engine=None):
     app.include_router(discovery_router(app))
     app.include_router(delegations_router(app))
     app.include_router(automations_router(app))
+    app.include_router(assistant_router(app))
 
     @app.get("/health/live", tags=["health"])
     def live():

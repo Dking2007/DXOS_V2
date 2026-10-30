@@ -142,6 +142,20 @@ nhiều dòng "chưa chạy" ở phần lịch sử bên dưới; phần lịch 
   ảnh + 1 PDF (PDF bị từ chối), nút Đăng khóa khi đang tải, bài gửi đúng 2 mã ảnh; lưới 4 ô
   "+2", xem toàn màn hình lướt bằng phím; video WebM thật phát trong bài; 390 px không tràn.
   Chưa thử với Core/gateway thật.
+- Trợ lý AI (migration `workspace_0012`, nhánh `feat/ai-assistant`): Workspace + Core **115
+  passed, 1 skipped** (thêm 8 test: hỏi đáp có nguồn, khóa API không lộ, bài ẩn/xóa không được dùng,
+  lỗi dịch vụ không trừ lượt, giới hạn/ngày, chỉ một dịch vụ đang dùng, Claude qua SDK có
+  fallbacks/effort và bắt `refusal`, cấu trúc request Gemini/DeepSeek, tìm kiến thức không dấu,
+  sinh bài từ gói nghiệp vụ); `npm run test` **49 passed**; lint, typecheck, build, ruff, kiểm SPDX
+  đạt. Alembic upgrade → downgrade 0011 → upgrade bằng SQLite tạm đạt; thử riêng việc cấp/thu hồi
+  `assistant.manage` cho vai trò có sẵn: đúng. Dịch vụ AI **chỉ được giả lập** (transport giả):
+  chưa gọi thật Claude/OpenAI/Gemini/DeepSeek với khóa thật. Giao diện kiểm bằng API giả lập
+  (Chromium 1440 px sáng/tối, 390 px không tràn ngang).
+  Bổ sung cổng riêng (migration `workspace_0013`): Workspace + Core **118 passed, 1 skipped** (thêm 3
+  test: kiểm URL — HTTP, IP nội bộ/link-local, tên trỏ một phần về loopback, có user:pass, có query
+  bị từ chối; danh sách trắng cho cổng nội bộ; cấu trúc request 3 giao thức; tên miền đổi sang IP
+  nội bộ bị chặn ở lần gọi sau; luồng tạo cổng → hỏi đáp qua cổng). DNS và cổng đều **giả lập**,
+  chưa gọi một gateway thật.
 - Core outbox được lưu pending; chưa có external dispatcher/event-trigger delivery.
   Worker DB poll/reconciler của run không chứng minh pipeline broker đã hoạt động.
 
