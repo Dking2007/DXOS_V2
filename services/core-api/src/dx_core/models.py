@@ -218,3 +218,7 @@ class Audit(Entity, Base):
     action: Mapped[str] = mapped_column(String(120))
     resource_id: Mapped[str] = mapped_column(String(36))
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Hash chain per application (see audit_chain.py); NULL on rows written before core_0003.
+    seq: Mapped[int | None] = mapped_column(Integer)
+    prev_hash: Mapped[str | None] = mapped_column(String(64))
+    entry_hash: Mapped[str | None] = mapped_column(String(64))
