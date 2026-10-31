@@ -237,6 +237,76 @@ def build_router(app):
             } if previous.required_file_count != current.required_file_count else None,
         }
 
+    def side(db, version, fixture):
+        """One fixture through one version; failures are results here, not request errors."""
+        try:
+            result = simulate_one(db, version, fixture)
+        except AppError as exc:
+            return {"error": {"code": exc.code, "detail": exc.detail}, "state": "error", "path": [], "assignees": []}
+        return {"state": result["state"], "path": result["path"],
+                "assignees": [entry["subject"] for entry in result["assignees"]],
+                "routing_evidence": result["routing_evidence"]}
+
+    @router.get("/package-versions/{version_id}/impact")
+    def version_impact(version_id: str, against_id: str, suite_id: str, db: Session = Depends(db_dep),
+                       actor: Actor = Depends(actor_dep)):
+        """Run the same fixtures through two versions and say what changes, and why.
+
+        Read-only rehearsal: nothing is created, sent or published. Both versions are evaluated
+        against today's organisation, so a difference between them comes from the rules. Whether the
+        organisation moved since the baseline was last rehearsed is reported separately as drift,
+        by comparing the recipients stored in that report with the ones resolved now.
+        """
+        user = user_for(db, actor)
+        candidate = version_for(db, version_id)
+        baseline = version_for(db, against_id)
+        if candidate.package_id != baseline.package_id:
+            raise AppError(422, "version_mismatch", "Chỉ so sánh các phiên bản trong cùng gói.")
+        manage(db, user, db.get(m.BusinessPackage, candidate.package_id))
+        suite = db.get(m.SimulationSuite, suite_id)
+        if not suite or suite.version_id not in {candidate.id, baseline.id}:
+            raise AppError(404, "suite_not_found", "Không tìm thấy bộ thử của hai phiên bản này.")
+        rules_changed = baseline.approval_steps != candidate.approval_steps
+        # A different form row with the same fields is no change; the route is judged by the steps.
+        form_changed = db.get(m.Form, baseline.form_id).fields != db.get(m.Form, candidate.form_id).fields
+        files_changed = baseline.required_file_count != candidate.required_file_count
+        recorded = {}
+        last = db.scalar(select(m.SimulationReport).where(
+            m.SimulationReport.version_id == baseline.id, m.SimulationReport.suite_id == suite.id,
+        ).order_by(m.SimulationReport.created_at.desc(), m.SimulationReport.id.desc()).limit(1))
+        for entry in (last.results if last else []):
+            people = [row["subject"] for row in entry.get("result", {}).get("assignees", [])]
+            recorded[entry["name"]] = people if "result" in entry else None
+        items = []
+        for fixture in suite.cases:
+            value = SimpleNamespace(
+                payload=fixture["payload"], decisions=fixture.get("decisions", {}),
+                file_count=fixture.get("file_count", 0),
+                owner_id=fixture["owner_id"], department_id=fixture.get("department_id"))
+            before, after = side(db, baseline, value), side(db, candidate, value)
+            changes = [name for name, same in (
+                ("outcome", before["state"] == after["state"]),
+                ("path", before["path"] == after["path"]),
+                ("assignees", before["assignees"] == after["assignees"]),
+            ) if not same]
+            causes = ["rule"] if changes and (rules_changed or form_changed or files_changed) else []
+            was = recorded.get(fixture["name"])
+            drift = was is not None and was != before["assignees"]
+            items.append({"name": fixture["name"], "changed": bool(changes), "changes": changes,
+                          "causes": causes, "baseline": before, "candidate": after,
+                          "recipient_drift": {"recorded": was, "now": before["assignees"]} if drift else None})
+        return {
+            "baseline": {"id": baseline.id, "version_no": baseline.version_no, "config_hash": baseline.config_hash},
+            "candidate": {"id": candidate.id, "version_no": candidate.version_no, "config_hash": candidate.config_hash},
+            "suite": {"id": suite.id, "config_hash": suite.config_hash,
+                      "fixtures_hash": hashlib.sha256(json.dumps(suite.cases, sort_keys=True).encode()).hexdigest()},
+            "differences": {"rules": rules_changed, "form": form_changed, "required_files": files_changed},
+            "summary": {"fixtures": len(items), "changed": sum(item["changed"] for item in items),
+                        "recipient_drift": sum(item["recipient_drift"] is not None for item in items)},
+            "items": items,
+            "effects_performed": False,
+        }
+
     @router.post("/business-packages/{package_id}/versions", status_code=201)
     def create_version(package_id: str, body: VersionCreate, idempotency_key: str | None = Header(None),
                        db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):

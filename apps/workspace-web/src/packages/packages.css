@@ -672,3 +672,16 @@
     flex-direction: column;
   }
 }
+
+.impact { margin-top: 1.25rem; display: grid; gap: 0.6rem; }
+.impact-pick { display: flex; gap: 0.5rem; align-items: center; font-size: 0.85rem; }
+.impact-headline { font-weight: 600; margin: 0; }
+.impact-headline.changed { color: var(--warning, #b45309); }
+.impact-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.impact-list li { border: 1px solid var(--border, #d8dee4); border-radius: 8px; padding: 0.6rem 0.8rem; }
+.impact-list li.changed { border-left: 3px solid var(--warning, #b45309); }
+.impact-name { display: flex; justify-content: space-between; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+.impact-compare { margin: 0.5rem 0 0; display: grid; gap: 0.25rem; }
+.impact-compare div { display: grid; grid-template-columns: 3rem 1fr; gap: 0.5rem; }
+.impact-compare dt { font-weight: 600; }
+.impact-compare dd { margin: 0; overflow-wrap: anywhere; }

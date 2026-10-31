@@ -2725,6 +2725,65 @@
         }
       }
     },
+    "/workspace/v1/package-versions/{version_id}/impact": {
+      "get": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Version Impact",
+        "description": "Run the same fixtures through two versions and say what changes, and why.\n\nRead-only rehearsal: nothing is created, sent or published. Both versions are evaluated\nagainst today's organisation, so a difference between them comes from the rules. Whether the\norganisation moved since the baseline was last rehearsed is reported separately as drift,\nby comparing the recipients stored in that report with the ones resolved now.",
+        "operationId": "version_impact_workspace_v1_package_versions__version_id__impact_get",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          },
+          {
+            "name": "against_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Against Id"
+            }
+          },
+          {
+            "name": "suite_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Suite Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/package-versions/{version_id}/validate": {
       "post": {
         "tags": [

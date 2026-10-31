@@ -20,8 +20,9 @@ nhiều dòng "chưa chạy" ở phần lịch sử bên dưới; phần lịch 
 - I03 (Core độc lập): dừng `workspace-web`, `workspace-api`, `workspace-worker`; tuyến `/workspace/`
   trả 502 nhưng `examples/core-client/main.py` (client `core-example`, namespace `equipment`) tạo
   schema, record, file và chạy workflow thành công qua gateway. Sau đó khởi động lại Workspace.
-- Chưa chạy trong lượt này: ONLYOFFICE với Document Server thật (I11–I13), backup/restore (I15),
-  outbox fault injection (I10), đo thu hồi quyền (I14).
+- Lượt 31/10/2026 (v0.2.2, Docker Desktop trên Windows, Document Server 8.3.3 thật, profile `office`, `ONLYOFFICE_ENABLED=true`): `GET /office/healthcheck` qua gateway trả `true`; đăng nhập `staff` qua Keycloak, tạo DOCX trống từ Kho tài liệu, mở trình soạn thảo thật (iframe `documenteditor`, giao diện tiếng Việt), gõ một câu tiếng Việt có dấu rồi đóng bằng "Về kho tài liệu". Sau vài giây Drive có phiên bản 2 (25 310 byte so với 929 byte của bản 1) và log `workspace-api` ghi `office/content` rồi `office/callback` trả 200. Chỉ một người dùng và một lần lưu; chưa kiểm hai người cùng sửa (I11), callback trùng/muộn/JWT sai với Document Server thật (I12), force-save và thu hồi quyền khi đang mở (I13), phông chữ tiếng Việt khi xuất. Chưa mở lại tệp để đối chiếu nội dung đã lưu. Playwright E2E cũ: 2/3 đạt; ca tạo hồ sơ bỏ qua điều kiện đầu vào vì DB mới chưa có biểu mẫu đã phát hành, không phải lỗi ứng dụng đã được xác nhận.
+- Còn chưa chạy: hai người cùng sửa (I11–I13),
+  outbox fault injection (I10), đo thu hồi quyền (I14). Backup/restore (I15) đã diễn tập một phần ngày 31/10, xem `docs/operations.md`.
 
 ### Kết quả đã chạy trên máy phát triển
 
@@ -167,17 +168,17 @@ nhiều dòng "chưa chạy" ở phần lịch sử bên dưới; phần lịch 
 | I02 | SSO Workspace/Core | State/nonce/PKCE, issuer/audience, CSRF/session hoạt động | Đã chạy 28/10: đăng nhập SSO qua Keycloak + gateway bằng Playwright; chưa kiểm riêng state/nonce/PKCE |
 | I03 | Core độc lập | Dừng Workspace, generic schema/record/file/run vẫn dùng được | Đã chạy 28/10: dừng Workspace, `examples/core-client` vẫn tạo schema/record/file/run |
 | I04 | Namespace | Token equipment không thấy workspace, body không đổi namespace | Cần API integration |
-| I05 | ACL và metadata | User ngoài quyền không đọc tên/snippet/bytes/version | Cần test quyền |
+| I05 | ACL và metadata | User ngoài quyền không đọc tên/snippet/bytes/version | Một phần 31/10: `test_access_matrix.py` (tệp, hồ sơ, công việc, tìm kiếm, báo cáo, tác nhân service); chưa phủ import evidence AI và token namespace khác phía Workspace |
 | I06 | Revision/idempotency | Retry cùng intent trả cùng kết quả; khác body 409 | Cần API tests |
 | I07 | File hold | File được submission pin không bị GC | Cần storage integration |
 | I08 | Hồ sơ | Tạo → gửi → trả lại → sửa → trình lại → duyệt có lịch sử/snapshot đúng | Một phần 28/10: E2E tạo hồ sơ nháp và tải lại; luồng gửi/trả lại/duyệt mới kiểm bằng pytest |
 | I09 | Concurrency | Hai decision cùng revision chỉ một có hiệu lực | Cần PostgreSQL thật |
 | I10 | Outbox crash | Kill sau tác động/trước ACK không tạo hai run/decision | Cần fault injection |
-| I11 | Office cộng tác | Hai user cùng document key, lưu bền vững đúng file/version | Cần Docs thật |
+| I11 | Office cộng tác | Hai user cùng document key, lưu bền vững đúng file/version | Một phần 31/10: một user mở, sửa, lưu thành phiên bản 2 qua Docs thật; chưa kiểm hai user |
 | I12 | Office callback | JWT sai bị từ chối, trùng không thêm version, muộn không overwrite | SQLite/HTTP contract đã kiểm; cần Docs thật |
 | I13 | Submit/save barrier | Đóng editor và nhận callback cuối trước submit; không âm thầm dùng bản cũ | Open-session barrier đã kiểm; chưa force-save, cần Docs thật |
 | I14 | Grant revocation | Download/API chặn theo cửa sổ đã công bố; không giả chặn URL tức thì | Cần đo |
-| I15 | Restore | Restore DB/objects/keys, references đúng, không replay action mù | Chưa diễn tập |
+| I15 | Restore | Restore DB/objects/keys, references đúng, không replay action mù | Một phần 31/10: dump/restore 3 DB và objects sang project riêng, số dòng và hash khớp, API lên healthy; chưa kiểm SSO, tải file qua API, workflow resume, outbox (xem docs/operations.md) |
 
 Backend test dùng SQLite hoặc in-process mock chỉ chứng minh đúng hành vi được
 kiểm trong môi trường đó; PostgreSQL concurrency cần kiểm riêng. Office mock callback
