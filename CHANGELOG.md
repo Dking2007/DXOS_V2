@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Added
+- Test API cho cổng phát hành gói nghiệp vụ (`test_packages.py`, 14 test: thiếu/không chạy/không đạt bộ thử, cấu hình đổi, quyền, bản đã phát hành bất biến) và ma trận quyền truy cập (`test_access_matrix.py`, 9 test: tệp, hồ sơ, công việc, tìm kiếm, báo cáo với người ngoài luồng và quản trị kỹ thuật). Chưa phát hiện lỗi rò rỉ; chưa phủ chat/bảng tin, đính kèm, Office callback và tác nhân service.
+- CI chạy thêm `packages/flowkit/tests` (56 test) và test Node của plugin `vn-document-format` (29 test), trước đây không được chạy.
+
 ## [0.2.2] - 2026-10-31
 
 ### Added
