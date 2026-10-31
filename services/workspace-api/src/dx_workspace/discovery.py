@@ -31,6 +31,7 @@ from .policies import (
     manages_department,
     permissions,
 )
+from .policies import is_overdue as case_overdue
 from .tasks import FINAL, aware, is_overdue, manages, visible
 from .text import fold, folded_positions, matches
 
@@ -328,6 +329,55 @@ def build_router(app):
             return [t for t in rows if manages(db, user, t)]
         return rows
 
+    def by_department(db, open_tasks, completed, cases, returns) -> list[dict]:
+        """The same figures per department, the way management reads them.
+
+        Tasks count for the department of the person doing them (or the unit they were sent to
+        while nobody has been named); dossiers for the department of the person who filed them.
+        """
+        names = {d.id: d.name for d in db.scalars(select(m.Department))}
+        rows: dict[str, dict] = {}
+
+        def row(department_id):
+            return rows.setdefault(
+                department_id or "",
+                {
+                    "department_id": department_id,
+                    "name": names.get(department_id, "Chưa thuộc phòng ban"),
+                    "tasks_open": 0,
+                    "tasks_overdue": 0,
+                    "tasks_completed": 0,
+                    "cases_total": 0,
+                    "cases_waiting": 0,
+                    "cases_overdue": 0,
+                    "returns": 0,
+                },
+            )
+
+        def task_department(task):
+            person = db.get(m.User, task.assignee_id) if task.assignee_id else None
+            return person.department_id if person and person.department_id else task.department_id
+
+        for task in open_tasks:
+            entry = row(task_department(task))
+            entry["tasks_open"] += 1
+            entry["tasks_overdue"] += int(is_overdue(task))
+        for task in completed:
+            row(task_department(task))["tasks_completed"] += 1
+        department_of = {}
+        for case in cases:
+            department_of[case.id] = case.department_id
+            entry = row(case.department_id)
+            entry["cases_total"] += 1
+            entry["cases_waiting"] += int(case.status in {"pending_workflow_start", "processing"})
+            entry["cases_overdue"] += int(case_overdue(case, db))
+        for item in returns:
+            row(department_of.get(item.case_id))["returns"] += 1
+        return sorted(
+            rows.values(),
+            key=lambda r: (-(r["tasks_overdue"] + r["cases_overdue"]), -r["tasks_open"], r["name"]),
+        )
+
     @router.get("/reports/overview", tags=["reports"])
     def overview(
         days: int = Query(30, ge=1, le=366),
@@ -384,6 +434,7 @@ def build_router(app):
             )
         ).one()
         result = {
+            "by_department": by_department(db, open_tasks, completed, cases, returns),
             "as_of": now,
             "period_days": days,
             "scope": scope,
@@ -471,6 +522,63 @@ def build_router(app):
             "﻿" + buffer.getvalue(),
             media_type="text/csv; charset=utf-8",
             headers={"Content-Disposition": 'attachment; filename="cong-viec.csv"'},
+        )
+
+    @router.get("/reports/cases.csv", tags=["reports"])
+    def cases_csv(db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        """Every dossier this person may see, with where it waits and whether it is late."""
+        user = user_for(db, actor)
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(
+            [
+                "ma_ho_so",
+                "ten_ho_so",
+                "mau",
+                "nguoi_lap",
+                "don_vi",
+                "trang_thai",
+                "luu_tru",
+                "buoc_dang_cho",
+                "nguoi_dang_xu_ly",
+                "han_buoc",
+                "qua_han",
+                "tao_luc",
+                "cap_nhat_luc",
+            ]
+        )
+        for case in db.scalars(select(m.Case).where(case_filter(db, user)).order_by(m.Case.number)):
+            form = db.get(m.Form, case.form_id)
+            owner = db.get(m.User, case.owner_id)
+            department = db.get(m.Department, case.department_id) if case.department_id else None
+            waiting = db.scalar(
+                select(m.ApprovalTask)
+                .where(m.ApprovalTask.case_id == case.id, m.ApprovalTask.state == "pending")
+                .order_by(m.ApprovalTask.step_index)
+                .limit(1)
+            )
+            approver = db.get(m.User, waiting.assignee_id) if waiting else None
+            writer.writerow(
+                [
+                    f"HS-{case.number:06d}",
+                    case.title,
+                    form.name if form else "",
+                    owner.display_name if owner else "",
+                    department.name if department else "",
+                    case.status,
+                    "x" if case.archived_at else "",
+                    waiting.label if waiting else "",
+                    approver.display_name if approver else "",
+                    waiting.due_at.isoformat() if waiting and waiting.due_at else "",
+                    "x" if case_overdue(case, db) else "",
+                    case.created_at.isoformat(),
+                    case.updated_at.isoformat() if case.updated_at else "",
+                ]
+            )
+        return Response(
+            "\ufeff" + buffer.getvalue(),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="ho-so.csv"'},
         )
 
     # The AI digest and report narrative read the same figures people see.

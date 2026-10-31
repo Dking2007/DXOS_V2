@@ -5702,6 +5702,26 @@
         }
       }
     },
+    "/workspace/v1/reports/cases.csv": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Cases Csv",
+        "description": "Every dossier this person may see, with where it waits and whether it is late.",
+        "operationId": "cases_csv_workspace_v1_reports_cases_csv_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/delegations": {
       "get": {
         "tags": [

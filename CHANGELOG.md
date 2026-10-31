@@ -7,6 +7,10 @@
 ## [Unreleased]
 
 ### Added
+- Báo cáo theo phòng ban: bảng "Tình hình từng đơn vị" (việc đang mở, quá hạn, hoàn tất trong kỳ; hồ sơ, đang chờ
+  duyệt, quá hạn, lần trả lại), phòng nhiều việc/hồ sơ quá hạn đứng đầu (`by_department` trong
+  `/reports/overview`). Xuất CSV hồ sơ (`GET /reports/cases.csv`): bước đang chờ, người đang xử lý, hạn bước, quá
+  hạn, chỉ những hồ sơ người tải được xem. 1 test.
 - 17 tính năng AI (migration `workspace_0016`), mô tả trong [docs/ai-features.md](docs/ai-features.md): đọc tài
   liệu để điền biểu mẫu (tạo căn cứ trường nguồn AI, câu trích phải có thật trong trang), tóm tắt hồ sơ cho
   người duyệt, soát hồ sơ trước khi trình, gợi ý ý kiến duyệt/lý do trả lại, soạn văn bản hành chính ra tệp
