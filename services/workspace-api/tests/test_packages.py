@@ -255,3 +255,101 @@ def test_package_without_unconditional_step_is_refused(world):
     assert response.status_code == 422
     assert response.json()["code"] == "unconditional_approver_required"
 
+
+
+def new_version(world, package, form, steps):
+    as_(world, "manager")
+    response = world[0].post(f"{BASE}/business-packages/{package['id']}/versions",
+                             json={"form_id": form["id"], "approval_steps": steps}, headers=key())
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def impact(world, candidate, baseline, suite_value):
+    response = world[0].get(f"{BASE}/package-versions/{candidate['id']}/impact",
+                            params={"against_id": baseline["id"], "suite_id": suite_value["id"]})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_impact_of_a_new_rule_shows_only_the_fixtures_it_changes(world):
+    users = world[7]
+    form = make_form(world)
+    first = {"label": "Cán bộ thẩm định", "resolver": "user", "user_id": users["staff"]}
+    package = create_package(world, form, approval_steps=[first])
+    baseline = package["version"]
+    # Candidate: a second approver only for amounts above 50.
+    candidate = new_version(world, package, form, [first, {
+        "label": "Giám đốc", "resolver": "user", "user_id": users["director"],
+        "condition": {"field": "amount", "operator": "gt", "value": 50}}])
+    small = {**case("Kinh phí nhỏ"), "decisions": {"review_0": {"decision": "approve"}}}
+    large = {**case("Kinh phí lớn"), "payload": {"reason": "Mua sắm", "amount": 100},
+             "decisions": {"review_0": {"decision": "approve"}}}
+    # The manager authors the suite and approves nothing, so no fixture is a self-approval.
+    stored = suite(world, baseline, [small, large])
+    report = impact(world, candidate, baseline, stored)
+    by_name = {item["name"]: item for item in report["items"]}
+    assert report["differences"] == {"rules": True, "form": False, "required_files": False}
+    assert report["effects_performed"] is False
+    assert report["summary"] == {"fixtures": 2, "changed": 1, "recipient_drift": 0}
+    assert by_name["Kinh phí nhỏ"]["changed"] is False
+    changed = by_name["Kinh phí lớn"]
+    assert changed["changed"] and "path" in changed["changes"] and changed["causes"] == ["rule"]
+    assert len(changed["candidate"]["path"]) > len(changed["baseline"]["path"])
+    # Rehearsal only: no new suite, report or version was created, and the version is still a draft.
+    assert len(world[0].get(f"{BASE}/package-versions/{baseline['id']}/test-suites").json()["items"]) == 1
+    assert world[0].get(f"{BASE}/package-versions/{baseline['id']}/simulation-reports").json()["items"] == []
+
+
+def test_impact_flags_recipients_that_moved_since_the_last_rehearsal(world):
+    from dx_workspace.models import Department, User
+
+    users = world[7]
+    form = make_form(world)
+    steps = [{"label": "Trưởng đơn vị", "resolver": "department_manager"}]
+    package = create_package(world, form, approval_steps=steps)
+    baseline = package["version"]
+    candidate = new_version(world, package, form, steps)  # identical rules
+    as_(world, "director")
+    stored = suite(world, baseline, [case("Hồ sơ phòng hành chính")])
+    simulate(world, baseline, stored)  # records who the role resolved to at this moment
+    quiet = impact(world, candidate, baseline, stored)
+    assert quiet["summary"] == {"fixtures": 1, "changed": 0, "recipient_drift": 0}
+    with Session(world[2]) as db:
+        department = db.get(Department, db.get(User, users["director"]).department_id)
+        department.manager_id = users["staff"]
+        db.commit()
+    moved = impact(world, candidate, baseline, stored)
+    item = moved["items"][0]
+    # The two versions still agree (same rules); what changed is who the role resolves to now.
+    assert item["changed"] is False and moved["differences"]["rules"] is False
+    assert moved["summary"]["recipient_drift"] == 1
+    assert item["recipient_drift"]["recorded"] != item["recipient_drift"]["now"]
+
+
+def test_impact_reports_errors_per_fixture_and_checks_ownership(world):
+    users = world[7]
+    form = make_form(world)
+    director = {"label": "Giám đốc", "resolver": "user", "user_id": users["director"]}
+    package = create_package(world, form, approval_steps=[director], required_file_count=0)
+    baseline = package["version"]
+    candidate = new_version(world, package, form, [director])
+    stored = suite(world, baseline, [case("Cần tài liệu", file_count=0)])
+    with Session(world[2]) as db:
+        from dx_workspace.models import PackageVersion
+        db.get(PackageVersion, candidate["id"]).required_file_count = 2
+        db.commit()
+    report = impact(world, candidate, baseline, stored)
+    item = report["items"][0]
+    assert report["differences"]["required_files"] is True
+    assert item["changed"] and item["candidate"]["error"]["code"] == "required_documents_missing"
+    assert item["baseline"]["state"] != "error"
+    # Another package's version is refused; so is anyone who cannot manage the package.
+    other = create_package(world, form, approval_steps=[director])["version"]
+    mismatch = world[0].get(f"{BASE}/package-versions/{other['id']}/impact",
+                            params={"against_id": baseline["id"], "suite_id": stored["id"]})
+    assert mismatch.status_code == 422 and mismatch.json()["code"] == "version_mismatch"
+    as_(world, "staff")
+    denied = world[0].get(f"{BASE}/package-versions/{candidate['id']}/impact",
+                          params={"against_id": baseline["id"], "suite_id": stored["id"]})
+    assert denied.status_code in (403, 404)

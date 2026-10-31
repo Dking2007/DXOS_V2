@@ -694,6 +694,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/v1/package-versions/{version_id}/impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Version Impact
+         * @description Run the same fixtures through two versions and say what changes, and why.
+         *
+         *     Read-only rehearsal: nothing is created, sent or published. Both versions are evaluated
+         *     against today's organisation, so a difference between them comes from the rules. Whether the
+         *     organisation moved since the baseline was last rehearsed is reported separately as drift,
+         *     by comparing the recipients stored in that report with the ones resolved now.
+         */
+        get: operations["version_impact_workspace_v1_package_versions__version_id__impact_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/package-versions/{version_id}/validate": {
         parameters: {
             query?: never;
@@ -4610,6 +4635,40 @@ export interface operations {
         parameters: {
             query: {
                 against_id: string;
+            };
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_impact_workspace_v1_package_versions__version_id__impact_get: {
+        parameters: {
+            query: {
+                against_id: string;
+                suite_id: string;
             };
             header?: never;
             path: {
