@@ -580,3 +580,68 @@ class PostAttachment(Base):
     kind: Mapped[str] = mapped_column(String(10))
     position: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AssistantConfig(Base):
+    """The single settings row for the help assistant (id is always "default")."""
+
+    __tablename__ = "assistant_config"
+    id: Mapped[str] = mapped_column(String(20), primary_key=True, default="default")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    welcome: Mapped[str] = mapped_column(Text, default="")
+    instructions: Mapped[str] = mapped_column(Text, default="")
+    suggestions: Mapped[list] = mapped_column(JSON, default=list)
+    daily_limit: Mapped[int] = mapped_column(Integer, default=50)
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AssistantProvider(Base):
+    """A configured LLM service. The API key is stored encrypted and never returned."""
+
+    __tablename__ = "assistant_providers"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    name: Mapped[str] = mapped_column(String(120))
+    kind: Mapped[str] = mapped_column(String(20))
+    model: Mapped[str] = mapped_column(String(120))
+    # Only for self-hosted gateways ("custom_*" kinds); official services use fixed endpoints.
+    base_url: Mapped[str | None] = mapped_column(String(300))
+    secret: Mapped[str] = mapped_column(Text, default="")
+    key_hint: Mapped[str] = mapped_column(String(12), default="")
+    max_output_tokens: Mapped[int] = mapped_column(Integer, default=2000)
+    active: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_test_ok: Mapped[bool | None] = mapped_column(Boolean)
+    last_test_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AssistantArticle(Base):
+    """One piece of knowledge the assistant answers from: a process, a how-to, an FAQ."""
+
+    __tablename__ = "assistant_articles"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    title: Mapped[str] = mapped_column(String(250))
+    category: Mapped[str] = mapped_column(String(20), default="guide")
+    body: Mapped[str] = mapped_column(Text)
+    published: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Where it came from: written by hand, or generated from a business package version.
+    source: Mapped[str] = mapped_column(String(20), default="manual")
+    source_ref: Mapped[str | None] = mapped_column(String(36), index=True)
+    author_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AssistantUsage(Base):
+    """Questions asked per person per day, for the daily limit."""
+
+    __tablename__ = "assistant_usage"
+    __table_args__ = (UniqueConstraint("user_id", "day"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    day: Mapped[str] = mapped_column(String(10))
+    count: Mapped[int] = mapped_column(Integer, default=0)

@@ -28,6 +28,7 @@ import CreateMenu from './components/shell/CreateMenu.vue'
 import MobileNav from './components/shell/MobileNav.vue'
 import NotificationPanel from './components/shell/NotificationPanel.vue'
 import OnboardingTour from './components/shell/OnboardingTour.vue'
+import AssistantWidget from './assistant/AssistantWidget.vue'
 const route = useRoute()
 const session = useSession()
 const sidebar = ref(false)
@@ -214,6 +215,7 @@ function toggleSidebarCollapsed() {
     <MobileNav v-if="!route.meta.wide" :counts="counts" @more="sidebar = true" />
     <CommandPalette ref="palette" />
     <OnboardingTour />
+    <AssistantWidget />
   </div>
   <AppToaster />
 </template>

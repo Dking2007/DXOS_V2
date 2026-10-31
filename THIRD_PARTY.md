@@ -33,12 +33,13 @@ MongoDB, HashiCorp Vault/Terraform, Camunda 8, Elasticsearch bản SSPL. Workflo
 - **ONLYOFFICE Docs — AGPL-3.0**: tùy chọn, mặc định tắt, chạy container riêng; giữ logo/thông báo của hãng.
 - **certifi — MPL-2.0**: dùng nguyên bản, không sửa tệp.
 
-## 2. Thư viện Python (54) — nguồn: PyPI, khóa trong `requirements.lock`
+## 2. Thư viện Python (62) — nguồn: PyPI, khóa trong `requirements.lock`
 
 | Gói | Phiên bản | Giấy phép (SPDX) | Cách dùng |
 |---|---|---|---|
 | alembic | 1.16.5 | MIT | thư viện (pip) |
 | annotated-types | 0.8.0 | MIT | thư viện (pip) |
+| anthropic | 2.3.0 | Apache-2.0 | thư viện (pip) |
 | anyio | 4.15.1 | MIT | thư viện (pip) |
 | attrs | 26.1.0 | MIT | thư viện (pip) |
 | boto3 | 1.40.44 | Apache-2.0 | thư viện (pip) |
@@ -48,19 +49,24 @@ MongoDB, HashiCorp Vault/Terraform, Camunda 8, Elasticsearch bản SSPL. Workflo
 | click | 8.5.0 | BSD-3-Clause | thư viện (pip) |
 | colorama | 0.4.6 | BSD-3-Clause | thư viện (pip) |
 | cryptography | 46.0.2 | Apache-2.0 OR BSD-3-Clause | thư viện (pip) |
+| docstring_parser | 0.18.0 | MIT | thư viện (pip) |
 | fastapi | 0.118.0 | MIT | thư viện (pip) |
 | greenlet | 3.5.6 | MIT AND PSF-2.0 | thư viện (pip) |
 | h11 | 0.16.0 | MIT | thư viện (pip) |
 | httpcore | 1.0.9 | BSD-3-Clause | thư viện (pip) |
+| httpcore2 | 2.16.0 | BSD-3-Clause | thư viện (pip) |
 | httptools | 0.9.0 | MIT | thư viện (pip) |
 | httpx | 0.28.1 | BSD-3-Clause | thư viện (pip) |
+| httpx2 | 2.16.0 | BSD-3-Clause | thư viện (pip) |
 | idna | 3.20 | BSD-3-Clause | thư viện (pip) |
 | iniconfig | 2.3.1 | MIT | thư viện (pip) |
+| jiter | 0.18.0 | MIT | thư viện (pip) |
 | jmespath | 1.1.0 | MIT | thư viện (pip) |
 | jsonschema | 4.25.1 | MIT | thư viện (pip) |
 | jsonschema-specifications | 2025.9.1 | MIT | thư viện (pip) |
 | Mako | 1.4.3 | MIT | thư viện (pip) |
 | MarkupSafe | 3.0.4 | BSD-3-Clause | thư viện (pip) |
+| opentelemetry-api | 1.45.2 | Apache-2.0 | thư viện (pip) |
 | packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | thư viện (pip) |
 | pluggy | 1.7.0 | MIT | thư viện (pip) |
 | psycopg | 3.2.10 | LGPL-3.0-only | thư viện (pip) |
@@ -81,8 +87,10 @@ MongoDB, HashiCorp Vault/Terraform, Camunda 8, Elasticsearch bản SSPL. Workflo
 | ruff | 0.13.3 | MIT | thư viện (pip) |
 | s3transfer | 0.14.0 | Apache-2.0 | thư viện (pip) |
 | six | 1.17.0 | MIT | thư viện (pip) |
+| sniffio | 1.3.1 | MIT OR Apache-2.0 | thư viện (pip) |
 | SQLAlchemy | 2.0.43 | MIT | thư viện (pip) |
 | starlette | 0.48.0 | BSD-3-Clause | thư viện (pip) |
+| truststore | 0.10.5 | MIT | thư viện (pip) |
 | typing-inspection | 0.4.4 | MIT | thư viện (pip) |
 | typing_extensions | 4.16.0 | PSF-2.0 | thư viện (pip) |
 | tzdata | 2026.5 | Apache-2.0 | thư viện (pip) |
@@ -92,7 +100,7 @@ MongoDB, HashiCorp Vault/Terraform, Camunda 8, Elasticsearch bản SSPL. Workflo
 | watchfiles | 1.3.0 | MIT | thư viện (pip) |
 | websockets | 17.2 | BSD-3-Clause | thư viện (pip) |
 
-## 3. Thư viện npm chạy trong sản phẩm (66)
+## 3. Thư viện npm chạy trong sản phẩm (67)
 
 | Gói | Phiên bản | Giấy phép (SPDX) | Cách dùng |
 |---|---|---|---|
@@ -103,6 +111,7 @@ MongoDB, HashiCorp Vault/Terraform, Camunda 8, Elasticsearch bản SSPL. Workflo
 | @fontsource/be-vietnam-pro | 5.1.1 | OFL-1.1 | thư viện (npm) |
 | @fontsource/source-sans-3 | 5.1.1 | OFL-1.1 | thư viện (npm) |
 | @jridgewell/sourcemap-codec | 1.6.0 | MIT | thư viện (npm) |
+| @lobehub/icons-static-svg | 1.95.0 | MIT | thư viện (npm) |
 | @napi-rs/canvas | 0.1.100 | MIT | thư viện (npm) |
 | @napi-rs/canvas-android-arm64 | 0.1.100 | MIT | thư viện (npm) |
 | @napi-rs/canvas-darwin-arm64 | 0.1.100 | MIT | thư viện (npm) |

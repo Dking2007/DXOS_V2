@@ -16,12 +16,14 @@ import {
   Moon,
   Newspaper,
   Search,
+  Sparkles,
   SquarePen,
 } from 'lucide-vue-next'
 import { api } from '../../api'
 import { useSession } from '../../stores/session'
 import { visibleGroups } from '../../ui/nav'
 import { cycleTheme } from '../../ui/theme'
+import { assistantOpen } from '../../assistant/state'
 
 interface Hit {
   type: string
@@ -103,6 +105,14 @@ const staticCommands = computed<Command[]>(() => {
         section: 'Đi tới',
         run: go(link.to),
       })
+  commands.push({
+    key: 'assistant',
+    label: 'Hỏi trợ lý AI',
+    hint: 'Quy trình nghiệp vụ, cách dùng phần mềm',
+    icon: Sparkles,
+    section: 'Tùy chỉnh',
+    run: () => (assistantOpen.value = true),
+  })
   commands.push({
     key: 'theme',
     label: 'Đổi giao diện sáng / tối',

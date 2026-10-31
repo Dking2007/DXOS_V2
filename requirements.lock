@@ -2,6 +2,7 @@
 # uvloop is Linux-only for uvicorn[standard]. No credentials or editable local paths.
 alembic==1.16.5
 annotated-types==0.8.0
+anthropic==2.3.0
 anyio==4.15.1
 attrs==26.1.0
 boto3==1.40.44
@@ -11,19 +12,24 @@ cffi==2.1.1
 click==8.5.0
 colorama==0.4.6
 cryptography==46.0.2
+docstring_parser==0.18.0
 fastapi==0.118.0
 greenlet==3.5.6
 h11==0.16.0
 httpcore==1.0.9
+httpcore2==2.16.0
 httptools==0.9.0
 httpx==0.28.1
+httpx2==2.16.0
 idna==3.20
 iniconfig==2.3.1
+jiter==0.18.0
 jmespath==1.1.0
 jsonschema==4.25.1
 jsonschema-specifications==2025.9.1
 Mako==1.4.3
 MarkupSafe==3.0.4
+opentelemetry-api==1.45.2
 packaging==26.3
 pluggy==1.7.0
 psycopg==3.2.10
@@ -44,8 +50,10 @@ rpds-py==2026.9.1
 ruff==0.13.3
 s3transfer==0.14.0
 six==1.17.0
+sniffio==1.3.1
 SQLAlchemy==2.0.43
 starlette==0.48.0
+truststore==0.10.5
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 tzdata==2026.5

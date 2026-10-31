@@ -89,6 +89,11 @@ export const router = createRouter({
       meta: { title: 'Thiết kế luồng', capability: 'automations.manage', wide: true },
     },
     {
+      path: '/assistant',
+      component: () => import('./views/AssistantAdminView.vue'),
+      meta: { title: 'Trợ lý AI', capability: 'assistant.manage' },
+    },
+    {
       path: '/packages',
       component: () => import('./views/PackagesView.vue'),
       meta: { title: 'Gói nghiệp vụ' },

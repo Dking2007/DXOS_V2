@@ -3,6 +3,7 @@
 import type { Component } from 'vue'
 import {
   BarChart3,
+  Bot,
   ClipboardCheck,
   Files,
   FolderClosed,
@@ -87,6 +88,13 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: PackageOpen,
         hint: 'Quy trình duyệt cho từng loại hồ sơ',
         capability: 'forms.manage',
+      },
+      {
+        to: '/assistant',
+        label: 'Trợ lý AI',
+        icon: Bot,
+        hint: 'Kiến thức và dịch vụ AI của trợ lý',
+        capability: 'assistant.manage',
       },
       { to: '/settings', label: 'Thiết lập', icon: Settings2, hint: 'Mẫu biểu, tổ chức, vai trò, giao diện' },
     ],
