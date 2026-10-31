@@ -13,7 +13,7 @@ interface ProcessMetrics {
   truncated: boolean
   overdue_cases: number
   returns: number
-  steps: { step: string; package_version_id: string | null; count: number; waiting: number; average_wait_hours: number | null; case_ids: string[] }[]
+  steps: { step: string; package_version_id: string | null; count: number; waiting: number; overdue: number; average_wait_hours: number | null; case_ids: string[] }[]
   suggestions: { kind: string; step?: string; sample_size: number; message: string; case_ids: string[] }[]
 }
 /** Where approvals wait longest, over the same period as the rest of the report. */
@@ -41,7 +41,7 @@ const maxWait = computed(() =>
       <template v-if="metrics.data.value?.sample_size">
         <p class="muted" style="font-size: 13px">Tính trên {{ metrics.data.value.sample_size }} lượt duyệt · {{ metrics.data.value.overdue_cases }} hồ sơ quá hạn · {{ metrics.data.value.returns }} lần trả lại<span v-if="metrics.data.value.truncated"> · chỉ lấy 2.000 lượt gần nhất</span></p>
         <div v-for="step in metrics.data.value.steps" :key="`${step.package_version_id}:${step.step}`" class="metric-row">
-          <div><strong>{{ step.step }}</strong><small>{{ step.count }} lượt · {{ step.waiting }} đang chờ</small>
+          <div><strong>{{ step.step }}</strong><small>{{ step.count }} lượt · {{ step.waiting }} đang chờ<span v-if="step.overdue" class="overdue-text"> · {{ step.overdue }} quá hạn</span></small>
             <div v-if="step.case_ids.length" class="metric-cases"><RouterLink v-for="(caseId, n) in step.case_ids" :key="caseId" :to="`/cases/${caseId}`">Hồ sơ {{ n + 1 }}</RouterLink></div>
           </div>
           <div>

@@ -96,7 +96,7 @@ export const router = createRouter({
     {
       path: '/packages',
       component: () => import('./views/PackagesView.vue'),
-      meta: { title: 'Gói nghiệp vụ' },
+      meta: { title: 'Quy trình' },
     },
     {
       path: '/:pathMatch(.*)*',

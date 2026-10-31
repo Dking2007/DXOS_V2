@@ -3183,6 +3183,151 @@
         }
       }
     },
+    "/workspace/v1/processes": {
+      "post": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Create Process",
+        "description": "Create the form, the package and its first version together, and publish them if asked.",
+        "operationId": "create_process_workspace_v1_processes_post",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/business-packages/{package_id}/revise": {
+      "post": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Revise Process",
+        "description": "Change a process. Forms never change in place, so this makes a new form and version.",
+        "operationId": "revise_process_workspace_v1_business_packages__package_id__revise_post",
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessRevise"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/processes/unpackaged-forms": {
+      "get": {
+        "tags": [
+          "business-packages"
+        ],
+        "summary": "Unpackaged Forms",
+        "description": "Forms made before processes existed, so they can be turned into one.",
+        "operationId": "unpackaged_forms_workspace_v1_processes_unpackaged_forms_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/cases/{case_id}/explanation": {
       "get": {
         "tags": [
@@ -8107,6 +8252,19 @@
                 "type": "null"
               }
             ]
+          },
+          "due_hours": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2160.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Hours"
           }
         },
         "additionalProperties": false,
@@ -9970,6 +10128,134 @@
           "payload"
         ],
         "title": "PreviewInput"
+      },
+      "ProcessCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 3000,
+            "title": "Description",
+            "default": ""
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FormField"
+            },
+            "type": "array",
+            "maxItems": 80,
+            "minItems": 1,
+            "title": "Fields"
+          },
+          "approval_steps": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalStep"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Approval Steps"
+          },
+          "required_file_count": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "Required File Count",
+            "default": 0
+          },
+          "allowed_roles": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "staff",
+                "manager",
+                "director",
+                "technical_admin"
+              ]
+            },
+            "type": "array",
+            "title": "Allowed Roles"
+          },
+          "publish": {
+            "type": "boolean",
+            "title": "Publish",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "fields",
+          "approval_steps"
+        ],
+        "title": "ProcessCreate",
+        "description": "Everything an administrator decides about one kind of dossier, on one screen."
+      },
+      "ProcessRevise": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 3000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FormField"
+            },
+            "type": "array",
+            "maxItems": 80,
+            "minItems": 1,
+            "title": "Fields"
+          },
+          "approval_steps": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalStep"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Approval Steps"
+          },
+          "required_file_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 30.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required File Count"
+          },
+          "publish": {
+            "type": "boolean",
+            "title": "Publish",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fields",
+          "approval_steps"
+        ],
+        "title": "ProcessRevise",
+        "description": "A change to a process: a new form and a new version; dossiers already filed keep theirs."
       },
       "ProviderInput": {
         "properties": {

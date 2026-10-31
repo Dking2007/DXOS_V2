@@ -12,6 +12,7 @@ import {
   PackageOpen,
   Paperclip,
   Play,
+  Pencil,
   Plus,
   Rocket,
   ShieldCheck,
@@ -27,6 +28,8 @@ import type { FormTemplate, User } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import ProcessDiagram from '../packages/ProcessDiagram.vue'
 import ScenarioEditor from '../packages/ScenarioEditor.vue'
+import ProcessWizard from '../processes/ProcessWizard.vue'
+import type { ProcessDraft } from '../processes/ProcessWizard.vue'
 import { useAi } from '../ai/useAi'
 import PackageDialog from '../packages/PackageDialog.vue'
 import {
@@ -215,7 +218,44 @@ function publish() {
     await client.invalidateQueries({ queryKey: ['business-packages'] })
   }, 'Đã phát hành. Hồ sơ mới tạo từ biểu mẫu này sẽ dùng phiên bản vừa phát hành.')
 }
+// Creating and changing a process happen in one wizard; the older dialog stays for turning a
+// form made before processes existed into one.
+const wizard = ref<{ mode: 'create' | 'revise'; initial?: ProcessDraft } | null>(null)
+const legacyForms = useQuery({
+  queryKey: ['processes', 'unpackaged-forms'],
+  queryFn: () => api.request<Page<FormTemplate>>('/processes/unpackaged-forms'),
+  enabled: canManage,
+})
+const legacyFormId = ref('')
+function reviseProcess() {
+  if (!selectedPackage.value || !selectedVersion.value || !versionForm.value) return
+  wizard.value = {
+    mode: 'revise',
+    initial: {
+      name: selectedPackage.value.name,
+      description: versionForm.value.description ?? '',
+      fields: structuredClone(versionForm.value.fields),
+      steps: structuredClone(selectedVersion.value.approval_steps),
+      files: selectedVersion.value.required_file_count,
+      roles: [...selectedPackage.value.allowed_roles],
+    },
+  }
+}
+async function saved(packageId: string) {
+  wizard.value = null
+  await client.invalidateQueries({ queryKey: ['business-packages'] })
+  await client.invalidateQueries({ queryKey: ['forms'] })
+  if (packageId !== selectedPackageId.value) selectedPackageId.value = packageId
+  else await refreshVersion()
+  selectedVersionId.value = ''
+}
+function convertForm(formId: string) {
+  legacyFormId.value = formId
+  dialog.value = 'package'
+}
 async function created(packageId: string) {
+  legacyFormId.value = ''
+  await client.invalidateQueries({ queryKey: ['processes', 'unpackaged-forms'] })
   dialog.value = null
   await client.invalidateQueries({ queryKey: ['business-packages'] })
   if (packageId !== selectedPackageId.value) selectedPackageId.value = packageId
@@ -281,11 +321,14 @@ const currentStage = computed(() => stages.value.findIndex((s) => !s.done))
   <header class="page-head">
     <div>
       <span class="eyebrow">THIẾT KẾ QUY TRÌNH</span>
-      <h1>Gói nghiệp vụ</h1>
-      <p>Mỗi gói quy định một loại hồ sơ: biểu mẫu, ai duyệt theo thứ tự nào, cần tài liệu gì. Kiểm tra cấu hình rồi phát hành; có thể chạy thử thêm nếu muốn.</p>
+      <h1>Quy trình</h1>
+      <p>
+        Mỗi quy trình quy định một loại hồ sơ: thông tin cần nhập, ai duyệt theo thứ tự nào và trong bao lâu, cần tài
+        liệu gì. Tạo và sửa ở cùng một chỗ; mỗi lần sửa là một phiên bản mới, hồ sơ đã lập giữ quy trình cũ.
+      </p>
     </div>
     <div v-if="canManage" class="page-actions">
-      <button class="button" @click="dialog = 'package'"><Plus :size="18" />Tạo gói</button>
+      <button class="button" @click="wizard = { mode: 'create' }"><Plus :size="18" />Tạo quy trình</button>
     </div>
   </header>
   <div v-if="error" class="notice error error-inline" role="alert">
@@ -299,11 +342,11 @@ const currentStage = computed(() => stages.value.findIndex((s) => !s.done))
       :loading="packages.isPending.value"
       :error="packages.error.value"
       :empty="packages.data.value?.items.length === 0"
-      title="Chưa có gói nghiệp vụ"
-      description="Tạo gói từ một biểu mẫu đã phát hành để quy định cách xử lý một loại hồ sơ."
+      title="Chưa có quy trình nào"
+      description="Tạo quy trình đầu tiên: thông tin cần nhập, các bước duyệt và thời hạn, tài liệu cần kèm."
       @retry="packages.refetch()"
-      ><button v-if="canManage" class="button small" @click="dialog = 'package'">
-        <Plus :size="16" />Tạo gói
+      ><button v-if="canManage" class="button small" @click="wizard = { mode: 'create' }">
+        <Plus :size="16" />Tạo quy trình
       </button></StatePanel
     >
   </section>
@@ -340,8 +383,8 @@ const currentStage = computed(() => stages.value.findIndex((s) => !s.done))
             <span v-if="versionForm"><ClipboardList :size="14" /> Biểu mẫu: {{ versionForm.name }}</span>
           </div>
         </div>
-        <button v-if="canManage" class="button secondary small" @click="dialog = 'version'">
-          <Plus :size="15" />Phiên bản mới
+        <button v-if="canManage && versionForm" class="button secondary small" @click="reviseProcess">
+          <Pencil :size="15" />Sửa quy trình
         </button>
       </header>
 
@@ -618,16 +661,44 @@ const currentStage = computed(() => stages.value.findIndex((s) => !s.done))
     </section>
   </div>
 
+  <section v-if="canManage && legacyForms.data.value?.items.length" class="card" style="margin-top: 20px">
+    <header class="card-header">
+      <div>
+        <h2>Biểu mẫu chưa thành quy trình</h2>
+        <p class="muted" style="font-size: 13px; margin-top: 4px">
+          Mẫu tạo trước khi có màn Quy trình. Hồ sơ vẫn dùng được; chuyển thành quy trình để quản lý phiên bản,
+          tài liệu bắt buộc và chạy thử ở một chỗ.
+        </p>
+      </div>
+    </header>
+    <div v-for="form in legacyForms.data.value.items" :key="form.id" class="list-row">
+      <div class="grow">
+        <p>{{ form.name }}</p>
+        <small>{{ form.fields.length }} trường · {{ form.approval_steps.length }} bước duyệt</small>
+      </div>
+      <button class="button secondary small" @click="convertForm(form.id)">Chuyển thành quy trình</button>
+    </div>
+  </section>
   <PackageDialog
     v-if="dialog"
     :mode="dialog"
     :package-id="selectedPackageId"
     :forms="(forms.data.value?.items ?? []).filter((f) => !f.state || f.state === 'published')"
     :templates="(packages.data.value?.items ?? []).filter((p) => p.active_version_id)"
-    :initial-form-id="dialog === 'version' ? selectedVersion?.form_id : undefined"
+    :initial-form-id="dialog === 'version' ? selectedVersion?.form_id : legacyFormId || undefined"
     :initial-files="dialog === 'version' ? selectedVersion?.required_file_count : 0"
     :user-name="userName"
     @close="dialog = null"
     @created="created"
+  />
+  <ProcessWizard
+    v-if="wizard"
+    :mode="wizard.mode"
+    :package-id="selectedPackageId"
+    :initial="wizard.initial"
+    :users="users.data.value?.items ?? []"
+    :user-name="userName"
+    @close="wizard = null"
+    @saved="saved"
   />
 </template>

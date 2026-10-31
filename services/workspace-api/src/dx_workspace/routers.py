@@ -139,7 +139,7 @@ def build_router(app):
         data["code"] = f"HS-{value.number:06d}"
         owner = db.get(m.User, value.owner_id)
         data["owner_name"] = owner.display_name if owner else ""
-        data["overdue"] = is_overdue(value)
+        data["overdue"] = is_overdue(value, db)
         form = db.get(m.Form, value.form_id)
         data["form_name"] = form.name if form else ""
         return data
@@ -1462,6 +1462,8 @@ def build_router(app):
             transform=transform,
         )
 
+    # The process screen creates a form and its package in one step.
+    app.state.create_form = create_form
     # Shared with the AI features, which save drafted documents the same way as uploads.
     app.state.save_upload = save_upload
     return router

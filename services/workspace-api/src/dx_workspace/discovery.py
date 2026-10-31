@@ -142,7 +142,8 @@ def build_router(app):
                 case.title if case else "Hồ sơ cần duyệt",
                 "decide",
                 f"/cases/{item.case_id}",
-                case.due_at if case else None,
+                # The step's own deadline comes first; older dossiers may only have one of their own.
+                item.due_at or (case.due_at if case else None),
                 item.label + (" · duyệt thay" if on_behalf else ""),
                 "pending",
             )

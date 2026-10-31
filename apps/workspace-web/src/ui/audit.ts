@@ -5,7 +5,7 @@ const SUBJECTS: Record<string, { label: string; route?: string }> = {
   case: { label: 'Hồ sơ', route: '/cases/' },
   task: { label: 'Công việc', route: '/tasks/' },
   automation: { label: 'Tự động hóa', route: '/automations/' },
-  package: { label: 'Gói nghiệp vụ' },
+  package: { label: 'Quy trình' },
   form: { label: 'Biểu mẫu' },
   file: { label: 'Tài liệu' },
   folder: { label: 'Thư mục' },

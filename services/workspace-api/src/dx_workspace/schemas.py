@@ -164,6 +164,8 @@ class ApprovalStep(Input):
     resolver: Literal["user", "department_manager"]
     user_id: str | None = None
     condition: Condition | None = None
+    # How long the approver has, counted from when the step reaches them. Empty means no deadline.
+    due_hours: int | None = Field(default=None, ge=1, le=24 * 90)
 
     @model_validator(mode="after")
     def user_required(self):

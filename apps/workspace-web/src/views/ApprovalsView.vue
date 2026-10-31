@@ -82,6 +82,10 @@ const tasks = useQuery({
     ),
   refetchInterval: 20_000,
 })
+/** The deadline the process set for this step has passed. */
+function stepLate(task: { due_at?: string | null; state?: string; status?: string }) {
+  return !!task.due_at && new Date(task.due_at).getTime() < Date.now() && (task.state || task.status) === 'pending'
+}
 </script>
 <template>
   <header class="page-head">
@@ -121,6 +125,7 @@ const tasks = useQuery({
             <th>Hồ sơ</th>
             <th>Bước xử lý</th>
             <th>Thời gian nhận</th>
+            <th>Hạn xử lý</th>
             <th>Trạng thái</th>
             <th />
           </tr>
@@ -145,6 +150,9 @@ const tasks = useQuery({
             </td>
             <td>{{ task.label || task.step_label || 'Phê duyệt' }}</td>
             <td class="muted">{{ formatDate(task.created_at, true) }}</td>
+            <td :class="{ 'overdue-text': stepLate(task) }">
+              {{ task.due_at ? formatDate(task.due_at, true) : '—' }}<template v-if="stepLate(task)"> · quá hạn</template>
+            </td>
             <td>
               <StatusBadge :status="task.status || task.state || 'pending'" />
             </td>

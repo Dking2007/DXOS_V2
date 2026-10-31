@@ -15,6 +15,7 @@ def test_chain_is_linear_with_one_head():
     revisions = list(directory.walk_revisions())
     assert revisions, "No migrations found."
     assert [revision.revision for revision in revisions] == [
+        "workspace_0017",
         "workspace_0016",
         "workspace_0015",
         "workspace_0014",

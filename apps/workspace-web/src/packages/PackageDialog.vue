@@ -2,7 +2,6 @@
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { RouterLink } from 'vue-router'
 import { ArrowLeft, ArrowRight, Check, Copy, FileText } from 'lucide-vue-next'
 import { api } from '../api'
 import { errorText, newIntent } from '@dx/web-shared/api.ts'
@@ -33,7 +32,7 @@ const roles = ref<string[]>([])
 const busy = ref(false)
 const error = ref<unknown>(null)
 const form = computed(() => props.forms.find((f) => f.id === formId.value))
-const titles = ['Thông tin gói', 'Chọn biểu mẫu', 'Quy định khi trình']
+const titles = ['Thông tin quy trình', 'Chọn biểu mẫu', 'Quy định khi trình']
 const canNext = computed(() =>
   stepIndex.value === 0 ? !!name.value.trim() : stepIndex.value === 1 ? !!form.value : true,
 )
@@ -72,7 +71,7 @@ async function submit() {
         headers: { 'Idempotency-Key': newIntent() },
         body: JSON.stringify({ version_id: source.active_version_id, name: name.value.trim() }),
       })
-      toast.success('Đã tạo gói từ mẫu có sẵn')
+      toast.success('Đã tạo quy trình từ mẫu có sẵn')
       emit('created', created.id)
     } else {
       const created = await api.request<{ id: string }>('/business-packages', {
@@ -86,7 +85,7 @@ async function submit() {
           allowed_roles: roles.value,
         }),
       })
-      toast.success('Đã tạo gói nghiệp vụ')
+      toast.success('Đã tạo quy trình')
       emit('created', created.id)
     }
   } catch (cause) {
@@ -97,7 +96,7 @@ async function submit() {
 }
 </script>
 <template>
-  <ModalDialog :title="mode === 'version' ? 'Tạo phiên bản mới' : 'Tạo gói nghiệp vụ'" wide @close="close">
+  <ModalDialog :title="mode === 'version' ? 'Tạo phiên bản mới' : 'Chuyển biểu mẫu thành quy trình'" wide @close="close">
     <ol v-if="mode === 'package' && !template" class="wizard-steps">
       <li v-for="(title, index) in titles" :key="title" :class="{ done: index < stepIndex, current: index === stepIndex }">
         <span>{{ index < stepIndex ? '✓' : index + 1 }}</span>{{ title }}
@@ -107,7 +106,7 @@ async function submit() {
 
     <div v-if="stepIndex === 0" class="stack">
       <div class="field">
-        <label for="pkg-name">Tên gói<span class="required"> *</span></label
+        <label for="pkg-name">Tên quy trình<span class="required"> *</span></label
         ><input id="pkg-name" v-model="name" maxlength="200" placeholder="Ví dụ: Đề nghị mua sắm thiết bị" autofocus />
       </div>
       <div class="field">
@@ -131,14 +130,14 @@ async function submit() {
             <Copy :size="18" /><strong>{{ item.name }}</strong><small>Sao chép cấu hình đang dùng</small>
           </button>
         </div>
-        <small v-if="template">Bản sao là gói nháp riêng; cần kiểm tra và chạy thử lại trước khi phát hành.</small>
+        <small v-if="template">Bản sao là quy trình nháp riêng; cần kiểm tra và chạy thử lại trước khi phát hành.</small>
       </div>
     </div>
 
     <div v-else-if="stepIndex === 1" class="stack">
       <p class="muted">
-        Biểu mẫu quyết định trường thông tin và các bước duyệt. Muốn đổi điều kiện hay người duyệt, sửa biểu mẫu trong
-        <RouterLink to="/settings">Thiết lập</RouterLink> rồi tạo phiên bản mới.
+        Biểu mẫu quyết định trường thông tin và các bước duyệt. Sau khi tạo, đổi trường hay bước duyệt bằng nút
+        “Sửa quy trình”.
       </p>
       <div v-if="!forms.length" class="notice warning">Chưa có biểu mẫu đã phát hành.</div>
       <div class="choice-grid">
@@ -158,7 +157,7 @@ async function submit() {
         <span class="section-label">Quy trình duyệt của biểu mẫu này</span>
         <ProcessDiagram :steps="form.approval_steps" :fields="form.fields" :required-files="requiredFiles" :user-name="userName" />
         <div v-if="!unconditional" class="notice warning">
-          Mọi bước đều có điều kiện — gói cần ít nhất một bước luôn áp dụng để hồ sơ nào cũng có người duyệt.
+          Mọi bước đều có điều kiện — quy trình cần ít nhất một bước luôn áp dụng để hồ sơ nào cũng có người duyệt.
         </div>
       </template>
     </div>

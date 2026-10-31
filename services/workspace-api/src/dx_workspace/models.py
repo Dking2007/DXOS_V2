@@ -231,6 +231,8 @@ class ApprovalTask(Base):
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Who actually decided; differs from assignee_id only under an active delegation.
     decided_by_id: Mapped[str | None] = mapped_column(String(36))
+    # Set from the step's due_hours when the step reaches its approver.
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

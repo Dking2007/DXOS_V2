@@ -19,6 +19,8 @@ export interface ApprovalStep {
   resolver: 'user' | 'department_manager'
   user_id?: string
   condition?: Condition
+  /** How long the approver has once the dossier reaches this step; empty means no deadline. */
+  due_hours?: number | null
 }
 export interface FormTemplate {
   id: string
@@ -129,6 +131,8 @@ export interface Submission {
 export interface ApprovalTask {
   id: string
   case_id: string
+  /** From the step's deadline, set when the step reached its approver. */
+  due_at?: string | null
   case_title?: string
   case_code?: string
   case_number?: string

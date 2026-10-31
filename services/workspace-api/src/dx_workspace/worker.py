@@ -91,6 +91,7 @@ def sync_tasks(db: Session, core: CoreClient, submission: Submission):
                 label=step["label"],
                 core_task_id=item["id"],
                 core_revision=item.get("revision", 1),
+                due_at=utcnow() + timedelta(hours=step["due_hours"]) if step.get("due_hours") else None,
             )
             db.add(task)
             db.flush()

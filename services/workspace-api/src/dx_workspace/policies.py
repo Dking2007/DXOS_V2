@@ -140,13 +140,34 @@ def case_filter(db: Session, user: User):
     return alive & or_(own, participating)
 
 
-def is_overdue(value: Case) -> bool:
+def step_overdue(task) -> bool:
+    """A pending approval step past the deadline its process gives it."""
+    from .models import utcnow
+
+    if task.state != "pending" or not task.due_at:
+        return False
+    due = task.due_at if task.due_at.tzinfo else task.due_at.replace(tzinfo=UTC)
+    return due < utcnow()
+
+
+def is_overdue(value: Case, db: Session | None = None) -> bool:
     """True when an unfinished dossier has passed its due date.
+
+    With a session, a pending approval step past its own deadline also counts: the deadline
+    of each step comes from the process, not from whoever filed the dossier.
 
     A driver that returns naive timestamps (SQLite in tests) has them read back as UTC,
     since that is the timezone every value is written in; comparing without normalizing
     would raise instead of answering.
     """
+    if db is not None and value.status in {"processing", "pending_workflow_start"} and not value.archived_at:
+        if any(
+            step_overdue(task)
+            for task in db.scalars(
+                select(ApprovalTask).where(ApprovalTask.case_id == value.id, ApprovalTask.state == "pending")
+            )
+        ):
+            return True
     if not value.due_at or value.archived_at or value.status in {"approved", "rejected", "cancelled"}:
         return False
     from .models import utcnow
@@ -348,6 +369,7 @@ def resolve_steps(db: Session, case: Case, form, payload: dict) -> list[dict]:
                 "user_id": user.id,
                 "subject": user.subject,
                 "display_name": user.display_name,
+                "due_hours": step.get("due_hours"),
             }
         )
     if not result:

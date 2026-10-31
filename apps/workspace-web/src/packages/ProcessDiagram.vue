@@ -1,7 +1,8 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
-import { FilePlus2, Flag, GitBranch, Paperclip, UserCheck } from 'lucide-vue-next'
+import { Clock, FilePlus2, Flag, GitBranch, Paperclip, UserCheck } from 'lucide-vue-next'
+import { deadlineText } from '../processes/deadline'
 import type { ApprovalStep, FormField } from '@dx/web-shared/types.ts'
 import { conditionText, formatValue, resolverText } from './model'
 import type { RoutingEvidence } from './model'
@@ -41,6 +42,7 @@ function evidenceAt(index: number) {
       <div>
         <strong>{{ step.label }}</strong>
         <small><UserCheck :size="12" /> {{ resolverText(step, userName) }}</small>
+        <small v-if="step.due_hours"><Clock :size="12" /> {{ deadlineText(step.due_hours) }}</small>
         <span v-if="step.condition" class="process-condition"
           ><GitBranch :size="12" /> Chỉ khi {{ conditionText(step.condition, fields) }}</span
         >
