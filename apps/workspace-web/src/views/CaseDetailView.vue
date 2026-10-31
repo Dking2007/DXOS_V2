@@ -22,6 +22,7 @@ import {
   MessagesSquare,
   Paperclip,
   Pencil,
+  Plus,
   RotateCcw,
   Save,
   Undo2,
@@ -124,6 +125,8 @@ const fieldEvidence = useQuery({
   queryKey: ['field-evidence', id],
   queryFn: () => api.request<Page<FieldEvidence>>(`/cases/${id}/field-evidence`),
 })
+// The manual form is rarely needed now that AI proposes evidence; it stays one click away.
+const manualEvidence = ref(false)
 const evidenceField = ref('')
 const evidenceFile = ref('')
 const evidencePage = ref(1)
@@ -141,6 +144,7 @@ async function addEvidence() {
         suggested_value: parseValue(evidenceValue.value) }),
     })
     evidenceQuote.value = ''
+    manualEvidence.value = false
     await queryClient.invalidateQueries({ queryKey: ['field-evidence', id] })
   } catch (cause) { error.value = cause } finally { busy.value = false }
 }
@@ -815,8 +819,20 @@ function moveTab(step: number) {
                 Điền {{ confirmedEvidence.length }} giá trị đã xác nhận vào biểu mẫu
               </button></header>
             <div class="card-body">
-              <p class="muted">Ghi lại một giá trị lấy từ trang nào của tài liệu để người duyệt dễ đối chiếu. Chỉ người tạo hồ sơ xác nhận; việc xác nhận không tự sửa biểu mẫu.</p>
-              <div v-if="canEdit" class="form-grid">
+              <p class="muted">
+                Mỗi giá trị trong biểu mẫu có thể kèm căn cứ: lấy từ trang nào, câu nào của tài liệu đính kèm, để người duyệt
+                đối chiếu. Đề xuất do AI đọc tài liệu hiện ở đây để bạn xác nhận; việc xác nhận không tự sửa biểu mẫu.
+              </p>
+              <button
+                v-if="canEdit && !manualEvidence"
+                type="button"
+                class="button ghost small"
+                style="justify-self: start; margin-bottom: 10px"
+                @click="manualEvidence = true"
+              >
+                <Plus :size="15" />Thêm căn cứ thủ công
+              </button>
+              <div v-if="canEdit && manualEvidence" class="form-grid">
                 <div class="field"><label for="evidence-field">Mục trong biểu mẫu</label><select id="evidence-field" v-model="evidenceField"><option value="">Chọn mục</option><option v-for="field in detail.data.value.form.fields" :key="field.key" :value="field.key">{{ field.label }}</option></select></div>
                 <div class="field"><label for="evidence-file">Tài liệu gốc</label><select id="evidence-file" v-model="evidenceFile"><option value="">Chọn tài liệu</option><option v-for="file in detail.data.value.files" :key="file.id" :value="file.id">{{ file.name }}</option></select></div>
                 <div class="field"><label for="evidence-page">Trang</label><input id="evidence-page" v-model.number="evidencePage" type="number" min="1" /></div>

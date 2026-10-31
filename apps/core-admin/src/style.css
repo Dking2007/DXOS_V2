@@ -241,3 +241,12 @@
     margin: 30px 17px;
   }
 }
+
+.console-scope-note {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fff7e6;
+  color: #6b4a00;
+  font-size: 13px;
+}

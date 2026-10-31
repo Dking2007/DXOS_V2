@@ -47,6 +47,9 @@
 - CI chạy thêm `packages/flowkit/tests` (56 test) và test Node của plugin `vn-document-format` (29 test), trước đây không được chạy.
 
 ### Changed
+- Hồ sơ: form nhập tay "Đối chiếu với tài liệu gốc" ẩn sau nút "Thêm căn cứ thủ công"; phần chính là các
+  đề xuất chờ xác nhận. Liên kết tới console Core đổi tên thành "Bảng điều khiển kỹ thuật" (vẫn chỉ hiện cho
+  Quản trị kỹ thuật); console ghi rõ là công cụ nền tảng và chỉ chỗ xem nhật ký nghiệp vụ.
 - Gọn chức năng trùng lặp (rà soát ngày 31/10/2026):
   - **Bước duyệt chỉ khai báo ở biểu mẫu.** Gói nghiệp vụ không nhận `approval_steps` riêng nữa;
     mỗi phiên bản gói chụp lại bước duyệt của biểu mẫu (giao diện vốn đã làm vậy, chỉ API cho ghi đè).
