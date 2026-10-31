@@ -17,6 +17,8 @@ import {
 import { api } from '../api'
 import { useSession } from '../stores/session'
 import ProcessWaitCard from '../components/ProcessWaitCard.vue'
+import NarrativeCard from '../ai/NarrativeCard.vue'
+import { useAi } from '../ai/useAi'
 import { formatDate, formatSize } from '@dx/web-shared/api.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
@@ -47,6 +49,7 @@ interface Overview {
   automations?: { failed_in_period: number; enabled_rules: number }
 }
 const session = useSession()
+const ai = useAi()
 const canSeeProcess = computed(
   () => session.can('cases.read.department') || session.can('cases.read.organization'),
 )
@@ -103,6 +106,7 @@ function bars(record: Record<string, number>) {
       Cập nhật lúc {{ formatDate(data.as_of, true) }} (tính khi tải trang, không phải thời gian
       thực).
     </p>
+    <NarrativeCard v-if="ai.on('report_narrative')" :days="days" :scope="scope" />
     <div class="stat-grid">
       <RouterLink to="/tasks?scope=all&status=assigned,accepted,in_progress,blocked,returned,submitted" class="stat-tile">
         <span class="stat-icon"><ListChecks :size="21" /></span>

@@ -12,6 +12,7 @@ from dx_platform.errors import AppError
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from . import ai_core, ai_index
 from .automations import deliver_webhook, dispatch, resume
 from .config import get_settings
 from .core_client import CoreClient
@@ -250,6 +251,7 @@ def sync_folder_subtree(db: Session, core: CoreClient, settings, folder_id: str)
 
 def process_once(engine, settings, core=None) -> bool:
     core = core or CoreClient(settings)
+    ai_core.use_settings(settings)
     with Session(engine) as db:
         now = utcnow()
         job = db.scalar(
@@ -288,6 +290,8 @@ def process_once(engine, settings, core=None) -> bool:
                 deliver_webhook(db, settings, job.payload)
             elif job.kind == "automation.resume":
                 resume(db, job.payload)
+            elif job.kind == "ai.index":
+                ai_index.run_job(db, settings, core, job.payload)
             else:
                 raise AppError(422, "unknown_outbox_event", "Loại sự kiện chưa được đăng ký.")
             job.state, job.error, job.lease_until = "sent", None, None

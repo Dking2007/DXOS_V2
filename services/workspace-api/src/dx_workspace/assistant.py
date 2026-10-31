@@ -22,9 +22,11 @@ from pydantic import Field, model_validator
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from . import ai_core
 from . import assistant_llm as llm
 from . import models as m
 from . import schemas as s
+from .ai import personal_context
 from .assistant_kb import CATEGORIES, chunk_article, fold, package_article, search
 from .policies import ROLE_TEMPLATES, current_user, permissions, require
 from .services import audit, check_revision, page
@@ -102,6 +104,8 @@ class ModelsQuery(s.Input):
     api_key: str = Field(default="", max_length=500)
     # When editing, the stored address and key are used for whatever the form leaves blank.
     provider_id: str | None = None
+    # "embed" lists the models that make vectors for search by meaning.
+    purpose: Literal["chat", "embed"] = "chat"
 
 
 class ArticleInput(s.Input):
@@ -308,6 +312,14 @@ def build_router(app):
             + f"\nNgười đang hỏi: {user.display_name} ({role}).\n\nTài liệu tham khảo:\n"
             + (sources or "(Không tìm thấy tài liệu nào liên quan đến câu hỏi.)")
         )
+        if "assistant_my_data" in ai_core.enabled_features(db):
+            # Only the asker's own dossiers, tasks and pending approvals: what they could open anyway.
+            system += (
+                "\n\nNgoại lệ cho quy tắc trên: bạn được xem dữ liệu công việc của chính người đang hỏi "
+                "dưới đây (trong thẻ <du_lieu_cua_ban>) để trả lời câu hỏi về hồ sơ, công việc của họ. "
+                "Không suy ra điều không có trong đó.\n"
+                f"<du_lieu_cua_ban>\n{personal_context(db, user)}\n</du_lieu_cua_ban>"
+            )
         # Release the database before waiting up to a minute on the AI service.
         db.commit()
         reply = ask(provider, system, [t.model_dump() for t in body.messages])
@@ -441,7 +453,7 @@ def build_router(app):
 
     @router.post("/assistant/models")
     def models(body: ModelsQuery, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
-        """Ask a self-hosted server (or chat gateway) which models it serves."""
+        """Ask a service which models it offers, using the stored key when the form leaves it blank."""
         manager(db, actor)
         stored = get_provider(db, body.provider_id) if body.provider_id else None
         if stored and stored.kind != body.kind:
@@ -456,6 +468,7 @@ def build_router(app):
                 api_key,
                 allowed_hosts(),
                 transport=getattr(app.state, "assistant_transport", None),
+                purpose=body.purpose,
             )
         except llm.LlmError as exc:
             status = 422 if exc.code.startswith(("assistant_url", "assistant_models")) else 502

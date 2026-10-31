@@ -27,6 +27,7 @@ import {
   Undo2,
   Send,
   ShieldCheck,
+  Sparkles,
   Trash2,
   XCircle,
 } from 'lucide-vue-next'
@@ -55,6 +56,8 @@ import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import SchemaForm from '@dx/web-shared/components/SchemaForm.vue'
 import TaskCreateDialog from '../components/TaskCreateDialog.vue'
+import CaseAiPanel from '../ai/CaseAiPanel.vue'
+import { useAi } from '../ai/useAi'
 import { OPERATORS } from '../flow/nodes'
 import { toast } from '../ui/toast'
 import { previewKind } from '../ui/preview'
@@ -286,6 +289,33 @@ function askClosing(action: Closing) {
   closing.value = action
   closingReason.value = ''
   error.value = null
+}
+const ai = useAi()
+const drafting = ref(false)
+/** Let AI draft the approval note or return reason; the person edits it before confirming. */
+async function draftReason() {
+  if (!confirmation.value || !['approve', 'reject', 'return'].includes(confirmation.value)) return
+  drafting.value = true
+  try {
+    const result = await api.request<{ text: string }>(`/ai/cases/${id}/decision-draft`, {
+      method: 'POST',
+      body: JSON.stringify({ decision: confirmation.value, notes: reason.value }),
+    })
+    reason.value = result.text
+  } catch (cause) {
+    toast.error(cause)
+  } finally {
+    drafting.value = false
+  }
+}
+const confirmedEvidence = computed(() =>
+  (fieldEvidence.data.value?.items ?? []).filter((item) => item.review_state === 'confirmed' && item.confirmed_value),
+)
+/** Put the values the author confirmed against the source documents into the form. */
+function fillConfirmed() {
+  startEdit()
+  for (const item of confirmedEvidence.value) payload.value[item.field_key] = item.confirmed_value!.value
+  toast.success(`Đã điền ${confirmedEvidence.value.length} giá trị vào biểu mẫu. Kiểm tra rồi bấm “Lưu bản nháp”.`)
 }
 const showTask = ref(false)
 async function taskCreated(task: Task) {
@@ -684,6 +714,12 @@ function moveTab(step: number) {
         role="tabpanel"
         :aria-labelledby="`case-tab-${tab}`"
       >
+        <CaseAiPanel
+          v-if="tab === 'info' && !editing"
+          :case-id="id"
+          :can-edit="canEdit"
+          :files="(detail.data.value.files ?? []).map((file) => ({ id: file.id, name: file.name }))"
+        />
         <section v-if="tab === 'info'" class="card">
           <header class="card-header">
             <h2>Thông tin hồ sơ</h2>
@@ -774,7 +810,10 @@ function moveTab(step: number) {
             /></template>
           </section>
           <section class="card">
-            <header class="card-header"><div><span class="eyebrow">KIỂM TRA SỐ LIỆU</span><h2>Đối chiếu với tài liệu gốc</h2></div></header>
+            <header class="card-header"><div><span class="eyebrow">KIỂM TRA SỐ LIỆU</span><h2>Đối chiếu với tài liệu gốc</h2></div
+              ><button v-if="canEdit && confirmedEvidence.length && !editing" class="button secondary small" @click="fillConfirmed">
+                Điền {{ confirmedEvidence.length }} giá trị đã xác nhận vào biểu mẫu
+              </button></header>
             <div class="card-body">
               <p class="muted">Ghi lại một giá trị lấy từ trang nào của tài liệu để người duyệt dễ đối chiếu. Chỉ người tạo hồ sơ xác nhận; việc xác nhận không tự sửa biểu mẫu.</p>
               <div v-if="canEdit" class="form-grid">
@@ -1090,7 +1129,16 @@ function moveTab(step: number) {
               :required="confirmation !== 'approve' && confirmation !== 'withdraw'"
               :disabled="busy"
               placeholder="Ghi rõ nội dung cần lưu ý…"
-            /></div
+            /><button
+              v-if="ai.on('decision_draft') && myTask && ['approve', 'reject', 'return'].includes(confirmation ?? '')"
+              type="button"
+              class="button secondary small ai-action"
+              style="justify-self: start; margin-top: 6px"
+              :disabled="drafting || busy"
+              @click="draftReason"
+            >
+              <Sparkles :size="14" />{{ drafting ? 'AI đang soạn…' : reason ? 'Soạn lại bằng AI (dựa trên ghi chú)' : 'Gợi ý bằng AI' }}
+            </button></div
         ></template>
       </div>
       <div class="form-actions">

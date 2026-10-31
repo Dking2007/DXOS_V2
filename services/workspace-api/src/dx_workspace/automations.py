@@ -28,6 +28,7 @@ from pydantic import Field, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from . import ai_core
 from . import models as m
 from . import schemas as s
 from .feed import can_see as can_see_post
@@ -83,7 +84,7 @@ SAMPLES = {
     "case": {"title": "Đề xuất mua sắm thiết bị", "status": "approved", "priority": "high"},
     "post": {"audience": "organization", "official": True},
 }
-NODE_TYPES = {"trigger", "if", "notify", "create_task", "webhook", "wait"}
+NODE_TYPES = {"trigger", "if", "notify", "create_task", "webhook", "wait", "ai"}
 ROLE_RECIPIENTS = {"assignee", "creator", "owner", "author", "department_manager"}
 MAX_CHAIN = 3
 MAX_NODES = 40
@@ -136,6 +137,15 @@ class WaitData(s.Input):
     minutes: int = Field(default=60, ge=1, le=60 * 24 * 7)
 
 
+class AiData(s.Input):
+    """Ask AI to put the event in one of a few groups; a later condition branches on the answer."""
+
+    question: str = Field(default="", max_length=500)
+    choices: list[str] = Field(default_factory=list, max_length=8)
+    # The answer is stored under this name, so an "if" node can test e.g. ai_label eq "Gấp".
+    output: str = Field(default="ai_label", pattern=r"^[a-z_]{1,40}$")
+
+
 DATA_MODELS = {
     "trigger": TriggerData,
     "if": IfData,
@@ -143,6 +153,7 @@ DATA_MODELS = {
     "create_task": CreateTaskData,
     "webhook": WebhookData,
     "wait": WaitData,
+    "ai": AiData,
 }
 
 
@@ -412,6 +423,14 @@ def validate_graph(db: Session, settings, graph: dict) -> list[dict]:
                     check_url(settings, urljoin(connection.base_url, data.path))
                 except AppError as exc:
                     fail(node_id, exc.detail)
+        elif kind == "ai":
+            choices = [c.strip() for c in data.choices if c.strip()]
+            if not data.question.strip() or len(choices) < 2 or len(set(choices)) != len(choices):
+                fail(node_id, "Nhập câu hỏi và ít nhất hai lựa chọn khác nhau.")
+            if "automation_ai" not in ai_core.enabled_features(db):
+                fail(node_id, "Tính năng “Hỏi AI trong luồng” chưa được bật trong màn Trợ lý AI.")
+            if not outgoing.get(node_id):
+                fail(node_id, "Nối bước tiếp theo, thường là một node Điều kiện dùng kết quả AI.")
         elif kind == "wait" and not outgoing.get(node_id):
             fail(node_id, "Nối bước sẽ chạy sau khi chờ.")
     return errors
@@ -505,6 +524,16 @@ class Execution:
             branch = "true" if passed else "false"
             self.record(node, "succeeded", branch=branch, results=results)
             return self.successors(node["id"], branch)
+        if kind == "ai":
+            choices = [c.strip() for c in data.get("choices", []) if c.strip()]
+            try:
+                label = ai_core.classify(self.db, ai_core.runtime_settings(), data.get("question", ""), choices, self.data)
+            except AppError as exc:
+                self.record(node, "failed", error=exc.code, message=exc.detail)
+                return []
+            self.data = {**self.data, data.get("output") or "ai_label": label}
+            self.record(node, "succeeded", output=data.get("output") or "ai_label", value=label)
+            return self.successors(node["id"])
         if kind == "wait":
             minutes = int(data.get("minutes", 60))
             following = self.successors(node["id"])

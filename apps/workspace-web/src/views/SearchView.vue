@@ -4,11 +4,12 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
-import { Files, FileText, ListChecks, MessageSquare, Newspaper, Search } from 'lucide-vue-next'
+import { Files, FileText, ListChecks, MessageSquare, Newspaper, Search, Sparkles } from 'lucide-vue-next'
 import { api } from '../api'
 import { formatDate } from '@dx/web-shared/api.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
+import { useAi } from '../ai/useAi'
 interface Hit {
   type: string
   id: string
@@ -38,6 +39,25 @@ const result = useQuery({
   queryFn: () => api.request<Result>(`/search?q=${encodeURIComponent(q.value)}&limit=20`),
   enabled: computed(() => q.value.trim().length >= 2),
 })
+const ai = useAi()
+interface MeaningHit {
+  type: 'file' | 'task' | 'case'
+  id: string
+  title: string
+  link: string
+  snippet: string
+  score: number
+}
+// Search by meaning runs beside the word search, for content worded differently from the query.
+const meaning = useQuery({
+  queryKey: computed(() => ['ai-search', q.value]),
+  queryFn: () =>
+    api.request<{ items: MeaningHit[] }>('/ai/search', { method: 'POST', body: JSON.stringify({ q: q.value.trim() }) }),
+  enabled: computed(() => q.value.trim().length >= 2 && ai.on('semantic_search') && ai.semanticReady.value),
+  staleTime: 60_000,
+  retry: false,
+})
+const TYPE_LABEL = { file: 'Tài liệu', task: 'Công việc', case: 'Hồ sơ' }
 const groups = [
   { key: 'task', label: 'Công việc', icon: ListChecks },
   { key: 'case', label: 'Hồ sơ', icon: Files },
@@ -78,6 +98,25 @@ function go() {
       {{ result.data.value?.total ?? 0 }} kết quả cho “{{ q }}”
     </p>
     <div class="stack">
+      <section v-if="ai.on('semantic_search') && ai.semanticReady.value" class="ai-card">
+        <header><span class="ai-title"><Sparkles :size="16" />Kết quả theo ý nghĩa</span></header>
+        <p v-if="meaning.isPending.value" class="muted">AI đang tìm nội dung có ý nghĩa gần với “{{ q }}”…</p>
+        <p v-else-if="meaning.error.value" class="muted">Chưa tìm theo ý nghĩa được lúc này.</p>
+        <p v-else-if="!meaning.data.value?.items.length" class="muted">Không có nội dung nào gần nghĩa.</p>
+        <RouterLink
+          v-for="hit in meaning.data.value?.items"
+          :key="`${hit.type}:${hit.id}`"
+          :to="hit.link"
+          class="list-row"
+          style="color: inherit; text-decoration: none"
+        >
+          <div class="grow">
+            <p>{{ hit.title }}</p>
+            <small>{{ hit.snippet }}</small>
+          </div>
+          <span class="tag">{{ TYPE_LABEL[hit.type] }}</span>
+        </RouterLink>
+      </section>
       <template v-for="group in groups" :key="group.key">
         <section v-if="result.data.value?.groups[group.key]?.total" class="card">
           <header class="card-header">

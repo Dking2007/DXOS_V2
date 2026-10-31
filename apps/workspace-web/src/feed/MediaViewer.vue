@@ -59,7 +59,7 @@ onBeforeUnmount(() => {
       @touchstart.passive="touchX = $event.touches[0].clientX"
       @touchend="onTouchEnd"
     >
-      <img v-if="current.kind === 'image'" :key="current.id" :src="current.url" :alt="current.name" />
+      <img v-if="current.kind === 'image'" :key="current.id" :src="current.url" :alt="current.alt || current.name" />
       <video v-else :key="current.id" :src="current.url" controls autoplay playsinline />
     </div>
     <template v-if="items.length > 1">

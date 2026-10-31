@@ -6543,7 +6543,7 @@
           "assistant"
         ],
         "summary": "Models",
-        "description": "Ask a self-hosted server (or chat gateway) which models it serves.",
+        "description": "Ask a service which models it offers, using the stored key when the form leaves it blank.",
         "operationId": "models_workspace_v1_assistant_models_post",
         "requestBody": {
           "content": {
@@ -6987,6 +6987,905 @@
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/features": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Features",
+        "operationId": "features_workspace_v1_ai_features_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/settings": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Get Settings",
+        "operationId": "get_settings_workspace_v1_ai_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Put Settings",
+        "operationId": "put_settings_workspace_v1_ai_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/index": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Reindex",
+        "operationId": "reindex_workspace_v1_ai_index_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/settings/test-embedding": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Test Embedding",
+        "operationId": "test_embedding_workspace_v1_ai_settings_test_embedding_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmbeddingSetting"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/cases/{case_id}/extract": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Extract",
+        "description": "1. Read an attached file and propose a value, with page and quote, for each field.",
+        "operationId": "extract_workspace_v1_ai_cases__case_id__extract_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/cases/{case_id}/summary": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Stored Summary",
+        "operationId": "stored_summary_workspace_v1_ai_cases__case_id__summary_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Make Summary",
+        "description": "2. A few lines for the approver: what is asked, how much, what is attached, who said what.",
+        "operationId": "make_summary_workspace_v1_ai_cases__case_id__summary_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/cases/{case_id}/check": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Check Case",
+        "description": "3. Before submitting: what might be wrong, from fixed rules and from the attachments.",
+        "operationId": "check_case_workspace_v1_ai_cases__case_id__check_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/cases/{case_id}/decision-draft": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Decision Draft",
+        "description": "4. A polite approval note or return reason, for the person deciding to edit.",
+        "operationId": "decision_draft_workspace_v1_ai_cases__case_id__decision_draft_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionDraftInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/documents/draft": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Draft Document",
+        "description": "5. Turn a few points into an administrative document laid out per Decree 30.",
+        "operationId": "draft_document_workspace_v1_ai_documents_draft_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentDraftInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/files/{file_id}/summary": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Summarize File",
+        "description": "6a. A short summary of a document, each point with the page it comes from.",
+        "operationId": "summarize_file_workspace_v1_ai_files__file_id__summary_post",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/files/{file_id}/ask": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ask File",
+        "description": "6b. Answer a question from the document only, quoting the page it rests on.",
+        "operationId": "ask_file_workspace_v1_ai_files__file_id__ask_post",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/search": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Semantic Search",
+        "description": "7. Items whose content means what was asked, only those this person may open.",
+        "operationId": "semantic_search_workspace_v1_ai_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/files/{file_id}/labels": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Suggest Labels",
+        "description": "8. Labels and a folder that fit a document, from the labels and folders already in use.",
+        "operationId": "suggest_labels_workspace_v1_ai_files__file_id__labels_post",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/tasks/parse": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Parse Task",
+        "description": "9. Fill the assign-work form from one sentence; the person still reviews and presses Assign.",
+        "operationId": "parse_task_workspace_v1_ai_tasks_parse_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskTextInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/tasks/{task_id}/breakdown": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Breakdown",
+        "description": "10. Steps or sub-tasks for a large task, with suggested due dates before the task's own.",
+        "operationId": "breakdown_workspace_v1_ai_tasks__task_id__breakdown_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/digest": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Stored Digest",
+        "operationId": "stored_digest_workspace_v1_ai_digest_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Make Digest",
+        "description": "11. This morning in words: what is urgent, what waits for approval, what is about to slip.",
+        "operationId": "make_digest_workspace_v1_ai_digest_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/reports/narrative": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Narrative",
+        "description": "12. The report page in words, with where things stall and what to look at.",
+        "operationId": "narrative_workspace_v1_ai_reports_narrative_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NarrativeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/conversations/{conversation_id}/summary": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Chat Summary",
+        "description": "13. What a long conversation said and agreed, from the messages this member can read.",
+        "operationId": "chat_summary_workspace_v1_ai_conversations__conversation_id__summary_post",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatSummaryInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/write": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Write",
+        "description": "14a. Rewrite a post more concisely, fix spelling, or suggest titles.",
+        "operationId": "write_workspace_v1_ai_write_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/post-attachments/{attachment_id}/describe": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Describe Image",
+        "description": "14b. A text alternative for an image the author is posting, saved on the attachment.",
+        "operationId": "describe_image_workspace_v1_ai_post_attachments__attachment_id__describe_post",
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Attachment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/ai/package-versions/{version_id}/scenarios": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Scenarios",
+        "description": "17. Scenarios worth testing (amounts at the threshold, missing files) with their real path.",
+        "operationId": "scenarios_workspace_v1_ai_package_versions__version_id__scenarios_post",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -7488,6 +8387,20 @@
         ],
         "title": "ChatInput"
       },
+      "ChatSummaryInput": {
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "maximum": 400.0,
+            "minimum": 10.0,
+            "title": "Limit",
+            "default": 150
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ChatSummaryInput"
+      },
       "ChecklistItem": {
         "properties": {
           "id": {
@@ -7721,6 +8634,31 @@
         ],
         "title": "ConversationCreate"
       },
+      "DecisionDraftInput": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "reject",
+              "return"
+            ],
+            "title": "Decision"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Notes",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "DecisionDraftInput"
+      },
       "DecisionInput": {
         "properties": {
           "expected_revision": {
@@ -7880,6 +8818,64 @@
         ],
         "title": "DepartmentPatch"
       },
+      "DocumentDraftInput": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "to_trinh",
+              "cong_van",
+              "thong_bao",
+              "ke_hoach",
+              "bao_cao",
+              "giay_moi"
+            ],
+            "title": "Kind"
+          },
+          "points": {
+            "type": "string",
+            "maxLength": 6000,
+            "minLength": 5,
+            "title": "Points"
+          },
+          "recipients": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Recipients",
+            "default": ""
+          },
+          "signer_title": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Signer Title",
+            "default": ""
+          },
+          "signer_name": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Signer Name",
+            "default": ""
+          },
+          "folder_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "points"
+        ],
+        "title": "DocumentDraftInput"
+      },
       "Edge": {
         "properties": {
           "id": {
@@ -7920,6 +8916,30 @@
           "target"
         ],
         "title": "Edge"
+      },
+      "EmbeddingSetting": {
+        "properties": {
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Model",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EmbeddingSetting"
       },
       "EvidenceCreate": {
         "properties": {
@@ -7985,6 +9005,49 @@
           "decision"
         ],
         "title": "EvidenceReview"
+      },
+      "ExtractInput": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "title": "File Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "file_id"
+        ],
+        "title": "ExtractInput"
+      },
+      "FeatureSetting": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Model",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FeatureSetting"
       },
       "FileCopy": {
         "properties": {
@@ -8544,6 +9607,15 @@
               }
             ],
             "title": "Provider Id"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "embed"
+            ],
+            "title": "Purpose",
+            "default": "chat"
           }
         },
         "additionalProperties": false,
@@ -8552,6 +9624,30 @@
           "kind"
         ],
         "title": "ModelsQuery"
+      },
+      "NarrativeInput": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "maximum": 366.0,
+            "minimum": 1.0,
+            "title": "Days",
+            "default": 30
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "mine",
+              "managed"
+            ],
+            "title": "Scope",
+            "default": "all"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "NarrativeInput"
       },
       "NewDocument": {
         "properties": {
@@ -8922,6 +10018,22 @@
         ],
         "title": "ProviderPatch"
       },
+      "QuestionInput": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 2,
+            "title": "Question"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "QuestionInput"
+      },
       "ReadCursor": {
         "properties": {
           "seq": {
@@ -9110,6 +10222,29 @@
         ],
         "title": "RuleToggle"
       },
+      "SearchInput": {
+        "properties": {
+          "q": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 2,
+            "title": "Q"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 12
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "q"
+        ],
+        "title": "SearchInput"
+      },
       "SearchPreview": {
         "properties": {
           "q": {
@@ -9125,6 +10260,32 @@
           "q"
         ],
         "title": "SearchPreview"
+      },
+      "SettingsInput": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "features": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FeatureSetting"
+            },
+            "type": "object",
+            "title": "Features"
+          },
+          "embedding": {
+            "$ref": "#/components/schemas/EmbeddingSetting"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "features"
+        ],
+        "title": "SettingsInput"
       },
       "ShareInput": {
         "properties": {
@@ -9529,6 +10690,22 @@
         ],
         "title": "TaskSource"
       },
+      "TaskTextInput": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "TaskTextInput"
+      },
       "TaskTransition": {
         "properties": {
           "expected_revision": {
@@ -9791,6 +10968,32 @@
           "expected_revision"
         ],
         "title": "WithdrawInput"
+      },
+      "WriteInput": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "rewrite",
+              "proofread",
+              "title"
+            ],
+            "title": "Action"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 3,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action",
+          "text"
+        ],
+        "title": "WriteInput"
       },
       "dx_workspace__feed__CommentInput": {
         "properties": {

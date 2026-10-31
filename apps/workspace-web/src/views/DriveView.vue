@@ -2,7 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   ArrowDownUp,
@@ -27,6 +27,7 @@ import {
   Presentation,
   Search,
   Share2,
+  Sparkles,
   Tags,
   Trash2,
   Upload,
@@ -62,6 +63,9 @@ import { useSession } from '../stores/session'
 import { toast } from '../ui/toast'
 import { previewKind } from '../ui/preview'
 import FilePreview from '../components/FilePreview.vue'
+import DocumentAiDialog from '../ai/DocumentAiDialog.vue'
+import DraftDocumentDialog from '../ai/DraftDocumentDialog.vue'
+import { useAi } from '../ai/useAi'
 const queryClient = useQueryClient()
 const session = useSession()
 /** Sharing and trashing belong to the owner only; the API refuses them for collaborators too. */
@@ -75,6 +79,7 @@ const folder = ref<string | null>(null)
 const crumbs = ref<Folder[]>([])
 // Global search links here with ?q= so the matching file is already filtered.
 const route = useRoute()
+const router = useRouter()
 const initialQuery = String(route.query.q ?? '')
 const search = ref(initialQuery)
 const searchQuery = ref(initialQuery)
@@ -176,6 +181,49 @@ const anyFolderSyncing = computed(() =>
   ),
 )
 const visibleFiles = computed(() => files.data.value?.items ?? [])
+const ai = useAi()
+const aiFile = ref<{ id: string; name: string } | null>(null)
+const drafting = ref(false)
+const suggesting = ref(false)
+const suggestion = ref<{ folder_id: string | null; folder_name: string | null; reason: string } | null>(null)
+/** Let AI propose labels (and a better folder) for the file in the labels dialog. */
+async function suggestLabels() {
+  if (!selected.value) return
+  suggesting.value = true
+  try {
+    const result = await api.request<{ labels: string[]; folder_id: string | null; folder_name: string | null; reason: string }>(
+      `/ai/files/${selected.value.id}/labels`,
+      { method: 'POST' },
+    )
+    labelText.value = labelsToText([...parseLabels(labelText.value), ...result.labels])
+    suggestion.value = result
+  } catch (cause) {
+    toast.error(cause)
+  } finally {
+    suggesting.value = false
+  }
+}
+async function moveToSuggested() {
+  if (!selected.value || !suggestion.value?.folder_id) return
+  try {
+    await api.request(`/drive/files/${selected.value.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ expected_revision: selected.value.revision, folder_id: suggestion.value.folder_id }),
+    })
+    toast.success(`Đã chuyển vào thư mục “${suggestion.value.folder_name}”`)
+    suggestion.value = null
+    modal.value = null
+    await refresh()
+  } catch (cause) {
+    toast.error(cause)
+  }
+}
+async function drafted(file: { id: string; name: string }) {
+  drafting.value = false
+  toast.success(`Đã soạn “${file.name}”. Đang mở để chỉnh sửa.`)
+  await refresh()
+  await router.push(`/drive/${file.id}/edit`)
+}
 const activeFile = computed(() => visibleFiles.value.find(item => item.id === fileMenuId.value) ?? null)
 const sortedFolders = computed(() => [...(folders.data.value?.items ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'vi')))
 const currentLocation = computed(() => trash.value ? 'Thùng rác' : searchQuery.value ? 'Kết quả tìm kiếm' : crumbs.value.at(-1)?.name ?? 'Tài liệu của tôi')
@@ -484,6 +532,7 @@ function pickFile(event: Event) {
           <button @click="openNew('folder')"><FolderPlus :size="18" /> Thư mục mới</button>
           <button @click="openNew('upload')"><Upload :size="18" /> Tải tệp lên</button>
           <button @click="openNew('document')"><FilePlus2 :size="18" /> Tài liệu mới</button>
+          <button v-if="ai.on('document_draft')" @click="newMenuOpen = false; drafting = true"><Sparkles :size="18" /> Soạn văn bản bằng AI</button>
         </div>
       </div>
       <nav class="drive-nav" aria-label="Vị trí tài liệu">
@@ -643,6 +692,7 @@ function pickFile(event: Event) {
       <span class="grow">{{ activeFile.name }}</span>
       <button v-if="!trash && previewKind(activeFile.name)" @click="preview = activeFile"><Eye :size="16" /> Xem</button>
       <button v-if="!trash" @click="download(activeFile)"><Download :size="16" /> Tải xuống</button>
+      <button v-if="!trash && ai.on('document_qa')" @click="aiFile = activeFile"><Sparkles :size="16" /> Hỏi AI</button>
       <button v-if="!trash" @click="open('labels', activeFile)"><Tags :size="16" /> Nhãn</button>
       <button v-if="!trash" @click="open('copy', activeFile)"><Copy :size="16" /> Sao chép</button>
       <button v-if="!trash" @click="open('versions', activeFile)"><History :size="16" /> Phiên bản</button>
@@ -741,7 +791,26 @@ function pickFile(event: Event) {
               v-model="labelText"
               maxlength="500"
               placeholder="Ví dụ: Hợp đồng, Khẩn, Mẫu"
-            />
+            /><button
+              v-if="modal === 'labels' && ai.on('file_labels')"
+              type="button"
+              class="button secondary small ai-action"
+              style="justify-self: start; margin-top: 6px"
+              :disabled="suggesting"
+              @click="suggestLabels"
+            >
+              <Sparkles :size="14" />{{ suggesting ? 'AI đang xem tài liệu…' : 'Gợi ý nhãn bằng AI' }}
+            </button>
+            <small v-if="modal === 'labels' && suggestion?.reason" class="muted">AI: {{ suggestion.reason }}</small>
+            <button
+              v-if="modal === 'labels' && suggestion?.folder_id"
+              type="button"
+              class="button ghost small"
+              style="justify-self: start"
+              @click="moveToSuggested"
+            >
+              Chuyển vào thư mục gợi ý “{{ suggestion.folder_name }}”
+            </button>
             <small
               >Ngăn cách bằng dấu phẩy. Tên trùng chỉ khác chữ hoa được tính là một
               nhãn.</small
@@ -1001,6 +1070,8 @@ function pickFile(event: Event) {
       </div></template
     >
   </ModalDialog>
+  <DocumentAiDialog v-if="aiFile" :key="aiFile.id" :file="aiFile" @close="aiFile = null" />
+  <DraftDocumentDialog v-if="drafting" :folder-id="folder" @close="drafting = false" @created="drafted" />
   <FilePreview
     v-if="preview"
     :key="preview.id"

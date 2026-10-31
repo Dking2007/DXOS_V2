@@ -171,6 +171,49 @@ const waitUnit = computed(() => {
         </p>
       </template>
 
+      <template v-else-if="data.kind === 'ai'">
+        <div class="field">
+          <label for="node-ai-question">Câu hỏi cho AI</label>
+          <textarea
+            id="node-ai-question"
+            rows="3"
+            maxlength="500"
+            :value="String(c.question ?? '')"
+            @change="set('question', ($event.target as HTMLTextAreaElement).value)"
+          />
+          <small>AI đọc tiêu đề, trạng thái, mức ưu tiên, nhãn, nội dung của sự kiện rồi chọn đúng một đáp án.</small>
+        </div>
+        <div class="field">
+          <label for="node-ai-choices">Các lựa chọn</label>
+          <input
+            id="node-ai-choices"
+            :value="((c.choices as string[]) ?? []).join(', ')"
+            placeholder="Gấp, Bình thường"
+            @change="
+              set(
+                'choices',
+                ($event.target as HTMLInputElement).value
+                  .split(',')
+                  .map((item) => item.trim())
+                  .filter(Boolean)
+                  .slice(0, 8),
+              )
+            "
+          />
+          <small>2 đến 8 lựa chọn, ngăn cách bằng dấu phẩy.</small>
+        </div>
+        <div class="field">
+          <label for="node-ai-output">Lưu kết quả vào trường</label>
+          <input
+            id="node-ai-output"
+            :value="String(c.output ?? 'ai_label')"
+            pattern="[a-z_]{1,40}"
+            @change="set('output', ($event.target as HTMLInputElement).value || 'ai_label')"
+          />
+          <small>Nối tiếp một node <strong>Điều kiện</strong> và chọn trường này để rẽ nhánh theo đáp án của AI.</small>
+        </div>
+      </template>
+
       <template v-else-if="data.kind === 'wait'">
         <div class="field">
           <label for="node-wait">Thời gian chờ</label>

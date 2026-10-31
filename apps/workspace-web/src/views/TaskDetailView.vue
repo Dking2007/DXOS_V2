@@ -29,6 +29,8 @@ import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import TaskCreateDialog from '../components/TaskCreateDialog.vue'
+import TaskBreakdown from '../ai/TaskBreakdown.vue'
+import { useAi } from '../ai/useAi'
 import TaskAutomations from '../components/TaskAutomations.vue'
 const route = useRoute()
 const router = useRouter()
@@ -46,6 +48,7 @@ const pending = ref<TaskAction | null>(null)
 const reason = ref('')
 const result = ref('')
 const showSubtask = ref(false)
+const ai = useAi()
 const comment = ref('')
 const dueEdit = ref<{ value: string; reason: string } | null>(null)
 const assignTarget = ref('')
@@ -347,6 +350,12 @@ function localInput(value: string | null) {
           <p v-if="!task.subtasks.length" class="step-empty" style="padding: 18px 23px">
             Chưa có việc con. Việc cha chỉ nghiệm thu khi mọi việc con đã xong hoặc hủy.
           </p>
+          <TaskBreakdown
+            v-if="ai.on('task_breakdown') && !['completed', 'cancelled'].includes(task.status)"
+            :task-id="task.id"
+            :case-id="task.case_id"
+            @created="detail.refetch()"
+          />
           <RouterLink
             v-for="child in task.subtasks"
             :key="child.id"

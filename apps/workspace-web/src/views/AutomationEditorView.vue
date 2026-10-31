@@ -42,6 +42,7 @@ import FlowNode from '../flow/FlowNode.vue'
 import NodeInspector from '../flow/NodeInspector.vue'
 import { FLOW_CONTEXT } from '../flow/context'
 import { KINDS, TEMPLATES, canvasEdge, toApi, toCanvas } from '../flow/nodes'
+import { useAi } from '../ai/useAi'
 import type { ApiGraph, FlowNodeData, NodeKind, TriggerInfo } from '../flow/nodes'
 interface Step {
   node_id: string | null
@@ -167,7 +168,15 @@ const infoOpen = ref(false)
 watch(selectedId, (id) => id && (infoOpen.value = false))
 const triggerNode = computed(() => nodes.value.find((node) => node.data?.kind === 'trigger'))
 const trigger = computed(() => triggers.value.find((t) => t.key === triggerNode.value?.data?.config.event))
-const fields = computed(() => trigger.value?.fields ?? {})
+// Answers of "Hỏi AI" steps become fields that later conditions can test.
+const fields = computed(() => ({
+  ...(trigger.value?.fields ?? {}),
+  ...Object.fromEntries(
+    nodes.value
+      .filter((node) => node.data?.kind === 'ai')
+      .map((node) => [String(node.data!.config.output || 'ai_label'), `Kết quả AI: ${String(node.data!.config.question ?? '')}`]),
+  ),
+}))
 /** Only task events after creation can be limited to tasks people attach the flow to. */
 const attachable = computed(() => !!trigger.value?.attachable)
 watch(attachable, (value) => !value && (scope.value = 'all'))
@@ -501,10 +510,13 @@ watch(notice, (value) => value && setTimeout(() => (notice.value = ''), 2500))
 useUnsavedGuard(dirty)
 
 provide(FLOW_CONTEXT, { triggers, userName, overlay, addAfter })
+const ai = useAi()
 const palette = computed(() =>
   (['Kích hoạt', 'Logic', 'Hành động'] as const).map((group) => ({
     group,
-    kinds: (Object.keys(KINDS) as NodeKind[]).filter((kind) => KINDS[kind].group === group),
+    kinds: (Object.keys(KINDS) as NodeKind[]).filter(
+      (kind) => KINDS[kind].group === group && (kind !== 'ai' || ai.on('automation_ai')),
+    ),
   })),
 )
 </script>

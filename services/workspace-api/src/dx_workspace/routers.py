@@ -13,6 +13,7 @@ from fastapi import Form as MultipartForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from . import ai_core, ai_index
 from . import models as m
 from . import schemas as s
 from .core_client import CoreClient
@@ -506,6 +507,8 @@ def build_router(app):
         db.add(value)
         db.flush()
         audit(db, user, "file.uploaded", value.id)
+        if "semantic_search" in ai_core.enabled_features(db) and ai_index.provider(db):
+            enqueue(db, "ai.index", value.id, {"ref_type": "file", "ref_id": value.id})
         db.commit()
         return file_data(value)
 
@@ -1459,4 +1462,6 @@ def build_router(app):
             transform=transform,
         )
 
+    # Shared with the AI features, which save drafted documents the same way as uploads.
+    app.state.save_upload = save_upload
     return router

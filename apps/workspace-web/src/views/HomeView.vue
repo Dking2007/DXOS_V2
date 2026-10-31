@@ -27,6 +27,8 @@ import { formatDate } from '@dx/web-shared/api.ts'
 import type { AgendaItem, CaseItem, Task } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
+import DigestCard from '../ai/DigestCard.vue'
+import { useAi } from '../ai/useAi'
 const session = useSession()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -40,6 +42,7 @@ const firstName = computed(
   () => session.user?.display_name.split(' ').slice(-1)[0] ?? '',
 )
 const overview = useOverview()
+const ai = useAi()
 const agenda = computed(() => overview.data.value?.agenda ?? [])
 const overdueCount = computed(() => agenda.value.filter((item) => item.overdue).length)
 
@@ -143,6 +146,7 @@ const summary = computed(() => {
     </div>
     <div class="date-block"><CalendarDays :size="16" />{{ today }}</div>
   </section>
+  <DigestCard v-if="ai.on('daily_digest')" />
   <div class="home-columns">
     <section class="card agenda-card" data-tour="agenda">
       <header class="card-header">

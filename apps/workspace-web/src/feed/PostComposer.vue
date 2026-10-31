@@ -2,11 +2,14 @@
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
-import { AlertCircle, Building2, Globe2, ImagePlus, Megaphone, Play, SendHorizontal, X } from 'lucide-vue-next'
+import { AlertCircle, Building2, Globe2, ImagePlus, Megaphone, Play, ScanText, SendHorizontal, X } from 'lucide-vue-next'
 import { useSession } from '../stores/session'
 import { toast } from '../ui/toast'
 import { MAX_MEDIA, MEDIA_ACCEPT, useMediaUploads } from './media'
 import { avatarHue, initials } from './text'
+import { api } from '../api'
+import WritingTools from '../ai/WritingTools.vue'
+import { useAi } from '../ai/useAi'
 
 const body = defineModel<string>({ required: true })
 const props = defineProps<{ busy: boolean }>()
@@ -21,6 +24,22 @@ const dragging = ref(false)
 const textarea = ref<HTMLTextAreaElement>()
 const picker = ref<HTMLInputElement>()
 const LIMIT = 10_000
+const ai = useAi()
+const describing = ref('')
+/** Draft a text alternative for an uploaded image; it is saved with the attachment. */
+async function describe(key: string) {
+  const item = media.items.value.find((entry) => entry.key === key)
+  if (!item?.media) return
+  describing.value = key
+  try {
+    const result = await api.request<{ alt: string }>(`/ai/post-attachments/${item.media.id}/describe`, { method: 'POST' })
+    item.media = { ...item.media, alt: result.alt }
+  } catch (error) {
+    toast.error(error)
+  } finally {
+    describing.value = ''
+  }
+}
 const media = useMediaUploads(() => session.user?.csrf_token ?? '')
 const name = computed(() => session.user?.display_name ?? '')
 const firstName = computed(() => name.value.split(' ').slice(-1)[0] ?? '')
@@ -140,7 +159,27 @@ defineExpose({ focus, reset, hasMedia })
         <button type="button" class="feed-pending-remove" :aria-label="`Bỏ ${item.file.name}`" @mousedown.prevent @click="media.remove(item.key)">
           <X :size="13" />
         </button>
+        <button
+          v-if="ai.on('writing_help') && item.kind === 'image' && item.media && !item.media.alt"
+          type="button"
+          class="feed-pending-describe"
+          :disabled="!!describing"
+          :title="describing === item.key ? 'AI đang xem ảnh…' : 'Tạo mô tả ảnh cho người dùng trình đọc màn hình'"
+          :aria-label="`Tạo mô tả cho ${item.file.name}`"
+          @mousedown.prevent
+          @click="describe(item.key)"
+        >
+          <ScanText :size="13" />
+        </button>
       </div>
+    </div>
+    <ul v-if="media.items.value.some((item) => item.media?.alt)" class="ai-note" aria-label="Mô tả ảnh">
+      <li v-for="item in media.items.value.filter((entry) => entry.media?.alt)" :key="item.key">
+        {{ item.file.name }}: {{ item.media!.alt }}
+      </li>
+    </ul>
+    <div v-if="open && ai.on('writing_help') && body.trim().length >= 3" style="padding: 0 16px 8px">
+      <WritingTools v-model="body" />
     </div>
     <p v-if="status" class="feed-pending-status" :class="{ error: media.failed.value }" role="status">{{ status }}</p>
     <div v-if="dragging" class="feed-drop-hint" aria-hidden="true"><ImagePlus :size="22" />Thả ảnh hoặc video vào đây</div>

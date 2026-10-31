@@ -582,6 +582,8 @@ class PostAttachment(Base):
     size: Mapped[int] = mapped_column(Integer)
     kind: Mapped[str] = mapped_column(String(10))
     position: Mapped[int] = mapped_column(Integer, default=0)
+    # Text alternative for people using a screen reader; the author may let AI draft it.
+    alt: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -595,6 +597,11 @@ class AssistantConfig(Base):
     instructions: Mapped[str] = mapped_column(Text, default="")
     suggestions: Mapped[list] = mapped_column(JSON, default=list)
     daily_limit: Mapped[int] = mapped_column(Integer, default=50)
+    # AI features beyond the chat: {feature: {"enabled": bool, "provider_id": str | None}}.
+    # A feature without its own provider uses the assistant's active one.
+    features: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Search by meaning: {"provider_id": str, "model": str}; empty means switched off.
+    embedding: Mapped[dict] = mapped_column(JSON, default=dict)
     revision: Mapped[int] = mapped_column(Integer, default=1)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -649,3 +656,30 @@ class AssistantUsage(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     day: Mapped[str] = mapped_column(String(10))
     count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AiResult(Base):
+    """A stored AI answer, keyed by what it was made from, so unchanged input is not paid twice."""
+
+    __tablename__ = "ai_results"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    key: Mapped[str] = mapped_column(String(200), unique=True)
+    feature: Mapped[str] = mapped_column(String(40), index=True)
+    content: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AiEmbedding(Base):
+    """One searchable piece of a file, task or dossier and its vector, for search by meaning."""
+
+    __tablename__ = "ai_embeddings"
+    __table_args__ = (UniqueConstraint("ref_type", "ref_id", "chunk"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    ref_type: Mapped[str] = mapped_column(String(20))
+    ref_id: Mapped[str] = mapped_column(String(36), index=True)
+    chunk: Mapped[int] = mapped_column(Integer, default=0)
+    text: Mapped[str] = mapped_column(Text)
+    vector: Mapped[list] = mapped_column(JSON)
+    model: Mapped[str] = mapped_column(String(160))
+    content_hash: Mapped[str] = mapped_column(String(64))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -118,6 +118,7 @@ def build_router(app):
             "mime": value.mime,
             "size": value.size,
             "kind": value.kind,
+            "alt": value.alt,
             "url": f"/workspace/v1/post-attachments/{value.id}/content",
         }
 

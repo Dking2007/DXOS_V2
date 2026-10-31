@@ -33,7 +33,7 @@ MongoDB, HashiCorp Vault/Terraform, Camunda 8, Elasticsearch bản SSPL. Workflo
 - **ONLYOFFICE Docs — AGPL-3.0**: tùy chọn, mặc định tắt, chạy container riêng; giữ logo/thông báo của hãng.
 - **certifi — MPL-2.0**: dùng nguyên bản, không sửa tệp.
 
-## 2. Thư viện Python (62) — nguồn: PyPI, khóa trong `requirements.lock`
+## 2. Thư viện Python (63) — nguồn: PyPI, khóa trong `requirements.lock`
 
 | Gói | Phiên bản | Giấy phép (SPDX) | Cách dùng |
 |---|---|---|---|
@@ -76,6 +76,7 @@ MongoDB, HashiCorp Vault/Terraform, Camunda 8, Elasticsearch bản SSPL. Workflo
 | pydantic_core | 2.50.1 | MIT | thư viện (pip) |
 | Pygments | 2.21.0 | BSD-2-Clause | thư viện (pip) |
 | PyJWT | 2.10.1 | MIT | thư viện (pip) |
+| pypdf | 6.20.1 | BSD-3-Clause | thư viện (pip) |
 | pytest | 8.4.2 | MIT | thư viện (pip) |
 | pytest-cov | 7.0.0 | MIT | thư viện (pip) |
 | python-dateutil | 2.9.0.post0 | Apache-2.0 OR BSD-3-Clause | thư viện (pip) |

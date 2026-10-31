@@ -634,8 +634,35 @@ def test_model_lists_come_from_each_server_kind():
         "Qwen/Qwen2.5-7B-Instruct"
     ]
     with pytest.raises(llm.LlmError) as error:
-        llm.list_models("openai", "", "", allowed, transport)
+        llm.list_models("unknown", "", "", allowed, transport)
     assert error.value.code == "assistant_models_unsupported"
+
+
+def test_hosted_services_list_their_models_split_into_chat_and_embedding():
+    seen = []
+
+    def service(request):
+        seen.append(request)
+        host = request.url.host
+        if host == "generativelanguage.googleapis.com":
+            return httpx.Response(200, json={"models": [
+                {"name": "models/gemini-2.5-flash", "supportedGenerationMethods": ["generateContent"]},
+                {"name": "models/gemini-embedding-001", "supportedGenerationMethods": ["embedContent"]},
+            ]})  # fmt: skip
+        if host == "api.anthropic.com":
+            return httpx.Response(200, json={"data": [{"id": "claude-opus-5-5"}, {"id": "claude-haiku-5-5"}]})
+        return httpx.Response(200, json={"data": [
+            {"id": "gpt-5"}, {"id": "text-embedding-3-small"}, {"id": "whisper-1"}, {"id": "tts-1"},
+        ]})  # fmt: skip
+
+    transport = httpx.MockTransport(service)
+    assert llm.list_models("openai", "", "sk-1", set(), transport) == ["gpt-5"]
+    assert llm.list_models("openai", "", "sk-1", set(), transport, purpose="embed") == ["text-embedding-3-small"]
+    assert llm.list_models("gemini", "", "g-1", set(), transport) == ["gemini-2.5-flash"]
+    assert llm.list_models("gemini", "", "g-1", set(), transport, purpose="embed") == ["gemini-embedding-001"]
+    assert llm.list_models("anthropic", "", "a-1", set(), transport) == ["claude-haiku-5-5", "claude-opus-5-5"]
+    assert seen[-1].headers["x-api-key"] == "a-1" and seen[-1].headers["anthropic-version"]
+    assert seen[2].headers["x-goog-api-key"] == "g-1" and seen[0].headers["authorization"] == "Bearer sk-1"
 
 
 def test_administrators_add_a_keyless_ollama_server_and_pick_its_model(world, monkeypatch):  # noqa: F811

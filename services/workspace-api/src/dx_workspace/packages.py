@@ -438,4 +438,5 @@ def build_router(app):
                            "decision_traces": traces})
         return {"case_id": case_id, "submissions": result}
 
+    app.state.simulate_package = simulate_one
     return router

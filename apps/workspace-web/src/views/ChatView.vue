@@ -23,6 +23,7 @@ import {
   Trash2,
   UploadCloud,
   UserPlus,
+  Sparkles,
   X,
 } from 'lucide-vue-next'
 import { textMatches } from '@dx/web-shared/text.ts'
@@ -41,6 +42,8 @@ import type {
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import TaskCreateDialog from '../components/TaskCreateDialog.vue'
+import ChatSummaryDialog from '../ai/ChatSummaryDialog.vue'
+import { useAi } from '../ai/useAi'
 import MessageAttachments from '../chat/MessageAttachments.vue'
 import FilePreview from '../components/FilePreview.vue'
 import {
@@ -376,6 +379,10 @@ function startReply(message: ChatMessage) {
 }
 const picker = ref<string | null>(null)
 const taskFrom = ref<ChatMessage | null>(null)
+const ai = useAi()
+const summarizing = ref(false)
+// A task drafted from a sentence in the AI summary rather than from a single message.
+const taskSentence = ref('')
 async function taskCreated(task: Task) {
   taskFrom.value = null
   await router.push(`/tasks/${task.id}`)
@@ -555,6 +562,15 @@ const kindLabel: Record<Conversation['kind'], string> = {
             class="button ghost small"
             ><ExternalLink :size="14" />Mở {{ conversation.data.value.ref_type === 'task' ? 'công việc' : 'hồ sơ' }}</RouterLink
           >
+          <button
+            v-if="ai.on('chat_summary')"
+            class="icon-button ai-action"
+            aria-label="Tóm tắt cuộc trò chuyện bằng AI"
+            title="Tóm tắt bằng AI"
+            @click="summarizing = true"
+          >
+            <Sparkles :size="18" />
+          </button>
           <button
             v-if="conversation.data.value.kind !== 'direct' && conversation.data.value.my_role === 'owner'"
             class="icon-button"
@@ -854,5 +870,19 @@ const kindLabel: Record<Conversation['kind'], string> = {
     :source="{ type: 'message', id: taskFrom.id, label: (taskFrom.body || snippet(taskFrom)).slice(0, 200) }"
     @close="taskFrom = null"
     @created="taskCreated"
+  />
+  <ChatSummaryDialog
+    v-if="summarizing && conversation.data.value"
+    :conversation-id="activeId"
+    :title="conversation.data.value.title"
+    @close="summarizing = false"
+    @task="(sentence) => { summarizing = false; taskSentence = sentence }"
+  />
+  <TaskCreateDialog
+    v-if="taskSentence"
+    heading="Tạo việc từ cuộc trò chuyện"
+    :sentence="taskSentence"
+    @close="taskSentence = ''"
+    @created="taskSentence = ''"
   />
 </template>

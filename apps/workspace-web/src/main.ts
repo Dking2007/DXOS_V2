@@ -10,6 +10,7 @@ import '@dx/web-shared/style.css'
 import './style.css'
 import './collab.css'
 import './shell.css'
+import './ai/ai.css'
 
 applyTheme()
 const app = createApp(App)

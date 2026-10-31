@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
 import type { Component } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { Bell, GitBranch, Hourglass, ListPlus, Webhook, Zap } from 'lucide-vue-next'
+import { Bell, GitBranch, Hourglass, ListPlus, Sparkles, Webhook, Zap } from 'lucide-vue-next'
 
-export type NodeKind = 'trigger' | 'if' | 'notify' | 'create_task' | 'webhook' | 'wait'
+export type NodeKind = 'trigger' | 'if' | 'notify' | 'create_task' | 'webhook' | 'wait' | 'ai'
 
 export interface FlowCondition {
   field: string
@@ -65,6 +65,14 @@ export const KINDS: Record<NodeKind, KindMeta> = {
     icon: GitBranch,
     color: '#7a5cd6',
     defaults: () => ({ mode: 'all', conditions: [{ field: 'priority', operator: 'eq', value: 'urgent' }] }),
+  },
+  ai: {
+    title: 'Hỏi AI',
+    group: 'Logic',
+    hint: 'AI phân loại để rẽ nhánh',
+    icon: Sparkles,
+    color: '#6d4fd0',
+    defaults: () => ({ question: 'Việc này có gấp không?', choices: ['Gấp', 'Bình thường'], output: 'ai_label' }),
   },
   wait: {
     title: 'Chờ',
@@ -148,6 +156,8 @@ export function summary(
     }
     case 'wait':
       return `Chờ ${waitLabel(Number(c.minutes ?? 60))}`
+    case 'ai':
+      return `${((c.choices as string[]) ?? []).join(' / ') || 'Thêm lựa chọn'} → ${String(c.output ?? 'ai_label')}`
     case 'notify': {
       const people = ((c.recipients as string[]) ?? []).map((r) => RECIPIENTS[r] ?? names(r))
       return people.length ? `Tới ${people.join(', ')}` : 'Chọn người nhận'

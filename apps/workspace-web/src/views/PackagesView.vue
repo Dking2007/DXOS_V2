@@ -15,6 +15,7 @@ import {
   Plus,
   Rocket,
   ShieldCheck,
+  Sparkles,
   Users,
   XCircle,
 } from 'lucide-vue-next'
@@ -26,6 +27,7 @@ import type { FormTemplate, User } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import ProcessDiagram from '../packages/ProcessDiagram.vue'
 import ScenarioEditor from '../packages/ScenarioEditor.vue'
+import { useAi } from '../ai/useAi'
 import PackageDialog from '../packages/PackageDialog.vue'
 import {
   DECISION_LABEL,
@@ -194,6 +196,28 @@ async function created(packageId: string) {
   else await refreshVersion()
   selectedVersionId.value = ''
   toast.success('Đã tạo bản nháp. Bước tiếp theo: kiểm tra cấu hình.')
+}
+const ai = useAi()
+const proposing = ref(false)
+/** AI proposes scenarios; each comes with what the package does today, for the person to check. */
+async function proposeScenarios() {
+  if (!selectedVersion.value) return
+  proposing.value = true
+  try {
+    const result = await api.request<{ fixtures: Suite['cases'] }>(
+      `/ai/package-versions/${selectedVersion.value.id}/scenarios`,
+      { method: 'POST' },
+    )
+    if (!result.fixtures.length) toast.error('AI chưa đề xuất được kịch bản dùng được.')
+    else {
+      editor.value?.load(result.fixtures)
+      toast.success(`AI đề xuất ${result.fixtures.length} kịch bản. Xem lại kết quả mong đợi rồi lưu bộ.`)
+    }
+  } catch (cause) {
+    toast.error(cause)
+  } finally {
+    proposing.value = false
+  }
 }
 function reuseSuite(suite: Suite) {
   tab.value = 'tests'
@@ -457,7 +481,17 @@ const currentStage = computed(() => stages.value.findIndex((s) => !s.done))
             </div>
           </details>
           <template v-if="selectedVersion.state !== 'published'">
-            <h3 class="pkg-subhead"><FlaskConical :size="16" /> Soạn bộ kịch bản mới</h3>
+            <h3 class="pkg-subhead"><FlaskConical :size="16" /> Soạn bộ kịch bản mới
+              <button
+                v-if="ai.on('package_scenarios')"
+                class="button secondary small ai-action"
+                style="margin-left: auto"
+                :disabled="proposing"
+                @click="proposeScenarios"
+              >
+                <Sparkles :size="14" />{{ proposing ? 'AI đang nghĩ…' : 'Gợi ý kịch bản bằng AI' }}
+              </button></h3
+            >
             <ScenarioEditor
               v-if="versionForm"
               ref="editor"

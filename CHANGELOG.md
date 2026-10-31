@@ -20,6 +20,19 @@
   công khai; cổng nội bộ/HTTP phải có trong biến mới `ASSISTANT_ALLOWED_HOSTS`; kiểm lại trước mỗi
   lần gọi, không theo chuyển hướng.
 - `packages/flowkit` (`dx-flowkit` 0.1.0): kiểm tra và chạy thử đồ thị quy trình JSON, tách từ `dx_core.workflow`, không phụ thuộc thư viện ngoài. 56 test; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên. `dx_core.workflow` chưa dùng gói này.
+- 17 tính năng AI (migration `workspace_0016`), mô tả trong [docs/ai-features.md](docs/ai-features.md): đọc tài
+  liệu để điền biểu mẫu (tạo căn cứ trường nguồn AI, câu trích phải có thật trong trang), tóm tắt hồ sơ cho
+  người duyệt, soát hồ sơ trước khi trình, gợi ý ý kiến duyệt/lý do trả lại, soạn văn bản hành chính ra tệp
+  Word theo NĐ 30/2020, tóm tắt và hỏi đáp trên tài liệu, tìm theo ý nghĩa (vector, lập chỉ mục trong
+  worker), gợi ý nhãn và thư mục, giao việc bằng câu nói, tách việc con, bản tin việc hôm nay, nhận xét báo
+  cáo bằng lời, tóm tắt hội thoại, hỗ trợ viết bài và mô tả ảnh, node "Hỏi AI" trong luồng tự động, trợ lý
+  trả lời về dữ liệu của chính người hỏi, sinh kịch bản thử cho gói nghiệp vụ. Người có quyền
+  `assistant.manage` bật từng tính năng và chọn dịch vụ riêng ở tab **Tính năng AI**; mặc định tắt hết. Dịch
+  vụ AI nhận được ảnh và PDF (Claude, OpenAI, Gemini, Ollama, vLLM, cổng tương thích); tạo vector qua
+  OpenAI, Gemini, Ollama, vLLM, cổng Chat Completions. Phụ thuộc mới `pypdf` 6.20.1 (BSD-3-Clause). 12 test
+  backend, 1 test frontend; đã chạy thật với Ollama `gpt-oss:20b` và `bge-m3`.
+  Một dịch vụ AI phục vụ nhiều tính năng, mỗi tính năng chọn model riêng trong danh sách model lấy thẳng từ
+  dịch vụ (`POST /assistant/models` nay lấy được của mọi loại dịch vụ, tách model trò chuyện và model tạo vector).
 - Trợ lý AI dùng được máy chủ AI tự cài: **Ollama** (gọi API gốc `/api/chat`, đặt `num_ctx` 16384 để
   kiến thức không bị cắt ngầm) và **vLLM** (OpenAI Chat Completions). Khóa API không bắt buộc với hai
   loại này; nút "Lấy danh sách model" đọc model có trên máy chủ (`POST /assistant/models`, dùng được

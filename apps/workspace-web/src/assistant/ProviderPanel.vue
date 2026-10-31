@@ -38,7 +38,8 @@ const info = computed(() => props.kinds.find((k) => k.kind === kind.value))
 const isGateway = computed(() => !!info.value?.custom)
 const keyOptional = computed(() => !!info.value?.key_optional)
 // Servers that can say which models they have, so nobody has to type a name like qwen3:8b.
-const LISTS_MODELS = ['ollama', 'vllm', 'custom_chat']
+// Every kind can list its models now (hosted ones with the key typed in the form).
+const LISTS_MODELS = ['ollama', 'vllm', 'custom_chat', 'custom_responses', 'custom_anthropic', 'openai', 'gemini', 'anthropic', 'deepseek']
 const models = ref<string[]>([])
 const loadingModels = ref(false)
 const dialog = ref<'add' | 'edit' | null>(null)
@@ -78,6 +79,7 @@ function openEdit(item: AssistantProvider) {
   error.value = ''
   models.value = []
   opened.value = state()
+  if (LISTS_MODELS.includes(item.kind)) void fetchModels()
 }
 function pickKind(value: AssistantProvider['kind']) {
   kind.value = value
@@ -102,7 +104,7 @@ async function fetchModels() {
     })
     models.value = result.models
     if (!result.models.length) error.value = 'Máy chủ chưa có model nào. Với Ollama, tải model bằng lệnh ollama pull.'
-    else if (!result.models.includes(model.value)) model.value = result.models[0]
+    else if (!model.value.trim()) model.value = result.models[0]
   } catch (cause) {
     error.value = errorText(cause)
   } finally {
@@ -335,29 +337,41 @@ async function remove(item: AssistantProvider) {
         </small>
       </div>
       <div class="field">
-        <label for="provider-model">Model</label>
+        <label for="provider-model">Model mặc định</label>
         <div class="inline-actions">
+          <select
+            v-if="models.length"
+            id="provider-model"
+            v-model="model"
+            class="grow"
+            required
+          >
+            <option v-for="option in models" :key="option" :value="option">{{ option }}</option>
+            <option v-if="model && !models.includes(model)" :value="model">{{ model }} (không có trong danh sách)</option>
+          </select>
           <input
+            v-else
             id="provider-model"
             v-model="model"
             class="grow"
             maxlength="120"
             required
-            list="provider-models"
             placeholder="Tên model trong tài khoản của bạn"
           />
           <button
             v-if="LISTS_MODELS.includes(kind)"
             type="button"
             class="button secondary small"
-            :disabled="loadingModels || (!baseUrl.trim() && !editing)"
+            :disabled="loadingModels || (!editing && (isGateway ? !baseUrl.trim() : apiKey.trim().length < 8))"
             @click="fetchModels"
           >
             <ListRestart :size="14" />{{ loadingModels ? 'Đang lấy…' : 'Lấy danh sách model' }}
           </button>
         </div>
-        <datalist id="provider-models"><option v-for="option in models" :key="option" :value="option" /></datalist>
-        <small v-if="models.length" class="muted">Máy chủ có {{ models.length }} model; bấm vào ô để chọn.</small>
+        <small class="muted">
+          Trợ lý dùng model này. Ở tab Tính năng AI, mỗi tính năng có thể chọn model khác của cùng dịch vụ.
+        </small>
+        <small v-if="models.length" class="muted">Dịch vụ có {{ models.length }} model.</small>
         <small v-else class="muted">{{
           info?.self_hosted
             ? 'Bấm “Lấy danh sách model” để chọn model đã tải trên máy chủ.'

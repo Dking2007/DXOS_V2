@@ -70,6 +70,9 @@ const VERBS: Record<string, string> = {
   unblock: 'gỡ vướng mắc',
   cancel: 'hủy',
   cancelled: 'hủy hồ sơ',
+  features_updated: 'đổi cấu hình tính năng AI',
+  index_requested: 'lập lại chỉ mục tìm theo ý nghĩa',
+  ai_extracted: 'AI đọc tài liệu để đề xuất',
   archived: 'lưu trữ',
   unarchived: 'bỏ lưu trữ',
 }

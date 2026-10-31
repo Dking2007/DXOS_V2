@@ -333,6 +333,8 @@ export interface PostMedia {
   size: number
   kind: 'image' | 'video'
   url: string
+  /** Text alternative for screen readers, written by the author or drafted by AI. */
+  alt?: string | null
 }
 export interface PostComment {
   id: string

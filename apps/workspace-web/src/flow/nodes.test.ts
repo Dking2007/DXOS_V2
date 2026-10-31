@@ -64,3 +64,10 @@ describe('node summaries', () => {
     expect(waitLabel(1440)).toBe('1 ngày')
   })
 })
+
+describe('AI step', () => {
+  it('says which answers it can give and where the answer goes', () => {
+    const data = { kind: 'ai', label: '', config: KINDS.ai.defaults() } as FlowNodeData
+    expect(summary(data, [], (id) => id)).toBe('Gấp / Bình thường → ai_label')
+  })
+})

@@ -25,7 +25,7 @@ const singleVideo = computed(() => props.items.length === 1 && props.items[0].ki
       :aria-label="item.kind === 'video' ? `Xem video ${item.name}` : `Xem ảnh ${item.name}`"
       @click="emit('open', index)"
     >
-      <img v-if="item.kind === 'image'" :src="item.url" :alt="item.name" loading="lazy" />
+      <img v-if="item.kind === 'image'" :src="item.url" :alt="item.alt || item.name" loading="lazy" />
       <template v-else>
         <video :src="`${item.url}#t=0.1`" preload="metadata" muted playsinline tabindex="-1" />
         <span class="feed-play" aria-hidden="true"><Play :size="26" fill="currentColor" /></span>

@@ -22,6 +22,7 @@ credentials) stay refused.
 
 from __future__ import annotations
 
+import base64
 import ipaddress
 import re
 import socket
@@ -89,7 +90,25 @@ CUSTOM_PATHS = {
     "ollama": "/api/chat",
 }
 # Where each kind lists the models it serves, for the "fetch models" button.
-MODEL_LIST_PATHS = {"custom_chat": "/models", "vllm": "/models", "ollama": "/api/tags"}
+MODEL_LIST_PATHS = {
+    "custom_chat": "/models",
+    "custom_responses": "/models",
+    "custom_anthropic": "/models",
+    "vllm": "/models",
+    "ollama": "/api/tags",
+}
+# Where hosted services list the models a key may use.
+MODEL_LIST_URLS = {
+    "openai": "https://api.openai.com/v1/models",
+    "deepseek": "https://api.deepseek.com/models",
+    "anthropic": "https://api.anthropic.com/v1/models?limit=1000",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
+}
+# Model lists mix chat, embedding, speech and image models; names tell them apart well enough.
+EMBEDDING_NAME = re.compile(r"embed|bge|(^|[-_/])e5|gte|minilm|arctic", re.IGNORECASE)
+NOT_CHAT_NAME = re.compile(
+    r"tts|whisper|dall-e|moderation|image|transcribe|audio|realtime|rerank", re.IGNORECASE
+)
 THINKING = re.compile(r"<think>.*?(</think>\s*|$)", re.DOTALL)
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
@@ -122,6 +141,83 @@ class LlmError(Exception):
 class Reply:
     text: str
     truncated: bool = False
+
+
+@dataclass
+class Attachment:
+    """A file sent along with the last question: an image, or a PDF for services that read PDFs."""
+
+    name: str
+    mime: str
+    data: bytes
+
+    @property
+    def b64(self) -> str:
+        return base64.b64encode(self.data).decode()
+
+    @property
+    def data_url(self) -> str:
+        return f"data:{self.mime};base64,{self.b64}"
+
+    @property
+    def is_pdf(self) -> bool:
+        return self.mime == "application/pdf"
+
+
+# Services that read PDF files themselves (so a scanned PDF still works). Others get the text a
+# PDF carries, extracted on our side, and can only look at images.
+READS_PDF = {"anthropic", "openai", "gemini", "custom_anthropic", "custom_responses"}
+# DeepSeek's chat API takes text only.
+NO_FILES = {"deepseek"}
+OPENAI_EMBED_URL = "https://api.openai.com/v1/embeddings"
+GEMINI_EMBED_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:batchEmbedContents"
+# Which kinds can turn text into vectors for search by meaning, and where they do it.
+EMBED_KINDS = {"openai", "gemini", "ollama", "vllm", "custom_chat"}
+
+
+def reads_pdf(kind: str) -> bool:
+    return kind in READS_PDF
+
+
+def _with_files(kind: str, messages: list[dict], files: list[Attachment]) -> list[dict]:
+    """Attach files to the last user message in the shape each protocol expects."""
+    if not files:
+        return messages
+    if kind in NO_FILES:
+        raise LlmError("assistant_no_vision", "Dịch vụ AI này chỉ đọc chữ, không xem được ảnh hay tệp.")
+    if any(f.is_pdf for f in files) and kind not in READS_PDF:
+        raise LlmError("assistant_no_pdf", "Dịch vụ AI này không đọc trực tiếp được tệp PDF.")
+    *head, last = messages
+    text = last["content"]
+    if kind in {"anthropic", "custom_anthropic"}:
+        parts = [
+            {
+                "type": "document" if f.is_pdf else "image",
+                "source": {"type": "base64", "media_type": f.mime, "data": f.b64},
+            }
+            for f in files
+        ]
+        return [*head, {"role": "user", "content": [*parts, {"type": "text", "text": text}]}]
+    if kind == "gemini":
+        parts = [{"inline_data": {"mime_type": f.mime, "data": f.b64}} for f in files]
+        return [*head, {"role": "user", "content": text, "parts": [*parts, {"text": text}]}]
+    if kind == "ollama":
+        return [*head, {"role": "user", "content": text, "images": [f.b64 for f in files]}]
+    if kind == "custom_responses":
+        parts = [
+            {"type": "input_file", "filename": f.name, "file_data": f.data_url}
+            if f.is_pdf
+            else {"type": "input_image", "image_url": f.data_url}
+            for f in files
+        ]
+        return [*head, {"role": "user", "content": [{"type": "input_text", "text": text}, *parts]}]
+    parts = [
+        {"type": "file", "file": {"filename": f.name, "file_data": f.data_url}}
+        if f.is_pdf
+        else {"type": "image_url", "image_url": {"url": f.data_url}}
+        for f in files
+    ]
+    return [*head, {"role": "user", "content": [{"type": "text", "text": text}, *parts]}]
 
 
 def is_custom(kind: str) -> bool:
@@ -220,11 +316,16 @@ def complete(
     transport=None,
     base_url: str | None = None,
     allowed_hosts: set[str] | None = None,
+    files: list[Attachment] | None = None,
 ) -> Reply:
-    """Send one chat turn. `messages` alternate user/assistant and end with the user's question."""
+    """Send one chat turn. `messages` alternate user/assistant and end with the user's question.
+
+    `files` (images, or PDFs where `reads_pdf`) go with that last question.
+    """
     if kind not in KINDS:
         raise LlmError("assistant_kind_invalid", "Loại dịch vụ AI không được hỗ trợ.")
     check_model(kind, model)
+    messages = _with_files(kind, messages, files or [])
     if not api_key and not key_optional(kind):
         raise LlmError("assistant_key_missing", "Dịch vụ AI chưa có khóa API.")
     if is_custom(kind):
@@ -371,37 +472,68 @@ def _ollama(url, model, api_key, system, messages, max_tokens, transport) -> Rep
     return Reply(text=_without_thinking(text).strip(), truncated=data.get("done_reason") == "length")
 
 
-def list_models(kind: str, base_url: str, api_key: str, allowed_hosts: set[str], transport=None) -> list[str]:
-    """Model names a self-hosted server or chat gateway offers, for the administrator to pick."""
-    if kind not in MODEL_LIST_PATHS:
+def list_models(
+    kind: str,
+    base_url: str,
+    api_key: str,
+    allowed_hosts: set[str],
+    transport=None,
+    purpose: str = "chat",
+) -> list[str]:
+    """Models a service offers for `purpose` ("chat" or "embed"), for the administrator to pick."""
+    if kind in MODEL_LIST_URLS:
+        url = MODEL_LIST_URLS[kind]
+    elif kind in MODEL_LIST_PATHS:
+        url = check_base_url(base_url, allowed_hosts, kind) + MODEL_LIST_PATHS[kind]
+    else:
         raise LlmError("assistant_models_unsupported", "Dịch vụ này không có danh sách model để lấy.")
-    base = check_base_url(base_url, allowed_hosts, kind)
+    if kind in {"anthropic", "custom_anthropic"}:
+        headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01"}
+    elif kind == "gemini":
+        headers = {"x-goog-api-key": api_key}
+    else:
+        headers = _bearer(api_key)
     try:
         with httpx.Client(timeout=TIMEOUT_SECONDS, transport=transport, follow_redirects=False) as client:
-            response = client.get(base + MODEL_LIST_PATHS[kind], headers=_bearer(api_key))
+            response = client.get(url, headers=headers)
     except httpx.TimeoutException as exc:
-        raise LlmError("assistant_timeout", "Máy chủ AI phản hồi quá lâu.") from exc
+        raise LlmError("assistant_timeout", "Dịch vụ AI phản hồi quá lâu.") from exc
     except httpx.TransportError as exc:
-        raise LlmError("assistant_unreachable", "Không kết nối được tới máy chủ AI.") from exc
+        raise LlmError("assistant_unreachable", "Không kết nối được tới dịch vụ AI.") from exc
     if response.status_code != 200:
         raise _http_error(kind, response, "")
     try:
         data = response.json()
-        names = (
-            [item["name"] for item in data["models"]]
-            if kind == "ollama"
-            else [item["id"] for item in data["data"]]
-        )
+        if kind == "ollama":
+            names = [item["name"] for item in data["models"]]
+        elif kind == "gemini":
+            method = "embedContent" if purpose == "embed" else "generateContent"
+            names = [
+                item["name"].removeprefix("models/")
+                for item in data["models"]
+                if method in (item.get("supportedGenerationMethods") or [])
+            ]
+        else:
+            names = [item["id"] for item in data["data"]]
     except (ValueError, KeyError, TypeError) as exc:
-        raise LlmError("assistant_bad_response", "Máy chủ AI trả về danh sách model không đọc được.") from exc
-    return sorted({name for name in names if isinstance(name, str) and CUSTOM_MODEL_PATTERN.match(name)})
+        raise LlmError("assistant_bad_response", "Dịch vụ AI trả về danh sách model không đọc được.") from exc
+    names = [n for n in names if isinstance(n, str) and CUSTOM_MODEL_PATTERN.match(n)]
+    if kind != "gemini":
+        if purpose == "embed":
+            names = [n for n in names if EMBEDDING_NAME.search(n)]
+        else:
+            names = [n for n in names if not EMBEDDING_NAME.search(n) and not NOT_CHAT_NAME.search(n)]
+    return sorted(set(names))
 
 
 def _gemini(model, api_key, system, messages, max_tokens, transport) -> Reply:
     body = {
         "systemInstruction": {"parts": [{"text": system}]},
         "contents": [
-            {"role": "model" if m["role"] == "assistant" else "user", "parts": [{"text": m["content"]}]}
+            {
+                "role": "model" if m["role"] == "assistant" else "user",
+                "parts": m.get("parts") or [{"text": m["content"]}],
+            }
             for m in messages
         ],
         "generationConfig": {"maxOutputTokens": max_tokens},
@@ -457,3 +589,54 @@ def _responses(url, model, api_key, system, messages, max_tokens, transport) -> 
     if reason == "content_filter":
         raise LlmError("assistant_refused", "Trợ lý không thể trả lời câu hỏi này.")
     return Reply(text=text.strip(), truncated=reason == "max_output_tokens")
+
+
+def embed(
+    kind: str,
+    model: str,
+    api_key: str,
+    texts: list[str],
+    base_url: str | None = None,
+    allowed_hosts: set[str] | None = None,
+    transport=None,
+) -> list[list[float]]:
+    """Vectors for `texts`, in order, from a service that offers embeddings."""
+    if kind not in EMBED_KINDS:
+        raise LlmError(
+            "assistant_embed_unsupported", "Dịch vụ này không tạo được vector cho tìm theo ý nghĩa."
+        )
+    check_model(kind, model)
+    if not api_key and not key_optional(kind):
+        raise LlmError("assistant_key_missing", "Dịch vụ AI chưa có khóa API.")
+    timeout = SELF_HOSTED_TIMEOUT_SECONDS if self_hosted(kind) else TIMEOUT_SECONDS
+    if kind == "gemini":
+        url = GEMINI_EMBED_URL.format(model=quote(model, safe=""))
+        body = {
+            "requests": [{"model": f"models/{model}", "content": {"parts": [{"text": x}]}} for x in texts]
+        }
+        response = _post(url, {"x-goog-api-key": api_key}, body, transport, timeout)
+    elif kind == "openai":
+        response = _post(
+            OPENAI_EMBED_URL, _bearer(api_key), {"model": model, "input": texts}, transport, timeout
+        )
+    else:
+        base = check_base_url(base_url or "", allowed_hosts or set(), kind)
+        path = "/api/embed" if kind == "ollama" else "/embeddings"
+        response = _post(base + path, _bearer(api_key), {"model": model, "input": texts}, transport, timeout)
+    if response.status_code != 200:
+        raise _http_error(kind, response, model)
+    try:
+        data = response.json()
+        if kind == "gemini":
+            vectors = [item["values"] for item in data["embeddings"]]
+        elif kind == "ollama":
+            vectors = data["embeddings"]
+        else:
+            vectors = [
+                item["embedding"] for item in sorted(data["data"], key=lambda item: item.get("index", 0))
+            ]
+    except (ValueError, KeyError, TypeError) as exc:
+        raise LlmError("assistant_bad_response", "Dịch vụ AI trả về vector không đọc được.") from exc
+    if len(vectors) != len(texts):
+        raise LlmError("assistant_bad_response", "Số vector trả về không khớp số đoạn gửi đi.")
+    return [[float(v) for v in vector] for vector in vectors]

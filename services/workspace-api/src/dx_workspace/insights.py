@@ -338,4 +338,5 @@ def build_router(app):
             "suggestions": suggestions,
         }
 
+    app.state.process_metrics = process_metrics
     return router

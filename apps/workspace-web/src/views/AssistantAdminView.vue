@@ -4,7 +4,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { BookOpen, CheckCircle2, Circle, Cpu, Save, Settings2, Sparkles } from 'lucide-vue-next'
+import { BookOpen, CheckCircle2, Circle, Cpu, Save, Settings2, Sparkles, Wand2 } from 'lucide-vue-next'
 import type { AssistantAdmin } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import { api } from '../api'
@@ -13,12 +13,13 @@ import { useUnsavedGuard } from '../ui/unsaved'
 import { assistantOpen } from '../assistant/state'
 import ProviderPanel from '../assistant/ProviderPanel.vue'
 import KnowledgePanel from '../assistant/KnowledgePanel.vue'
+import AiSettingsPanel from '../ai/AiSettingsPanel.vue'
 
 const queryClient = useQueryClient()
 const route = useRoute()
-type Tab = 'overview' | 'providers' | 'knowledge'
+type Tab = 'overview' | 'providers' | 'knowledge' | 'features'
 const requested = String(route.query.tab ?? '')
-const tab = ref<Tab>((['overview', 'providers', 'knowledge'] as const).find((t) => t === requested) ?? 'overview')
+const tab = ref<Tab>((['overview', 'providers', 'knowledge', 'features'] as const).find((t) => t === requested) ?? 'overview')
 const admin = useQuery({
   queryKey: ['assistant-admin'],
   queryFn: () => api.request<AssistantAdmin>('/assistant/admin'),
@@ -107,6 +108,7 @@ const checklist = computed(() => {
     <button :class="{ active: tab === 'overview' }" @click="tab = 'overview'"><Settings2 :size="15" /> Cấu hình chung</button>
     <button :class="{ active: tab === 'providers' }" @click="tab = 'providers'"><Cpu :size="15" /> Dịch vụ AI</button>
     <button :class="{ active: tab === 'knowledge' }" @click="tab = 'knowledge'"><BookOpen :size="15" /> Kiến thức</button>
+    <button :class="{ active: tab === 'features' }" @click="tab = 'features'"><Wand2 :size="15" /> Tính năng AI</button>
   </nav>
   <StatePanel
     v-if="!admin.data.value"
@@ -169,8 +171,9 @@ const checklist = computed(() => {
         </section>
         <div class="notice">
           <Sparkles :size="18" /><span
-            >Trợ lý chỉ đọc phần <strong>Kiến thức</strong>, không xem được hồ sơ, công việc, tài liệu hay tin
-            nhắn của ai. Câu hỏi của người dùng được gửi tới dịch vụ AI bạn chọn.</span
+            >Trợ lý đọc phần <strong>Kiến thức</strong>. Nó chỉ xem thêm hồ sơ, công việc của chính người hỏi khi bạn bật
+            “Trợ lý trả lời về dữ liệu của người hỏi” ở tab <strong>Tính năng AI</strong>; không bao giờ xem dữ liệu của
+            người khác. Câu hỏi được gửi tới dịch vụ AI bạn chọn.</span
           >
         </div>
       </aside>
@@ -183,5 +186,6 @@ const checklist = computed(() => {
       @changed="refresh"
     />
     <KnowledgePanel v-if="tab === 'knowledge'" :categories="admin.data.value.categories" @changed="refresh" />
+    <AiSettingsPanel v-if="tab === 'features'" />
   </template>
 </template>

@@ -472,4 +472,7 @@ def build_router(app):
             headers={"Content-Disposition": 'attachment; filename="cong-viec.csv"'},
         )
 
+    # The AI digest and report narrative read the same figures people see.
+    app.state.me_overview = overview_for_me
+    app.state.reports_overview = overview
     return router
