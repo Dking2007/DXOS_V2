@@ -76,6 +76,11 @@
   `dx_workspace/text.py` và `apps/shared/src/text.ts`.
 - Bỏ mũi tên ▾ ở nhãn "e-Office" trên thanh bên: không có chức năng chuyển không gian nào.
 
+### Fixed
+- Điện thoại: dòng "giờ · phạm vi" ở đầu bài viết bảng tin không còn xuống dòng từng chữ (cắt bằng dấu …,
+  nhãn "Đã ghim" chỉ còn biểu tượng); nút trợ lý AI thu sang mép phải khi cuộn xuống và trang có thêm khoảng
+  trống cuối, nên không còn che nút ở hàng cuối danh sách Việc hôm nay.
+
 ## [0.2.2] - 2026-10-31
 
 ### Added

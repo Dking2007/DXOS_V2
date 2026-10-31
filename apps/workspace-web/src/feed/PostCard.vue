@@ -109,7 +109,7 @@ const me = computed(() => session.user?.display_name ?? '')
           >
         </small>
       </div>
-      <span v-if="post.pinned_at" class="feed-pin"><Pin :size="12" />Đã ghim</span>
+      <span v-if="post.pinned_at" class="feed-pin" title="Đã ghim"><Pin :size="12" /><span class="feed-pin-text">Đã ghim</span></span>
       <div v-if="post.can_moderate || post.can_edit" ref="menuRoot" class="feed-menu">
         <button
           class="icon-button"

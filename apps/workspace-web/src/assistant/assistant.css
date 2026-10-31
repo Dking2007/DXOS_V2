@@ -603,6 +603,18 @@ body .toaster {
   body:has(.sticky-actions) .assistant-fab {
     bottom: calc(150px + env(safe-area-inset-bottom));
   }
+  .assistant-fab {
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+  /* Slid mostly off the right edge while scrolling down; a sliver stays visible and tappable. */
+  .assistant-fab.tucked {
+    transform: translateX(60%);
+    opacity: 0.55;
+  }
+  /* Room under the last row so nothing ends up permanently behind the round button. */
+  body .workspace-main {
+    padding-bottom: calc(140px + env(safe-area-inset-bottom));
+  }
   body .toaster {
     bottom: calc(140px + env(safe-area-inset-bottom));
   }
