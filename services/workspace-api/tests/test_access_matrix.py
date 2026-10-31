@@ -99,3 +99,17 @@ def test_governance_routes_need_their_permission(world):
         client = as_(world, who)
         assert client.get(B + "/assistant/admin").status_code in (403, 404), who
         assert client.patch(B + "/roles/staff", json={"permissions": ["forms.manage"]}).status_code in (403, 404, 422), who
+
+
+def test_service_principal_cannot_act_as_a_user(world, resources):
+    """The Workspace service token is for Core calls; it must not read user data through the user API."""
+    client = as_(world, "service")
+    file_id, case_id = resources["file"]["id"], resources["case"]["id"]
+    for method, route in (
+        ("get", "/me"), ("get", "/drive/files"), ("get", f"/drive/files/{file_id}"),
+        ("post", f"/drive/files/{file_id}/download"), ("get", "/cases"), ("get", f"/cases/{case_id}"),
+        ("get", "/users"), ("get", "/audit-logs"), ("get", "/tasks"), ("get", "/reports/tasks.csv"),
+        ("get", "/search?q=zq77"), ("get", "/conversations"), ("get", "/posts"),
+        ("get", "/assistant/admin"), ("get", "/roles"),
+    ):
+        assert getattr(client, method)(B + route).status_code == 403, route
