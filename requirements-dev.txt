@@ -1,5 +1,6 @@
 -c requirements.lock
 -e ./packages/platform-kit
+-e ./packages/flowkit
 -e ./services/core-api
 -e ./services/workspace-api
 pytest==8.4.2

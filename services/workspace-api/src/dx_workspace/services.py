@@ -107,7 +107,6 @@ def case_event(case) -> dict:
         "status": case.status,
         "priority": case.priority,
         "owner_id": case.owner_id,
-        "assignee_id": case.assignee_id or case.owner_id,
         "department_id": case.department_id,
         "form_id": case.form_id,
     }

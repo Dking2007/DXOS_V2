@@ -622,7 +622,7 @@ def test_trashed_folder_grants_nothing(world):
 
 
 def make_dossier(world, form, **extra):
-    """Create a dossier with triage fields, defaulting to no explicit assignee."""
+    """Create a dossier with triage fields."""
     client, _, _, _, _, actors, current, _, _ = world
     current[0] = actors["staff"]
     body = {
@@ -643,34 +643,31 @@ def test_triage_fields_default_to_owner_and_normal(world):
     client, _, _, _, _, actors, current, users, _ = world
     assert case["priority"] == "normal"
     assert case["due_at"] is None
-    # The creator carries the dossier until someone else is named.
-    assert case["assignee_id"] == users["staff"]
-    assert case["assignee_name"]
     assert case["overdue"] is False
-
-
-def test_triage_fields_persist_and_handover_keeps_ownership(world):
-    client, _, _, _, _, actors, current, users, _ = world
-    form = make_form(world)
-    case = make_dossier(
-        world,
-        form,
-        priority="urgent",
-        due_at="2026-10-01T00:00:00Z",
-        assignee_id=None,
-    )
-    assert case["priority"] == "urgent"
-    assert case["overdue"] is True
-    # Hand the dossier to the manager; ownership stays with the creator.
-    handed = client.patch(
+    # Work on a dossier is a linked task; the dossier itself has no assignee to set.
+    assert "assignee_id" not in case
+    current[0] = actors["staff"]
+    rejected = client.patch(
         f"/workspace/v1/cases/{case['id']}",
         json={"expected_revision": case["revision"], "assignee_id": users["manager"]},
-        headers={"Idempotency-Key": "handover"},
     )
-    assert handed.status_code == 200, handed.text
-    assert handed.json()["assignee_id"] == users["manager"]
-    assert handed.json()["owner_id"] == case["owner_id"]
-    assert handed.json()["priority"] == "urgent"
+    assert rejected.status_code == 422
+
+
+def test_triage_fields_persist(world):
+    client, _, _, _, _, actors, current, users, _ = world
+    form = make_form(world)
+    case = make_dossier(world, form, priority="urgent", due_at="2026-10-01T00:00:00Z")
+    assert case["priority"] == "urgent"
+    assert case["overdue"] is True
+    changed = client.patch(
+        f"/workspace/v1/cases/{case['id']}",
+        json={"expected_revision": case["revision"], "priority": "high"},
+        headers={"Idempotency-Key": "reprioritise"},
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["owner_id"] == case["owner_id"]
+    assert changed.json()["priority"] == "high"
 
 
 def test_approved_dossier_is_no_longer_overdue(world):
@@ -703,20 +700,6 @@ def test_approved_dossier_is_no_longer_overdue(world):
     settled = client.get(f"/workspace/v1/cases/{case['id']}").json()
     assert settled["status"] == "approved"
     assert settled["overdue"] is False
-
-
-def test_assignee_must_be_able_to_read_the_dossier(world):
-    client, _, _, _, _, actors, current, users, _ = world
-    form = make_form(world)
-    case = make_dossier(world, form)
-    current[0] = actors["staff"]
-    response = client.patch(
-        f"/workspace/v1/cases/{case['id']}",
-        json={"expected_revision": case["revision"], "assignee_id": users["staff_b"]},
-        headers={"Idempotency-Key": "handover-outsider"},
-    )
-    assert response.status_code == 422, response.text
-    assert response.json()["code"] == "assignee_invalid"
 
 
 def test_future_due_date_is_not_overdue(world):

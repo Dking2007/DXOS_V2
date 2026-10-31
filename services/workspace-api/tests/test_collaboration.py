@@ -243,6 +243,10 @@ def test_search_and_reports_only_count_what_the_user_may_see(world):  # noqa: F8
     client = as_(world, "staff")
     found = client.get(API + "/search?q=KIỂM KÊ").json()
     assert [i["id"] for i in found["groups"]["task"]["items"]] == [task["id"]]
+    # Typing without accents finds the accented title, in global search and in the task list.
+    plain = client.get(API + "/search?q=kiem ke").json()
+    assert [i["id"] for i in plain["groups"]["task"]["items"]] == [task["id"]]
+    assert [i["id"] for i in client.get(API + "/tasks?q=kiem ke").json()["items"]] == [task["id"]]
     hidden = as_(world, "outsider").get(API + "/search?q=kiểm kê").json()
     assert hidden["groups"]["task"]["total"] == 0
     report = as_(world, "manager").get(API + "/reports/overview?scope=managed").json()
@@ -605,6 +609,40 @@ def test_flow_branches_and_wait_resume(world):  # noqa: F811
     assert sorted(r["state"] for r in finished) == ["succeeded", "succeeded"]
 
 
+def test_steps_after_a_wait_see_the_record_as_it_is_now(world):  # noqa: F811
+    """A reminder after a wait only fires for work that is still returned."""
+    _, _, engine, _, _, _, _, users, _ = world
+    director = as_(world, "director")
+    graph = {
+        "nodes": [
+            node("start", "trigger", event="task.returned"),
+            node("later", "wait", minutes=1440),
+            node("still", "if", conditions=[{"field": "status", "operator": "eq", "value": "returned"}]),
+            node("remind", "notify", recipients=["creator"], title="Vẫn chưa làm lại: {title}"),
+        ],
+        "edges": [edge("start", "later"), edge("later", "still"), edge("still", "remind", "true")],
+    }
+    rule = director.post(API + "/automations", json={"name": "Nhắc việc bị trả lại", "graph": graph}).json()
+    enable(director, rule)
+    returned = {}
+    for title in ("Bỏ quên", "Đã làm lại"):
+        task = new_task(world, by="director", title=title, assignee_id=users["staff"])
+        task = transition(as_(world, "staff"), task, "accept").json()
+        task = transition(as_(world, "staff"), task, "submit").json()
+        response = transition(as_(world, "director"), task, "return", reason="Thiếu số liệu")
+        assert response.status_code == 200, response.text
+        returned[title] = response.json()
+    process_due(world)
+    assert transition(as_(world, "staff"), returned["Đã làm lại"], "start").status_code == 200
+    with Session(engine) as db:
+        for job in db.scalars(select(Outbox).where(Outbox.kind == "automation.resume")):
+            job.available_at = datetime.now(UTC) - timedelta(seconds=1)
+        db.commit()
+    drain(world)
+    reminders = [t for t in titles(as_(world, "director")) if t.startswith("Vẫn chưa làm lại")]
+    assert reminders == ["Vẫn chưa làm lại: Bỏ quên"]
+
+
 def test_manual_run_uses_a_visible_record_and_reports_what_it_ran_for(world):  # noqa: F811
     users = world[7]
     director = as_(world, "director")
@@ -897,3 +935,12 @@ def test_feed_posts_carry_pictures_visible_only_with_the_post(world):  # noqa: F
     # Deleting the post hides its pictures.
     as_(world, "staff").delete(f"{API}/posts/{post['id']}")
     assert as_(world, "manager").get(picture["url"]).status_code == 404
+
+
+def test_audit_log_names_who_acted_and_is_admin_only(world):  # noqa: F811
+    users = world[7]
+    task = new_task(world, title="Rà soát hợp đồng", assignee_id=users["staff"])
+    entries = as_(world, "director").get(API + "/audit-logs?limit=200").json()["items"]
+    created = next(e for e in entries if e["action"] == "task.created" and e["resource_id"] == task["id"])
+    assert created["actor_name"] and created["actor_name"] != created["actor_id"]
+    assert as_(world, "staff").get(API + "/audit-logs").status_code == 403

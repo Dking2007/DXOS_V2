@@ -93,9 +93,6 @@
   font-size: 11px;
   margin-top: 2px;
 }
-.workspace-label > svg:last-child {
-  margin-left: auto;
-}
 .organization-icon {
   height: 31px;
   width: 31px;
@@ -221,7 +218,6 @@
   .app-shell.sidebar-collapsed .brand { justify-content: center; padding-right: 0; padding-left: 0; }
   .app-shell.sidebar-collapsed .brand > span:last-child,
   .app-shell.sidebar-collapsed .workspace-label > div,
-  .app-shell.sidebar-collapsed .workspace-label > svg:last-child,
   .app-shell.sidebar-collapsed .nav-label,
   .app-shell.sidebar-collapsed .nav-link > span,
   .app-shell.sidebar-collapsed .sidebar-collapse > span,

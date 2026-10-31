@@ -161,11 +161,11 @@ export function readiness(version: PackageVersion, suites: Suite[], reports: Rep
   const latest = latestReports(reports, version.config_hash)
   const validated = version.state === 'validated' || version.state === 'published'
   const hasSuites = current.length > 0
-  const allPassed = hasSuites && current.every((suite) => latest.get(suite.id)?.passed)
+  // Test sets are optional; the ones that exist must pass on their latest run.
+  const allPassed = current.every((suite) => latest.get(suite.id)?.passed)
   let blocker: string | null = null
   if (version.state === 'published') blocker = null
   else if (!validated) blocker = 'Kiểm tra cấu hình trước.'
-  else if (!hasSuites) blocker = 'Lưu ít nhất một bộ kịch bản chạy thử.'
   else if (!allPassed) blocker = 'Chạy lại cho tới khi mọi bộ kịch bản đều đạt.'
   return { validated, hasSuites, allPassed, canPublish: version.state === 'validated' && allPassed, blocker }
 }

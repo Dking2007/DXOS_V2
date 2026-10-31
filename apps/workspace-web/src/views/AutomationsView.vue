@@ -281,7 +281,11 @@ async function saveConnection() {
   </section>
 
   <ModalDialog v-if="showTemplates" title="Tạo luồng mới" wide @close="showTemplates = false">
-    <p class="muted" style="margin-bottom: 16px">Chọn một mẫu để bắt đầu; mọi bước đều chỉnh được trên canvas.</p>
+    <p class="muted" style="margin-bottom: 16px">
+      Hệ thống đã tự báo những việc cơ bản (giao việc, nộp kết quả, trả lại, kết quả duyệt hồ sơ). Dùng luồng cho
+      những gì thông báo sẵn không làm được: nhắc khi việc vẫn chưa xong sau một thời gian, báo thêm người khác, tự
+      tạo việc. Mọi bước đều chỉnh được trên canvas.
+    </p>
     <div class="template-grid">
       <button
         v-for="template in TEMPLATES"

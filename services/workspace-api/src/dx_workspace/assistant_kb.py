@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import math
 import re
-import unicodedata
 from collections import Counter
 from dataclasses import dataclass
 from itertools import pairwise
+
+from .text import fold
 
 CHUNK_CHARS = 900
 # Words so common in questions that they say nothing about the topic.
@@ -29,12 +30,6 @@ CATEGORIES = {
     "faq": "Hỏi đáp",
     "other": "Khác",
 }
-
-
-def fold(text: str) -> str:
-    """Lower case without Vietnamese accents, so typing without marks still matches."""
-    text = unicodedata.normalize("NFD", text.lower()).replace("đ", "d")
-    return "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
 
 
 def words(text: str) -> list[str]:

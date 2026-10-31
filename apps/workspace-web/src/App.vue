@@ -5,7 +5,6 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, RouterLink, RouterView } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import {
-  ChevronDown,
   LogOut,
   Menu,
   Moon,
@@ -102,7 +101,6 @@ function toggleSidebarCollapsed() {
       <div class="workspace-label">
         <span class="organization-icon"><ShieldCheck :size="17" /></span>
         <div><strong>e-Office</strong><small>Không gian nội bộ</small></div>
-        <ChevronDown :size="14" />
       </div>
       <nav aria-label="Điều hướng chính" data-tour="nav" class="nav-groups">
         <div

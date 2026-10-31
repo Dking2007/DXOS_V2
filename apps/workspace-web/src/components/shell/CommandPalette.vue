@@ -19,6 +19,7 @@ import {
   Sparkles,
   SquarePen,
 } from 'lucide-vue-next'
+import { fold } from '@dx/web-shared/text.ts'
 import { api } from '../../api'
 import { useSession } from '../../stores/session'
 import { visibleGroups } from '../../ui/nav'
@@ -124,14 +125,10 @@ const staticCommands = computed<Command[]>(() => {
   return commands
 })
 
-function normalize(value: string) {
-  return value.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').toLowerCase()
-}
-
 const results = computed<Command[]>(() => {
-  const q = normalize(text.value.trim())
+  const q = fold(text.value.trim())
   const matches = staticCommands.value.filter(
-    (item) => !q || normalize(`${item.label} ${item.hint}`).includes(q),
+    (item) => !q || fold(`${item.label} ${item.hint}`).includes(q),
   )
   const hits: Command[] = []
   if (debounced.value.length >= 2)

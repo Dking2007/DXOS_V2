@@ -72,7 +72,7 @@ another language.
 | Node | Purpose |
 |---|---|
 | `start` / `end` | Exactly one start; every branch ends at an end. |
-| `if` | Compares `config.path` with `config.value` using `eq ne gt gte lt lte in exists`. Edges leaving it use `when: true/false` (or a string). |
+| `if` | Compares `config.path` with `config.value` using `eq ne gt gte lt lte in contains exists empty not_empty` (see `compare`). Edges leaving it use `when: true/false` (or a string). |
 | `map` | Builds output from `config.values`, resolving `$.path` / `${path}` references. |
 | `human_task` | Needs `config.assigned_subject`. Waits for a decision in simulation. |
 
@@ -87,9 +87,11 @@ Paths read from `{"input": ..., "nodes": {<id>: {"output": ...}}}`. Keys startin
   tell you whether an action would succeed.
 - It does not run live workflows. Persistence, retries and locking are the host
   application's job (Desktiny does this in `dx_core.workflow.advance`).
-- Conditions compare Python values: `"10" > 5` raises `condition_type_error`, it does
-  not coerce.
-- Version `0.1.0`, not yet published to PyPI.
+- Conditions do not coerce: ordering needs two numbers or two strings, so `"10" > 5`
+  and `True > 0` raise `condition_type_error`. `compare(operator, left, right)` applies
+  the same rule to plain values; Desktiny uses it for form, approval-step and
+  automation conditions too, treating the error as "no match".
+- Version `0.2.0`, not yet published to PyPI.
 
 ## Development
 
@@ -98,7 +100,7 @@ pip install pytest .
 python -m pytest
 ```
 
-56 tests cover each operator, each validation error code, the simulation paths, and a
+67 tests cover each operator, each validation error code, the simulation paths, and a
 check that the package imports nothing outside the standard library and never calls
 `eval`/`exec`.
 

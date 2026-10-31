@@ -15,6 +15,8 @@ import {
   Workflow,
 } from 'lucide-vue-next'
 import { api } from '../api'
+import { useSession } from '../stores/session'
+import ProcessWaitCard from '../components/ProcessWaitCard.vue'
 import { formatDate, formatSize } from '@dx/web-shared/api.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
@@ -44,6 +46,10 @@ interface Overview {
   storage: { my_files: number; my_bytes: number }
   automations?: { failed_in_period: number; enabled_rules: number }
 }
+const session = useSession()
+const canSeeProcess = computed(
+  () => session.can('cases.read.department') || session.can('cases.read.organization'),
+)
 const days = ref(30)
 const scope = ref<'all' | 'mine' | 'managed'>('all')
 const report = useQuery({
@@ -142,7 +148,7 @@ function bars(record: Record<string, number>) {
           <div class="card-body">
             <p v-if="!data.tasks.total" class="muted">Chưa có công việc trong phạm vi.</p>
             <div v-for="row in bars(data.tasks.by_status)" :key="row.status" class="bar-row">
-              <StatusBadge :status="row.status" />
+              <StatusBadge kind="task" :status="row.status" />
               <div class="metric-bar"><span :style="{ width: `${row.width}%` }" /></div>
               <strong>{{ row.count }}</strong>
             </div>
@@ -213,5 +219,6 @@ function bars(record: Record<string, number>) {
         </section>
       </aside>
     </div>
+    <ProcessWaitCard v-if="canSeeProcess" :days="days" />
   </template>
 </template>

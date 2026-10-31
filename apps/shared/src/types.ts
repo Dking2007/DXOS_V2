@@ -105,6 +105,9 @@ export interface CaseItem {
   payload?: Record<string, unknown>
   payload_revision?: number
   file_ids?: string[]
+  /** How many times it was submitted; 0 means a draft nobody has seen, which may be deleted. */
+  submission_no?: number
+  archived_at?: string | null
 }
 export interface Submission {
   id: string

@@ -221,9 +221,51 @@ export const TEMPLATES: { key: string; title: string; description: string; graph
     graph: { nodes: [n('trigger', 'trigger', 0, 0)], edges: [] },
   },
   {
+    key: 'returned-reminder',
+    title: 'Việc trả lại chưa làm lại sau 1 ngày → nhắc',
+    description:
+      'Người làm đã được báo khi việc bị trả lại. Luồng chờ 1 ngày, nếu việc vẫn ở trạng thái Trả lại thì nhắc cả người làm và người giao.',
+    graph: {
+      nodes: [
+        n('trigger', 'trigger', 0, 60, { event: 'task.returned' }),
+        n('wait_day', 'wait', 300, 60, { minutes: 1440 }),
+        n('if_still', 'if', 600, 60, {
+          mode: 'all',
+          conditions: [{ field: 'status', operator: 'eq', value: 'returned' }],
+        }),
+        n('notify_both', 'notify', 920, 60, {
+          recipients: ['assignee', 'creator'],
+          title: 'Việc bị trả lại vẫn chưa được làm lại: {title}',
+        }),
+      ],
+      edges: [e('trigger', 'wait_day'), e('wait_day', 'if_still'), e('if_still', 'notify_both', 'true')],
+    },
+  },
+  {
+    key: 'case-revision-reminder',
+    title: 'Hồ sơ trả lại chưa trình lại sau 2 ngày → nhắc',
+    description:
+      'Nếu sau 2 ngày hồ sơ vẫn ở trạng thái Cần chỉnh sửa thì nhắc người lập và lãnh đạo đơn vị.',
+    graph: {
+      nodes: [
+        n('trigger', 'trigger', 0, 60, { event: 'case.needs_revision' }),
+        n('wait_days', 'wait', 300, 60, { minutes: 2880 }),
+        n('if_still', 'if', 600, 60, {
+          mode: 'all',
+          conditions: [{ field: 'status', operator: 'eq', value: 'needs_revision' }],
+        }),
+        n('notify_owner', 'notify', 920, 60, {
+          recipients: ['owner', 'department_manager'],
+          title: 'Hồ sơ bị trả lại chưa được trình lại: {title}',
+        }),
+      ],
+      edges: [e('trigger', 'wait_days'), e('wait_days', 'if_still'), e('if_still', 'notify_owner', 'true')],
+    },
+  },
+  {
     key: 'urgent-submitted',
-    title: 'Việc khẩn được nộp → báo lãnh đạo',
-    description: 'Nếu việc có ưu tiên Khẩn thì báo lãnh đạo đơn vị và người giao; nếu không thì chỉ báo người giao.',
+    title: 'Việc khẩn được nộp → báo lãnh đạo đơn vị',
+    description: 'Người giao đã được báo sẵn khi có kết quả. Luồng báo thêm lãnh đạo đơn vị nếu việc có ưu tiên Khẩn.',
     graph: {
       nodes: [
         n('trigger', 'trigger', 0, 80, { event: 'task.submitted' }),
@@ -231,57 +273,29 @@ export const TEMPLATES: { key: string; title: string; description: string; graph
           mode: 'all',
           conditions: [{ field: 'priority', operator: 'eq', value: 'urgent' }],
         }),
-        n('notify_leader', 'notify', 620, 0, {
-          recipients: ['department_manager', 'creator'],
+        n('notify_leader', 'notify', 620, 80, {
+          recipients: ['department_manager'],
           title: 'Việc khẩn đã nộp kết quả: {title}',
         }),
-        n('notify_creator', 'notify', 620, 180, {
-          recipients: ['creator'],
-          title: 'Có kết quả cần nghiệm thu: {title}',
-        }),
       ],
-      edges: [
-        e('trigger', 'if_urgent'),
-        e('if_urgent', 'notify_leader', 'true'),
-        e('if_urgent', 'notify_creator', 'false'),
-      ],
+      edges: [e('trigger', 'if_urgent'), e('if_urgent', 'notify_leader', 'true')],
     },
   },
   {
     key: 'case-approved',
     title: 'Hồ sơ được duyệt → tạo việc lưu trữ',
-    description: 'Mỗi hồ sơ được phê duyệt tự sinh một việc lưu trữ cho người phụ trách.',
+    description:
+      'Tạo một việc lưu trữ gắn với hồ sơ, hạn 3 ngày. Chọn người hoặc phòng nhận việc trong node. Người lập hồ sơ đã được báo kết quả sẵn.',
     graph: {
       nodes: [
         n('trigger', 'trigger', 0, 60, { event: 'case.approved' }),
-        n('task_archive', 'create_task', 320, 0, {
+        n('task_archive', 'create_task', 320, 60, {
           title: 'Lưu trữ hồ sơ: {title}',
           priority: 'normal',
           due_in_days: 3,
         }),
-        n('notify_owner', 'notify', 320, 160, {
-          recipients: ['owner'],
-          title: 'Hồ sơ đã được duyệt: {title}',
-        }),
       ],
-      edges: [e('trigger', 'task_archive'), e('trigger', 'notify_owner')],
-    },
-  },
-  {
-    key: 'returned-reminder',
-    title: 'Việc bị trả lại → nhắc sau 1 ngày',
-    description: 'Báo ngay cho người phụ trách, chờ 1 ngày rồi nhắc lại người giao theo dõi.',
-    graph: {
-      nodes: [
-        n('trigger', 'trigger', 0, 60, { event: 'task.returned' }),
-        n('notify_now', 'notify', 300, 60, { recipients: ['assignee'], title: 'Việc bị trả lại: {title}' }),
-        n('wait_day', 'wait', 600, 60, { minutes: 1440 }),
-        n('notify_later', 'notify', 900, 60, {
-          recipients: ['creator'],
-          title: 'Theo dõi việc đã trả lại hôm qua: {title}',
-        }),
-      ],
-      edges: [e('trigger', 'notify_now'), e('notify_now', 'wait_day'), e('wait_day', 'notify_later')],
+      edges: [e('trigger', 'task_archive')],
     },
   },
 ]

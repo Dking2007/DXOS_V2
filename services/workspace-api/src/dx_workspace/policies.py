@@ -126,16 +126,18 @@ def approval_assignees(db: Session, user: User) -> list[str]:
 
 
 def case_filter(db: Session, user: User):
+    """Dossiers this user may see. Deleted drafts are gone for everyone."""
+    alive = Case.deleted_at.is_(None)
     own = Case.owner_id == user.id
     participating = Case.id.in_(
         select(ApprovalTask.case_id).where(ApprovalTask.assignee_id.in_(approval_assignees(db, user)))
     )
     perms = permissions(db, user)
     if "cases.read.organization" in perms:
-        return True
+        return alive
     if "cases.read.department" in perms and user.department_id:
-        return or_(own, participating, Case.department_id == user.department_id)
-    return or_(own, participating)
+        return alive & or_(own, participating, Case.department_id == user.department_id)
+    return alive & or_(own, participating)
 
 
 def is_overdue(value: Case) -> bool:
@@ -145,7 +147,7 @@ def is_overdue(value: Case) -> bool:
     since that is the timezone every value is written in; comparing without normalizing
     would raise instead of answering.
     """
-    if not value.due_at or value.status in {"approved", "rejected", "archived"}:
+    if not value.due_at or value.archived_at or value.status in {"approved", "rejected", "cancelled"}:
         return False
     from .models import utcnow
 
@@ -165,8 +167,10 @@ def get_case(db: Session, user: User, case_id: str) -> Case:
 def case_readable(db: Session, user: User, value: Case) -> bool:
     """True when the same visibility rule that governs `get_case` would admit this user.
 
-    Used before assigning a dossier: the assignee has to work on something they can open.
+    Used where a dossier is referenced from elsewhere, such as a chat about it.
     """
+    if value.deleted_at:
+        return False
     own = value.owner_id == user.id
     participating = db.scalar(
         select(ApprovalTask.id).where(

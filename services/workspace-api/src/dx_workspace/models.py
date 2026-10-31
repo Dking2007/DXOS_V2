@@ -176,11 +176,14 @@ class Case(Base):
     status: Mapped[str] = mapped_column(String(40), default="draft", index=True)
     revision: Mapped[int] = mapped_column(default=1)
     submission_no: Mapped[int] = mapped_column(default=0)
-    # Triaging fields: who carries the dossier and by when. The assignee defaults to the
-    # owner; setting it is what lets a manager hand work over without transferring ownership.
+    # Triaging fields: how urgent the dossier is and by when it must be settled. Work on a
+    # dossier is handed to someone as a task linked to it, so the dossier has no assignee.
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     priority: Mapped[str] = mapped_column(String(20), default="normal")
-    assignee_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    # A draft that was never submitted can be deleted; it is hidden, not erased, so the audit
+    # log still points somewhere. Archiving only hides a settled dossier from the default list.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

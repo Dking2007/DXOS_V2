@@ -20,7 +20,7 @@ import {
   queryString,
 } from '@dx/web-shared/api.ts'
 import type { Page } from '@dx/web-shared/api.ts'
-import type { CaseItem, DriveFile, FormTemplate, User } from '@dx/web-shared/types.ts'
+import type { CaseItem, DriveFile, FormTemplate } from '@dx/web-shared/types.ts'
 import type { components } from '@dx/web-shared/generated/workspace-api.ts'
 import { initialPayload, validatePayload } from '@dx/web-shared/forms.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
@@ -34,6 +34,8 @@ const route = useRoute()
 const session = useSession()
 const router = useRouter()
 const queryClient = useQueryClient()
+// Archived dossiers are a separate pile rather than a status: they keep their result.
+const ARCHIVED = 'archived'
 const status = ref('')
 const search = ref('')
 const cursor = ref<string | null>(null)
@@ -41,7 +43,11 @@ const cases = useQuery({
   queryKey: computed(() => ['cases', status.value, search.value, cursor.value]),
   queryFn: () =>
     api.request<Page<CaseItem>>(
-      `/cases${queryString({ status: status.value, q: search.value, cursor: cursor.value })}`,
+      `/cases${queryString(
+        status.value === ARCHIVED
+          ? { archived: true, q: search.value, cursor: cursor.value }
+          : { status: status.value, q: search.value, cursor: cursor.value },
+      )}`,
     ),
 })
 const forms = useQuery({
@@ -70,7 +76,6 @@ const payload = ref<Record<string, unknown>>({})
 const fileIds = ref<string[]>([])
 const priority = ref<'low' | 'normal' | 'high' | 'urgent'>('normal')
 const dueAt = ref('')
-const assigneeId = ref('')
 const errors = ref<Record<string, string>>({})
 const error = ref<unknown>(null)
 const busy = ref(false)
@@ -81,10 +86,6 @@ const selectedForm = computed(() =>
 const matchingPackages = computed(() =>
   activePackages.data.value?.items.filter((item) => item.form_id === formId.value) ?? [],
 )
-const members = useQuery({
-  queryKey: ['users', 'assignees'],
-  queryFn: () => api.request<Page<User>>('/users'),
-})
 watch(formId, () => {
   packageVersionId.value = ''
   payload.value = initialPayload(selectedForm.value?.fields ?? [])
@@ -103,7 +104,6 @@ function openCreate() {
   intent.value = newIntent()
   priority.value = 'normal'
   dueAt.value = ''
-  assigneeId.value = ''
 }
 const createDirty = computed(
   () =>
@@ -148,7 +148,6 @@ async function create() {
         file_ids: fileIds.value,
         priority: priority.value,
         due_at: dueInstant(),
-        assignee_id: assigneeId.value || null,
       } satisfies components['schemas']['CaseCreate']),
     })
     await queryClient.invalidateQueries({ queryKey: ['cases'] })
@@ -183,6 +182,8 @@ async function create() {
             { value: 'processing', label: 'Đang xử lý' },
             { value: 'needs_revision', label: 'Cần sửa' },
             { value: 'approved', label: 'Đã duyệt' },
+            { value: 'cancelled', label: 'Đã hủy' },
+            { value: ARCHIVED, label: 'Lưu trữ' },
           ]"
           :key="tab.value"
           class="tab"
@@ -349,19 +350,6 @@ async function create() {
           <div class="field">
             <label for="case-due">Hạn xử lý</label
             ><input id="case-due" v-model="dueAt" type="datetime-local" />
-          </div>
-          <div class="field">
-            <label for="case-assignee">Người phụ trách</label
-            ><select id="case-assignee" v-model="assigneeId">
-              <option value="">Tôi (người tạo)</option>
-              <option
-                v-for="member in members.data.value?.items"
-                :key="member.id"
-                :value="member.id"
-              >
-                {{ member.display_name }}
-              </option></select
-            ><small>Người nhận phải thuộc phạm vi đơn vị của hồ sơ.</small>
           </div>
         </div>
         <template v-if="selectedForm"

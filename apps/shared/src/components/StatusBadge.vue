@@ -1,7 +1,12 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
-defineProps<{ status: string }>()
+/** `kind="task"` uses task wording: a task's result is accepted ("nghiệm thu"), a dossier is approved. */
+const props = defineProps<{ status: string; kind?: 'task' }>()
+const taskLabels: Record<string, string> = {
+  submitted: 'Chờ nghiệm thu',
+  completed: 'Đã nghiệm thu',
+}
 const labels: Record<string, string> = {
   draft: 'Bản nháp',
   pending_workflow_start: 'Đang khởi tạo',
@@ -40,6 +45,6 @@ const labels: Record<string, string> = {
 </script>
 <template>
   <span class="status-badge" :class="`status-${status}`"
-    ><span class="status-dot" />{{ labels[status] || status }}</span
+    ><span class="status-dot" />{{ (props.kind === 'task' && taskLabels[status]) || labels[status] || status }}</span
   >
 </template>

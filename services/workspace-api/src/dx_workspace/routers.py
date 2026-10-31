@@ -8,7 +8,7 @@ from typing import Literal
 
 from dx_platform.auth import Actor
 from dx_platform.errors import AppError
-from fastapi import APIRouter, Depends, File, Header, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Header, Query, Request, Response, UploadFile
 from fastapi import Form as MultipartForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,7 +20,6 @@ from .policies import (
     ALLOWED_PERMISSIONS,
     approval_assignees,
     case_filter,
-    case_readable,
     current_user,
     edit_case,
     file_access,
@@ -47,6 +46,7 @@ from .services import (
     page,
     serial,
 )
+from .text import matches
 
 
 def changes_require_owner(fields: dict) -> bool:
@@ -138,8 +138,6 @@ def build_router(app):
         data["code"] = f"HS-{value.number:06d}"
         owner = db.get(m.User, value.owner_id)
         data["owner_name"] = owner.display_name if owner else ""
-        assignee = db.get(m.User, value.assignee_id) if value.assignee_id else None
-        data["assignee_name"] = assignee.display_name if assignee else (owner.display_name if owner else "")
         data["overdue"] = is_overdue(value)
         form = db.get(m.Form, value.form_id)
         data["form_name"] = form.name if form else ""
@@ -461,11 +459,9 @@ def build_router(app):
         )
         if not q:
             statement = statement.where(m.DriveFile.folder_id == folder_id)
-        else:
-            statement = statement.where(
-                m.DriveFile.name.ilike("%" + q.replace("%", "\\%").replace("_", "\\_") + "%", escape="\\")
-            )
-        candidates = [v for v in db.scalars(statement) if file_access(db, user, v)]
+        candidates = [
+            v for v in db.scalars(statement) if (not q or matches(q, v.name)) and file_access(db, user, v)
+        ]
         if sort_by == "name":
             candidates.sort(key=lambda value: (value.name.casefold(), value.id), reverse=descending)
         elif sort_by == "size":
@@ -809,6 +805,7 @@ def build_router(app):
     def cases(
         status: str | None = None,
         q: str = "",
+        archived: bool = False,
         limit: int = Query(100, ge=1, le=200),
         cursor: str | None = None,
         db: Session = Depends(db_dep),
@@ -816,14 +813,20 @@ def build_router(app):
     ):
         user = context(db, actor)
         statement = select(m.Case).where(case_filter(db, user))
+        # Archived and cancelled dossiers leave the working list but stay one filter away.
+        statement = statement.where(
+            m.Case.archived_at.is_not(None) if archived else m.Case.archived_at.is_(None)
+        )
         if status:
             statement = statement.where(m.Case.status == status)
-        if q:
-            statement = statement.where(
-                m.Case.title.ilike("%" + q.replace("%", "\\%").replace("_", "\\_") + "%", escape="\\")
-            )
+        elif not archived:
+            statement = statement.where(m.Case.status != "cancelled")
         return page(
-            list(db.scalars(statement.order_by(m.Case.updated_at.desc(), m.Case.id))),
+            [
+                value
+                for value in db.scalars(statement.order_by(m.Case.updated_at.desc(), m.Case.id))
+                if not q or matches(q, value.title, f"HS-{value.number:06d}")
+            ],
             limit,
             cursor,
             transform=lambda v: case_data(db, v),
@@ -872,16 +875,6 @@ def build_router(app):
             if package.allowed_roles and user.role not in package.allowed_roles:
                 raise AppError(403, "package_use_denied", "Vai trò của bạn chưa được dùng gói nghiệp vụ này.")
         payload = s.validate_payload(form, body.payload)
-        if body.assignee_id:
-            assignee = db.get(m.User, body.assignee_id)
-            if not assignee or not assignee.active:
-                raise AppError(422, "assignee_invalid", "Người phụ trách không hoạt động.")
-            if assignee.id != user.id and not case_readable(
-                db, assignee, m.Case(owner_id=user.id, department_id=user.department_id)
-            ):
-                raise AppError(
-                    422, "assignee_invalid", "Người phụ trách phải thuộc phạm vi đơn vị của hồ sơ."
-                )
         for file_id in body.file_ids:
             get_file(db, user, file_id)
         record = core(actor).post(
@@ -907,9 +900,6 @@ def build_router(app):
             file_ids=list(dict.fromkeys(body.file_ids)),
             priority=body.priority,
             due_at=body.due_at,
-            # The owner carries the dossier until someone is named; handover is a change of
-            # assignee, never of ownership, so the creator keeps editing and trashing rights.
-            assignee_id=body.assignee_id or user.id,
         )
         db.add(value)
         db.flush()
@@ -1024,15 +1014,6 @@ def build_router(app):
         if body.file_ids is not None:
             for file_id in body.file_ids:
                 get_file(db, user, file_id)
-        if body.assignee_id is not None:
-            assignee = db.get(m.User, body.assignee_id)
-            if not assignee or not assignee.active:
-                raise AppError(422, "assignee_invalid", "Người phụ trách không hoạt động.")
-            # The assignee works on the dossier, so they must already be allowed to read it.
-            if assignee.id != value.owner_id and not case_readable(db, assignee, value):
-                raise AppError(
-                    422, "assignee_invalid", "Người phụ trách phải thuộc phạm vi được xem của hồ sơ."
-                )
         if body.payload is not None:
             form = db.get(m.Form, value.form_id)
             payload = s.validate_payload(form, body.payload)
@@ -1230,6 +1211,90 @@ def build_router(app):
         db.commit()
         return case_data(db, db.get(m.Case, case_id))
 
+    def lock_case(db, user, case_id):
+        db.scalar(
+            select(m.Case)
+            .where(m.Case.id == case_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return get_case(db, user, case_id)
+
+    @router.delete("/cases/{case_id}", tags=["cases"], status_code=204)
+    def delete_case(
+        case_id: str,
+        expected_revision: int = Query(ge=1),
+        db: Session = Depends(db_dep),
+        actor: Actor = Depends(actor_dep),
+    ):
+        """Delete a draft nobody has seen: only its owner, and only before it was ever submitted."""
+        user = context(db, actor)
+        value = lock_case(db, user, case_id)
+        if value.owner_id != user.id:
+            raise AppError(403, "case_owner_required", "Chỉ người tạo được xóa hồ sơ.")
+        check_revision(value, expected_revision)
+        if value.status != "draft" or value.submission_no:
+            raise AppError(
+                409,
+                "case_not_deletable",
+                "Chỉ xóa được bản nháp chưa từng trình. Hồ sơ đã trình hãy dùng “Hủy hồ sơ”.",
+            )
+        cas(db, m.Case, case_id, expected_revision, {"deleted_at": m.utcnow(), "updated_at": m.utcnow()})
+        audit(db, user, "case.deleted", case_id, {"title": value.title})
+        db.commit()
+        return Response(status_code=204)
+
+    @router.post("/cases/{case_id}/cancel", tags=["cases"])
+    def cancel_case(
+        case_id: str,
+        body: s.WithdrawInput,
+        db: Session = Depends(db_dep),
+        actor: Actor = Depends(actor_dep),
+    ):
+        """Close a dossier its owner gives up on. It stays readable, with its history."""
+        user = context(db, actor)
+        value = lock_case(db, user, case_id)
+        if value.owner_id != user.id:
+            raise AppError(403, "case_owner_required", "Chỉ người tạo được hủy hồ sơ.")
+        check_revision(value, body.expected_revision)
+        if value.status not in {"draft", "needs_revision"}:
+            raise AppError(
+                409,
+                "case_not_cancellable",
+                "Chỉ hủy được hồ sơ đang là bản nháp hoặc bị trả lại; hồ sơ đang trình hãy thu hồi trước.",
+            )
+        cas(db, m.Case, case_id, body.expected_revision, {"status": "cancelled", "updated_at": m.utcnow()})
+        audit(db, user, "case.cancelled", case_id, {"reason": body.reason})
+        db.commit()
+        return case_data(db, db.get(m.Case, case_id))
+
+    @router.post("/cases/{case_id}/archive", tags=["cases"])
+    def archive_case(
+        case_id: str,
+        body: s.ArchiveInput,
+        db: Session = Depends(db_dep),
+        actor: Actor = Depends(actor_dep),
+    ):
+        """Leaders file away settled dossiers (approved, rejected or cancelled); undoable."""
+        user = context(db, actor)
+        perms = permissions(db, user)
+        if not {"cases.read.department", "cases.read.organization"} & perms:
+            raise AppError(403, "permission_denied", "Chỉ lãnh đạo được lưu trữ hồ sơ.")
+        value = lock_case(db, user, case_id)
+        check_revision(value, body.expected_revision)
+        if value.status not in {"approved", "rejected", "cancelled"}:
+            raise AppError(409, "case_not_settled", "Chỉ lưu trữ hồ sơ đã có kết quả hoặc đã hủy.")
+        cas(
+            db,
+            m.Case,
+            case_id,
+            body.expected_revision,
+            {"archived_at": m.utcnow() if body.archived else None, "updated_at": m.utcnow()},
+        )
+        audit(db, user, "case.archived" if body.archived else "case.unarchived", case_id)
+        db.commit()
+        return case_data(db, db.get(m.Case, case_id))
+
     @router.get("/approval-tasks", tags=["approvals"])
     def approval_tasks(
         state: str | None = "pending",
@@ -1377,8 +1442,21 @@ def build_router(app):
     ):
         user = context(db, actor)
         require(db, user, "audit.read")
+        names: dict[str, str] = {}
+
+        def transform(value):
+            data = serial(value)
+            if value.actor_id not in names:
+                actor_user = db.get(m.User, value.actor_id)
+                names[value.actor_id] = actor_user.display_name if actor_user else value.actor_id
+            data["actor_name"] = names[value.actor_id]
+            return data
+
         return page(
-            list(db.scalars(select(m.Audit).order_by(m.Audit.created_at.desc(), m.Audit.id))), limit, cursor
+            list(db.scalars(select(m.Audit).order_by(m.Audit.created_at.desc(), m.Audit.id))),
+            limit,
+            cursor,
+            transform=transform,
         )
 
     return router

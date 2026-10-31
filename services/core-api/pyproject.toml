@@ -9,7 +9,7 @@ name = "dx-core"
 version = "0.2.2"
 license = "Apache-2.0"
 requires-python = ">=3.13"
-dependencies = ["dx-platform-kit==0.2.2"]
+dependencies = ["dx-platform-kit==0.2.2", "dx-flowkit==0.2.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

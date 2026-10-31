@@ -27,14 +27,12 @@ class PackageCreate(s.Input):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=3000)
     form_id: str
-    approval_steps: list[s.ApprovalStep] | None = None
     required_file_count: int = Field(default=0, ge=0, le=30)
     allowed_roles: list[Literal["staff", "manager", "director", "technical_admin"]] = Field(default_factory=list)
 
 
 class VersionCreate(s.Input):
     form_id: str
-    approval_steps: list[s.ApprovalStep] | None = None
     required_file_count: int = Field(default=0, ge=0, le=30)
 
 
@@ -98,13 +96,13 @@ def build_router(app):
         ):
             raise AppError(404, "package_not_found", "Không tìm thấy gói nghiệp vụ.")
 
-    def make_version(db, package, form_id, steps_input, required_count):
+    def make_version(db, package, form_id, required_count):
+        # Approval steps are defined once, on the form. A version freezes a copy so that
+        # dossiers already opened under it keep the route they were created with.
         form = db.get(m.Form, form_id)
         if not form or form.state != "published":
             raise AppError(422, "form_invalid", "Cần biểu mẫu đã phát hành.")
-        steps = [item.model_dump() for item in steps_input] if steps_input is not None else form.approval_steps
-        s.FormCreate(name=form.name, fields=[s.FormField.model_validate(item) for item in form.fields],
-                     approval_steps=[s.ApprovalStep.model_validate(item) for item in steps])
+        steps = form.approval_steps
         if not any(step.get("condition") is None for step in steps):
             raise AppError(422, "unconditional_approver_required", "Gói cần ít nhất một bước duyệt không có điều kiện.")
         number = (db.scalar(select(m.PackageVersion.version_no).where(m.PackageVersion.package_id == package.id)
@@ -163,7 +161,7 @@ def build_router(app):
                                     department_id=user.department_id, allowed_roles=sorted(set(body.allowed_roles)))
         db.add(package)
         db.flush()
-        version = make_version(db, package, body.form_id, body.approval_steps, body.required_file_count)
+        version = make_version(db, package, body.form_id, body.required_file_count)
         response = {**serial(package), "version": serial(version)}
         idem.response = response
         audit(db, user, "package.created", package.id)
@@ -191,8 +189,7 @@ def build_router(app):
         )
         db.add(package)
         db.flush()
-        steps = [s.ApprovalStep.model_validate(item) for item in source.approval_steps]
-        version = make_version(db, package, source.form_id, steps, source.required_file_count)
+        version = make_version(db, package, source.form_id, source.required_file_count)
         response = {**serial(package), "version": serial(version)}
         idem.response = response
         audit(db, user, "package.imported_template", package.id,
@@ -252,7 +249,7 @@ def build_router(app):
                                   idempotency_key, body.model_dump())
         if replay:
             return replay
-        version = make_version(db, package, body.form_id, body.approval_steps, body.required_file_count)
+        version = make_version(db, package, body.form_id, body.required_file_count)
         idem.response = serial(version)
         audit(db, user, "package.version_created", package.id, {"version_id": version.id})
         db.commit()
@@ -402,9 +399,9 @@ def build_router(app):
         form = db.get(m.Form, version.form_id)
         if config_hash(form, version.approval_steps, version.required_file_count) != version.config_hash:
             raise AppError(409, "config_changed", "Cấu hình đã thay đổi; chạy lại bộ thử.")
+        # Test sets are optional: validation already checks the route and the approvers. A
+        # test set someone did write is a promise about the behaviour, so it has to pass.
         suites = list(db.scalars(select(m.SimulationSuite).where(m.SimulationSuite.version_id == version.id)))
-        if not suites:
-            raise AppError(409, "simulation_required", "Cần bộ thử đạt trước khi phát hành.")
         successful = None
         for suite in suites:
             latest = db.scalar(select(m.SimulationReport).where(
@@ -417,7 +414,8 @@ def build_router(app):
         version.state, version.revision = "published", version.revision + 1
         package.active_version_id = version.id
         audit(db, user, "package.published", package.id, {"version_id": version.id,
-                                                         "report_id": successful.id, "config_hash": version.config_hash})
+                                                         "report_id": successful.id if successful else None,
+                                                         "config_hash": version.config_hash})
         db.commit()
         return serial(version)
 

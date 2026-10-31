@@ -18,6 +18,7 @@ from . import models as m
 from . import schemas as s
 from .policies import current_user, get_case, get_file, manages_department, message_readable, permissions
 from .services import audit, cas, emit, notify, page, serial
+from .text import matches
 
 FINAL = {"completed", "cancelled"}
 PRIORITIES = Literal["low", "normal", "high", "urgent"]
@@ -408,7 +409,7 @@ def build_router(app):
         user = user_for(db, actor)
         rows = list(db.scalars(select(m.Task).order_by(m.Task.created_at.desc(), m.Task.id)))
         statuses = set(status.split(",")) if status else None
-        needle = q.casefold().strip() if q else ""
+        needle = q.strip() if q else ""
 
         def keep(task):
             if not visible(db, user, task):
@@ -429,9 +430,7 @@ def build_router(app):
                 return False
             if overdue is not None and is_overdue(task) != overdue:
                 return False
-            return (
-                not needle or needle in task.title.casefold() or needle in (task.description or "").casefold()
-            )
+            return not needle or matches(needle, task.title, task.description)
 
         return page([t for t in rows if keep(t)], limit, cursor, transform=lambda t: task_data(db, user, t))
 

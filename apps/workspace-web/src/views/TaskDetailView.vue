@@ -252,7 +252,7 @@ function localInput(value: string | null) {
         <span class="eyebrow">CÔNG VIỆC · r{{ task.revision }}</span>
         <h1>{{ task.title }}</h1>
         <div class="inline-actions" style="margin-top: 12px">
-          <StatusBadge :status="task.status" /><span
+          <StatusBadge kind="task" :status="task.status" /><span
             class="priority"
             :class="`priority-${task.priority}`"
             >{{ priorityLabel[task.priority] }}</span
@@ -358,7 +358,7 @@ function localInput(value: string | null) {
               <p>{{ child.title }}</p>
               <small>{{ child.assignee_name || 'Chưa giao' }}</small>
             </div>
-            <StatusBadge :status="child.status" />
+            <StatusBadge kind="task" :status="child.status" />
           </RouterLink>
         </section>
         <section class="card">

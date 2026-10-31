@@ -5,6 +5,7 @@
 from .engine import (
     NODE_TYPES,
     OPERATORS,
+    compare,
     edge_selected,
     evaluate,
     path_value,
@@ -18,6 +19,7 @@ __all__ = [
     "NODE_TYPES",
     "OPERATORS",
     "FlowError",
+    "compare",
     "edge_selected",
     "evaluate",
     "path_value",
@@ -25,4 +27,4 @@ __all__ = [
     "simulate_graph",
     "validate_graph",
 ]
-__version__ = "0.1.0"
+__version__ = "0.2.0"

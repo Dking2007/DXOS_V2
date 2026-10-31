@@ -8,7 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends libpq5 \
     && rm -rf /var/lib/apt/lists/*
 COPY requirements.lock /app/requirements.lock
 COPY packages/platform-kit /app/packages/platform-kit
-RUN pip install -c /app/requirements.lock /app/packages/platform-kit
+COPY packages/flowkit /app/packages/flowkit
+RUN pip install -c /app/requirements.lock /app/packages/platform-kit /app/packages/flowkit
 ARG SERVICE
 COPY services/${SERVICE} /app/services/${SERVICE}
 RUN pip install -c /app/requirements.lock /app/services/${SERVICE} && useradd --create-home --uid 10001 dx

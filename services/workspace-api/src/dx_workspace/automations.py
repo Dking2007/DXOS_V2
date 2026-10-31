@@ -19,6 +19,7 @@ from typing import Any, Literal
 from urllib.parse import urljoin, urlsplit
 
 import httpx
+from dx_flowkit import FlowError, compare
 from dx_platform.auth import Actor
 from dx_platform.errors import AppError
 from dx_platform.security import SecretBox
@@ -34,6 +35,7 @@ from .feed import visibility_filter as post_visibility
 from .policies import case_filter, current_user, get_case, require
 from .services import audit, cas, case_event, enqueue, notify, page, serial
 from .tasks import TaskCreate, TaskSource, create_task, event_data, get_task, log, manages, visible
+from .text import matches
 
 TRIGGERS = {
     "task.created": "Công việc được tạo",
@@ -63,7 +65,6 @@ CASE_FIELDS = {
     "priority": "Mức ưu tiên",
     "department_id": "Đơn vị",
     "owner_id": "Người tạo",
-    "assignee_id": "Người phụ trách",
     "form_id": "Mẫu hồ sơ",
 }
 POST_FIELDS = {
@@ -225,26 +226,11 @@ def check_url(settings, url: str):
 
 
 def condition_holds(condition: dict, data: dict) -> bool:
-    value, target, operator = data.get(condition["field"]), condition.get("value"), condition["operator"]
-    if operator == "empty":
-        return value in (None, "", [])
-    if operator == "not_empty":
-        return value not in (None, "", [])
-    if operator == "eq":
-        return value == target
-    if operator == "ne":
-        return value != target
-    if operator == "contains":
-        if isinstance(value, list):
-            return target in value
-        return isinstance(value, str) and isinstance(target, str) and target.casefold() in value.casefold()
-    if operator == "in":
-        return isinstance(target, list) and value in target
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not isinstance(target, (int, float)):
+    """One flow condition on event data; values of the wrong kind simply do not match."""
+    try:
+        return compare(condition["operator"], data.get(condition["field"]), condition.get("value"))
+    except FlowError:
         return False
-    return {"gt": value > target, "gte": value >= target, "lt": value < target, "lte": value <= target}[
-        operator
-    ]
 
 
 def render(template: str, data: dict) -> str:
@@ -264,6 +250,9 @@ def recipients(db: Session, names: list[str], data: dict) -> list[str]:
                     "author": "author_id",
                 }[name]
             )
+            if name == "assignee" and "case_id" in data and "task_id" not in data:
+                # A dossier has no assignee; the person who carries it is its owner.
+                user_id = data.get("owner_id")
         elif name == "department_manager":
             department = (
                 db.get(m.Department, data.get("department_id")) if data.get("department_id") else None
@@ -724,7 +713,7 @@ def resume(db: Session, payload: dict):
     execution = Execution(
         db,
         run.graph,
-        payload["data"],
+        current_data(db, payload["data"]),
         dry_run=False,
         run=run,
         rule=rule,
@@ -733,6 +722,21 @@ def resume(db: Session, payload: dict):
     )
     run.steps = steps + execution.walk(payload["nodes"])
     settle(run)
+
+
+def current_data(db: Session, data: dict) -> dict:
+    """Event data refreshed from the record, so steps after a wait see what is true now.
+
+    That is what makes "wait a day, then remind if it is still returned" possible; the
+    event's own facts (who triggered it, and so on) are kept when the record is gone.
+    """
+    if data.get("task_id"):
+        task = db.get(m.Task, data["task_id"])
+        return {**data, **event_data(task)} if task else data
+    if data.get("case_id"):
+        case = db.get(m.Case, data["case_id"])
+        return {**data, **case_event(case)} if case else data
+    return data
 
 
 def link_for(data: dict) -> str | None:
@@ -1030,18 +1034,18 @@ def build_router(app):
         """Records a manual run can use: those of the trigger's kind that the user may see."""
         user = admin(db, actor)
         family = trigger_family(get_rule(db, rule_id).trigger)
-        needle = (q or "").casefold().strip()
+        needle = (q or "").strip()
         items = []
         if family == "task":
 
             for task in db.scalars(select(m.Task).order_by(m.Task.updated_at.desc())):
-                if needle in task.title.casefold() and visible(db, user, task):
+                if matches(needle, task.title) and visible(db, user, task):
                     items.append({"id": task.id, "title": task.title, "status": task.status})
         elif family == "case":
             for case in db.scalars(
                 select(m.Case).where(case_filter(db, user)).order_by(m.Case.updated_at.desc())
             ):
-                if needle in case.title.casefold() or needle in f"hs-{case.number:06d}":
+                if matches(needle, case.title, f"hs-{case.number:06d}"):
                     items.append(
                         {
                             "id": case.id,
@@ -1053,7 +1057,7 @@ def build_router(app):
             for post in db.scalars(
                 select(m.Post).where(post_visibility(db, user)).order_by(m.Post.created_at.desc())
             ):
-                if needle in post.body.casefold():
+                if matches(needle, post.body):
                     items.append({"id": post.id, "title": post.body[:90], "status": None})
         return {"family": family, "items": items[:20]}
 

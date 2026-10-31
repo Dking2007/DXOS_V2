@@ -25,6 +25,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-vue-next'
+import { textMatches } from '@dx/web-shared/text.ts'
 import { api } from '../api'
 import { useSession } from '../stores/session'
 import { errorText, newIntent } from '@dx/web-shared/api.ts'
@@ -67,7 +68,7 @@ const list = useQuery({
   refetchInterval: 8_000,
 })
 const visibleList = computed(() =>
-  (list.data.value?.items ?? []).filter((item) => item.title.toLowerCase().includes(filter.value.toLowerCase())),
+  (list.data.value?.items ?? []).filter((item) => textMatches(item.title, filter.value)),
 )
 watch(
   () => list.data.value?.items,
@@ -419,7 +420,7 @@ const departments = useQuery({
 const otherUsers = computed(() =>
   (users.data.value?.items ?? []).filter(
     (user) =>
-      user.id !== session.user?.id && user.display_name.toLowerCase().includes(peopleQuery.value.toLowerCase()),
+      user.id !== session.user?.id && textMatches(user.display_name, peopleQuery.value),
   ),
 )
 function togglePerson(id: string) {

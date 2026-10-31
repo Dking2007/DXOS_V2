@@ -32,13 +32,14 @@ from .policies import (
     permissions,
 )
 from .tasks import FINAL, aware, is_overdue, manages, visible
+from .text import fold, folded_positions, matches
 
 TYPES = ("task", "case", "file", "post", "message")
 
 
 def snippet(text: str, needle: str, width: int = 140) -> str:
     text = " ".join((text or "").split())
-    at = text.casefold().find(needle)
+    at = folded_positions(text).find(fold(needle).strip())
     if at < 0 or len(text) <= width:
         return text[:width] + ("…" if len(text) > width else "")
     start = max(0, at - width // 3)
@@ -192,16 +193,16 @@ def build_router(app):
         actor: Actor = Depends(actor_dep),
     ):
         user = user_for(db, actor)
-        needle = q.casefold().strip()
+        needle = q.strip()
 
         def hit(*texts):
-            return any(needle in (text or "").casefold() for text in texts)
+            return matches(needle, *texts)
 
         wanted = set(types.split(",")) & set(TYPES) if types else set(TYPES)
         groups: dict[str, dict] = {}
 
-        def add(kind, matches):
-            groups[kind] = {"total": len(matches), "items": matches[:limit]}
+        def add(kind, found):
+            groups[kind] = {"total": len(found), "items": found[:limit]}
 
         if "task" in wanted:
             rows = db.scalars(select(m.Task).order_by(m.Task.updated_at.desc()))
@@ -222,7 +223,7 @@ def build_router(app):
                 ],
             )
         if "case" in wanted:
-            code = needle.removeprefix("hs-").lstrip("0")
+            code = needle.casefold().removeprefix("hs-").lstrip("0")
             number = int(code) if code.isdigit() else None
             rows = db.scalars(select(m.Case).where(case_filter(db, user)).order_by(m.Case.updated_at.desc()))
             add(
@@ -247,7 +248,7 @@ def build_router(app):
                 .where(m.DriveFile.deleted_at.is_(None))
                 .order_by(m.DriveFile.created_at.desc())
             )
-            matches = []
+            found = []
             for f in rows:
                 labels = " ".join(f.labels or [])
                 if not hit(f.name, labels):
@@ -255,7 +256,7 @@ def build_router(app):
                 # Name and labels are metadata too: only files the user may read are counted.
                 if f.acl_state != "ready" or not file_access(db, user, f):
                     continue
-                matches.append(
+                found.append(
                     {
                         "type": "file",
                         "id": f.id,
@@ -265,7 +266,7 @@ def build_router(app):
                         "updated_at": f.created_at,
                     }
                 )
-            add("file", matches)
+            add("file", found)
         if "post" in wanted:
             rows = db.scalars(
                 select(m.Post).where(visibility_filter(db, user)).order_by(m.Post.created_at.desc())

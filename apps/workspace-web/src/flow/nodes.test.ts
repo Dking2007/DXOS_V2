@@ -13,10 +13,10 @@ describe('flow graph conversion', () => {
   })
 
   it('turns condition ports into branches and plain ports into none', () => {
-    const template = TEMPLATES.find((t) => t.key === 'urgent-submitted')!
+    const template = TEMPLATES.find((t) => t.key === 'returned-reminder')!
     const { nodes, edges } = toCanvas(template.graph)
     const branches = toApi(nodes, edges).edges.map((e) => e.branch)
-    expect(branches).toEqual([null, 'true', 'false'])
+    expect(branches).toEqual([null, null, 'true'])
     expect(nodes.find((n) => n.id === 'trigger')?.deletable).toBe(false)
   })
 

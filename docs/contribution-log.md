@@ -43,6 +43,8 @@ Tại thời điểm ghi: 30/10/2026.
    thành viên nhóm ký CLA, bot đổi sang "signed", 1 check đạt. Dòng "Merging is blocked" trên PR là bình thường
    vì chỉ người bảo trì mới merge được.
 5. **30/10, ghi lại:** cập nhật README và tệp này. Chưa có phản hồi nào của người bảo trì nên không ghi gì thêm.
+6. **31/10, `dx-flowkit` 0.2.0:** `dx_core.workflow` bỏ bản sao riêng và dùng gói này; thêm `compare` để điều
+   kiện của biểu mẫu, bước duyệt và luồng tự động hóa trong Workspace cùng một quy tắc. 67 test. Vẫn chưa lên PyPI.
 
 ## Phản hồi của người bảo trì
 

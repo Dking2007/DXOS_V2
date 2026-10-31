@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from dx_flowkit import (
     FlowError,
+    compare,
     evaluate,
     path_value,
     resolve,
@@ -93,6 +94,14 @@ def test_resolve_walks_dicts_and_lists_and_leaves_plain_values():
         ("lte", 5, 5, True),
         ("in", "a", ["a", "b"], True),
         ("in", "z", ["a", "b"], False),
+        ("in", "an", "Thanh", True),
+        ("gt", "2026-10-02", "2026-10-01", True),
+        ("contains", ["gấp", "quý"], "gấp", True),
+        ("contains", "Báo cáo GẤP", "gấp", True),
+        ("contains", "Báo cáo", "gấp", False),
+        ("empty", "", None, True),
+        ("empty", [], None, True),
+        ("not_empty", "x", None, True),
     ],
 )
 def test_evaluate_operators(operator, left, right, expected):
@@ -116,6 +125,13 @@ def test_evaluate_rejects_unknown_operator_and_type_mismatch():
     assert raised.value.code == "condition_type_error"
     with pytest.raises(FlowError) as raised:
         evaluate({"path": "$.input.x", "operator": "in", "value": 5}, {"input": {"x": 1}})
+    assert raised.value.code == "condition_type_error"
+
+
+@pytest.mark.parametrize(("operator", "left", "right"), [("gte", True, 0), ("gt", None, 1), ("contains", 5, "a")])
+def test_compare_does_not_coerce_booleans_missing_values_or_numbers(operator, left, right):
+    with pytest.raises(FlowError) as raised:
+        compare(operator, left, right)
     assert raised.value.code == "condition_type_error"
 
 

@@ -49,7 +49,7 @@ lint: deps
 check: lint test
 
 install: build
-	$(VENV)/bin/python -m pip install --ignore-installed --prefix "$(DESTDIR)$(PREFIX)" -c requirements.lock ./packages/platform-kit ./services/core-api ./services/workspace-api
+	$(VENV)/bin/python -m pip install --ignore-installed --prefix "$(DESTDIR)$(PREFIX)" -c requirements.lock ./packages/platform-kit ./packages/flowkit ./services/core-api ./services/workspace-api
 	install -d "$(DESTDIR)$(PREFIX)/share/desktiny/workspace-web" "$(DESTDIR)$(PREFIX)/share/desktiny/core-admin" "$(DESTDIR)$(PREFIX)/share/desktiny/config"
 	cp -r apps/workspace-web/dist/. "$(DESTDIR)$(PREFIX)/share/desktiny/workspace-web/"
 	cp -r apps/core-admin/dist/. "$(DESTDIR)$(PREFIX)/share/desktiny/core-admin/"

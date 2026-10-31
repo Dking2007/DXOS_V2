@@ -242,7 +242,7 @@ function closeCreate() {
                 priorityLabel[task.priority]
               }}</span>
             </td>
-            <td><StatusBadge :status="task.status" /></td>
+            <td><StatusBadge kind="task" :status="task.status" /></td>
           </tr>
         </tbody>
       </table>
@@ -250,7 +250,7 @@ function closeCreate() {
     <div v-if="items.length && view === 'board'" class="kanban">
       <div v-for="column in columns" :key="column.status" class="kanban-column">
         <header>
-          <StatusBadge :status="column.status" /><span class="muted">{{
+          <StatusBadge kind="task" :status="column.status" /><span class="muted">{{
             items.filter((task) => task.status === column.status).length
           }}</span>
         </header>
@@ -293,7 +293,7 @@ function closeCreate() {
               {{ formatDate(task.due_at, true) }}</small
             >
           </div>
-          <StatusBadge :status="task.status" />
+          <StatusBadge kind="task" :status="task.status" />
         </RouterLink>
       </section>
     </div>

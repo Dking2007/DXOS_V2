@@ -20,6 +20,18 @@
   công khai; cổng nội bộ/HTTP phải có trong biến mới `ASSISTANT_ALLOWED_HOSTS`; kiểm lại trước mỗi
   lần gọi, không theo chuyển hướng.
 - `packages/flowkit` (`dx-flowkit` 0.1.0): kiểm tra và chạy thử đồ thị quy trình JSON, tách từ `dx_core.workflow`, không phụ thuộc thư viện ngoài. 56 test; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên. `dx_core.workflow` chưa dùng gói này.
+- Đóng hồ sơ (migration `workspace_0015`, thêm `cases.deleted_at`, `cases.archived_at`). Trước đây
+  không có cách nào bỏ một hồ sơ tạo nhầm. Người lập **xóa bản nháp chưa từng trình**
+  (`DELETE /cases/{id}`; ẩn khỏi mọi danh sách, tìm kiếm, báo cáo, nhật ký vẫn ghi). Hồ sơ đã từng
+  trình không xóa được: người lập **hủy** khi đang là bản nháp hoặc bị trả lại (`POST
+  /cases/{id}/cancel`, trạng thái `cancelled`, lịch sử giữ nguyên). Lãnh đạo (quyền xem hồ sơ của
+  phòng hoặc toàn cơ quan) **lưu trữ / bỏ lưu trữ** hồ sơ đã duyệt, từ chối hoặc đã hủy (`POST
+  /cases/{id}/archive`). Hồ sơ đã hủy và đã lưu trữ rời danh sách mặc định, xem ở tab "Đã hủy",
+  "Lưu trữ" và vẫn tìm thấy. 4 test.
+- Tab **Nhật ký hoạt động** trong Thiết lập cho người có quyền `audit.read`: ai làm gì, lúc nào, có
+  liên kết tới hồ sơ/công việc/luồng. Trước đây quyền này có trong ma trận phân quyền nhưng không có
+  màn hình nào dùng. `GET /audit-logs` trả thêm `actor_name`. Test frontend bắt buộc mọi hành động
+  backend ghi nhật ký đều có nhãn tiếng Việt.
 - `plugins/vn-document-format` (0.1.0): plugin ONLYOFFICE kiểm tra thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP, Phụ lục I. 29 test; đã chạy thử trong ONLYOFFICE 8.3.3 trên hai tệp mẫu. Có icon, ảnh chụp và CHANGELOG theo hướng dẫn marketplace. Chưa kiểm lề trên 8.3.3 (thiếu hàm đọc lề); chưa gửi lên marketplace.
 - Mục "Đóng góp ngược cho cộng đồng nguồn mở" trong README, ghi trạng thái thật từng việc.
 - `scripts/desktiny-migrate.sh` (cài thành `$PREFIX/bin/desktiny-migrate`): chạy migration CSDL từ bản đã cài, không cần thư mục mã nguồn.
@@ -31,6 +43,31 @@
 - `make install` không cài `alembic.ini` và `migrations/`, nên bản cài ra `PREFIX` không thể khởi tạo CSDL khi xóa thư mục mã nguồn (tiêu chí PoF 4, mục "chạy được ngoài thư mục mã nguồn"). Nay cài vào `$PREFIX/share/desktiny/<service>-api/`.
 
 ### Changed
+- Gọn chức năng trùng lặp (rà soát ngày 31/10/2026):
+  - **Bước duyệt chỉ khai báo ở biểu mẫu.** Gói nghiệp vụ không nhận `approval_steps` riêng nữa;
+    mỗi phiên bản gói chụp lại bước duyệt của biểu mẫu (giao diện vốn đã làm vậy, chỉ API cho ghi đè).
+  - **Hồ sơ bỏ "người phụ trách"** (migration `workspace_0014` xóa cột `cases.assignee_id`). Người
+    xử lý hồ sơ là công việc gắn với hồ sơ, đã có nút tạo trong trang hồ sơ. Luồng tự động gửi tới
+    "người phụ trách" của sự kiện hồ sơ nay gửi người lập hồ sơ.
+  - **Core dùng `dx-flowkit`** thay cho bản sao trong `dx_core.workflow` (thông báo lỗi tiếng Việt
+    giữ nguyên). `dx-flowkit` 0.2.0 thêm `compare` và các toán tử `contains`, `empty`, `not_empty`;
+    điều kiện của biểu mẫu, bước duyệt và luồng tự động hóa cùng dùng `compare` (trước đây ba hàm
+    viết riêng). So sánh lớn/nhỏ nhận hai số hoặc hai chuỗi; giá trị khác kiểu là "không khớp" ở
+    Workspace, là lỗi `condition_type_error` ở Core như trước. CI chạy cả test của `packages/flowkit`.
+  - **"Hồ sơ đang chờ lâu ở bước nào?" chuyển từ Trang chủ sang Báo cáo**, theo khoảng thời gian
+    của trang Báo cáo. Trang chủ bỏ 4 ô số liệu trùng với huy hiệu thanh bên và bộ lọc lịch việc.
+- Gói nghiệp vụ phát hành được khi đã kiểm tra cấu hình, không bắt buộc bộ kịch bản chạy thử; bộ
+  kịch bản đã tạo thì vẫn phải đạt.
+- Mẫu tự động hóa không lặp lại thông báo có sẵn nữa: thay bằng nhắc việc bị trả lại chưa làm lại
+  sau 1 ngày, nhắc hồ sơ trả lại chưa trình lại sau 2 ngày, báo lãnh đạo khi việc khẩn được nộp,
+  tạo việc lưu trữ khi hồ sơ được duyệt. Bước sau node Chờ nay đọc lại trạng thái hiện tại của công
+  việc/hồ sơ (trước đây dùng dữ liệu lúc xảy ra sự kiện nên không viết được "nếu vẫn chưa xong").
+- Từ ngữ: công việc dùng "nghiệm thu", hồ sơ dùng "phê duyệt". Công việc ở trạng thái `submitted`
+  hiện "Chờ nghiệm thu" (trước đây hiện "Đã trình" của hồ sơ), `completed` hiện "Đã nghiệm thu".
+- Tìm kiếm không phân biệt dấu ở mọi nơi: Ctrl+K, trang Tìm kiếm, danh sách công việc, hồ sơ, kho
+  tài liệu, chọn bản ghi khi chạy luồng, lọc cuộc trò chuyện (gõ "bao cao" ra "Báo cáo"). Dùng chung
+  `dx_workspace/text.py` và `apps/shared/src/text.ts`.
+- Bỏ mũi tên ▾ ở nhãn "e-Office" trên thanh bên: không có chức năng chuyển không gian nào.
 - Cấu trúc Workspace API: bỏ hai vòng phụ thuộc bị che bằng import trong hàm (`tasks` ↔ `messaging`, `routers` ↔ `packages`). `validate_payload` và `step_evidence` chuyển vào `schemas.py`; `membership` và `message_readable` chuyển vào `policies.py`; các import cục bộ giữa `automations`, `messaging` và `tasks` đưa lên đầu tệp. Không đổi hành vi hay API (contract OpenAPI không đổi; 105 test dịch vụ + 4 test ranh giới đạt). `tests/test_boundaries.py` có thêm test chặn vòng phụ thuộc mới.
 - Thêm `.gitattributes` và `.editorconfig` (LF thống nhất giữa Windows/Linux/macOS).
 - `npm run generate:api` giữ header SPDX của hai tệp sinh ra (trước đây xóa mất, làm job `compliance` đỏ). CI so sánh `contracts/` và `apps/shared/src/generated/` với bản đã commit.

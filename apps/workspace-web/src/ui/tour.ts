@@ -72,14 +72,14 @@ const BY_ROLE: Record<string, TourStep[]> = {
     {
       target: 'agenda',
       title: 'Việc của bạn và của phòng',
-      body: 'Ngoài việc của mình, bạn thấy việc phòng nhận cần phân công, kết quả cần xem và hồ sơ chờ duyệt.',
+      body: 'Ngoài việc của mình, bạn thấy việc phòng nhận cần phân công, kết quả chờ nghiệm thu và hồ sơ chờ phê duyệt.',
     },
   ],
   director: [
     {
       target: 'agenda',
       title: 'Những gì cần bạn quyết định',
-      body: 'Hồ sơ chờ duyệt và kết quả công việc cần xem đứng đầu danh sách. Khi vắng mặt, dùng “Ủy quyền duyệt” trong mục Cần phê duyệt.',
+      body: 'Hồ sơ chờ phê duyệt và kết quả công việc chờ nghiệm thu đứng đầu danh sách. Khi vắng mặt, dùng “Ủy quyền duyệt” trong mục Cần phê duyệt.',
     },
   ],
   technical_admin: [

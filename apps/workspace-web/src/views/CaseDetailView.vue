@@ -5,7 +5,10 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
+  Ban,
   Check,
   CheckCheck,
   ClipboardCheck,
@@ -24,6 +27,7 @@ import {
   Undo2,
   Send,
   ShieldCheck,
+  Trash2,
   XCircle,
 } from 'lucide-vue-next'
 import { api } from '../api'
@@ -203,6 +207,86 @@ const canWithdraw = computed(
       (task) => task.decision && (task.state || task.status) !== 'cancelled',
     ),
 )
+const isOwner = computed(() => detail.data.value?.owner_id === session.user?.id)
+const canDelete = computed(
+  () => isOwner.value && detail.data.value?.status === 'draft' && !detail.data.value?.submission_no,
+)
+const canCancel = computed(
+  () =>
+    isOwner.value &&
+    ['draft', 'needs_revision'].includes(detail.data.value?.status ?? '') &&
+    !!detail.data.value?.submission_no,
+)
+const canArchive = computed(
+  () =>
+    (session.can('cases.read.department') || session.can('cases.read.organization')) &&
+    ['approved', 'rejected', 'cancelled'].includes(detail.data.value?.status ?? ''),
+)
+type Closing = 'delete' | 'cancel' | 'archive' | 'unarchive'
+const closing = ref<Closing | null>(null)
+const CLOSING: Record<Closing, { title: string; text: string; button: string; done: string }> = {
+  delete: {
+    title: 'Xóa bản nháp',
+    text: 'Bản nháp chưa từng trình nên chưa ai xem. Sau khi xóa, hồ sơ không còn trong danh sách và tìm kiếm; nhật ký hoạt động vẫn ghi lại việc xóa.',
+    button: 'Xóa bản nháp',
+    done: 'Đã xóa bản nháp',
+  },
+  cancel: {
+    title: 'Hủy hồ sơ',
+    text: 'Hồ sơ đã từng trình nên không xóa được. Hủy sẽ đóng hồ sơ, không trình lại được nữa; lịch sử duyệt vẫn được giữ và vẫn tìm thấy trong mục “Đã hủy”.',
+    button: 'Hủy hồ sơ',
+    done: 'Đã hủy hồ sơ',
+  },
+  archive: {
+    title: 'Lưu trữ hồ sơ',
+    text: 'Hồ sơ rời khỏi danh sách đang làm và chuyển sang mục “Lưu trữ”, giữ nguyên kết quả. Có thể bỏ lưu trữ bất cứ lúc nào.',
+    button: 'Lưu trữ',
+    done: 'Đã lưu trữ hồ sơ',
+  },
+  unarchive: {
+    title: 'Bỏ lưu trữ',
+    text: 'Hồ sơ trở lại danh sách hồ sơ thường.',
+    button: 'Bỏ lưu trữ',
+    done: 'Đã đưa hồ sơ trở lại danh sách',
+  },
+}
+const closingReason = ref('')
+async function closeCase() {
+  const value = detail.data.value
+  if (!value || !closing.value) return
+  busy.value = true
+  error.value = null
+  const action = closing.value
+  try {
+    if (action === 'delete') {
+      await api.request(`/cases/${id}?expected_revision=${value.revision}`, { method: 'DELETE' })
+    } else if (action === 'cancel') {
+      await api.request(`/cases/${id}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ expected_revision: value.revision, reason: closingReason.value }),
+      })
+    } else {
+      await api.request(`/cases/${id}/archive`, {
+        method: 'POST',
+        body: JSON.stringify({ expected_revision: value.revision, archived: action === 'archive' }),
+      })
+    }
+    toast.success(CLOSING[action].done)
+    closing.value = null
+    await queryClient.invalidateQueries({ queryKey: ['cases'] })
+    if (action === 'delete') await router.push('/cases')
+    else await refresh()
+  } catch (cause) {
+    error.value = cause
+  } finally {
+    busy.value = false
+  }
+}
+function askClosing(action: Closing) {
+  closing.value = action
+  closingReason.value = ''
+  error.value = null
+}
 const showTask = ref(false)
 async function taskCreated(task: Task) {
   showTask.value = false
@@ -446,7 +530,9 @@ function moveTab(step: number) {
         <span class="eyebrow">Mã hồ sơ {{ detail.data.value.code }}</span>
         <h1>{{ detail.data.value.title }}</h1>
         <div class="case-subline">
-          <StatusBadge :status="detail.data.value.status" /><span class="muted"
+          <StatusBadge :status="detail.data.value.status" /><span v-if="detail.data.value.archived_at" class="tag"
+            ><Archive :size="13" /> Lưu trữ</span
+          ><span class="muted"
             >{{ detail.data.value.form.name }} · tạo bởi {{ userName(detail.data.value.owner_id) }}</span
           >
         </div>
@@ -461,7 +547,19 @@ function moveTab(step: number) {
         >
           <ListPlus :size="16" />Tạo việc</button
         ><button v-if="canWithdraw" class="button secondary" @click="ask('withdraw')">
-          <Undo2 :size="16" />Thu hồi
+          <Undo2 :size="16" />Thu hồi</button
+        ><button v-if="canDelete" class="button secondary" @click="askClosing('delete')">
+          <Trash2 :size="16" />Xóa bản nháp</button
+        ><button v-if="canCancel" class="button secondary" @click="askClosing('cancel')">
+          <Ban :size="16" />Hủy hồ sơ</button
+        ><button
+          v-if="canArchive"
+          class="button secondary"
+          @click="askClosing(detail.data.value.archived_at ? 'unarchive' : 'archive')"
+        >
+          <component :is="detail.data.value.archived_at ? ArchiveRestore : Archive" :size="16" />{{
+            detail.data.value.archived_at ? 'Bỏ lưu trữ' : 'Lưu trữ'
+          }}
         </button>
       </div>
     </header>
@@ -1023,6 +1121,32 @@ function moveTab(step: number) {
                       ? 'Thu hồi hồ sơ'
                       : 'Xác nhận từ chối'
           }}
+        </button>
+      </div>
+    </form></ModalDialog
+  >
+  <ModalDialog
+    v-if="closing"
+    :title="CLOSING[closing].title"
+    @close="
+      () => {
+        if (!busy) closing = null
+      }
+    "
+    ><div v-if="error" class="notice error error-inline" role="alert">{{ errorText(error) }}</div>
+    <form @submit.prevent="closeCase">
+      <div class="stack">
+        <p><strong>{{ detail.data.value?.title }}</strong></p>
+        <p class="muted">{{ CLOSING[closing].text }}</p>
+        <div v-if="closing === 'cancel'" class="field">
+          <label for="closing-reason">Lý do (không bắt buộc)</label
+          ><textarea id="closing-reason" v-model="closingReason" rows="3" maxlength="2000" :disabled="busy" />
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="button secondary" :disabled="busy" @click="closing = null">Quay lại</button
+        ><button class="button" :class="{ danger: closing === 'delete' || closing === 'cancel' }" :disabled="busy">
+          {{ busy ? 'Đang ghi nhận…' : CLOSING[closing].button }}
         </button>
       </div>
     </form></ModalDialog

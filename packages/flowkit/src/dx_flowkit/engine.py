@@ -13,7 +13,8 @@ from types import SimpleNamespace
 from .errors import FlowError
 
 NODE_TYPES = {"start", "map", "if", "human_task", "end"}
-OPERATORS = {"eq", "ne", "gt", "gte", "lt", "lte", "in", "exists"}
+OPERATORS = {"eq", "ne", "gt", "gte", "lt", "lte", "in", "contains", "exists", "empty", "not_empty"}
+EMPTY = (None, "", [], {})
 SETTLED = {"succeeded", "skipped", "cancelled"}
 
 
@@ -44,31 +45,47 @@ def resolve(value, context):
     return value
 
 
-def evaluate(condition, context):
-    """Evaluate ``{"path", "operator", "value"}`` against ``context`` and return a bool."""
-    operator = condition.get("operator", "eq")
+def _number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def compare(operator, left, right):
+    """Apply one condition operator to two plain values and return a bool.
+
+    Ordering compares two numbers or two strings (ISO dates order correctly); booleans are
+    not numbers. ``in`` looks ``left`` up in a list or string ``right``; ``contains`` is the
+    reverse, case-insensitive for text. Operands of the wrong kind raise
+    ``condition_type_error``: a caller that prefers "does not match" catches it.
+    """
     if not isinstance(operator, str) or operator not in OPERATORS:
         raise FlowError("invalid_operator", "Condition operator is not supported.")
-    left = path_value(context, condition.get("path", ""))
-    right = resolve(condition.get("value"), context)
     if operator == "exists":
         return left is not None
+    if operator == "empty":
+        return left in EMPTY
+    if operator == "not_empty":
+        return left not in EMPTY
     if operator == "eq":
         return left == right
     if operator == "ne":
         return left != right
-    try:
-        if operator == "gt":
-            return left > right
-        if operator == "gte":
-            return left >= right
-        if operator == "lt":
-            return left < right
-        if operator == "lte":
-            return left <= right
+    if operator == "in" and (isinstance(right, list) or isinstance(left, str) and isinstance(right, str)):
         return left in right
-    except TypeError:
-        raise FlowError("condition_type_error", "Condition operands have incompatible types.") from None
+    if operator == "contains" and isinstance(left, list):
+        return right in left
+    if operator == "contains" and isinstance(left, str) and isinstance(right, str):
+        return right.casefold() in left.casefold()
+    if operator in {"gt", "gte", "lt", "lte"} and (
+        _number(left) and _number(right) or isinstance(left, str) and isinstance(right, str)
+    ):
+        return {"gt": left > right, "gte": left >= right, "lt": left < right, "lte": left <= right}[operator]
+    raise FlowError("condition_type_error", "Condition operands have incompatible types.")
+
+
+def evaluate(condition, context):
+    """Evaluate ``{"path", "operator", "value"}`` against ``context`` and return a bool."""
+    left = path_value(context, condition.get("path", ""))
+    return compare(condition.get("operator", "eq"), left, resolve(condition.get("value"), context))
 
 
 def validate_graph(graph: dict, max_steps=100):
@@ -204,7 +221,9 @@ def simulate_graph(graph: dict, input_data: dict, decisions: dict | None = None)
         if node["type"] == "human_task":
             subject = resolve(config["assigned_subject"], context)
             if not isinstance(subject, str) or not subject:
-                raise FlowError("assignee_unresolved", f"Step '{node_id}' has no resolvable assignee.")
+                raise FlowError(
+                    "assignee_unresolved", f"Step '{node_id}' has no resolvable assignee.", node_id=node_id
+                )
             decision = decisions.get(node_id)
             people.append({"node_id": node_id, "subject": subject, "source": "fixture"})
             if decision is None:

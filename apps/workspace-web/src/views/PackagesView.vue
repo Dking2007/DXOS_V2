@@ -217,9 +217,9 @@ const stages = computed(() => {
     { key: 'validate', title: 'Kiểm tra cấu hình', hint: 'Người duyệt, đồ thị', done: ready.validated },
     {
       key: 'test',
-      title: 'Chạy thử đạt',
-      hint: ready.hasSuites ? `${currentSuites.value.length} bộ kịch bản` : 'Chưa có kịch bản',
-      done: published || ready.allPassed,
+      title: 'Chạy thử (không bắt buộc)',
+      hint: ready.hasSuites ? `${currentSuites.value.length} bộ kịch bản` : 'Bỏ qua được',
+      done: published || (ready.validated && ready.allPassed),
     },
     { key: 'publish', title: 'Phát hành', hint: published ? 'Đang dùng' : 'Áp dụng cho hồ sơ mới', done: published },
   ]
@@ -232,7 +232,7 @@ const currentStage = computed(() => stages.value.findIndex((s) => !s.done))
     <div>
       <span class="eyebrow">THIẾT KẾ QUY TRÌNH</span>
       <h1>Gói nghiệp vụ</h1>
-      <p>Mỗi gói quy định một loại hồ sơ: biểu mẫu, ai duyệt theo thứ tự nào, cần tài liệu gì. Chạy thử trước khi áp dụng.</p>
+      <p>Mỗi gói quy định một loại hồ sơ: biểu mẫu, ai duyệt theo thứ tự nào, cần tài liệu gì. Kiểm tra cấu hình rồi phát hành; có thể chạy thử thêm nếu muốn.</p>
     </div>
     <div v-if="canManage" class="page-actions">
       <button class="button" @click="dialog = 'package'"><Plus :size="18" />Tạo gói</button>

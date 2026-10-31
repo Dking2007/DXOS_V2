@@ -1516,6 +1516,16 @@
             }
           },
           {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -1711,6 +1721,50 @@
                 "schema": {}
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Delete Case",
+        "description": "Delete a draft nobody has seen: only its owner, and only before it was ever submitted.",
+        "operationId": "delete_case_workspace_v1_cases__case_id__delete",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "expected_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Expected Revision"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -1927,6 +1981,108 @@
         },
         "responses": {
           "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/cases/{case_id}/cancel": {
+      "post": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Cancel Case",
+        "description": "Close a dossier its owner gives up on. It stays readable, with its history.",
+        "operationId": "cancel_case_workspace_v1_cases__case_id__cancel_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/cases/{case_id}/archive": {
+      "post": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Archive Case",
+        "description": "Leaders file away settled dossiers (approved, rejected or cancelled); undoable.",
+        "operationId": "archive_case_workspace_v1_cases__case_id__archive_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchiveInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -6963,6 +7119,26 @@
         ],
         "title": "ApprovalStep"
       },
+      "ArchiveInput": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "archived": {
+            "type": "boolean",
+            "title": "Archived"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "archived"
+        ],
+        "title": "ArchiveInput"
+      },
       "ArticleInput": {
         "properties": {
           "title": {
@@ -7158,17 +7334,6 @@
               }
             ],
             "title": "Due At"
-          },
-          "assignee_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Assignee Id"
           }
         },
         "additionalProperties": false,
@@ -7255,17 +7420,6 @@
               }
             ],
             "title": "Due At"
-          },
-          "assignee_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Assignee Id"
           }
         },
         "additionalProperties": false,
@@ -8402,20 +8556,6 @@
             "type": "string",
             "title": "Form Id"
           },
-          "approval_steps": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ApprovalStep"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Approval Steps"
-          },
           "required_file_count": {
             "type": "integer",
             "maximum": 30.0,
@@ -9526,20 +9666,6 @@
           "form_id": {
             "type": "string",
             "title": "Form Id"
-          },
-          "approval_steps": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ApprovalStep"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Approval Steps"
           },
           "required_file_count": {
             "type": "integer",

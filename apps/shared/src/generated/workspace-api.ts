@@ -424,7 +424,11 @@ export interface paths {
         get: operations["case_detail_workspace_v1_cases__case_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Case
+         * @description Delete a draft nobody has seen: only its owner, and only before it was ever submitted.
+         */
+        delete: operations["delete_case_workspace_v1_cases__case_id__delete"];
         options?: never;
         head?: never;
         /** Patch Case */
@@ -499,6 +503,46 @@ export interface paths {
          *     once so nobody can decide on a dossier its owner has pulled back.
          */
         post: operations["withdraw_case_workspace_v1_cases__case_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/cases/{case_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Case
+         * @description Close a dossier its owner gives up on. It stays readable, with its history.
+         */
+        post: operations["cancel_case_workspace_v1_cases__case_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/cases/{case_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Case
+         * @description Leaders file away settled dossiers (approved, rejected or cancelled); undoable.
+         */
+        post: operations["archive_case_workspace_v1_cases__case_id__archive_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2061,6 +2105,13 @@ export interface components {
             user_id?: string | null;
             condition?: components["schemas"]["Condition"] | null;
         };
+        /** ArchiveInput */
+        ArchiveInput: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Archived */
+            archived: boolean;
+        };
         /** ArticleInput */
         ArticleInput: {
             /** Title */
@@ -2147,8 +2198,6 @@ export interface components {
             priority: "low" | "normal" | "high" | "urgent";
             /** Due At */
             due_at?: string | null;
-            /** Assignee Id */
-            assignee_id?: string | null;
         };
         /** CasePatch */
         CasePatch: {
@@ -2166,8 +2215,6 @@ export interface components {
             priority?: ("low" | "normal" | "high" | "urgent") | null;
             /** Due At */
             due_at?: string | null;
-            /** Assignee Id */
-            assignee_id?: string | null;
         };
         /** ChatInput */
         ChatInput: {
@@ -2566,8 +2613,6 @@ export interface components {
             description: string;
             /** Form Id */
             form_id: string;
-            /** Approval Steps */
-            approval_steps?: components["schemas"]["ApprovalStep"][] | null;
             /**
              * Required File Count
              * @default 0
@@ -2952,8 +2997,6 @@ export interface components {
         VersionCreate: {
             /** Form Id */
             form_id: string;
-            /** Approval Steps */
-            approval_steps?: components["schemas"]["ApprovalStep"][] | null;
             /**
              * Required File Count
              * @default 0
@@ -3974,6 +4017,7 @@ export interface operations {
             query?: {
                 status?: string | null;
                 q?: string;
+                archived?: boolean;
                 limit?: number;
                 cursor?: string | null;
             };
@@ -4057,6 +4101,37 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_case_workspace_v1_cases__case_id__delete: {
+        parameters: {
+            query: {
+                expected_revision: number;
+            };
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -4225,6 +4300,76 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_case_workspace_v1_cases__case_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithdrawInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_case_workspace_v1_cases__case_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArchiveInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

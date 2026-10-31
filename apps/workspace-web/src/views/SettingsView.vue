@@ -35,15 +35,18 @@ import SchemaForm from '@dx/web-shared/components/SchemaForm.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import RoleMatrix from '../components/RoleMatrix.vue'
 import AppearanceSettings from '../components/AppearanceSettings.vue'
+import AuditLog from '../components/AuditLog.vue'
 import { permissionLabel, PERMISSIONS, roleLabel } from '../ui/labels'
 import { toast } from '../ui/toast'
 import { confirmDiscard } from '../ui/unsaved'
 const session = useSession()
 const queryClient = useQueryClient()
-type SettingsTab = 'forms' | 'organization' | 'permissions' | 'appearance'
+type SettingsTab = 'forms' | 'organization' | 'permissions' | 'audit' | 'appearance'
 const requestedTab = String(useRoute().query.tab ?? '')
 const tab = ref<SettingsTab>(
-  (['forms', 'organization', 'permissions', 'appearance'] as const).find((key) => key === requestedTab) ??
+  (['forms', 'organization', 'permissions', 'audit', 'appearance'] as const).find(
+    (key) => key === requestedTab && (key !== 'audit' || session.can('audit.read')),
+  ) ??
     (['director', 'manager'].includes(session.user?.role ?? '') ? 'forms' : 'permissions'),
 )
 const forms = useQuery({
@@ -268,6 +271,12 @@ const roleLabels: Record<string, string> = {
     >
       Vai trò & quyền</button
     ><button
+      v-if="session.can('audit.read')"
+      :class="{ active: tab === 'audit' }"
+      @click="tab = 'audit'"
+    >
+      Nhật ký hoạt động</button
+    ><button
       :class="{ active: tab === 'appearance' }"
       @click="tab = 'appearance'"
     >
@@ -459,6 +468,7 @@ const roleLabels: Record<string, string> = {
       </section>
     </div></template
   >
+  <template v-if="tab === 'audit'"><AuditLog /></template>
   <template v-if="tab === 'appearance'"><div class="stack"><AppearanceSettings /></div></template>
   <template v-if="tab === 'permissions'"
     ><RoleMatrix v-if="session.can('organization.manage')" style="margin-bottom: 20px" /><section class="card">

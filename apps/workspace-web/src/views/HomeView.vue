@@ -15,7 +15,6 @@ import {
   FilePlus2,
   FolderClosed,
   ListChecks,
-  MessagesSquare,
   PartyPopper,
   UserPlus,
 } from 'lucide-vue-next'
@@ -41,7 +40,6 @@ const firstName = computed(
   () => session.user?.display_name.split(' ').slice(-1)[0] ?? '',
 )
 const overview = useOverview()
-const counts = computed(() => overview.data.value?.counts)
 const agenda = computed(() => overview.data.value?.agenda ?? [])
 const overdueCount = computed(() => agenda.value.filter((item) => item.overdue).length)
 
@@ -83,7 +81,7 @@ const groups = computed(() => {
 const ACTIONS: Record<AgendaItem['action'], { label: string; icon: typeof Check }> = {
   accept: { label: 'Nhận việc', icon: Check },
   assign: { label: 'Phân công', icon: UserPlus },
-  review: { label: 'Xem kết quả', icon: Eye },
+  review: { label: 'Nghiệm thu', icon: Eye },
   decide: { label: 'Xem và duyệt', icon: ClipboardCheck },
   open: { label: 'Mở', icon: ArrowRight },
 }
@@ -127,31 +125,6 @@ const cases = useQuery({
   queryKey: ['cases', 'home'],
   queryFn: () => api.request<Page<CaseItem>>('/cases?limit=5'),
 })
-const canSeeMetrics = computed(
-  () => session.can('cases.read.department') || session.can('cases.read.organization'),
-)
-interface ProcessMetrics {
-  period_days: number
-  as_of: string
-  sample_size: number
-  truncated: boolean
-  overdue_cases: number
-  returns: number
-  steps: { step: string; package_version_id: string | null; count: number; waiting: number; average_wait_hours: number | null; case_ids: string[] }[]
-  suggestions: { kind: string; step?: string; sample_size: number; message: string; case_ids: string[] }[]
-}
-const metricDays = ref(30)
-const metrics = useQuery({
-  queryKey: computed(() => ['process-metrics', metricDays.value]),
-  queryFn: () => api.request<ProcessMetrics>(`/process-metrics?days=${metricDays.value}`),
-  enabled: canSeeMetrics,
-})
-const maxWait = computed(() =>
-  Math.max(
-    1,
-    ...(metrics.data.value?.steps.map((step) => step.average_wait_hours ?? 0) ?? []),
-  ),
-)
 const summary = computed(() => {
   if (!overview.data.value) return 'Đang xem những việc cần bạn hôm nay…'
   const total = agenda.value.length
@@ -170,29 +143,6 @@ const summary = computed(() => {
     </div>
     <div class="date-block"><CalendarDays :size="16" />{{ today }}</div>
   </section>
-  <div class="stat-grid">
-    <RouterLink to="/tasks?scope=mine" class="stat-tile"
-      ><span class="stat-icon blue"><ListChecks :size="21" /></span>
-      <div>
-        <strong>{{ counts?.tasks ?? '—' }}</strong><small>Việc đang chờ bạn</small>
-      </div></RouterLink
-    ><RouterLink to="/tasks?scope=managed&status=submitted" class="stat-tile"
-      ><span class="stat-icon amber"><Eye :size="21" /></span>
-      <div>
-        <strong>{{ counts?.tasks_to_review ?? '—' }}</strong><small>Kết quả cần xem</small>
-      </div></RouterLink
-    ><RouterLink to="/approvals" class="stat-tile"
-      ><span class="stat-icon"><ClipboardCheck :size="21" /></span>
-      <div>
-        <strong>{{ counts?.approvals ?? '—' }}</strong><small>Hồ sơ chờ bạn duyệt</small>
-      </div></RouterLink
-    ><RouterLink to="/chat" class="stat-tile"
-      ><span class="stat-icon red"><MessagesSquare :size="21" /></span>
-      <div>
-        <strong>{{ counts?.chat ?? '—' }}</strong><small>Tin nhắn chưa đọc</small>
-      </div></RouterLink
-    >
-  </div>
   <div class="home-columns">
     <section class="card agenda-card" data-tour="agenda">
       <header class="card-header">
@@ -237,7 +187,7 @@ const summary = computed(() => {
               >{{ item.detail }}<template v-if="item.due_at"> · <span :class="{ 'overdue-text': item.overdue }">{{ dueText(item) }}</span></template></small
             >
           </RouterLink>
-          <StatusBadge v-if="item.kind === 'task' && item.status" :status="item.status" class="agenda-status" />
+          <StatusBadge v-if="item.kind === 'task' && item.status" kind="task" :status="item.status" class="agenda-status" />
           <button
             type="button"
             class="button small"
@@ -301,31 +251,4 @@ const summary = computed(() => {
       </section>
     </aside>
   </div>
-  <section v-if="canSeeMetrics" class="card" style="margin-top: 20px">
-    <header class="card-header">
-      <div><span class="eyebrow">CẢI TIẾN QUY TRÌNH</span><h2>Hồ sơ đang chờ lâu ở bước nào?</h2></div>
-      <label class="period-select">Trong <select v-model.number="metricDays"><option :value="7">7 ngày</option><option :value="30">30 ngày</option><option :value="90">90 ngày</option></select></label>
-    </header>
-    <div class="card-body">
-      <StatePanel :loading="metrics.isPending.value" :error="metrics.error.value"
-        :empty="metrics.data.value?.sample_size === 0" compact title="Chưa đủ hồ sơ để tính thời gian chờ"
-        @retry="metrics.refetch()" />
-      <template v-if="metrics.data.value?.sample_size">
-        <p class="muted" style="font-size: 13px">Tính trên {{ metrics.data.value.sample_size }} lượt duyệt · {{ metrics.data.value.overdue_cases }} hồ sơ quá hạn · {{ metrics.data.value.returns }} lần trả lại<span v-if="metrics.data.value.truncated"> · chỉ lấy 2.000 lượt gần nhất</span></p>
-        <div v-for="step in metrics.data.value.steps" :key="`${step.package_version_id}:${step.step}`" class="metric-row">
-          <div><strong>{{ step.step }}</strong><small>{{ step.count }} lượt · {{ step.waiting }} đang chờ</small>
-            <div v-if="step.case_ids.length" class="metric-cases"><RouterLink v-for="(caseId, n) in step.case_ids" :key="caseId" :to="`/cases/${caseId}`">Hồ sơ {{ n + 1 }}</RouterLink></div>
-          </div>
-          <div>
-            <div class="metric-bar" aria-hidden="true"><span :style="{ width: `${((step.average_wait_hours ?? 0) / maxWait) * 100}%` }" /></div>
-            <span class="metric-bar-label">Chờ trung bình {{ step.average_wait_hours === null ? 'chưa có' : `${step.average_wait_hours} giờ` }}</span>
-          </div>
-        </div>
-        <div v-if="metrics.data.value.suggestions.length" class="notice" style="margin-top: 18px">
-          <strong>Điểm cần kiểm tra</strong>
-          <p v-for="suggestion in metrics.data.value.suggestions" :key="`${suggestion.kind}:${suggestion.step}`">{{ suggestion.step ? `${suggestion.step}: ` : '' }}{{ suggestion.message }}</p>
-        </div>
-      </template>
-    </div>
-  </section>
 </template>

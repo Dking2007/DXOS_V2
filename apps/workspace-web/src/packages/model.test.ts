@@ -47,8 +47,9 @@ describe('publish readiness', () => {
   const report = (suite_id: string, passed: boolean, created_at: string, hash = 'h2') =>
     ({ id: suite_id + created_at, suite_id, passed, created_at, config_hash: hash, results: [] }) as Report
 
-  it('needs every current suite to pass on its latest run', () => {
-    expect(readiness(version, [], []).blocker).toMatch(/bộ kịch bản/)
+  it('publishes without test sets, but needs every current one to pass on its latest run', () => {
+    expect(readiness(version, [], []).canPublish).toBe(true)
+    expect(readiness(version, [], []).blocker).toBeNull()
     const suites = [suite('a'), suite('b')]
     expect(readiness(version, suites, [report('a', true, '1')]).canPublish).toBe(false)
     const passing = [report('a', true, '1'), report('b', false, '1'), report('b', true, '2')]

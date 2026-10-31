@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
+from dx_flowkit import FlowError, compare
 from dx_platform.errors import AppError
 from jsonschema import Draft202012Validator, FormatChecker
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -208,7 +209,6 @@ class CaseCreate(Input):
     file_ids: list[str] = Field(default_factory=list, max_length=30)
     priority: Literal["low", "normal", "high", "urgent"] = "normal"
     due_at: datetime | None = None
-    assignee_id: str | None = None
 
     @field_validator("due_at")
     @classmethod
@@ -224,7 +224,6 @@ class CasePatch(Revision):
     file_ids: list[str] | None = Field(default=None, max_length=30)
     priority: Literal["low", "normal", "high", "urgent"] | None = None
     due_at: datetime | None = None
-    assignee_id: str | None = None
 
     @field_validator("due_at")
     @classmethod
@@ -236,6 +235,10 @@ class CasePatch(Revision):
 
 class WithdrawInput(Revision):
     reason: str = Field(default="", max_length=2000)
+
+
+class ArchiveInput(Revision):
+    archived: bool
 
 
 class DecisionInput(Revision):
@@ -282,22 +285,13 @@ def json_schema(fields: list[dict], payload: dict | None = None) -> dict:
 
 
 def condition_matches(condition: dict | None, payload: dict) -> bool:
+    """A field's or approval step's condition; the same operators as workflows and flows."""
     if not condition:
         return True
-    value = payload.get(condition["field"])
-    target = condition.get("value")
-    operator = condition["operator"]
-    if operator == "eq":
-        return value == target
-    if operator == "ne":
-        return value != target
-    if isinstance(value, bool) or isinstance(target, bool):
+    try:
+        return compare(condition["operator"], payload.get(condition["field"]), condition.get("value"))
+    except FlowError:
         return False
-    if not isinstance(value, (int, float)) or not isinstance(target, (int, float)):
-        return False
-    return {"gt": value > target, "gte": value >= target, "lt": value < target, "lte": value <= target}[
-        operator
-    ]
 
 
 def visible_fields(fields: list[dict], payload: dict) -> list[dict]:
