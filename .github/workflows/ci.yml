@@ -65,6 +65,8 @@ jobs:
       - run: npm ci
       - name: Mọi tệp mã có header SPDX
         run: node scripts/add_spdx_headers.mjs --check
+      - name: Kho không chứa secret, dump hay image không ghim phiên bản
+        run: node scripts/audit_repo.mjs
       - name: REUSE lint
         run: pip install reuse && reuse lint
       - name: THIRD_PARTY.md khớp lockfile

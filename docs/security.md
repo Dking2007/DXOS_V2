@@ -74,6 +74,9 @@ JSON Schema validation không thay luật nghiệp vụ. Không eval Python/Java
 SQL tùy ý từ graph/form. File không được dùng tên gốc làm object key/path. Rich text
 không thuộc phạm vi đợt đầu; tránh render nội dung không tin cậy với `v-html`.
 Kiểm định dạng file/giới hạn giải nén không phải quét malware; hiện chưa tích hợp
-antivirus hoặc sandbox scan. Audit qua API là lịch sử ứng dụng, không phải bằng
-chứng storage bất biến/chống sửa.
+antivirus hoặc sandbox scan. Audit của Core có chuỗi băm SHA-256 (`GET
+/core/v1/audit-logs/verify`) và trigger chặn sửa/xóa trên PostgreSQL: sửa trực tiếp
+bằng SQL bị phát hiện. Chuỗi không chống được người ghi lại toàn bộ bảng rồi tính lại mọi
+hash; muốn chống điều đó phải lưu `head` ở nơi quản trị DB không sửa được (chưa làm).
+Audit của Workspace và các dòng Core ghi trước `core_0003` chưa có chuỗi.
 Không log Authorization/cookie/secret hoặc toàn bộ nội dung tài liệu.
