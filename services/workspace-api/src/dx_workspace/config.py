@@ -16,6 +16,9 @@ class Settings(PlatformSettings):
     # Comma-separated hostnames automation webhooks may call. Empty disables outbound calls,
     # so a rule cannot reach arbitrary hosts from inside the deployment network.
     automation_allowed_hosts: str = ""
+    # Comma-separated hosts an assistant gateway may use even though they are internal or plain
+    # HTTP (e.g. a LiteLLM proxy inside the office). Public HTTPS gateways need no entry.
+    assistant_allowed_hosts: str = ""
 
 
 @lru_cache

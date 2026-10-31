@@ -21,6 +21,11 @@ export const PERMISSIONS: Record<string, PermissionInfo> = {
   'feed.moderate': { label: 'Kiểm duyệt bảng tin', hint: 'Ẩn hoặc gỡ bài của người khác.', group: 'Trao đổi' },
   'automations.manage': { label: 'Thiết kế tự động hóa', hint: 'Tạo và bật luồng tự động.', group: 'Quản trị' },
   'organization.manage': { label: 'Quản lý tổ chức', hint: 'Phòng ban, thành viên và vai trò.', group: 'Quản trị' },
+  'assistant.manage': {
+    label: 'Quản lý trợ lý AI',
+    hint: 'Chọn dịch vụ AI, khóa API và kiến thức cho trợ lý.',
+    group: 'Quản trị',
+  },
   'audit.read': { label: 'Xem nhật ký hệ thống', hint: 'Tra cứu ai đã làm gì, khi nào.', group: 'Quản trị' },
 }
 

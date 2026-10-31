@@ -6,7 +6,21 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-31
+
 ### Added
+- Trợ lý AI ở góc màn hình (migration `workspace_0012`): trả lời về quy trình nghiệp vụ và cách
+  dùng phần mềm, chỉ dựa trên kiến thức do quản trị viên nhập, có ghi nguồn `[1]`. Quyền mới
+  `assistant.manage` (mặc định Ban giám đốc, Quản trị kỹ thuật) cho màn **Trợ lý AI**: bật/tắt,
+  lời chào, câu gợi ý, hướng dẫn thêm, giới hạn câu hỏi/người/ngày; dịch vụ Claude (SDK `anthropic`
+  2.3.0), OpenAI, Gemini, DeepSeek với khóa API mã hóa, chỉ hiện 4 ký tự cuối, kiểm tra kết nối;
+  kiến thức viết tay, nhập tệp `.md/.txt`, sinh từ gói nghiệp vụ đang áp dụng, thử tìm không tốn
+  lượt gọi AI. Trợ lý không đọc hồ sơ/công việc/tài liệu/tin nhắn. 8 test backend, 4 test frontend.
+  Logo các dịch vụ AI lấy từ `@lobehub/icons-static-svg` 1.95.0 (MIT; logo là nhãn hiệu của từng hãng).
+  Cổng riêng (migration `workspace_0013`): dùng endpoint tự đặt theo giao thức Anthropic Messages,
+  OpenAI Chat Completions hoặc OpenAI Responses (model như `auto`). Chỉ nhận HTTPS trên địa chỉ
+  công khai; cổng nội bộ/HTTP phải có trong biến mới `ASSISTANT_ALLOWED_HOSTS`; kiểm lại trước mỗi
+  lần gọi, không theo chuyển hướng.
 - `packages/flowkit` (`dx-flowkit` 0.1.0): kiểm tra và chạy thử đồ thị quy trình JSON, tách từ `dx_core.workflow`, không phụ thuộc thư viện ngoài. 56 test; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên. `dx_core.workflow` chưa dùng gói này.
 - `plugins/vn-document-format` (0.1.0): plugin ONLYOFFICE kiểm tra thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP, Phụ lục I. 29 test; đã chạy thử trong ONLYOFFICE 8.3.3 trên hai tệp mẫu. Có icon, ảnh chụp và CHANGELOG theo hướng dẫn marketplace. Chưa kiểm lề trên 8.3.3 (thiếu hàm đọc lề); chưa gửi lên marketplace.
 - Mục "Đóng góp ngược cho cộng đồng nguồn mở" trong README, ghi trạng thái thật từng việc.
@@ -30,7 +44,8 @@
 - `make install` dùng pip của `.venv` (cần `make venv` trước) thay vì `python3 -m pip` của hệ thống (kèm `--ignore-installed` để mọi phụ thuộc thật sự nằm trong `PREFIX`, không bị bỏ qua vì đã có trong `.venv`): Python 3.13 từ deadsnakes trên Ubuntu 24.04 không có pip, nên lệnh cũ thất bại. `desktiny-migrate` tự chọn đúng `python3.X` đã cài gói thay vì `python3` mặc định. BUILD.md gọi `make venv deps PYTHON=python3.13`. Cả ba lỗi tìm ra khi chạy BUILD.md từng dòng trong Ubuntu 24.04 sạch (27/10/2026).
 - Phụ thuộc `psycopg[binary]` đổi thành `psycopg` thuần Python: không còn đóng gói sẵn libpq trong wheel; hệ điều hành cung cấp `libpq5` (đã thêm vào `api.Dockerfile`, bước CI backend và BUILD.md). `psycopg-binary` bị loại khỏi `requirements.lock` và `THIRD_PARTY.md` (54 gói Python).
 - BUILD.md: thêm mục Thư viện hệ thống và `libpq5` vào bảng yêu cầu.
-- Tài liệu (`V2_CHANGES.md`, `SELF_REVIEW.md`) trỏ tới v0.2.1 là bản dùng để chấm.
+- Tài liệu (`V2_CHANGES.md`, `SELF_REVIEW.md`) trỏ tới v0.2.2 là bản dùng để chấm (thay cho v0.2.1; v0.2.0 vẫn chỉ là mốc lịch sử có lỗi `reuse lint`).
+- Hợp nhất nhánh `feat/ai-assistant` (trợ lý AI) vào `main`; đã chạy lại toàn bộ kiểm trên bản hợp nhất: ruff, pytest (118 đạt, 1 bỏ qua vì cần PostgreSQL thật), contract OpenAPI và kiểu TypeScript sinh ra khớp mã, lint/typecheck/test/build frontend, kiểm SPDX và `THIRD_PARTY.md`.
 
 ## [0.2.1] - 2026-10-26
 
