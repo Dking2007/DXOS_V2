@@ -47,6 +47,10 @@
 - CI chạy thêm `packages/flowkit/tests` (56 test) và test Node của plugin `vn-document-format` (29 test), trước đây không được chạy.
 
 ### Changed
+- Tính năng AI: nút "Gói khuyến nghị" bật 13 tính năng chỉ đọc những gì người dùng đã được xem (để riêng tìm
+  theo ý nghĩa, bước AI trong luồng, trợ lý xem dữ liệu người hỏi, sinh kịch bản thử). Khi một lần gọi AI quá 6
+  giây, góc dưới màn hình báo "AI đang xử lý… N giây"; quá 15 giây nói rõ máy chủ AI của cơ quan có thể mất 1–2
+  phút. Test frontend đối chiếu danh sách tính năng với `ai_core.FEATURES`.
 - Hồ sơ: form nhập tay "Đối chiếu với tài liệu gốc" ẩn sau nút "Thêm căn cứ thủ công"; phần chính là các
   đề xuất chờ xác nhận. Liên kết tới console Core đổi tên thành "Bảng điều khiển kỹ thuật" (vẫn chỉ hiện cho
   Quản trị kỹ thuật); console ghi rõ là công cụ nền tảng và chỉ chỗ xem nhật ký nghiệp vụ.
