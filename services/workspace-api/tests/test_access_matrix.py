@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 Desktiny contributors
+# ruff: noqa: F811
 """Who can reach a private resource, by every route that returns its metadata or bytes."""
 
 import pytest
