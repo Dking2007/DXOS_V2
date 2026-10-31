@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- `docs/operations.md`: kết quả diễn tập backup/restore ngày 31/10/2026 (PostgreSQL + object storage sang project riêng, số dòng và hash khớp) và lỗi `pg_restore --no-owner`; `docs/acceptance.md` ghi lượt chạy ONLYOFFICE Document Server thật.
 - Test API cho cổng phát hành gói nghiệp vụ (`test_packages.py`, 14 test: thiếu/không chạy/không đạt bộ thử, cấu hình đổi, quyền, bản đã phát hành bất biến) và ma trận quyền truy cập (`test_access_matrix.py`, 9 test: tệp, hồ sơ, công việc, tìm kiếm, báo cáo với người ngoài luồng và quản trị kỹ thuật). Có thêm ca tác nhân service không được dùng API người dùng (15 route đều 403). Chưa phát hiện lỗi rò rỉ. Chat, bảng tin, đính kèm và Office callback đã có test riêng từ trước (`test_collaboration.py`, `test_office_save.py`); chưa phủ đường import evidence của AI và token khác namespace phía Workspace.
 - CI chạy thêm `packages/flowkit/tests` (56 test) và test Node của plugin `vn-document-format` (29 test), trước đây không được chạy.
 

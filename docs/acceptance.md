@@ -21,8 +21,8 @@ nhiều dòng "chưa chạy" ở phần lịch sử bên dưới; phần lịch 
   trả 502 nhưng `examples/core-client/main.py` (client `core-example`, namespace `equipment`) tạo
   schema, record, file và chạy workflow thành công qua gateway. Sau đó khởi động lại Workspace.
 - Lượt 31/10/2026 (v0.2.2, Docker Desktop trên Windows, Document Server 8.3.3 thật, profile `office`, `ONLYOFFICE_ENABLED=true`): `GET /office/healthcheck` qua gateway trả `true`; đăng nhập `staff` qua Keycloak, tạo DOCX trống từ Kho tài liệu, mở trình soạn thảo thật (iframe `documenteditor`, giao diện tiếng Việt), gõ một câu tiếng Việt có dấu rồi đóng bằng "Về kho tài liệu". Sau vài giây Drive có phiên bản 2 (25 310 byte so với 929 byte của bản 1) và log `workspace-api` ghi `office/content` rồi `office/callback` trả 200. Chỉ một người dùng và một lần lưu; chưa kiểm hai người cùng sửa (I11), callback trùng/muộn/JWT sai với Document Server thật (I12), force-save và thu hồi quyền khi đang mở (I13), phông chữ tiếng Việt khi xuất. Chưa mở lại tệp để đối chiếu nội dung đã lưu. Playwright E2E cũ: 2/3 đạt; ca tạo hồ sơ bỏ qua điều kiện đầu vào vì DB mới chưa có biểu mẫu đã phát hành, không phải lỗi ứng dụng đã được xác nhận.
-- Còn chưa chạy: hai người cùng sửa (I11–I13), backup/restore (I15),
-  outbox fault injection (I10), đo thu hồi quyền (I14).
+- Còn chưa chạy: hai người cùng sửa (I11–I13),
+  outbox fault injection (I10), đo thu hồi quyền (I14). Backup/restore (I15) đã diễn tập một phần ngày 31/10, xem `docs/operations.md`.
 
 ### Kết quả đã chạy trên máy phát triển
 
@@ -178,7 +178,7 @@ nhiều dòng "chưa chạy" ở phần lịch sử bên dưới; phần lịch 
 | I12 | Office callback | JWT sai bị từ chối, trùng không thêm version, muộn không overwrite | SQLite/HTTP contract đã kiểm; cần Docs thật |
 | I13 | Submit/save barrier | Đóng editor và nhận callback cuối trước submit; không âm thầm dùng bản cũ | Open-session barrier đã kiểm; chưa force-save, cần Docs thật |
 | I14 | Grant revocation | Download/API chặn theo cửa sổ đã công bố; không giả chặn URL tức thì | Cần đo |
-| I15 | Restore | Restore DB/objects/keys, references đúng, không replay action mù | Chưa diễn tập |
+| I15 | Restore | Restore DB/objects/keys, references đúng, không replay action mù | Một phần 31/10: dump/restore 3 DB và objects sang project riêng, số dòng và hash khớp, API lên healthy; chưa kiểm SSO, tải file qua API, workflow resume, outbox (xem docs/operations.md) |
 
 Backend test dùng SQLite hoặc in-process mock chỉ chứng minh đúng hành vi được
 kiểm trong môi trường đó; PostgreSQL concurrency cần kiểm riêng. Office mock callback
