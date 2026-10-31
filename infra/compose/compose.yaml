@@ -265,6 +265,10 @@ services:
       OIDC_CLIENT_ID: workspace
       OIDC_CLIENT_SECRET: ${WORKSPACE_CLIENT_SECRET}
       OIDC_AUDIENCE: dx-workspace
+    # Lets the assistant reach an Ollama/vLLM server running on the Docker host itself
+    # (Docker Desktop has this name built in; Linux needs the mapping).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       workspace-migrate:
         condition: service_completed_successfully

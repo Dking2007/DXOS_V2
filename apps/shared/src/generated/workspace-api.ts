@@ -1908,6 +1908,26 @@ export interface paths {
         patch: operations["patch_provider_workspace_v1_assistant_providers__provider_id__patch"];
         trace?: never;
     };
+    "/workspace/v1/assistant/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Models
+         * @description Ask a self-hosted server (or chat gateway) which models it serves.
+         */
+        post: operations["models_workspace_v1_assistant_models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/assistant/providers/{provider_id}/activate": {
         parameters: {
             query?: never;
@@ -2572,6 +2592,26 @@ export interface components {
             /** Body */
             body: string;
         };
+        /** ModelsQuery */
+        ModelsQuery: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "anthropic" | "openai" | "gemini" | "deepseek" | "custom_anthropic" | "custom_chat" | "custom_responses" | "ollama" | "vllm";
+            /**
+             * Base Url
+             * @default
+             */
+            base_url: string;
+            /**
+             * Api Key
+             * @default
+             */
+            api_key: string;
+            /** Provider Id */
+            provider_id?: string | null;
+        };
         /** NewDocument */
         NewDocument: {
             /** Name */
@@ -2700,10 +2740,13 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "anthropic" | "openai" | "gemini" | "deepseek" | "custom_anthropic" | "custom_chat" | "custom_responses";
+            kind: "anthropic" | "openai" | "gemini" | "deepseek" | "custom_anthropic" | "custom_chat" | "custom_responses" | "ollama" | "vllm";
             /** Model */
             model: string;
-            /** Api Key */
+            /**
+             * Api Key
+             * @default
+             */
             api_key: string;
             /**
              * Max Output Tokens
@@ -7436,6 +7479,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ProviderPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    models_workspace_v1_assistant_models_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelsQuery"];
             };
         };
         responses: {

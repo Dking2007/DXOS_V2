@@ -6,10 +6,18 @@ Claude goes through the official Anthropic SDK; OpenAI, DeepSeek and Gemini thro
 REST APIs, at endpoints fixed here.
 
 An administrator may also point the assistant at their own gateway that speaks the Anthropic
-Messages, OpenAI Chat Completions or OpenAI Responses protocol. Such a URL must be HTTPS on a
+Messages, OpenAI Chat Completions or OpenAI Responses protocol, or at a model server the office
+runs itself: Ollama (its own /api/chat, so the context window can be set) or vLLM (OpenAI Chat
+Completions). Those two usually run without an API key. Such a URL must be HTTPS on a
 public address; private, loopback and link-local addresses (and plain HTTP) are refused unless
 the host is listed in ASSISTANT_ALLOWED_HOSTS. The check runs when the URL is saved and again
 before every call, and redirects are never followed.
+
+Ollama and vLLM live on the office network by nature, so for them an administrator may enter a
+private or plain-HTTP address directly, like any other service. What keeps that from being a way
+into other internal systems: the address must be the server root (or /v1), so only the fixed
+model-server paths are ever called, and link-local addresses (where clouds serve instance
+credentials) stay refused.
 """
 
 from __future__ import annotations
@@ -24,6 +32,11 @@ import anthropic
 import httpx
 
 TIMEOUT_SECONDS = 60
+# A model on the office's own hardware may answer slowly, especially the first call that loads it.
+SELF_HOSTED_TIMEOUT_SECONDS = 180
+# Ollama's default context is a few thousand tokens and it silently drops the oldest text when a
+# prompt is longer, which here is the system rules. Ask for a window the knowledge excerpts fit in.
+OLLAMA_CONTEXT_TOKENS = 16384
 MODEL_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,120}$")
 # Gateways often route by names such as "openrouter/anthropic/claude" or "auto"; the model is
 # only ever sent in the JSON body for these, never placed in a URL.
@@ -51,12 +64,33 @@ KINDS = {
         "suggested_model": "auto",
         "custom": True,
     },
+    "ollama": {
+        "label": "Ollama",
+        "suggested_model": "",
+        "custom": True,
+        "self_hosted": True,
+        "key_optional": True,
+        "default_base_url": "http://localhost:11434",
+    },
+    "vllm": {
+        "label": "vLLM",
+        "suggested_model": "",
+        "custom": True,
+        "self_hosted": True,
+        "key_optional": True,
+        "default_base_url": "http://localhost:8000/v1",
+    },
 }
 CUSTOM_PATHS = {
     "custom_anthropic": "/messages",
     "custom_chat": "/chat/completions",
     "custom_responses": "/responses",
+    "vllm": "/chat/completions",
+    "ollama": "/api/chat",
 }
+# Where each kind lists the models it serves, for the "fetch models" button.
+MODEL_LIST_PATHS = {"custom_chat": "/models", "vllm": "/models", "ollama": "/api/tags"}
+THINKING = re.compile(r"<think>.*?(</think>\s*|$)", re.DOTALL)
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -94,6 +128,14 @@ def is_custom(kind: str) -> bool:
     return kind in CUSTOM_PATHS
 
 
+def key_optional(kind: str) -> bool:
+    return bool(KINDS.get(kind, {}).get("key_optional"))
+
+
+def self_hosted(kind: str) -> bool:
+    return bool(KINDS.get(kind, {}).get("self_hosted"))
+
+
 def check_model(kind: str, model: str) -> None:
     pattern = CUSTOM_MODEL_PATTERN if is_custom(kind) else MODEL_PATTERN
     if not pattern.match(model):
@@ -107,9 +149,14 @@ def resolve_host(host: str) -> list[str]:
     return list({info[4][0] for info in socket.getaddrinfo(host, None)})
 
 
-def check_base_url(url: str, allowed_hosts: set[str]) -> str:
-    """The gateway base URL, normalised to end in its API version (".../v1")."""
+def check_base_url(url: str, allowed_hosts: set[str], kind: str = "custom_chat") -> str:
+    """The gateway base URL, normalised to end in its API version (".../v1").
+
+    Ollama's own API has no version segment, so its URL is kept at the server root.
+    """
     value = url.strip().rstrip("/")
+    if kind == "ollama":
+        value = re.sub(r"/(v1|api)$", "", value)
     try:
         parts = urlsplit(value)
     except ValueError as exc:
@@ -120,6 +167,8 @@ def check_base_url(url: str, allowed_hosts: set[str]) -> str:
     if parts.query or parts.fragment:
         raise LlmError("assistant_url_invalid", "Địa chỉ cổng không được chứa ? hay #.")
     trusted = host in allowed_hosts
+    if self_hosted(kind) and not trusted:
+        return _self_hosted_base(kind, value, host, parts.path)
     if parts.scheme == "http" and not trusted:
         raise LlmError(
             "assistant_url_insecure",
@@ -135,9 +184,26 @@ def check_base_url(url: str, allowed_hosts: set[str]) -> str:
                 "assistant_url_private",
                 f"“{host}” là địa chỉ nội bộ. Chỉ dùng được khi quản trị hệ thống thêm nó vào ASSISTANT_ALLOWED_HOSTS.",
             )
-    if not re.search(r"/v\d+$", parts.path):
+    if kind != "ollama" and not re.search(r"/v\d+$", parts.path):
         value += "/v1"
     return value
+
+
+def _self_hosted_base(kind: str, value: str, host: str, path: str) -> str:
+    """An Ollama or vLLM address on any network except link-local, at the server root only."""
+    if path not in ({""} if kind == "ollama" else {"", "/v1"}):
+        example = "http://192.168.1.20:11434" if kind == "ollama" else "http://192.168.1.20:8000/v1"
+        raise LlmError(
+            "assistant_url_invalid",
+            f"Chỉ nhập địa chỉ gốc của máy chủ, ví dụ {example}, không kèm đường dẫn khác.",
+        )
+    try:
+        addresses = [ipaddress.ip_address(a.split("%")[0]) for a in resolve_host(host)]
+    except (OSError, ValueError) as exc:
+        raise LlmError("assistant_url_unresolved", f"Không tìm thấy máy chủ “{host}”.") from exc
+    if not addresses or any(a.is_link_local or a.is_multicast or a.is_unspecified for a in addresses):
+        raise LlmError("assistant_url_private", f"Không dùng được địa chỉ “{host}” cho máy chủ AI.")
+    return value if kind == "ollama" or path else value + "/v1"
 
 
 def endpoint(kind: str, base_url: str) -> str:
@@ -159,11 +225,13 @@ def complete(
     if kind not in KINDS:
         raise LlmError("assistant_kind_invalid", "Loại dịch vụ AI không được hỗ trợ.")
     check_model(kind, model)
-    if not api_key:
+    if not api_key and not key_optional(kind):
         raise LlmError("assistant_key_missing", "Dịch vụ AI chưa có khóa API.")
     if is_custom(kind):
         # Checked again here: a name that was public when saved may point elsewhere now.
-        base = check_base_url(base_url or "", allowed_hosts or set())
+        base = check_base_url(base_url or "", allowed_hosts or set(), kind)
+        if kind == "ollama":
+            return _ollama(endpoint(kind, base), model, api_key, system, messages, max_tokens, transport)
         if kind == "custom_anthropic":
             return _anthropic(model, api_key, system, messages, max_tokens, transport, base_url=base)
         if kind == "custom_responses":
@@ -228,15 +296,17 @@ def _anthropic(model, api_key, system, messages, max_tokens, transport, base_url
 
 def _http_error(kind: str, response: httpx.Response, model: str) -> LlmError:
     try:
-        body = response.json()
-        detail = body.get("error", {}).get("message") if isinstance(body.get("error"), dict) else ""
-    except ValueError:
+        error = response.json().get("error")
+        # OpenAI-style services nest the message; Ollama and vLLM may send a plain string.
+        detail = error.get("message", "") if isinstance(error, dict) else str(error or "")
+    except (ValueError, AttributeError):
         detail = ""
     status = response.status_code
     if status in (401, 403):
         return LlmError("assistant_key_invalid", "Khóa API không hợp lệ hoặc không có quyền.")
-    if status == 404:
-        return LlmError("assistant_model_not_found", f"Không tìm thấy model “{model}”.")
+    if status == 404 or (kind == "ollama" and "not found" in detail):
+        hint = f" Trên máy chủ Ollama, chạy: ollama pull {model}" if kind == "ollama" else ""
+        return LlmError("assistant_model_not_found", f"Không tìm thấy model “{model}”.{hint}")
     if status == 429:
         return LlmError("assistant_rate_limited", "Dịch vụ AI đang quá tải hoặc đã hết hạn mức.")
     if 400 <= status < 500:
@@ -244,9 +314,9 @@ def _http_error(kind: str, response: httpx.Response, model: str) -> LlmError:
     return LlmError("assistant_upstream_error", "Dịch vụ AI đang gặp sự cố. Thử lại sau.")
 
 
-def _post(url: str, headers: dict, body: dict, transport) -> httpx.Response:
+def _post(url: str, headers: dict, body: dict, transport, timeout: int = TIMEOUT_SECONDS) -> httpx.Response:
     try:
-        with httpx.Client(timeout=TIMEOUT_SECONDS, transport=transport, follow_redirects=False) as client:
+        with httpx.Client(timeout=timeout, transport=transport, follow_redirects=False) as client:
             return client.post(url, headers=headers, json=body)
     except httpx.TimeoutException as exc:
         raise LlmError("assistant_timeout", "Dịch vụ AI phản hồi quá lâu.") from exc
@@ -254,11 +324,21 @@ def _post(url: str, headers: dict, body: dict, transport) -> httpx.Response:
         raise LlmError("assistant_unreachable", "Không kết nối được tới dịch vụ AI.") from exc
 
 
+def _bearer(api_key: str) -> dict:
+    return {"Authorization": f"Bearer {api_key}"} if api_key else {}
+
+
+def _without_thinking(text: str) -> str:
+    """Reasoning models served as-is (qwen3, deepseek-r1) put their thinking in <think> tags."""
+    return THINKING.sub("", text)
+
+
 def _openai_style(url, kind, model, api_key, system, messages, max_tokens, transport) -> Reply:
     body = {"model": model, "messages": [{"role": "system", "content": system}, *messages]}
     # OpenAI's newer models only accept max_completion_tokens; DeepSeek and gateways keep max_tokens.
     body["max_completion_tokens" if kind == "openai" else "max_tokens"] = max_tokens
-    response = _post(url, {"Authorization": f"Bearer {api_key}"}, body, transport)
+    timeout = SELF_HOSTED_TIMEOUT_SECONDS if self_hosted(kind) else TIMEOUT_SECONDS
+    response = _post(url, _bearer(api_key), body, transport, timeout)
     if response.status_code != 200:
         raise _http_error(kind, response, model)
     try:
@@ -268,7 +348,53 @@ def _openai_style(url, kind, model, api_key, system, messages, max_tokens, trans
         raise LlmError("assistant_bad_response", "Dịch vụ AI trả về dữ liệu không đọc được.") from exc
     if choice.get("finish_reason") == "content_filter":
         raise LlmError("assistant_refused", "Trợ lý không thể trả lời câu hỏi này.")
+    if self_hosted(kind):
+        text = _without_thinking(text)
     return Reply(text=text.strip(), truncated=choice.get("finish_reason") == "length")
+
+
+def _ollama(url, model, api_key, system, messages, max_tokens, transport) -> Reply:
+    body = {
+        "model": model,
+        "messages": [{"role": "system", "content": system}, *messages],
+        "stream": False,
+        "options": {"num_ctx": OLLAMA_CONTEXT_TOKENS, "num_predict": max_tokens},
+    }
+    response = _post(url, _bearer(api_key), body, transport, SELF_HOSTED_TIMEOUT_SECONDS)
+    if response.status_code != 200:
+        raise _http_error("ollama", response, model)
+    try:
+        data = response.json()
+        text = data["message"].get("content") or ""
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:
+        raise LlmError("assistant_bad_response", "Dịch vụ AI trả về dữ liệu không đọc được.") from exc
+    return Reply(text=_without_thinking(text).strip(), truncated=data.get("done_reason") == "length")
+
+
+def list_models(kind: str, base_url: str, api_key: str, allowed_hosts: set[str], transport=None) -> list[str]:
+    """Model names a self-hosted server or chat gateway offers, for the administrator to pick."""
+    if kind not in MODEL_LIST_PATHS:
+        raise LlmError("assistant_models_unsupported", "Dịch vụ này không có danh sách model để lấy.")
+    base = check_base_url(base_url, allowed_hosts, kind)
+    try:
+        with httpx.Client(timeout=TIMEOUT_SECONDS, transport=transport, follow_redirects=False) as client:
+            response = client.get(base + MODEL_LIST_PATHS[kind], headers=_bearer(api_key))
+    except httpx.TimeoutException as exc:
+        raise LlmError("assistant_timeout", "Máy chủ AI phản hồi quá lâu.") from exc
+    except httpx.TransportError as exc:
+        raise LlmError("assistant_unreachable", "Không kết nối được tới máy chủ AI.") from exc
+    if response.status_code != 200:
+        raise _http_error(kind, response, "")
+    try:
+        data = response.json()
+        names = (
+            [item["name"] for item in data["models"]]
+            if kind == "ollama"
+            else [item["id"] for item in data["data"]]
+        )
+    except (ValueError, KeyError, TypeError) as exc:
+        raise LlmError("assistant_bad_response", "Máy chủ AI trả về danh sách model không đọc được.") from exc
+    return sorted({name for name in names if isinstance(name, str) and CUSTOM_MODEL_PATTERN.match(name)})
 
 
 def _gemini(model, api_key, system, messages, max_tokens, transport) -> Reply:

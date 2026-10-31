@@ -20,6 +20,15 @@
   công khai; cổng nội bộ/HTTP phải có trong biến mới `ASSISTANT_ALLOWED_HOSTS`; kiểm lại trước mỗi
   lần gọi, không theo chuyển hướng.
 - `packages/flowkit` (`dx-flowkit` 0.1.0): kiểm tra và chạy thử đồ thị quy trình JSON, tách từ `dx_core.workflow`, không phụ thuộc thư viện ngoài. 56 test; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên. `dx_core.workflow` chưa dùng gói này.
+- Trợ lý AI dùng được máy chủ AI tự cài: **Ollama** (gọi API gốc `/api/chat`, đặt `num_ctx` 16384 để
+  kiến thức không bị cắt ngầm) và **vLLM** (OpenAI Chat Completions). Khóa API không bắt buộc với hai
+  loại này; nút "Lấy danh sách model" đọc model có trên máy chủ (`POST /assistant/models`, dùng được
+  cả cho cổng Chat Completions). Chờ tối đa 180 giây; bỏ phần `<think>…</think>` của model suy luận
+  khỏi câu trả lời. Cấu hình ngay trong giao diện như các dịch vụ khác: địa chỉ nội bộ và HTTP được nhận
+  mà không cần `ASSISTANT_ALLOWED_HOSTS`, nhưng chỉ ở gốc máy chủ (hoặc `/v1`) nên chỉ các đường dẫn cố
+  định của máy chủ model được gọi, và địa chỉ link-local (metadata đám mây) vẫn bị chặn. Cổng `custom_*`
+  giữ quy tắc cũ. Compose thêm `host.docker.internal` cho `workspace-api` để gọi Ollama chạy trên
+  chính máy cài Docker. Logo từ `@lobehub/icons-static-svg` (đã có). 5 test backend, 1 test frontend.
 - Đóng hồ sơ (migration `workspace_0015`, thêm `cases.deleted_at`, `cases.archived_at`). Trước đây
   không có cách nào bỏ một hồ sơ tạo nhầm. Người lập **xóa bản nháp chưa từng trình**
   (`DELETE /cases/{id}`; ẩn khỏi mọi danh sách, tìm kiếm, báo cáo, nhật ký vẫn ghi). Hồ sơ đã từng

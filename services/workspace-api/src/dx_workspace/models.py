@@ -607,7 +607,8 @@ class AssistantProvider(Base):
     name: Mapped[str] = mapped_column(String(120))
     kind: Mapped[str] = mapped_column(String(20))
     model: Mapped[str] = mapped_column(String(120))
-    # Only for self-hosted gateways ("custom_*" kinds); official services use fixed endpoints.
+    # Only for gateways and self-hosted servers ("custom_*", Ollama, vLLM); official services
+    # use fixed endpoints. The key may be empty for a self-hosted server that has none.
     base_url: Mapped[str | None] = mapped_column(String(300))
     secret: Mapped[str] = mapped_column(Text, default="")
     key_hint: Mapped[str] = mapped_column(String(12), default="")

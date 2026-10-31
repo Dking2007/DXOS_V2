@@ -179,6 +179,7 @@ const checklist = computed(() => {
       v-if="tab === 'providers'"
       :providers="admin.data.value.providers"
       :kinds="admin.data.value.kinds"
+      :allowed-hosts="admin.data.value.allowed_hosts"
       @changed="refresh"
     />
     <KnowledgePanel v-if="tab === 'knowledge'" :categories="admin.data.value.categories" @changed="refresh" />

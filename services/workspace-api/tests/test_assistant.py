@@ -53,6 +53,7 @@ def test_people_ask_and_administrators_shape_the_assistant(world):  # noqa: F811
     overview = director.get(API + "/assistant/admin").json()
     assert {k["kind"] for k in overview["kinds"]} == {
         "anthropic", "openai", "gemini", "deepseek", "custom_anthropic", "custom_chat", "custom_responses",
+        "ollama", "vllm",
     }  # fmt: skip
     bad_model = director.post(
         API + "/assistant/providers",
@@ -537,3 +538,174 @@ def test_administrators_configure_a_gateway_and_people_ask_through_it(world, mon
         json={"expected_revision": gateway["revision"], "name": "Cổng LLM", "model": "gpt-route"},
     ).json()
     assert edited["base_url"] == "https://llm.example.com/v1" and edited["model"] == "gpt-route"
+
+
+def test_ollama_uses_its_own_api_with_a_wide_context_and_no_key():
+    allowed = {"ollama.office.lan"}
+    assert llm.check_base_url("http://ollama.office.lan:11434/v1/", allowed, "ollama") == (
+        "http://ollama.office.lan:11434"
+    )
+    seen = {}
+
+    def server(request):
+        seen["request"] = request
+        return httpx.Response(
+            200,
+            json={
+                "message": {
+                    "role": "assistant",
+                    "content": "<think>Người hỏi muốn…</think>\n\nVào mục Hồ sơ [1].",
+                },
+                "done_reason": "length",
+            },
+        )
+
+    reply = llm.complete(
+        "ollama",
+        "qwen3:8b",
+        "",
+        "Quy tắc",
+        [{"role": "user", "content": "Lập hồ sơ thế nào?"}],
+        800,
+        transport=httpx.MockTransport(server),
+        base_url="http://ollama.office.lan:11434",
+        allowed_hosts=allowed,
+    )
+    request = seen["request"]
+    body = json.loads(request.content)
+    assert str(request.url) == "http://ollama.office.lan:11434/api/chat"
+    assert "authorization" not in request.headers
+    assert body["stream"] is False and body["options"] == {
+        "num_ctx": llm.OLLAMA_CONTEXT_TOKENS,
+        "num_predict": 800,
+    }
+    assert body["messages"][0] == {"role": "system", "content": "Quy tắc"}
+    # The model's reasoning is not shown to people.
+    assert reply.text == "Vào mục Hồ sơ [1]." and reply.truncated
+
+    def missing(request):
+        return httpx.Response(404, json={"error": 'model "llama9" not found, try pulling it first'})
+
+    with pytest.raises(llm.LlmError) as error:
+        llm.complete(
+            "ollama", "llama9", "", "s", [{"role": "user", "content": "x"}], 100,
+            transport=httpx.MockTransport(missing), base_url="http://ollama.office.lan:11434", allowed_hosts=allowed,
+        )  # fmt: skip
+    assert error.value.code == "assistant_model_not_found" and "ollama pull llama9" in error.value.message
+
+
+def test_vllm_speaks_chat_completions_and_sends_a_key_only_if_set():
+    allowed = {"gpu.office.lan"}
+    seen = []
+
+    def server(request):
+        seen.append(request)
+        return httpx.Response(200, json=openai_reply("<think>suy nghĩ</think>Chào anh."))
+
+    for key in ("", "vllm-key-123"):
+        reply = llm.complete(
+            "vllm", "Qwen/Qwen2.5-7B-Instruct", key, "Quy tắc", [{"role": "user", "content": "Chào"}], 300,
+            transport=httpx.MockTransport(server), base_url="http://gpu.office.lan:8000", allowed_hosts=allowed,
+        )  # fmt: skip
+        assert reply.text == "Chào anh."
+    assert str(seen[0].url) == "http://gpu.office.lan:8000/v1/chat/completions"
+    assert "authorization" not in seen[0].headers
+    assert seen[1].headers["authorization"] == "Bearer vllm-key-123"
+    assert json.loads(seen[0].content)["max_tokens"] == 300
+    # Hosted services still need their key.
+    with pytest.raises(llm.LlmError) as error:
+        llm.complete("openai", "gpt-x", "", "s", [{"role": "user", "content": "x"}], 100)
+    assert error.value.code == "assistant_key_missing"
+
+
+def test_model_lists_come_from_each_server_kind():
+    def server(request):
+        if request.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}, {"name": "llama3.1:8b"}]})
+        return httpx.Response(200, json={"object": "list", "data": [{"id": "Qwen/Qwen2.5-7B-Instruct"}]})
+
+    transport = httpx.MockTransport(server)
+    allowed = {"ai.lan"}
+    assert llm.list_models("ollama", "http://ai.lan:11434", "", allowed, transport) == [
+        "llama3.1:8b",
+        "qwen3:8b",
+    ]
+    assert llm.list_models("vllm", "http://ai.lan:8000", "", allowed, transport) == [
+        "Qwen/Qwen2.5-7B-Instruct"
+    ]
+    with pytest.raises(llm.LlmError) as error:
+        llm.list_models("openai", "", "", allowed, transport)
+    assert error.value.code == "assistant_models_unsupported"
+
+
+def test_administrators_add_a_keyless_ollama_server_and_pick_its_model(world, monkeypatch):  # noqa: F811
+    fake_dns(monkeypatch, {"ollama.office.lan": ["10.0.0.7"]})
+    app = world[1]
+
+    def server(request):
+        if request.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
+        return httpx.Response(
+            200, json={"message": {"content": "Kết nối thành công."}, "done_reason": "stop"}
+        )
+
+    app.state.assistant_transport = httpx.MockTransport(server)
+    director = as_(world, "director")
+    query = {"kind": "ollama", "base_url": "http://ollama.office.lan:11434"}
+    # Configured like any other service: no operator list needed for an office-network server.
+    assert director.get(API + "/assistant/admin").json()["allowed_hosts"] == []
+    assert director.post(API + "/assistant/models", json=query).json() == {"models": ["qwen3:8b"]}
+    created = director.post(
+        API + "/assistant/providers", json={"name": "Ollama phòng máy", "model": "qwen3:8b", **query}
+    )
+    assert created.status_code == 201, created.text
+    provider = created.json()
+    assert provider["key_hint"] == "" and provider["endpoint"] == "http://ollama.office.lan:11434/api/chat"
+    assert director.post(f"{API}/assistant/providers/{provider['id']}/test").json()["ok"] is True
+    # Editing reuses the stored address when the form leaves it blank.
+    listed = director.post(API + "/assistant/models", json={"kind": "ollama", "provider_id": provider["id"]})
+    assert listed.json() == {"models": ["qwen3:8b"]}
+    # A hosted service still needs its key.
+    keyless = director.post(
+        API + "/assistant/providers", json={"name": "x", "kind": "openai", "model": "gpt-x"}
+    )
+    assert keyless.status_code == 422 and keyless.json()["code"] == "assistant_key_missing"
+
+
+def test_self_hosted_servers_may_be_private_but_only_at_their_root(monkeypatch):
+    fake_dns(
+        monkeypatch,
+        {
+            "ollama.office.lan": ["10.0.0.7"],
+            "localhost": ["127.0.0.1"],
+            "host.docker.internal": ["fdc4:f303:9324::254"],
+            "metadata.internal": ["169.254.169.254"],
+        },
+    )
+    assert (
+        llm.check_base_url("http://ollama.office.lan:11434", set(), "ollama")
+        == "http://ollama.office.lan:11434"
+    )
+    assert llm.check_base_url("http://localhost:11434/v1", set(), "ollama") == "http://localhost:11434"
+    assert (
+        llm.check_base_url("http://host.docker.internal:8000", set(), "vllm")
+        == "http://host.docker.internal:8000/v1"
+    )
+    assert (
+        llm.check_base_url("http://ollama.office.lan:8000/v1/", set(), "vllm")
+        == "http://ollama.office.lan:8000/v1"
+    )
+    rejected = {
+        ("ollama", "http://metadata.internal"): "assistant_url_private",
+        ("ollama", "http://ollama.office.lan:8001/workspace/v1"): "assistant_url_invalid",
+        ("vllm", "http://ollama.office.lan:8000/admin/v1"): "assistant_url_invalid",
+        ("vllm", "http://nowhere.lan:8000"): "assistant_url_unresolved",
+    }
+    for (kind, url), code in rejected.items():
+        with pytest.raises(llm.LlmError) as error:
+            llm.check_base_url(url, set(), kind)
+        assert error.value.code == code, url
+    # Arbitrary gateways keep the stricter rule.
+    with pytest.raises(llm.LlmError) as error:
+        llm.check_base_url("http://ollama.office.lan:11434", set(), "custom_chat")
+    assert error.value.code == "assistant_url_insecure"

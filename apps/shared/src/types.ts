@@ -366,7 +366,16 @@ export interface AssistantReply {
 export interface AssistantProvider {
   id: string
   name: string
-  kind: 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'custom_anthropic' | 'custom_chat' | 'custom_responses'
+  kind:
+    | 'anthropic'
+    | 'openai'
+    | 'gemini'
+    | 'deepseek'
+    | 'custom_anthropic'
+    | 'custom_chat'
+    | 'custom_responses'
+    | 'ollama'
+    | 'vllm'
   kind_label: string
   model: string
   base_url: string | null
@@ -403,7 +412,18 @@ export interface AssistantAdmin {
     revision: number
   }
   providers: AssistantProvider[]
-  kinds: { kind: AssistantProvider['kind']; label: string; suggested_model: string; custom?: boolean }[]
+  kinds: {
+    kind: AssistantProvider['kind']
+    label: string
+    suggested_model: string
+    custom?: boolean
+    /** A model server the office runs itself (Ollama, vLLM). */
+    self_hosted?: boolean
+    key_optional?: boolean
+    default_base_url?: string
+  }[]
+  /** Hosts the operator allowed for plain HTTP or private addresses (ASSISTANT_ALLOWED_HOSTS). */
+  allowed_hosts: string[]
   categories: { key: AssistantArticle['category']; label: string }[]
   article_count: number
   published_count: number

@@ -32,8 +32,9 @@ from .services import audit, check_revision, page
 MANAGE = "assistant.manage"
 CATEGORY = Literal["process", "guide", "faq", "other"]
 KIND = Literal[
-    "anthropic", "openai", "gemini", "deepseek", "custom_anthropic", "custom_chat", "custom_responses"
-]
+    "anthropic", "openai", "gemini", "deepseek", "custom_anthropic", "custom_chat", "custom_responses",
+    "ollama", "vllm",
+]  # fmt: skip
 MAX_ARTICLES = 1000
 DEFAULT_WELCOME = (
     "Xin chào! Tôi là trợ lý Desktiny. Hãy hỏi tôi về quy trình nghiệp vụ hoặc cách dùng phần mềm."
@@ -80,7 +81,8 @@ class ProviderInput(s.Input):
     name: str = Field(min_length=1, max_length=120)
     kind: KIND
     model: str = Field(min_length=1, max_length=120)
-    api_key: str = Field(min_length=8, max_length=500)
+    # Required except for model servers the office runs itself (Ollama, vLLM).
+    api_key: str = Field(default="", max_length=500)
     max_output_tokens: int = Field(default=4000, ge=256, le=64000)
     base_url: str = Field(default="", max_length=300)
 
@@ -92,6 +94,14 @@ class ProviderPatch(s.Revision):
     api_key: str = Field(default="", max_length=500)
     max_output_tokens: int = Field(default=4000, ge=256, le=64000)
     base_url: str = Field(default="", max_length=300)
+
+
+class ModelsQuery(s.Input):
+    kind: KIND
+    base_url: str = Field(default="", max_length=300)
+    api_key: str = Field(default="", max_length=500)
+    # When editing, the stored address and key are used for whatever the form leaves blank.
+    provider_id: str | None = None
 
 
 class ArticleInput(s.Input):
@@ -127,7 +137,7 @@ def build_router(app):
         """Validate model and gateway URL for a provider; the normalised URL for gateways."""
         try:
             llm.check_model(kind, model)
-            return llm.check_base_url(base_url, allowed_hosts()) if llm.is_custom(kind) else None
+            return llm.check_base_url(base_url, allowed_hosts(), kind) if llm.is_custom(kind) else None
         except llm.LlmError as exc:
             raise AppError(422, exc.code, exc.message) from exc
 
@@ -223,7 +233,13 @@ def build_router(app):
         return value
 
     def key_hint(api_key: str) -> str:
-        return f"…{api_key[-4:]}"
+        return f"…{api_key[-4:]}" if api_key else ""
+
+    def check_key(kind: str, api_key: str):
+        if api_key and len(api_key) < 8:
+            raise AppError(422, "assistant_key_invalid", "Khóa API quá ngắn.")
+        if not api_key and not llm.key_optional(kind):
+            raise AppError(422, "assistant_key_missing", "Nhập khóa API của dịch vụ.")
 
     def ask(provider: m.AssistantProvider, system: str, messages: list[dict]) -> llm.Reply:
         try:
@@ -343,6 +359,9 @@ def build_router(app):
             },
             "providers": [provider_data(p) for p in providers],
             "kinds": [{"kind": k, **v} for k, v in llm.KINDS.items()],
+            # Self-hosted servers usually sit on the office network; the form says which hosts
+            # the operator has opened up so the administrator is not left guessing.
+            "allowed_hosts": sorted(allowed_hosts()),
             "categories": [{"key": k, "label": v} for k, v in CATEGORIES.items()],
             "article_count": len(articles),
             "published_count": sum(1 for a in articles if a.published),
@@ -367,6 +386,8 @@ def build_router(app):
     @router.post("/assistant/providers", status_code=201)
     def add_provider(body: ProviderInput, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
         user = manager(db, actor)
+        api_key = body.api_key.strip()
+        check_key(body.kind, api_key)
         base_url = checked(body.kind, body.model.strip(), body.base_url)
         first = active_provider(db) is None
         value = m.AssistantProvider(
@@ -374,8 +395,8 @@ def build_router(app):
             kind=body.kind,
             model=body.model.strip(),
             base_url=base_url,
-            secret=box.encrypt(body.api_key.strip()),
-            key_hint=key_hint(body.api_key.strip()),
+            secret=box.encrypt(api_key) if api_key else "",
+            key_hint=key_hint(api_key),
             max_output_tokens=body.max_output_tokens,
             active=first,
         )
@@ -408,8 +429,7 @@ def build_router(app):
             body.max_output_tokens,
         )
         if body.api_key.strip():
-            if len(body.api_key.strip()) < 8:
-                raise AppError(422, "assistant_key_invalid", "Khóa API quá ngắn.")
+            check_key(value.kind, body.api_key.strip())
             value.secret = box.encrypt(body.api_key.strip())
             value.key_hint = key_hint(body.api_key.strip())
         value.last_test_ok = None
@@ -418,6 +438,29 @@ def build_router(app):
         audit(db, user, "assistant.provider_updated", value.id, {"key_changed": bool(body.api_key.strip())})
         db.commit()
         return provider_data(value)
+
+    @router.post("/assistant/models")
+    def models(body: ModelsQuery, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        """Ask a self-hosted server (or chat gateway) which models it serves."""
+        manager(db, actor)
+        stored = get_provider(db, body.provider_id) if body.provider_id else None
+        if stored and stored.kind != body.kind:
+            raise AppError(422, "assistant_kind_invalid", "Loại dịch vụ không khớp.")
+        api_key = body.api_key.strip() or (box.decrypt(stored.secret) if stored and stored.secret else "")
+        base_url = body.base_url.strip() or (stored.base_url if stored else "") or ""
+        db.commit()
+        try:
+            names = llm.list_models(
+                body.kind,
+                base_url,
+                api_key,
+                allowed_hosts(),
+                transport=getattr(app.state, "assistant_transport", None),
+            )
+        except llm.LlmError as exc:
+            status = 422 if exc.code.startswith(("assistant_url", "assistant_models")) else 502
+            raise AppError(status, exc.code, exc.message) from exc
+        return {"models": names}
 
     @router.post("/assistant/providers/{provider_id}/activate")
     def activate(provider_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):

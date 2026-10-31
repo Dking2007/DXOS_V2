@@ -2,7 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { CheckCircle2, KeyRound, Pencil, Plug, Plus, Star, Trash2, XCircle } from 'lucide-vue-next'
+import { CheckCircle2, KeyRound, ListRestart, Pencil, Plug, Plus, Star, Trash2, XCircle } from 'lucide-vue-next'
 import type { AssistantAdmin, AssistantProvider } from '@dx/web-shared/types.ts'
 import { errorText, formatDate } from '@dx/web-shared/api.ts'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
@@ -12,7 +12,11 @@ import { toast } from '../ui/toast'
 import { confirmDiscard } from '../ui/unsaved'
 import { GATEWAY_ICONS, GATEWAY_PROTOCOLS, gatewayEndpoint, PROVIDER_LOGOS } from './logos'
 
-const props = defineProps<{ providers: AssistantProvider[]; kinds: AssistantAdmin['kinds'] }>()
+const props = defineProps<{
+  providers: AssistantProvider[]
+  kinds: AssistantAdmin['kinds']
+  allowedHosts: string[]
+}>()
 const emit = defineEmits<{ changed: [] }>()
 
 const KIND_HINTS: Record<string, string> = {
@@ -23,10 +27,20 @@ const KIND_HINTS: Record<string, string> = {
   custom_anthropic: 'Khóa do cổng cấp, gửi trong header x-api-key.',
   custom_chat: 'Khóa do cổng cấp, gửi trong header Authorization: Bearer.',
   custom_responses: 'Khóa do cổng cấp, gửi trong header Authorization: Bearer.',
+  ollama: 'Ollama thường chạy không cần khóa: để trống. Chỉ nhập khi đặt Ollama sau proxy có xác thực.',
+  vllm: 'Nhập khóa nếu vLLM chạy với --api-key; không thì để trống.',
 }
 const official = computed(() => props.kinds.filter((k) => !k.custom))
-const gateways = computed(() => props.kinds.filter((k) => k.custom))
-const isGateway = computed(() => !!GATEWAY_PROTOCOLS[kind.value])
+const gateways = computed(() => props.kinds.filter((k) => k.custom && !k.self_hosted))
+const selfHosted = computed(() => props.kinds.filter((k) => k.self_hosted))
+const info = computed(() => props.kinds.find((k) => k.kind === kind.value))
+// Everything that is not an official service is called at an address the administrator gives.
+const isGateway = computed(() => !!info.value?.custom)
+const keyOptional = computed(() => !!info.value?.key_optional)
+// Servers that can say which models they have, so nobody has to type a name like qwen3:8b.
+const LISTS_MODELS = ['ollama', 'vllm', 'custom_chat']
+const models = ref<string[]>([])
+const loadingModels = ref(false)
 const dialog = ref<'add' | 'edit' | null>(null)
 const editing = ref<AssistantProvider | null>(null)
 const kind = ref<AssistantProvider['kind']>('anthropic')
@@ -48,7 +62,6 @@ function openAdd() {
   kind.value = 'anthropic'
   pickKind('anthropic')
   apiKey.value = ''
-  baseUrl.value = ''
   maxTokens.value = 4000
   error.value = ''
   opened.value = state()
@@ -63,6 +76,7 @@ function openEdit(item: AssistantProvider) {
   baseUrl.value = ''
   maxTokens.value = item.max_output_tokens
   error.value = ''
+  models.value = []
   opened.value = state()
 }
 function pickKind(value: AssistantProvider['kind']) {
@@ -70,6 +84,30 @@ function pickKind(value: AssistantProvider['kind']) {
   const info = props.kinds.find((k) => k.kind === value)
   name.value = info?.label ?? ''
   model.value = info?.suggested_model ?? ''
+  baseUrl.value = info?.default_base_url ?? ''
+  models.value = []
+}
+async function fetchModels() {
+  loadingModels.value = true
+  error.value = ''
+  try {
+    const result = await api.request<{ models: string[] }>('/assistant/models', {
+      method: 'POST',
+      body: JSON.stringify({
+        kind: kind.value,
+        base_url: baseUrl.value,
+        api_key: apiKey.value,
+        provider_id: editing.value?.id ?? null,
+      }),
+    })
+    models.value = result.models
+    if (!result.models.length) error.value = 'Máy chủ chưa có model nào. Với Ollama, tải model bằng lệnh ollama pull.'
+    else if (!result.models.includes(model.value)) model.value = result.models[0]
+  } catch (cause) {
+    error.value = errorText(cause)
+  } finally {
+    loadingModels.value = false
+  }
 }
 function close() {
   if (!busy.value && confirmDiscard(state() !== opened.value)) dialog.value = null
@@ -78,7 +116,8 @@ const canSave = computed(
   () =>
     !!name.value.trim() &&
     !!model.value.trim() &&
-    (dialog.value === 'edit' || apiKey.value.trim().length >= 8) &&
+    (apiKey.value.trim().length >= 8 ||
+      (!apiKey.value.trim() && (dialog.value === 'edit' || keyOptional.value))) &&
     (!isGateway.value || dialog.value === 'edit' || !!preview.value),
 )
 async function save() {
@@ -171,7 +210,7 @@ async function remove(item: AssistantProvider) {
       empty
       compact
       title="Chưa có dịch vụ AI nào"
-      description="Thêm Claude, OpenAI, Gemini hoặc DeepSeek bằng khóa API của cơ quan."
+      description="Thêm Claude, OpenAI, Gemini, DeepSeek bằng khóa API của cơ quan, hoặc máy chủ Ollama, vLLM tự cài."
       ><button class="button small" type="button" @click="openAdd"><Plus :size="15" />Thêm dịch vụ</button></StatePanel
     >
     <div class="provider-list">
@@ -187,7 +226,7 @@ async function remove(item: AssistantProvider) {
           <small>{{ item.kind_label }} · model <code>{{ item.model }}</code></small>
           <small v-if="item.endpoint" class="provider-endpoint"><code>{{ item.endpoint }}</code></small>
           <small
-            ><KeyRound :size="12" /> Khóa {{ item.key_hint }} ·
+            ><KeyRound :size="12" /> {{ item.key_hint ? `Khóa ${item.key_hint}` : 'Không dùng khóa' }} ·
             <template v-if="item.last_test_ok === true"
               ><CheckCircle2 :size="12" class="ok" /> Kết nối tốt {{ formatDate(item.last_test_at, true) }}</template
             ><template v-else-if="item.last_test_ok === false"
@@ -231,6 +270,21 @@ async function remove(item: AssistantProvider) {
             <span class="provider-logo" aria-hidden="true"><img :src="PROVIDER_LOGOS[item.kind]" alt="" /></span>{{ item.label }}
           </button>
         </div>
+        <span class="section-label">Máy chủ AI tự cài trong cơ quan</span>
+        <div class="kind-picker" role="radiogroup" aria-label="Máy chủ AI tự cài">
+          <button
+            v-for="item in selfHosted"
+            :key="item.kind"
+            type="button"
+            role="radio"
+            :aria-checked="kind === item.kind"
+            :class="{ active: kind === item.kind }"
+            @click="pickKind(item.kind)"
+          >
+            <span class="provider-logo" aria-hidden="true"><img :src="PROVIDER_LOGOS[item.kind]" alt="" /></span
+            ><span class="kind-text"><strong>{{ item.label }}</strong><small>Không cần khóa API</small></span>
+          </button>
+        </div>
         <span class="section-label">Cổng riêng (endpoint tương thích)</span>
         <div class="kind-picker gateways" role="radiogroup" aria-label="Cổng riêng">
           <button
@@ -260,34 +314,80 @@ async function remove(item: AssistantProvider) {
           inputmode="url"
           maxlength="300"
           :required="dialog === 'add'"
-          :placeholder="editing?.base_url || 'https://gateway.example.com/v1'"
+          :placeholder="editing?.base_url || info?.default_base_url || 'https://gateway.example.com/v1'"
         />
         <small class="muted">
           <template v-if="preview">Trợ lý sẽ gọi: <code>{{ preview }}</code></template>
           <template v-else>Nhập phần gốc của địa chỉ, ví dụ https://gateway.example.com hoặc …/v1.</template>
         </small>
-        <small class="muted">
-          Phải là HTTPS trên địa chỉ công khai. Cổng trong mạng nội bộ hoặc HTTP cần quản trị hệ thống thêm tên máy vào
-          <code>ASSISTANT_ALLOWED_HOSTS</code>.
+        <small v-if="info?.self_hosted" class="muted">
+          Nhập địa chỉ gốc của máy đang chạy {{ info.label }} trong mạng cơ quan, ví dụ
+          <code>http://192.168.1.20:{{ kind === 'ollama' ? '11434' : '8000' }}</code>; dùng được cả HTTP. Nếu
+          {{ info.label }} chạy ngay trên máy cài Desktiny bằng Docker, nhập
+          <code>http://host.docker.internal:{{ kind === 'ollama' ? '11434' : '8000' }}</code> (trong Docker,
+          <code>localhost</code> là chính container).
+        </small>
+        <small v-else class="muted">
+          Phải là HTTPS trên địa chỉ công khai. Máy trong mạng nội bộ hoặc HTTP cần quản trị hệ thống thêm tên máy vào
+          <code>ASSISTANT_ALLOWED_HOSTS</code><template v-if="allowedHosts.length">
+            (đang cho phép: <code>{{ allowedHosts.join(', ') }}</code>)</template
+          ><template v-else> (hiện chưa có máy nào)</template>.
         </small>
       </div>
       <div class="field">
         <label for="provider-model">Model</label>
-        <input id="provider-model" v-model="model" maxlength="120" required placeholder="Tên model trong tài khoản của bạn" />
-        <small class="muted">{{
-          isGateway ? 'Tên model cổng nhận, ví dụ “auto” để cổng tự chọn.' : 'Nhập đúng tên model tài khoản của bạn được dùng.'
+        <div class="inline-actions">
+          <input
+            id="provider-model"
+            v-model="model"
+            class="grow"
+            maxlength="120"
+            required
+            list="provider-models"
+            placeholder="Tên model trong tài khoản của bạn"
+          />
+          <button
+            v-if="LISTS_MODELS.includes(kind)"
+            type="button"
+            class="button secondary small"
+            :disabled="loadingModels || (!baseUrl.trim() && !editing)"
+            @click="fetchModels"
+          >
+            <ListRestart :size="14" />{{ loadingModels ? 'Đang lấy…' : 'Lấy danh sách model' }}
+          </button>
+        </div>
+        <datalist id="provider-models"><option v-for="option in models" :key="option" :value="option" /></datalist>
+        <small v-if="models.length" class="muted">Máy chủ có {{ models.length }} model; bấm vào ô để chọn.</small>
+        <small v-else class="muted">{{
+          info?.self_hosted
+            ? 'Bấm “Lấy danh sách model” để chọn model đã tải trên máy chủ.'
+            : isGateway
+              ? 'Tên model cổng nhận, ví dụ “auto” để cổng tự chọn.'
+              : 'Nhập đúng tên model tài khoản của bạn được dùng.'
         }}</small>
       </div>
       <div class="field">
-        <label for="provider-key">Khóa API{{ dialog === 'edit' ? ' (để trống nếu giữ khóa cũ)' : '' }}</label>
-        <input id="provider-key" v-model="apiKey" type="password" autocomplete="off" maxlength="500" :required="dialog === 'add'" />
+        <label for="provider-key"
+          >Khóa API{{ dialog === 'edit' ? ' (để trống nếu giữ khóa cũ)' : keyOptional ? ' (không bắt buộc)' : '' }}</label
+        >
+        <input
+          id="provider-key"
+          v-model="apiKey"
+          type="password"
+          autocomplete="off"
+          maxlength="500"
+          :required="dialog === 'add' && !keyOptional"
+        />
         <small class="muted">{{ KIND_HINTS[kind] }}</small>
       </div>
       <div class="field" style="max-width: 240px">
         <label for="provider-tokens">Độ dài trả lời tối đa (token)</label>
         <input id="provider-tokens" v-model.number="maxTokens" type="number" min="256" max="64000" />
       </div>
-      <div class="notice warning">
+      <div v-if="info?.self_hosted" class="notice">
+        Câu hỏi và các đoạn kiến thức chỉ đi tới máy chủ của cơ quan, không ra nhà cung cấp bên ngoài.
+      </div>
+      <div v-else class="notice warning">
         Câu hỏi của người dùng và các đoạn kiến thức liên quan sẽ được gửi tới nhà cung cấp này để tạo câu trả lời.
       </div>
       <div class="form-actions">

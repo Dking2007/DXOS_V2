@@ -6537,6 +6537,46 @@
         }
       }
     },
+    "/workspace/v1/assistant/models": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Models",
+        "description": "Ask a self-hosted server (or chat gateway) which models it serves.",
+        "operationId": "models_workspace_v1_assistant_models_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelsQuery"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/assistant/providers/{provider_id}/activate": {
       "post": {
         "tags": [
@@ -8465,6 +8505,54 @@
         ],
         "title": "MessageEdit"
       },
+      "ModelsQuery": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "anthropic",
+              "openai",
+              "gemini",
+              "deepseek",
+              "custom_anthropic",
+              "custom_chat",
+              "custom_responses",
+              "ollama",
+              "vllm"
+            ],
+            "title": "Kind"
+          },
+          "base_url": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Base Url",
+            "default": ""
+          },
+          "api_key": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Api Key",
+            "default": ""
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "ModelsQuery"
+      },
       "NewDocument": {
         "properties": {
           "name": {
@@ -8745,7 +8833,9 @@
               "deepseek",
               "custom_anthropic",
               "custom_chat",
-              "custom_responses"
+              "custom_responses",
+              "ollama",
+              "vllm"
             ],
             "title": "Kind"
           },
@@ -8758,8 +8848,8 @@
           "api_key": {
             "type": "string",
             "maxLength": 500,
-            "minLength": 8,
-            "title": "Api Key"
+            "title": "Api Key",
+            "default": ""
           },
           "max_output_tokens": {
             "type": "integer",
@@ -8780,8 +8870,7 @@
         "required": [
           "name",
           "kind",
-          "model",
-          "api_key"
+          "model"
         ],
         "title": "ProviderInput"
       },
