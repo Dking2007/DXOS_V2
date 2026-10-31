@@ -45,7 +45,11 @@ const blank: ProcessDraft = {
   files: 0,
   roles: [],
 }
-const draft = ref<ProcessDraft>(structuredClone(props.initial ?? blank))
+// Query data and props are reactive proxies, which structuredClone refuses; JSON copies plain data.
+function copy<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T
+}
+const draft = ref<ProcessDraft>(copy(props.initial ?? blank))
 const opened = JSON.stringify(draft.value)
 const publishNow = ref(true)
 const stepIndex = ref(props.mode === 'revise' ? 1 : 0)
@@ -71,8 +75,8 @@ function startFrom(versionId: string) {
   const source = sources.data.value?.items.find((item) => item.id === versionId)
   const form = forms.data.value?.items.find((item) => item.id === source?.form_id)
   if (!source || !form) return
-  draft.value.fields = structuredClone(form.fields)
-  draft.value.steps = structuredClone(source.approval_steps)
+  draft.value.fields = copy(form.fields)
+  draft.value.steps = copy(source.approval_steps)
   draft.value.files = source.required_file_count
   if (!draft.value.description) draft.value.description = form.description ?? ''
   toast.success(`Đã chép trường và bước duyệt từ “${source.package_name}”. Sửa lại cho quy trình mới.`)

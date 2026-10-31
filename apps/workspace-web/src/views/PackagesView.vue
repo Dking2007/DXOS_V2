@@ -234,8 +234,9 @@ function reviseProcess() {
     initial: {
       name: selectedPackage.value.name,
       description: versionForm.value.description ?? '',
-      fields: structuredClone(versionForm.value.fields),
-      steps: structuredClone(selectedVersion.value.approval_steps),
+      // The wizard copies these before editing them.
+      fields: versionForm.value.fields,
+      steps: selectedVersion.value.approval_steps,
       files: selectedVersion.value.required_file_count,
       roles: [...selectedPackage.value.allowed_roles],
     },
@@ -438,8 +439,8 @@ const currentStage = computed(() => stages.value.findIndex((s) => !s.done))
         </div>
         <div v-else-if="selectedVersion.state === 'published'" class="notice success" style="margin: 0 22px 4px">
           <CheckCircle2 :size="18" /><span
-            >Phiên bản này đang được dùng cho hồ sơ mới. Muốn thay đổi, tạo <strong>phiên bản mới</strong> — hồ sơ cũ
-            vẫn giữ phiên bản đã chọn.</span
+            >Phiên bản này đang được dùng cho hồ sơ mới. Muốn thay đổi, bấm <strong>Sửa quy trình</strong>: hệ thống tạo
+            phiên bản mới, hồ sơ đã lập vẫn giữ phiên bản cũ.</span
           >
         </div>
 

@@ -299,8 +299,7 @@ async function reindex() {
                 </button>
               </div>
               <small v-if="serviceOf(feature.key) && modelErrors[listKey(serviceOf(feature.key)!, 'chat')]" class="muted">
-                Không lấy được danh sách model ({{ modelErrors[listKey(serviceOf(feature.key)!, 'chat')] }}); gõ tên model
-                hoặc để trống để dùng model mặc định.
+                Không lấy được danh sách model của dịch vụ này; gõ tên model hoặc để trống.
               </small>
             </div>
           </div>

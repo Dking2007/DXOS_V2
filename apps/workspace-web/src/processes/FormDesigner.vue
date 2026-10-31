@@ -126,7 +126,7 @@ function setDeadline(step: ApprovalStep, amount: number, unit: number) {
         </div>
         <div class="field">
           <label :for="`step-due-${index}`"><Clock :size="13" /> Thời hạn xử lý</label>
-          <div class="inline-actions">
+          <div class="inline-actions" style="flex-wrap: nowrap">
             <input
               :id="`step-due-${index}`"
               type="number"
@@ -140,6 +140,7 @@ function setDeadline(step: ApprovalStep, amount: number, unit: number) {
             <select
               :value="deadlineParts(step.due_hours).unit"
               aria-label="Đơn vị thời hạn"
+              style="max-width: 110px"
               @change="
                 setDeadline(step, deadlineParts(step.due_hours).amount || 1, Number(($event.target as HTMLSelectElement).value))
               "
