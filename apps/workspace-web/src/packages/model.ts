@@ -74,6 +74,42 @@ export const ERROR_LABEL: Record<ErrorCode, string> = {
   form_validation_error: 'Dữ liệu biểu mẫu không hợp lệ',
   self_approval_denied: 'Người tạo trùng người duyệt',
 }
+export interface ImpactSide {
+  state: string
+  path: string[]
+  assignees: string[]
+  routing_evidence?: RoutingEvidence[]
+  error?: { code: string; detail: string }
+}
+export interface ImpactItem {
+  name: string
+  changed: boolean
+  changes: ('outcome' | 'path' | 'assignees')[]
+  causes: string[]
+  baseline: ImpactSide
+  candidate: ImpactSide
+  recipient_drift: { recorded: string[]; now: string[] } | null
+}
+export interface Impact {
+  baseline: { id: string; version_no: number }
+  candidate: { id: string; version_no: number }
+  differences: { rules: boolean; form: boolean; required_files: boolean }
+  summary: { fixtures: number; changed: number; recipient_drift: number }
+  items: ImpactItem[]
+}
+export const CHANGE_LABEL = { outcome: 'kết quả', path: 'đường đi', assignees: 'người nhận' } as const
+/** The approvers a fixture would meet, as the labels of the steps it passes through. */
+export function routeLabels(side: ImpactSide): string {
+  if (side.error) return ERROR_LABEL[side.error.code as ErrorCode] ?? side.error.detail
+  const steps = (side.routing_evidence ?? []).filter((step) => step.selected).map((step) => step.label)
+  return steps.length ? steps.join(' → ') : 'Không có bước duyệt'
+}
+export function impactHeadline(impact: Impact): string {
+  const { fixtures, changed } = impact.summary
+  if (!fixtures) return 'Bộ thử chưa có hồ sơ mẫu nào.'
+  if (!changed) return `Cả ${fixtures} hồ sơ mẫu cho kết quả giống phiên bản trước.`
+  return `${changed}/${fixtures} hồ sơ mẫu thay đổi so với phiên bản trước.`
+}
 export const DECISION_LABEL: Record<Decision, string> = {
   approve: 'Duyệt',
   return: 'Trả lại',

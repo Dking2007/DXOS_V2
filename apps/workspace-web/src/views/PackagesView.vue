@@ -31,13 +31,16 @@ import {
   DECISION_LABEL,
   ERROR_LABEL,
   ROLE_LABEL,
+  CHANGE_LABEL,
   VERSION_STATE,
   choicesFrom,
+  impactHeadline,
+  routeLabels,
   latestReports,
   pathStops,
   readiness,
 } from '../packages/model'
-import type { PackageVersion, Report, ReportResult, Suite } from '../packages/model'
+import type { Impact, PackageVersion, Report, ReportResult, Suite } from '../packages/model'
 import '../packages/packages.css'
 
 interface Package {
@@ -113,6 +116,29 @@ const versionDiff = useQuery({
   queryFn: () =>
     api.request<VersionDiff>(`/package-versions/${selectedVersionId.value}/diff?against_id=${previousVersion.value!.id}`),
   enabled: computed(() => !!selectedVersionId.value && !!previousVersion.value),
+})
+// A suite written for either version can rehearse both, so offer the suites of the two together.
+const previousSuites = useQuery({
+  queryKey: computed(() => ['simulation-suites', previousVersion.value?.id]),
+  queryFn: () => api.request<Page<Suite>>(`/package-versions/${previousVersion.value!.id}/test-suites`),
+  enabled: computed(() => canManage.value && !!previousVersion.value),
+})
+const impactSuites = computed(() =>
+  [...(suites.data.value?.items ?? []), ...(previousSuites.data.value?.items ?? [])].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at),
+  ),
+)
+const impactSuiteId = ref('')
+watch(impactSuites, (items) => {
+  if (!items.some((s) => s.id === impactSuiteId.value)) impactSuiteId.value = items[0]?.id ?? ''
+})
+const impact = useQuery({
+  queryKey: computed(() => ['package-version-impact', selectedVersionId.value, previousVersion.value?.id, impactSuiteId.value]),
+  queryFn: () =>
+    api.request<Impact>(
+      `/package-versions/${selectedVersionId.value}/impact?against_id=${previousVersion.value!.id}&suite_id=${impactSuiteId.value}`,
+    ),
+  enabled: computed(() => canManage.value && !!selectedVersionId.value && !!previousVersion.value && !!impactSuiteId.value),
 })
 const state = computed(() =>
   selectedVersion.value
@@ -503,6 +529,48 @@ const currentStage = computed(() => stages.value.findIndex((s) => !s.done))
           >
             Không có thay đổi cấu hình so với v{{ versionDiff.data.value.from_version }}.
           </p>
+          <section v-if="canManage && previousVersion" class="impact" aria-labelledby="impact-title">
+            <span id="impact-title" class="section-label">Tác động lên hồ sơ mẫu</span>
+            <p v-if="!impactSuites.length" class="muted">
+              Chưa có bộ thử. Tạo bộ thử ở thẻ Chạy thử để xem phiên bản này thay đổi gì với hồ sơ mẫu.
+            </p>
+            <template v-else>
+              <label v-if="impactSuites.length > 1" class="impact-pick">
+                Bộ thử
+                <select v-model="impactSuiteId">
+                  <option v-for="(suite, index) in impactSuites" :key="suite.id" :value="suite.id">
+                    Bộ {{ impactSuites.length - index }} · {{ suite.cases.length }} hồ sơ mẫu · {{ formatDate(suite.created_at) }}
+                  </option>
+                </select>
+              </label>
+              <p v-if="impact.isPending.value" class="muted">Đang chạy thử hai phiên bản…</p>
+              <p v-else-if="impact.error.value" class="notice" role="alert">{{ errorText(impact.error.value) }}</p>
+              <template v-else-if="impact.data.value">
+                <p class="impact-headline" :class="{ changed: impact.data.value.summary.changed }">
+                  {{ impactHeadline(impact.data.value) }}
+                </p>
+                <p v-if="impact.data.value.summary.recipient_drift" class="notice">
+                  Cơ cấu tổ chức đã đổi từ lần chạy thử trước: {{ impact.data.value.summary.recipient_drift }} hồ sơ mẫu
+                  hiện có người nhận khác. Chạy lại bộ thử trước khi phát hành.
+                </p>
+                <ul class="impact-list">
+                  <li v-for="item in impact.data.value.items" :key="item.name" :class="{ changed: item.changed }">
+                    <div class="impact-name">
+                      <strong>{{ item.name }}</strong>
+                      <span class="tag" :class="item.changed ? 'changed' : ''">
+                        {{ item.changed ? 'Đổi ' + item.changes.map((c) => CHANGE_LABEL[c]).join(', ') : 'Không đổi' }}
+                      </span>
+                    </div>
+                    <dl v-if="item.changed" class="impact-compare">
+                      <div><dt>v{{ impact.data.value.baseline.version_no }}</dt><dd>{{ routeLabels(item.baseline) }}</dd></div>
+                      <div><dt>v{{ impact.data.value.candidate.version_no }}</dt><dd>{{ routeLabels(item.candidate) }}</dd></div>
+                    </dl>
+                  </li>
+                </ul>
+                <p class="muted">Chỉ chạy thử: không tạo việc, không gửi thông báo, không phát hành.</p>
+              </template>
+            </template>
+          </section>
         </div>
       </template>
       <StatePanel
