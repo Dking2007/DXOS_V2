@@ -7,19 +7,6 @@
 ## [Unreleased]
 
 ### Added
-- Trợ lý AI ở góc màn hình (migration `workspace_0012`): trả lời về quy trình nghiệp vụ và cách
-  dùng phần mềm, chỉ dựa trên kiến thức do quản trị viên nhập, có ghi nguồn `[1]`. Quyền mới
-  `assistant.manage` (mặc định Ban giám đốc, Quản trị kỹ thuật) cho màn **Trợ lý AI**: bật/tắt,
-  lời chào, câu gợi ý, hướng dẫn thêm, giới hạn câu hỏi/người/ngày; dịch vụ Claude (SDK `anthropic`
-  2.3.0), OpenAI, Gemini, DeepSeek với khóa API mã hóa, chỉ hiện 4 ký tự cuối, kiểm tra kết nối;
-  kiến thức viết tay, nhập tệp `.md/.txt`, sinh từ gói nghiệp vụ đang áp dụng, thử tìm không tốn
-  lượt gọi AI. Trợ lý không đọc hồ sơ/công việc/tài liệu/tin nhắn. 8 test backend, 4 test frontend.
-  Logo các dịch vụ AI lấy từ `@lobehub/icons-static-svg` 1.95.0 (MIT; logo là nhãn hiệu của từng hãng).
-  Cổng riêng (migration `workspace_0013`): dùng endpoint tự đặt theo giao thức Anthropic Messages,
-  OpenAI Chat Completions hoặc OpenAI Responses (model như `auto`). Chỉ nhận HTTPS trên địa chỉ
-  công khai; cổng nội bộ/HTTP phải có trong biến mới `ASSISTANT_ALLOWED_HOSTS`; kiểm lại trước mỗi
-  lần gọi, không theo chuyển hướng.
-- `packages/flowkit` (`dx-flowkit` 0.1.0): kiểm tra và chạy thử đồ thị quy trình JSON, tách từ `dx_core.workflow`, không phụ thuộc thư viện ngoài. 56 test; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên. `dx_core.workflow` chưa dùng gói này.
 - 17 tính năng AI (migration `workspace_0016`), mô tả trong [docs/ai-features.md](docs/ai-features.md): đọc tài
   liệu để điền biểu mẫu (tạo căn cứ trường nguồn AI, câu trích phải có thật trong trang), tóm tắt hồ sơ cho
   người duyệt, soát hồ sơ trước khi trình, gợi ý ý kiến duyệt/lý do trả lại, soạn văn bản hành chính ra tệp
@@ -54,15 +41,10 @@
   liên kết tới hồ sơ/công việc/luồng. Trước đây quyền này có trong ma trận phân quyền nhưng không có
   màn hình nào dùng. `GET /audit-logs` trả thêm `actor_name`. Test frontend bắt buộc mọi hành động
   backend ghi nhật ký đều có nhãn tiếng Việt.
-- `plugins/vn-document-format` (0.1.0): plugin ONLYOFFICE kiểm tra thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP, Phụ lục I. 29 test; đã chạy thử trong ONLYOFFICE 8.3.3 trên hai tệp mẫu. Có icon, ảnh chụp và CHANGELOG theo hướng dẫn marketplace. Chưa kiểm lề trên 8.3.3 (thiếu hàm đọc lề); chưa gửi lên marketplace.
-- Mục "Đóng góp ngược cho cộng đồng nguồn mở" trong README, ghi trạng thái thật từng việc.
-- `scripts/desktiny-migrate.sh` (cài thành `$PREFIX/bin/desktiny-migrate`): chạy migration CSDL từ bản đã cài, không cần thư mục mã nguồn.
-
-### Fixed
-- Sửa chữ `WorkMMODIARY` (lỗi thay chuỗi) thành `Workspace` trong chú thích mã và `docs/acceptance.md`.
-- Tạo hồ sơ với trường số không bắt buộc để trống bị từ chối (`amount: None is not of type number`): form web gửi `null`, nay `validate_payload` coi giá trị `null` là chưa nhập. Có test hồi quy.
-- Người dùng demo do `scripts/bootstrap.py` sinh có họ (`lastName`) trống; Keycloak 26 buộc điền họ ở bước `VERIFY_PROFILE`, nên lần đăng nhập đầu của mọi tài khoản demo bị chặn và Playwright E2E có đăng nhập không qua được. Nay `lastName` là `Demo`.
-- `make install` không cài `alembic.ini` và `migrations/`, nên bản cài ra `PREFIX` không thể khởi tạo CSDL khi xóa thư mục mã nguồn (tiêu chí PoF 4, mục "chạy được ngoài thư mục mã nguồn"). Nay cài vào `$PREFIX/share/desktiny/<service>-api/`.
+- `GET /workspace/v1/package-versions/{id}/impact?against_id=&suite_id=`: so sánh tác động giữa hai phiên bản của một gói bằng cùng bộ fixture, chỉ đọc (không tạo task, không gửi, không phát hành). Trả về từng fixture đổi kết quả/đường đi/người nhận, nguyên nhân do quy tắc (`rule`), hash của hai phiên bản và của fixture, và cờ `recipient_drift` khi người nhận đã lưu trong báo cáo lần chạy thử gần nhất của bản gốc khác với người nhận hiện tại (cơ cấu tổ chức đổi). 3 test API mới. Giao diện tiếng Việt trong thẻ "So với vN" của màn Gói nghiệp vụ (tên hồ sơ mẫu, đổi kết quả/đường đi/người nhận, các bước duyệt hai bên, cảnh báo cơ cấu đổi; bộ thử của cả hai phiên bản đều chọn được) và 2 test vitest; đã kiểm bằng Chromium trên stack thật ở độ rộng desktop, chưa kiểm 390 px; chưa kiểm trên PostgreSQL. Cả hai phiên bản đều được đánh giá theo cơ cấu hiện tại, nên chênh lệch giữa chúng chỉ đến từ quy tắc.
+- `docs/operations.md`: kết quả diễn tập backup/restore ngày 31/10/2026 (PostgreSQL + object storage sang project riêng, số dòng và hash khớp) và lỗi `pg_restore --no-owner`; `docs/acceptance.md` ghi lượt chạy ONLYOFFICE Document Server thật.
+- Test API cho cổng phát hành gói nghiệp vụ (`test_packages.py`, 18 test, đã chỉnh theo quy tắc mới: bộ thử tùy chọn nhưng bộ đã viết phải đã chạy và đạt; cấu hình đổi, quyền, bản đã phát hành bất biến) và ma trận quyền truy cập (`test_access_matrix.py`, 9 test: tệp, hồ sơ, công việc, tìm kiếm, báo cáo với người ngoài luồng và quản trị kỹ thuật). Có thêm ca tác nhân service không được dùng API người dùng (15 route đều 403). Chưa phát hiện lỗi rò rỉ. Chat, bảng tin, đính kèm và Office callback đã có test riêng từ trước (`test_collaboration.py`, `test_office_save.py`); chưa phủ đường import evidence của AI và token khác namespace phía Workspace.
+- CI chạy thêm `packages/flowkit/tests` (56 test) và test Node của plugin `vn-document-format` (29 test), trước đây không được chạy.
 
 ### Changed
 - Gọn chức năng trùng lặp (rà soát ngày 31/10/2026):
@@ -90,6 +72,34 @@
   tài liệu, chọn bản ghi khi chạy luồng, lọc cuộc trò chuyện (gõ "bao cao" ra "Báo cáo"). Dùng chung
   `dx_workspace/text.py` và `apps/shared/src/text.ts`.
 - Bỏ mũi tên ▾ ở nhãn "e-Office" trên thanh bên: không có chức năng chuyển không gian nào.
+
+## [0.2.2] - 2026-10-31
+
+### Added
+- Trợ lý AI ở góc màn hình (migration `workspace_0012`): trả lời về quy trình nghiệp vụ và cách
+  dùng phần mềm, chỉ dựa trên kiến thức do quản trị viên nhập, có ghi nguồn `[1]`. Quyền mới
+  `assistant.manage` (mặc định Ban giám đốc, Quản trị kỹ thuật) cho màn **Trợ lý AI**: bật/tắt,
+  lời chào, câu gợi ý, hướng dẫn thêm, giới hạn câu hỏi/người/ngày; dịch vụ Claude (SDK `anthropic`
+  2.3.0), OpenAI, Gemini, DeepSeek với khóa API mã hóa, chỉ hiện 4 ký tự cuối, kiểm tra kết nối;
+  kiến thức viết tay, nhập tệp `.md/.txt`, sinh từ gói nghiệp vụ đang áp dụng, thử tìm không tốn
+  lượt gọi AI. Trợ lý không đọc hồ sơ/công việc/tài liệu/tin nhắn. 8 test backend, 4 test frontend.
+  Logo các dịch vụ AI lấy từ `@lobehub/icons-static-svg` 1.95.0 (MIT; logo là nhãn hiệu của từng hãng).
+  Cổng riêng (migration `workspace_0013`): dùng endpoint tự đặt theo giao thức Anthropic Messages,
+  OpenAI Chat Completions hoặc OpenAI Responses (model như `auto`). Chỉ nhận HTTPS trên địa chỉ
+  công khai; cổng nội bộ/HTTP phải có trong biến mới `ASSISTANT_ALLOWED_HOSTS`; kiểm lại trước mỗi
+  lần gọi, không theo chuyển hướng.
+- `packages/flowkit` (`dx-flowkit` 0.1.0): kiểm tra và chạy thử đồ thị quy trình JSON, tách từ `dx_core.workflow`, không phụ thuộc thư viện ngoài. 56 test; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên. `dx_core.workflow` chưa dùng gói này.
+- `plugins/vn-document-format` (0.1.0): plugin ONLYOFFICE kiểm tra thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP, Phụ lục I. 29 test; đã chạy thử trong ONLYOFFICE 8.3.3 trên hai tệp mẫu. Có icon, ảnh chụp và CHANGELOG theo hướng dẫn marketplace. Chưa kiểm lề trên 8.3.3 (thiếu hàm đọc lề); chưa gửi lên marketplace.
+- Mục "Đóng góp ngược cho cộng đồng nguồn mở" trong README, ghi trạng thái thật từng việc.
+- `scripts/desktiny-migrate.sh` (cài thành `$PREFIX/bin/desktiny-migrate`): chạy migration CSDL từ bản đã cài, không cần thư mục mã nguồn.
+
+### Fixed
+- Sửa chữ `WorkMMODIARY` (lỗi thay chuỗi) thành `Workspace` trong chú thích mã và `docs/acceptance.md`.
+- Tạo hồ sơ với trường số không bắt buộc để trống bị từ chối (`amount: None is not of type number`): form web gửi `null`, nay `validate_payload` coi giá trị `null` là chưa nhập. Có test hồi quy.
+- Người dùng demo do `scripts/bootstrap.py` sinh có họ (`lastName`) trống; Keycloak 26 buộc điền họ ở bước `VERIFY_PROFILE`, nên lần đăng nhập đầu của mọi tài khoản demo bị chặn và Playwright E2E có đăng nhập không qua được. Nay `lastName` là `Demo`.
+- `make install` không cài `alembic.ini` và `migrations/`, nên bản cài ra `PREFIX` không thể khởi tạo CSDL khi xóa thư mục mã nguồn (tiêu chí PoF 4, mục "chạy được ngoài thư mục mã nguồn"). Nay cài vào `$PREFIX/share/desktiny/<service>-api/`.
+
+### Changed
 - Cấu trúc Workspace API: bỏ hai vòng phụ thuộc bị che bằng import trong hàm (`tasks` ↔ `messaging`, `routers` ↔ `packages`). `validate_payload` và `step_evidence` chuyển vào `schemas.py`; `membership` và `message_readable` chuyển vào `policies.py`; các import cục bộ giữa `automations`, `messaging` và `tasks` đưa lên đầu tệp. Không đổi hành vi hay API (contract OpenAPI không đổi; 105 test dịch vụ + 4 test ranh giới đạt). `tests/test_boundaries.py` có thêm test chặn vòng phụ thuộc mới.
 - Thêm `.gitattributes` và `.editorconfig` (LF thống nhất giữa Windows/Linux/macOS).
 - `npm run generate:api` giữ header SPDX của hai tệp sinh ra (trước đây xóa mất, làm job `compliance` đỏ). CI so sánh `contracts/` và `apps/shared/src/generated/` với bản đã commit.
@@ -101,7 +111,8 @@
 - `make install` dùng pip của `.venv` (cần `make venv` trước) thay vì `python3 -m pip` của hệ thống (kèm `--ignore-installed` để mọi phụ thuộc thật sự nằm trong `PREFIX`, không bị bỏ qua vì đã có trong `.venv`): Python 3.13 từ deadsnakes trên Ubuntu 24.04 không có pip, nên lệnh cũ thất bại. `desktiny-migrate` tự chọn đúng `python3.X` đã cài gói thay vì `python3` mặc định. BUILD.md gọi `make venv deps PYTHON=python3.13`. Cả ba lỗi tìm ra khi chạy BUILD.md từng dòng trong Ubuntu 24.04 sạch (27/10/2026).
 - Phụ thuộc `psycopg[binary]` đổi thành `psycopg` thuần Python: không còn đóng gói sẵn libpq trong wheel; hệ điều hành cung cấp `libpq5` (đã thêm vào `api.Dockerfile`, bước CI backend và BUILD.md). `psycopg-binary` bị loại khỏi `requirements.lock` và `THIRD_PARTY.md` (54 gói Python).
 - BUILD.md: thêm mục Thư viện hệ thống và `libpq5` vào bảng yêu cầu.
-- Tài liệu (`V2_CHANGES.md`, `SELF_REVIEW.md`) trỏ tới v0.2.1 là bản dùng để chấm.
+- Tài liệu (`V2_CHANGES.md`, `SELF_REVIEW.md`) trỏ tới v0.2.2 là bản dùng để chấm (thay cho v0.2.1; v0.2.0 vẫn chỉ là mốc lịch sử có lỗi `reuse lint`).
+- Hợp nhất nhánh `feat/ai-assistant` (trợ lý AI) vào `main`; đã chạy lại toàn bộ kiểm trên bản hợp nhất: ruff, pytest (118 đạt, 1 bỏ qua vì cần PostgreSQL thật), contract OpenAPI và kiểu TypeScript sinh ra khớp mã, lint/typecheck/test/build frontend, kiểm SPDX và `THIRD_PARTY.md`.
 
 ## [0.2.1] - 2026-10-26
 

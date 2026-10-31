@@ -5,11 +5,13 @@ import {
   choicesFrom,
   conditionText,
   decisionsFor,
+  impactHeadline,
+  routeLabels,
   pathStops,
   readiness,
   resolverText,
 } from './model'
-import type { PackageVersion, Report, Suite } from './model'
+import type { Impact, ImpactSide, PackageVersion, Report, Suite } from './model'
 
 const fields = [{ key: 'amount', label: 'Kinh phí', type: 'number' as const }]
 
@@ -62,5 +64,29 @@ describe('publish readiness', () => {
     const result = readiness(version, [suite('old', 'h1')], [report('old', true, '1', 'h1')])
     expect(result.hasSuites).toBe(false)
     expect(readiness({ ...version, state: 'draft' }, [], []).blocker).toBe('Kiểm tra cấu hình trước.')
+  })
+})
+
+describe('impact of a new version', () => {
+  const impact = (changed: number, fixtures = 3): Impact =>
+    ({ summary: { fixtures, changed, recipient_drift: 0 } }) as Impact
+  it('says plainly how many sample dossiers change', () => {
+    expect(impactHeadline(impact(0))).toBe('Cả 3 hồ sơ mẫu cho kết quả giống phiên bản trước.')
+    expect(impactHeadline(impact(2))).toBe('2/3 hồ sơ mẫu thay đổi so với phiên bản trước.')
+    expect(impactHeadline(impact(0, 0))).toBe('Bộ thử chưa có hồ sơ mẫu nào.')
+  })
+  it('names the approvers a dossier meets, or the reason it cannot be routed', () => {
+    const side = (labels: [string, boolean][]) =>
+      ({
+        state: 'waiting',
+        path: [],
+        assignees: [],
+        routing_evidence: labels.map(([label, selected]) => ({ label, selected })),
+      }) as unknown as ImpactSide
+    expect(routeLabels(side([['Thẩm định', true], ['Giám đốc', true], ['Kế toán', false]]))).toBe('Thẩm định → Giám đốc')
+    expect(routeLabels(side([['Kế toán', false]]))).toBe('Không có bước duyệt')
+    expect(
+      routeLabels({ state: 'error', path: [], assignees: [], error: { code: 'self_approval_denied', detail: 'x' } }),
+    ).toBe('Người tạo trùng người duyệt')
   })
 })

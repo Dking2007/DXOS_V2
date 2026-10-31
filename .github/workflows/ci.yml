@@ -29,6 +29,8 @@ jobs:
       - run: ruff check packages services scripts tests examples infra
       - run: python -m unittest discover -s infra/tests -v
       - run: pytest -q
+      - name: Kiểm thử gói dx-flowkit độc lập (không nằm trong testpaths)
+        run: pip install ./packages/flowkit && pytest -q packages/flowkit/tests
       - run: python scripts/export_contracts.py
       - name: Contract OpenAPI đã commit khớp với mã
         run: git diff --exit-code contracts
@@ -44,6 +46,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
+      - name: Kiểm thử plugin vn-document-format
+        run: npm test --prefix plugins/vn-document-format
       - run: npm run build
       - name: Kiểu TypeScript sinh từ contract đã commit khớp
         run: npm run generate:api && git diff --exit-code apps/shared/src/generated

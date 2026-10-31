@@ -71,6 +71,23 @@ nhạy cảm. Không thực hiện xóa blob/GC khi chưa đối soát holds/ref
 7. Smoke SSO, metadata và download đúng hash, hồ sơ/approval history, workflow resume.
 8. Ghi thời gian thực tế và mất dữ liệu nếu có trước khi đặt mục tiêu RPO/RTO.
 
+### Kết quả diễn tập 31/10/2026 (Docker Desktop/Windows, PostgreSQL 17.5, dữ liệu demo nhỏ)
+
+Quy trình: dừng `core-api`, `workspace-api` và hai worker; `pg_dump -Fc` ba DB; `tar` volume object-storage;
+khởi động lại nguồn; dựng project Compose riêng (`-p dx-restore`, volume mới) và khôi phục vào đó.
+
+- Backup 9 giây, restore 10 giây (DB dump 47 KB / 134 KB / 218 KB, objects 29 KB, 19 tệp). Đây là số quan sát
+  trên dữ liệu rất nhỏ, **không** dùng làm RPO/RTO.
+- Đối chiếu: số dòng của mọi bảng khớp (Core 23 bảng, Workspace 47, Keycloak 88); hash tổng và số tệp object khớp;
+  `alembic_version` là `workspace_0013` / `core_0002`; `core-api` và `workspace-api` lên `healthy` trên dữ liệu đã
+  khôi phục, job migration không đổi gì.
+- **Lỗi quy trình đã gặp:** `pg_restore --no-owner` làm bảng thuộc `dx_bootstrap`, role `dx_core` mất quyền
+  (`permission denied for table alembic_version`) và `core-migrate` thất bại. Khôi phục **không** dùng `--no-owner`
+  (các role đã được `init-databases.sh` tạo trên môi trường mới), hoặc cấp lại quyền sau restore.
+- Chưa kiểm: SSO và đăng nhập trên môi trường đã khôi phục (không dựng gateway), tải tệp đúng hash qua API,
+  tiếp tục workflow đang chờ, đối soát outbox/unknown outcome, khóa mã hóa và `.env` (dùng lại đúng `.env` của nguồn),
+  snapshot nhất quán khi hệ thống đang ghi (lần này dừng ghi trước khi sao lưu), Office data.
+
 ## Dừng và dữ liệu
 
 `docker compose ... stop` dừng mà giữ dữ liệu. `down` giữ named volumes theo mặc
