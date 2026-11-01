@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select, text, update
 from sqlalchemy.orm import Session
 
+from .audit_chain import verify_chain
 from .models import (
     Application,
     Audit,
@@ -946,6 +947,11 @@ def create_app(settings: Settings | None = None, engine=None):
         audit(db, actor, "human_task.completed", task.id)
         db.commit()
         return result
+
+    @router.get("/audit-logs/verify")
+    def verify_audit(db: DB, actor: User):
+        admin(actor)
+        return verify_chain(db, actor.application)
 
     @router.get("/audit-logs")
     def audits(db: DB, actor: User, limit: int = Query(50, ge=1, le=100), cursor: str | None = None):

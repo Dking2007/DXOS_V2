@@ -1831,6 +1831,22 @@
         }
       }
     },
+    "/core/v1/audit-logs/verify": {
+      "get": {
+        "summary": "Verify Audit",
+        "operationId": "verify_audit_core_v1_audit_logs_verify_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/core/v1/audit-logs": {
       "get": {
         "summary": "Audits",

@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 Desktiny contributors
 from dx_platform.auth import Actor
+from dx_platform.database import utcnow
 from dx_platform.errors import AppError
 from dx_platform.security import digest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .audit_chain import append
 from .models import Audit, Idempotency, Outbox
 
 
@@ -41,14 +43,16 @@ def begin_idempotency(db: Session, actor: Actor, operation: str, key: str | None
 
 
 def audit(db: Session, actor: Actor, action: str, resource_id: str, detail=None):
-    db.add(
+    append(
+        db,
         Audit(
             application=actor.application,
             actor=actor.subject,
             action=action,
             resource_id=resource_id,
             detail=detail or {},
-        )
+            created_at=utcnow(),
+        ),
     )
 
 
