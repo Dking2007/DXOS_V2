@@ -1093,6 +1093,26 @@ export interface paths {
         patch: operations["patch_task_workspace_v1_tasks__task_id__patch"];
         trace?: never;
     };
+    "/workspace/v1/tasks/{task_id}/files/{file_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Task File Download
+         * @description A download ticket for a file attached to a task, for anyone who may see the task.
+         */
+        post: operations["task_file_download_workspace_v1_tasks__task_id__files__file_id__download_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/tasks/{task_id}/assign": {
         parameters: {
             query?: never;
@@ -6167,6 +6187,38 @@ export interface operations {
                 "application/json": components["schemas"]["TaskPatch"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    task_file_download_workspace_v1_tasks__task_id__files__file_id__download_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
