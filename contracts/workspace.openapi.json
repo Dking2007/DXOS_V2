@@ -5703,6 +5703,109 @@
         }
       }
     },
+    "/workspace/v1/cases/{case_id}/process": {
+      "get": {
+        "tags": [
+          "processes",
+          "cases"
+        ],
+        "summary": "Case Process",
+        "description": "The flow a dossier follows, painted with how far each submission has gone.",
+        "operationId": "case_process_workspace_v1_cases__case_id__process_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "submission_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 36
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Submission Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/automations/process-template": {
+      "get": {
+        "tags": [
+          "processes",
+          "automations"
+        ],
+        "summary": "Process Template",
+        "description": "A form's approval steps redrawn as a process flow, to start a new process from.",
+        "operationId": "process_template_workspace_v1_automations_process_template_get",
+        "parameters": [
+          {
+            "name": "form_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "title": "Form Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/automations/catalog": {
       "get": {
         "tags": [
@@ -5874,15 +5977,31 @@
         "summary": "Validate",
         "description": "Check a flow while it is being drawn; problems come back tied to their node.",
         "operationId": "validate_workspace_v1_automations_validate_post",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "automation",
+                "process"
+              ],
+              "type": "string",
+              "default": "automation",
+              "title": "Kind"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/Graph"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -9007,7 +9126,12 @@
                 "type": "string",
                 "enum": [
                   "true",
-                  "false"
+                  "false",
+                  "approve",
+                  "return",
+                  "reject",
+                  "completed",
+                  "cancelled"
                 ]
               },
               {
@@ -9550,6 +9674,15 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Data"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "automation",
+              "process"
+            ],
+            "title": "Kind",
+            "default": "automation"
           }
         },
         "additionalProperties": false,
@@ -10248,6 +10381,15 @@
             ],
             "title": "Scope",
             "default": "all"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "automation",
+              "process"
+            ],
+            "title": "Kind",
+            "default": "automation"
           }
         },
         "additionalProperties": false,
@@ -10288,6 +10430,15 @@
             ],
             "title": "Scope",
             "default": "all"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "automation",
+              "process"
+            ],
+            "title": "Kind",
+            "default": "automation"
           }
         },
         "additionalProperties": false,

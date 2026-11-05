@@ -1607,6 +1607,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/v1/cases/{case_id}/process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Case Process
+         * @description The flow a dossier follows, painted with how far each submission has gone.
+         */
+        get: operations["case_process_workspace_v1_cases__case_id__process_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/automations/process-template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Process Template
+         * @description A form's approval steps redrawn as a process flow, to start a new process from.
+         */
+        get: operations["process_template_workspace_v1_automations_process_template_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/automations/catalog": {
         parameters: {
             query?: never;
@@ -2904,7 +2944,7 @@ export interface components {
             /** Target */
             target: string;
             /** Branch */
-            branch?: ("true" | "false") | null;
+            branch?: ("true" | "false" | "approve" | "return" | "reject" | "completed" | "cancelled") | null;
         };
         /** EmbeddingSetting */
         EmbeddingSetting: {
@@ -3084,6 +3124,12 @@ export interface components {
             data?: {
                 [key: string]: unknown;
             };
+            /**
+             * Kind
+             * @default automation
+             * @enum {string}
+             */
+            kind: "automation" | "process";
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -3384,6 +3430,12 @@ export interface components {
              * @enum {string}
              */
             scope: "all" | "attached";
+            /**
+             * Kind
+             * @default automation
+             * @enum {string}
+             */
+            kind: "automation" | "process";
         };
         /** RulePatch */
         RulePatch: {
@@ -3403,6 +3455,12 @@ export interface components {
              * @enum {string}
              */
             scope: "all" | "attached";
+            /**
+             * Kind
+             * @default automation
+             * @enum {string}
+             */
+            kind: "automation" | "process";
         };
         /** RuleTest */
         RuleTest: {
@@ -7433,6 +7491,70 @@ export interface operations {
             };
         };
     };
+    case_process_workspace_v1_cases__case_id__process_get: {
+        parameters: {
+            query?: {
+                submission_id?: string | null;
+            };
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    process_template_workspace_v1_automations_process_template_get: {
+        parameters: {
+            query: {
+                form_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     catalog_workspace_v1_automations_catalog_get: {
         parameters: {
             query?: never;
@@ -7574,7 +7696,9 @@ export interface operations {
     };
     validate_workspace_v1_automations_validate_post: {
         parameters: {
-            query?: never;
+            query?: {
+                kind?: "automation" | "process";
+            };
             header?: never;
             path?: never;
             cookie?: never;

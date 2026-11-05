@@ -3,9 +3,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Copy, Plus, Trash2 } from 'lucide-vue-next'
-import { KINDS, OPERATORS, RECIPIENTS, waitLabel } from './nodes'
+import { KINDS, OPERATORS, RECIPIENTS, RESOLVERS, waitLabel } from './nodes'
 import type { FlowCondition, FlowNodeData, TriggerInfo } from './nodes'
 const props = defineProps<{
+  /** Drawing a dossier's process: the trigger picks a form instead of an event. */
+  process?: boolean
+  forms?: { id: string; name: string }[]
   data: FlowNodeData
   triggers: TriggerInfo[]
   /** Event fields available to conditions and text, from the flow's trigger. */
@@ -45,6 +48,14 @@ function showValue(value: unknown) {
 function toggleRecipient(key: string) {
   const list = (c.value.recipients as string[]) ?? []
   set('recipients', list.includes(key) ? list.filter((r) => r !== key) : [...list, key])
+}
+function toggleUser(key: string, id: string) {
+  const list = (c.value[key] as string[]) ?? []
+  set(key, list.includes(id) ? list.filter((item) => item !== id) : [...list, id].slice(0, 10))
+}
+function setDays(event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  set('due_in_days', value === '' ? null : Math.min(365, Math.max(0, Number(value))))
 }
 function insert(key: string, field: string) {
   const current = String(c.value[key] ?? '')
@@ -103,7 +114,180 @@ const waitUnit = computed(() => {
         />
       </div>
 
-      <template v-if="data.kind === 'trigger'">
+      <template v-if="data.kind === 'trigger' && process">
+        <div class="field">
+          <label for="node-form">Áp dụng cho biểu mẫu</label
+          ><select
+            id="node-form"
+            :value="c.form_id ?? ''"
+            @change="set('form_id', ($event.target as HTMLSelectElement).value || null)"
+          >
+            <option value="">Chọn biểu mẫu…</option>
+            <option v-for="f in forms ?? []" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+          <small>Quy trình chạy mỗi khi một hồ sơ của biểu mẫu này được trình (kể cả trình lại).</small>
+        </div>
+        <div class="field-help">
+          <span class="section-label">Dữ liệu hồ sơ dùng được trong điều kiện và nội dung</span>
+          <code v-for="(label, key) in fields" :key="key" class="var-chip" :title="label">{{ key }}</code>
+        </div>
+      </template>
+
+      <template v-else-if="data.kind === 'approval'">
+        <div class="field">
+          <label for="node-resolver">Người duyệt</label
+          ><select
+            id="node-resolver"
+            :value="c.resolver ?? 'department_manager'"
+            @change="set('resolver', ($event.target as HTMLSelectElement).value)"
+          >
+            <option v-for="(label, key) in RESOLVERS" :key="key" :value="key">{{ label }}</option>
+          </select>
+        </div>
+        <div v-if="c.resolver === 'user'" class="field">
+          <label for="node-approver">Chọn người</label
+          ><select
+            id="node-approver"
+            :value="c.user_id ?? ''"
+            @change="set('user_id', ($event.target as HTMLSelectElement).value || null)"
+          >
+            <option value="">Chọn người duyệt…</option>
+            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.display_name }}</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Lựa chọn của người duyệt</label>
+          <label class="checkbox-label"><input type="checkbox" checked disabled /> Duyệt</label>
+          <label class="checkbox-label"
+            ><input
+              type="checkbox"
+              :checked="c.allow_return !== false"
+              @change="set('allow_return', ($event.target as HTMLInputElement).checked)"
+            />
+            Trả lại để bổ sung</label
+          >
+          <label class="checkbox-label"
+            ><input
+              type="checkbox"
+              :checked="c.allow_reject !== false"
+              @change="set('allow_reject', ($event.target as HTMLInputElement).checked)"
+            />
+            Từ chối</label
+          >
+          <small>Cổng nào không nối tiếp thì hồ sơ kết thúc theo đúng tên cổng (duyệt, cần bổ sung, bị từ chối).</small>
+        </div>
+        <div class="field">
+          <label for="node-due-a">Hạn xử lý (ngày)</label
+          ><input id="node-due-a" type="number" min="0" max="365" :value="c.due_in_days ?? ''" @change="setDays" />
+        </div>
+        <div class="field">
+          <label for="node-instr">Hướng dẫn cho người duyệt</label
+          ><textarea
+            id="node-instr"
+            rows="3"
+            maxlength="1000"
+            :value="String(c.instructions ?? '')"
+            @change="set('instructions', ($event.target as HTMLTextAreaElement).value)"
+          />
+        </div>
+        <p class="field-help muted">Người tạo hồ sơ không bao giờ tự duyệt hồ sơ của mình; khi đó bước báo lỗi cấu hình.</p>
+      </template>
+
+      <template v-else-if="data.kind === 'consult'">
+        <div class="field">
+          <label>Người cho ý kiến</label>
+          <label class="checkbox-label"
+            ><input
+              type="checkbox"
+              :checked="!!c.include_department_manager"
+              @change="set('include_department_manager', ($event.target as HTMLInputElement).checked)"
+            />
+            Lãnh đạo đơn vị của hồ sơ</label
+          >
+          <select
+            aria-label="Thêm người cho ý kiến"
+            value=""
+            @change="
+              (event) => {
+                const value = (event.target as HTMLSelectElement).value
+                if (value) toggleUser('user_ids', value)
+                ;(event.target as HTMLSelectElement).value = ''
+              }
+            "
+          >
+            <option value="">+ Thêm người…</option>
+            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.display_name }}</option>
+          </select>
+          <div class="chip-select">
+            <button
+              v-for="id in (c.user_ids as string[]) ?? []"
+              :key="id"
+              type="button"
+              class="active"
+              @click="toggleUser('user_ids', id)"
+            >
+              {{ users.find((u) => u.id === id)?.display_name ?? id.slice(0, 8) }} ✕
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="node-cmode">Đi cổng Đồng ý khi</label
+          ><select id="node-cmode" :value="c.mode ?? 'all'" @change="set('mode', ($event.target as HTMLSelectElement).value)">
+            <option value="all">Tất cả đã trả lời và đều đồng ý</option>
+            <option value="any">Có một người đồng ý (không chờ người còn lại)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="node-due-c">Hạn cho ý kiến (ngày)</label
+          ><input id="node-due-c" type="number" min="0" max="365" :value="c.due_in_days ?? ''" @change="setDays" />
+        </div>
+        <div class="field">
+          <label for="node-cinstr">Nội dung xin ý kiến</label
+          ><textarea
+            id="node-cinstr"
+            rows="3"
+            maxlength="1000"
+            :value="String(c.instructions ?? '')"
+            @change="set('instructions', ($event.target as HTMLTextAreaElement).value)"
+          />
+        </div>
+      </template>
+
+      <template v-else-if="data.kind === 'request_info'">
+        <div class="field">
+          <label for="node-req">Lời nhắn cho người tạo hồ sơ</label
+          ><textarea
+            id="node-req"
+            rows="3"
+            maxlength="1000"
+            :value="String(c.message ?? '')"
+            @change="set('message', ($event.target as HTMLTextAreaElement).value)"
+          />
+          <small>Hồ sơ chuyển sang “Cần bổ sung”; người tạo sửa rồi trình lại, quy trình chạy lại từ đầu.</small>
+        </div>
+      </template>
+
+      <template v-else-if="data.kind === 'finish'">
+        <div class="field">
+          <label for="node-result">Kết quả hồ sơ</label
+          ><select id="node-result" :value="c.result ?? 'approved'" @change="set('result', ($event.target as HTMLSelectElement).value)">
+            <option value="approved">Được duyệt</option>
+            <option value="rejected">Bị từ chối</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="node-fmsg">Lời nhắn kèm thông báo</label
+          ><input
+            id="node-fmsg"
+            :value="String(c.message ?? '')"
+            maxlength="1000"
+            @change="set('message', ($event.target as HTMLInputElement).value)"
+          />
+        </div>
+        <p class="field-help muted">Khi tới node này, các bước khác còn đang chờ được đóng lại.</p>
+      </template>
+
+      <template v-else-if="data.kind === 'trigger'">
         <div class="field">
           <label for="node-event">Sự kiện</label
           ><select id="node-event" :value="c.event" @change="set('event', ($event.target as HTMLSelectElement).value)">
@@ -295,7 +479,7 @@ const waitUnit = computed(() => {
         </div>
       </template>
 
-      <template v-else-if="data.kind === 'create_task'">
+      <template v-else-if="data.kind === 'create_task' || data.kind === 'assign_task'">
         <div class="field">
           <label for="node-ttitle">Tên việc</label
           ><input id="node-ttitle" :value="c.title" maxlength="250" @input="set('title', ($event.target as HTMLInputElement).value)" />
@@ -347,7 +531,11 @@ const waitUnit = computed(() => {
             </select>
           </div>
         </div>
-        <p class="field-help muted">Việc được tạo dưới danh nghĩa và trong quyền của người tạo luồng.</p>
+        <p class="field-help muted">
+          Việc được tạo dưới danh nghĩa và trong quyền của người tạo luồng{{
+            data.kind === 'assign_task' ? ', gắn với hồ sơ; quy trình chờ tới khi việc được nghiệm thu hoặc bị hủy' : ''
+          }}.
+        </p>
       </template>
 
       <template v-else-if="data.kind === 'webhook'">

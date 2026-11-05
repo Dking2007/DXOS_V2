@@ -13,7 +13,7 @@ from fastapi import Form as MultipartForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import ai_core, ai_index
+from . import ai_core, ai_index, processes
 from . import models as m
 from . import schemas as s
 from .core_client import CoreClient
@@ -153,6 +153,7 @@ def build_router(app):
         )
         decider = db.get(m.User, value.decided_by_id) if value.decided_by_id else None
         data["decided_by_name"] = decider.display_name if decider else ""
+        data["instructions"] = processes.instructions_for(db, value)
         return data
 
     @router.get("/me", tags=["identity"])
@@ -1047,6 +1048,21 @@ def build_router(app):
         package_version = (
             db.get(m.PackageVersion, value.package_version_id) if value.package_version_id else None
         )
+        process = processes.rule_for_form(db, value.form_id)
+        if process:
+            people = processes.expected_approvers(db, value, process.graph, payload)
+            return page(
+                [
+                    {
+                        "id": item["user"].id,
+                        "display_name": item["user"].display_name,
+                        "label": item["label"],
+                        "step_index": index,
+                    }
+                    for index, item in enumerate(people)
+                ],
+                transform=lambda v: v,
+            )
         configured_form = (
             SimpleNamespace(approval_steps=package_version.approval_steps) if package_version else form
         )
@@ -1100,11 +1116,16 @@ def build_router(app):
         )
         if package_version and len(value.file_ids) < package_version.required_file_count:
             raise AppError(422, "required_documents_missing", "Hồ sơ chưa đủ số tài liệu bắt buộc của gói.")
-        configured_form = (
-            SimpleNamespace(approval_steps=package_version.approval_steps) if package_version else form
-        )
-        steps = resolve_steps(db, value, configured_form, record["payload"])
-        routing_evidence = s.step_evidence(configured_form.approval_steps, record["payload"], steps)
+        # A form with a switched-on canvas process follows it; otherwise its linear steps.
+        process = processes.rule_for_form(db, value.form_id)
+        if process:
+            steps, routing_evidence = [], []
+        else:
+            configured_form = (
+                SimpleNamespace(approval_steps=package_version.approval_steps) if package_version else form
+            )
+            steps = resolve_steps(db, value, configured_form, record["payload"])
+            routing_evidence = s.step_evidence(configured_form.approval_steps, record["payload"], steps)
         snapshots = []
         # The same logical-file lock orders editor open/save and submission pinning.
         for file_id in sorted(value.file_ids):
@@ -1151,6 +1172,9 @@ def build_router(app):
         )
         db.add(submission)
         db.flush()
+        if process:
+            # Pinned now: editing the flow later changes only dossiers submitted after that.
+            processes.begin(db, process, submission, value)
         cas(
             db,
             m.Case,
@@ -1351,6 +1375,8 @@ def build_router(app):
         case = db.get(m.Case, task.case_id)
         if case.owner_id == user.id:
             raise AppError(403, "self_approval_denied", "Không được tự duyệt hồ sơ.")
+        if task.options and body.decision not in task.options:
+            raise AppError(422, "decision_not_offered", "Bước này không cho phép lựa chọn đó.")
         cas(
             db,
             m.ApprovalTask,

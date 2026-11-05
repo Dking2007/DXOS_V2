@@ -7,6 +7,20 @@
 ## [Unreleased]
 
 ### Added
+- **Quy trình hồ sơ trên canvas tự động hóa** (migration `workspace_0017`): tab **Quy trình hồ sơ** trong
+  `/automations` vẽ đường đi của hồ sơ bằng đúng trình thiết kế luồng, thêm các bước **Duyệt** (lãnh đạo đơn vị
+  hoặc người cụ thể; cổng Duyệt / Trả lại / Từ chối, tắt được từng lựa chọn, hạn xử lý, hướng dẫn cho người
+  duyệt), **Xin ý kiến** song song (cần tất cả hoặc một người đồng ý), **Giao việc và chờ** (tạo việc gắn hồ sơ,
+  đi tiếp khi việc được nghiệm thu hoặc bị hủy), **Yêu cầu bổ sung** và **Kết thúc**. Node Điều kiện đọc được
+  câu trả lời biểu mẫu (`form.<trường>`), số và tên tài liệu đính kèm. 5 mẫu có sẵn và mẫu "Từ bước duyệt của
+  biểu mẫu" (`GET /automations/process-template`). Bật quy trình cho một biểu mẫu thì hồ sơ trình sau đó đi
+  theo quy trình thay cho bước duyệt khai trong biểu mẫu; mỗi biểu mẫu bật một quy trình
+  (`process_already_enabled`), hồ sơ ghim bản quy trình lúc trình. Mỗi bước Duyệt/Xin ý kiến vẫn là một human
+  task Core; quyết định ghi ở Workspace trước, bước không cho phép thì từ chối (`decision_not_offered`). Chi
+  tiết hồ sơ có tab **Quy trình** (`GET /cases/{id}/process`) vẽ sơ đồ chỉ đọc, tô bước đã qua, bước đang chờ
+  ai, ý kiến và kết quả; hồ sơ theo bước duyệt tuyến tính cũng được vẽ như vậy. Thu hồi hồ sơ dừng quy trình
+  và hủy các run Core còn chờ. Chạy thử quy trình nhận quyết định giả lập theo từng bước. 9 test backend, 4 test
+  frontend.
 - Công việc có đính kèm tệp: thẻ **Tài liệu** trong chi tiết công việc cho tải tệp lên hoặc chọn từ kho
   tài liệu, xem trước và tải về qua công việc (`POST /tasks/{id}/files/{file_id}/download`, ghi nhật ký
   `task.file_download`), nên người nhận việc mở được tệp mà không cần chia sẻ riêng. Người làm được thêm

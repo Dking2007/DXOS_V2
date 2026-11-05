@@ -13,3 +13,35 @@ P1 bổ sung so sánh phiên bản gói, bảng thời gian chờ theo bước t
 P2 hiện có bộ thử nhiều hồ sơ mẫu (tối đa 20 fixture mỗi suite) và thư viện mẫu nội bộ: sao chép phiên bản gói đang phát hành thành gói nháp mới, rồi kiểm chứng và phát hành riêng. Trang Báo cáo đưa gợi ý kiểm tra bước chờ lâu khi có ít nhất 5 nhiệm vụ hoàn thành và trung bình từ 24 giờ, hoặc xem lý do trả lại khi có ít nhất 3 lần. Đây là quy tắc gợi ý cố định, không phải kết luận về cá nhân. Chưa có sandbox integration với dịch vụ thử tách biệt; chế độ simulation vẫn không gọi connector ngoài.
 
 Sau khi cập nhật mã, chạy migration Core và Workspace trước khi khởi động API. Với Compose, các job `core-migrate` và `workspace-migrate` thực hiện bước này. Cấu hình đã phát hành không bị sửa trực tiếp; việc đổi quy trình tạo phiên bản mới.
+
+## Quy trình hồ sơ dạng canvas
+
+Ngoài bước duyệt tuyến tính khai trong biểu mẫu, người có quyền `automations.manage` vẽ được **quy trình hồ sơ**
+trên canvas tự động hóa (tab *Quy trình hồ sơ*). Quy trình là luồng loại `process` gắn với một biểu mẫu qua node
+kích hoạt "Hồ sơ được trình"; mỗi biểu mẫu chỉ bật được một quy trình. Khi bật, hồ sơ của biểu mẫu trình sau đó
+không dùng `approval_steps` mà chạy quy trình; tắt thì quay lại bước duyệt của biểu mẫu.
+
+| Bước | Hành vi |
+|---|---|
+| Duyệt | Một người (lãnh đạo đơn vị của hồ sơ hoặc người cụ thể) quyết định; cổng Duyệt / Trả lại / Từ chối. Cổng không nối thì hồ sơ kết thúc tương ứng: đã duyệt, cần bổ sung, bị từ chối. |
+| Xin ý kiến | Nhiều người trả lời cùng lúc (Đồng ý / Không đồng ý kèm lý do). Chế độ "tất cả" chờ đủ người và chỉ đi cổng Đồng ý khi mọi người đồng ý; chế độ "một người" đi tiếp ngay khi có người đồng ý và đóng các yêu cầu còn lại. |
+| Giao việc và chờ | Tạo việc gắn với hồ sơ dưới quyền người tạo quy trình; đi cổng Xong khi việc được nghiệm thu, cổng Hủy khi việc bị hủy. |
+| Yêu cầu bổ sung / Kết thúc | Chốt kết quả hồ sơ, gửi thông báo cho người tạo kèm lời nhắn; các bước khác còn chờ được đóng. |
+| Điều kiện, Chờ, Thông báo, Tạo việc, Webhook, Hỏi AI | Như luồng tự động; Điều kiện đọc thêm `form.<trường>`, `file_count`, `file_names`, `submission_no`. |
+
+Đồ thị được ghim vào lượt chạy lúc trình, nên sửa quy trình chỉ ảnh hưởng hồ sơ trình sau đó. Mỗi bước Duyệt
+hoặc mỗi người được xin ý kiến là một run của workflow Core một bước (`human_task`) tạo riêng cho lần trình; quyết
+định ghi ở Workspace trước rồi mới hoàn tất human task, như bước duyệt tuyến tính. Thu hồi hồ sơ hủy lượt chạy
+và các run Core còn chờ. Lượt chạy không còn bước nào chờ mà chưa có kết quả (ví dụ người duyệt bị khóa, không
+xác định được lãnh đạo đơn vị) được đánh dấu lỗi, lần trình chuyển `configuration_error`, người tạo hồ sơ và
+người tạo quy trình được báo.
+
+`GET /workspace/v1/cases/{id}/process` trả đồ thị và trạng thái từng bước theo quyền xem hồ sơ; tab **Quy trình**
+trong chi tiết hồ sơ vẽ nó dạng chỉ đọc. Hồ sơ theo bước duyệt tuyến tính cũng được vẽ (mỗi bước một node Duyệt,
+bước có điều kiện đứng sau node Điều kiện). Chạy thử trên canvas nhận `decisions` (theo id node) để giả lập
+quyết định từng bước; chạy thử không tạo nhiệm vụ, việc hay thông báo.
+
+Giới hạn hiện tại: quy trình là DAG, trả lại thì người tạo sửa và trình lại từ đầu; chưa có phê duyệt theo vai trò
+tùy ý, quorum hay ủy quyền theo bước; cấu hình gói nghiệp vụ (hash, bộ thử, cổng phát hành) chưa bao gồm quy
+trình canvas.
+

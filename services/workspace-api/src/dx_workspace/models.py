@@ -209,6 +209,9 @@ class Submission(Base):
     steps_snapshot: Mapped[list] = mapped_column(JSON)
     core_workflow_id: Mapped[str | None] = mapped_column(String(36))
     core_run_id: Mapped[str | None] = mapped_column(String(36), unique=True)
+    # Set when the form had a canvas process: the flow ran instead of the linear steps.
+    process_rule_id: Mapped[str | None] = mapped_column(String(36))
+    process_run_id: Mapped[str | None] = mapped_column(String(36))
     state: Mapped[str] = mapped_column(String(40), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -232,6 +235,12 @@ class ApprovalTask(Base):
     # Who actually decided; differs from assignee_id only under an active delegation.
     decided_by_id: Mapped[str | None] = mapped_column(String(36))
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Process flows only: the canvas node that asked, "approval" or "opinion" (advice that
+    # does not settle the dossier), the decisions offered, and the deadline the node set.
+    node_id: Mapped[str | None] = mapped_column(String(40))
+    kind: Mapped[str | None] = mapped_column(String(20))
+    options: Mapped[list | None] = mapped_column(JSON)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class FieldEvidence(Base):
@@ -509,6 +518,9 @@ class AutomationRule(Base):
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
     trigger: Mapped[str] = mapped_column(String(60), index=True)
+    # "automation" reacts to events; "process" is the approval flow a form's dossiers follow.
+    kind: Mapped[str] = mapped_column(String(20), default="automation", index=True)
+    form_id: Mapped[str | None] = mapped_column(String(36), index=True)
     # Pre-flow rules kept their logic in `conditions`/`actions`; flows store it all in `graph`.
     conditions: Mapped[list] = mapped_column(JSON, default=list)
     actions: Mapped[list] = mapped_column(JSON, default=list)
@@ -536,6 +548,11 @@ class AutomationRun(Base):
     # The flow as it was when the run started, so later edits never change a run in progress.
     graph: Mapped[dict | None] = mapped_column(JSON)
     data: Mapped[dict | None] = mapped_column(JSON)
+    # Process runs: the dossier and the submission the flow is carrying.
+    case_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    submission_id: Mapped[str | None] = mapped_column(String(36), unique=True, index=True)
+    # How a process run ended: approved, rejected or needs_revision.
+    outcome: Mapped[str | None] = mapped_column(String(30))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

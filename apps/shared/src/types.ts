@@ -148,6 +148,13 @@ export interface ApprovalTask {
   on_behalf_of?: string | null
   decided_by_id?: string | null
   decided_by_name?: string
+  /** Process flows: "opinion" asks for advice (agree / disagree) rather than a decision. */
+  kind?: 'approval' | 'opinion' | null
+  /** Decisions this step offers; absent means approve, return and reject. */
+  options?: ('approve' | 'return' | 'reject')[] | null
+  node_id?: string | null
+  due_at?: string | null
+  instructions?: string
 }
 export interface HistoryEvent {
   id?: string
