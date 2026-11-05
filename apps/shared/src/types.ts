@@ -148,6 +148,13 @@ export interface ApprovalTask {
   on_behalf_of?: string | null
   decided_by_id?: string | null
   decided_by_name?: string
+  /** Process flows: "opinion" asks for advice (agree / disagree) rather than a decision. */
+  kind?: 'approval' | 'opinion' | null
+  /** Decisions this step offers; absent means approve, return and reject. */
+  options?: ('approve' | 'return' | 'reject')[] | null
+  node_id?: string | null
+  due_at?: string | null
+  instructions?: string
 }
 export interface HistoryEvent {
   id?: string
@@ -266,7 +273,16 @@ export interface TaskDetail extends Task {
   subtasks: { id: string; title: string; status: TaskStatus; assignee_name: string }[]
   parent: { id: string; title: string } | null
   case: { id: string; title: string; code: string } | null
-  files: { id: string; name: string | null; size?: number; restricted?: boolean }[]
+  files: {
+    id: string
+    name: string | null
+    size?: number
+    mime?: string
+    owner_id?: string
+    owner_name?: string
+    /** The file was deleted from the drive after it was attached. */
+    restricted?: boolean
+  }[]
 }
 export interface ChatMessage {
   id: string

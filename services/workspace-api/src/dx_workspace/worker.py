@@ -12,11 +12,22 @@ from dx_platform.errors import AppError
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from . import ai_core, ai_index
+from . import ai_core, ai_index, processes
 from .automations import deliver_webhook, dispatch, resume
 from .config import get_settings
 from .core_client import CoreClient
-from .models import ApprovalTask, Case, Delegation, DriveFile, Folder, Outbox, Submission, User, utcnow
+from .models import (
+    ApprovalTask,
+    AutomationRun,
+    Case,
+    Delegation,
+    DriveFile,
+    Folder,
+    Outbox,
+    Submission,
+    User,
+    utcnow,
+)
 from .policies import active_delegators, effective_access, subtree_files
 from .services import case_event, emit, notify
 
@@ -132,6 +143,9 @@ def start_case(db: Session, core: CoreClient, submission_id: str):
             {"reference": "submission:" + submission.id},
             key=submission.id + ":hold:" + file["version_id"],
         )
+    if submission.process_run_id:
+        processes.start(db, core, submission)
+        return
     if not submission.core_workflow_id:
         workflow = core.post(
             "/workflows",
@@ -173,6 +187,10 @@ def complete_approval(db: Session, core: CoreClient, task_id: str):
     )
     task.state = "completed"
     task.revision += 1
+    if task.node_id:
+        # Canvas process: the flow decides what this answer leads to.
+        processes.on_decision(db, core, task)
+        return
     if task.decision in {"reject", "return"}:
         case.status = "rejected" if task.decision == "reject" else "needs_revision"
         submission.state = case.status
@@ -191,6 +209,9 @@ def complete_approval(db: Session, core: CoreClient, task_id: str):
 def withdraw_case(db: Session, core: CoreClient, submission_id: str):
     """Cancel the Core run of a withdrawn submission; a run never started needs nothing."""
     submission = db.scalar(select(Submission).where(Submission.id == submission_id).with_for_update())
+    if submission and submission.process_run_id:
+        processes.cancel(db, core, submission)
+        return
     if not submission or not submission.core_run_id:
         return
     run = core.get(f"/workflow-runs/{submission.core_run_id}")
@@ -286,10 +307,15 @@ def process_once(engine, settings, core=None) -> bool:
                 withdraw_case(db, core, job.aggregate_id)
             elif job.kind == "automation.dispatch":
                 dispatch(db, job.payload)
+                processes.on_task_event(db, core, job.payload)
             elif job.kind == "automation.webhook":
                 deliver_webhook(db, settings, job.payload)
             elif job.kind == "automation.resume":
-                resume(db, job.payload)
+                run = db.get(AutomationRun, job.payload["run_id"])
+                if run and run.submission_id:
+                    processes.resume(db, core, job.payload)
+                else:
+                    resume(db, job.payload)
             elif job.kind == "ai.index":
                 ai_index.run_job(db, settings, core, job.payload)
             else:

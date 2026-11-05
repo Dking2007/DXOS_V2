@@ -9,5 +9,9 @@ export interface FlowContext {
   /** True while a test or a recorded run is painted on the canvas. */
   overlay: Ref<boolean>
   addAfter: (nodeId: string, handle?: string) => void
+  /** Forms a process trigger can name; absent outside process flows. */
+  forms?: Ref<{ id: string; name: string }[]>
+  /** A picture of a run (e.g. on a dossier): no editing affordances. */
+  readonly?: boolean
 }
 export const FLOW_CONTEXT: InjectionKey<FlowContext> = Symbol('flow-context')

@@ -386,12 +386,24 @@ def build_router(app):
         data["case"] = {"id": case.id, "title": case.title, "code": f"HS-{case.number:06d}"} if case else None
         files = []
         for file_id in task.file_ids or []:
-            try:
-                file = get_file(db, user, file_id)
-                files.append({"id": file.id, "name": file.name, "size": file.size})
-            except AppError:
-                # A participant without access to the file sees that one exists, not what it is.
+            file = db.get(m.DriveFile, file_id)
+            if not file or file.deleted_at:
+                # Deleted from the drive after it was attached: say so instead of hiding it.
                 files.append({"id": file_id, "name": None, "restricted": True})
+                continue
+            # Attaching a file to a task shares it with everyone on the task: they open it
+            # through the task (see task_file_download), not through drive sharing.
+            owner = db.get(m.User, file.owner_id)
+            files.append(
+                {
+                    "id": file.id,
+                    "name": file.name,
+                    "size": file.size,
+                    "mime": file.mime,
+                    "owner_id": file.owner_id,
+                    "owner_name": owner.display_name if owner else "",
+                }
+            )
         data["files"] = files
         return data
 
@@ -472,9 +484,18 @@ def build_router(app):
             raise AppError(409, "task_closed", "Công việc đã đóng, không thể sửa.")
         changes = body.model_dump(exclude_unset=True, exclude={"expected_revision", "due_reason"})
         is_manager = manages(db, user, task)
-        # The person doing the work ticks the checklist; everything else belongs to whoever gave it.
-        if set(changes) - {"checklist"} and not is_manager:
+        # The person doing the work ticks the checklist and attaches results; everything else
+        # belongs to whoever gave it.
+        if set(changes) - {"checklist", "file_ids"} and not is_manager:
             raise AppError(403, "task_manager_required", "Chỉ người giao việc được sửa thông tin công việc.")
+        if "file_ids" in changes and not is_manager:
+            if task.assignee_id != user.id:
+                raise AppError(403, "task_manager_required", "Bạn không được đính kèm tệp cho công việc này.")
+            # The assignee may remove only what they attached themselves, never the brief they were given.
+            for removed in set(task.file_ids or []) - set(body.file_ids or []):
+                file = db.get(m.DriveFile, removed)
+                if file and file.owner_id != user.id:
+                    raise AppError(403, "task_file_not_yours", "Chỉ gỡ được tệp do bạn đính kèm.")
         if "checklist" in changes and not (is_manager or task.assignee_id == user.id):
             raise AppError(403, "task_manager_required", "Bạn không được sửa checklist của công việc này.")
         if "checklist" in changes:
@@ -508,11 +529,44 @@ def build_router(app):
                     "Hạn xử lý đã thay đổi: " + task.title,
                     link=f"/tasks/{task.id}",
                 )
+        added = [f for f in changes.get("file_ids", []) if f not in (task.file_ids or [])]
+        removed = [f for f in (task.file_ids or []) if "file_ids" in changes and f not in changes["file_ids"]]
         changes["updated_at"] = m.utcnow()
         cas(db, m.Task, task_id, body.expected_revision, changes)
+        if added or removed:
+            log(db, task, user.id, "files_changed", {"added": len(added), "removed": len(removed)})
+            others = {task.creator_id, task.assignee_id} - {user.id, None}
+            for recipient in others if added else ():
+                notify(
+                    db,
+                    recipient,
+                    f"task-files:{task.id}:{task.revision}",
+                    f"Có tệp mới đính kèm: {task.title}",
+                    link=f"/tasks/{task.id}",
+                )
         log(db, task, user.id, "updated", {"fields": sorted(set(changes) - {"updated_at"})})
         db.commit()
         return task_data(db, user, db.get(m.Task, task_id), True)
+
+    @router.post("/tasks/{task_id}/files/{file_id}/download")
+    def task_file_download(
+        task_id: str, file_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)
+    ):
+        """A download ticket for a file attached to a task, for anyone who may see the task."""
+        user = user_for(db, actor)
+        task = get_task(db, user, task_id)
+        if file_id not in (task.file_ids or []):
+            raise AppError(404, "attachment_not_found", "Không tìm thấy tệp đính kèm của công việc.")
+        file = db.get(m.DriveFile, file_id)
+        if not file or file.deleted_at:
+            raise AppError(410, "attachment_deleted", "Tệp đã bị xóa khỏi kho tài liệu.")
+        if file.acl_state != "ready":
+            raise AppError(409, "attachment_unavailable", "Tệp chưa sẵn sàng. Thử lại sau ít phút.")
+        _, version = app.state.core_service.file_version(file.core_file_id)
+        audit(db, user, "task.file_download", task.id, {"file_id": file.id, "version_id": version["id"]})
+        ticket = app.state.core_service.post(f"/storage/versions/{version['id']}/download-tickets", {})
+        db.commit()
+        return ticket
 
     @router.post("/tasks/{task_id}/assign")
     def assign(

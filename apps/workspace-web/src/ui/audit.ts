@@ -33,6 +33,7 @@ const VERBS: Record<string, string> = {
   version_created: 'tạo phiên bản',
   imported_template: 'tạo từ mẫu',
   attachment_download: 'tải tệp đính kèm',
+  file_download: 'tải tệp đính kèm',
   source_download: 'tải tài liệu gốc',
   uploaded: 'tải lên',
   share_changed: 'đổi chia sẻ',

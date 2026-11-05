@@ -1345,6 +1345,12 @@ a.stat-tile:hover {
   flex: none;
   color: var(--teal-ink);
 }
+.sticky-actions .sticky-note {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
 @media (max-width: 900px) {
   .sticky-actions {
     bottom: calc(72px + env(safe-area-inset-bottom));

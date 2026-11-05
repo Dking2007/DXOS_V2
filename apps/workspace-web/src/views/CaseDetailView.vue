@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  Workflow,
   XCircle,
 } from 'lucide-vue-next'
 import { api } from '../api'
@@ -59,6 +60,7 @@ import TaskCreateDialog from '../components/TaskCreateDialog.vue'
 import CaseAiPanel from '../ai/CaseAiPanel.vue'
 import { useAi } from '../ai/useAi'
 import { OPERATORS } from '../flow/nodes'
+import ProcessCanvas from '../flow/ProcessCanvas.vue'
 import { toast } from '../ui/toast'
 import { previewKind } from '../ui/preview'
 import FilePreview from '../components/FilePreview.vue'
@@ -202,6 +204,9 @@ const myTask = computed(() =>
       ['pending', 'waiting', 'open'].includes(task.status || task.state || 'pending'),
   ),
 )
+/** Process steps may ask for an opinion, or leave out returning / rejecting. */
+const opinion = computed(() => myTask.value?.kind === 'opinion')
+const offers = computed(() => new Set(myTask.value?.options ?? ['approve', 'return', 'reject']))
 const canWithdraw = computed(
   () =>
     detail.data.value?.owner_id === session.user?.id &&
@@ -519,12 +524,14 @@ function fieldLabel(key: string) {
   const name = key.replace(/^payload\./, '')
   return detail.data.value?.form.fields.find((field) => field.key === name)?.label ?? name
 }
-type CaseTab = 'info' | 'files' | 'history' | 'route'
-const tab = ref<CaseTab>('info')
+type CaseTab = 'info' | 'process' | 'files' | 'history' | 'route'
+const TAB_KEYS: CaseTab[] = ['info', 'process', 'files', 'history', 'route']
+const tab = ref<CaseTab>(TAB_KEYS.includes(route.query.tab as CaseTab) ? (route.query.tab as CaseTab) : 'info')
 const tabs = computed(() => {
   const data = detail.data.value
   const items: { key: CaseTab; label: string; icon: typeof Info; count?: number }[] = [
     { key: 'info', label: 'Thông tin', icon: Info },
+    { key: 'process', label: 'Quy trình', icon: Workflow },
     { key: 'files', label: 'Tài liệu', icon: Paperclip, count: data?.files?.length },
     { key: 'history', label: 'Lịch sử & bản đã trình', icon: History, count: data?.submissions.length },
   ]
@@ -947,6 +954,13 @@ function moveTab(step: number) {
             </div>
           </section>
         </template>
+        <ProcessCanvas
+          v-if="tab === 'process'"
+          :case-id="id"
+          :status="detail.data.value.status"
+          :form-id="detail.data.value.form.id"
+          :form-name="detail.data.value.form.name"
+        />
         <section v-if="tab === 'route'" class="card">
           <header class="card-header"><h2>Vì sao hồ sơ được chuyển đến những người này?</h2></header>
           <div class="card-body">
@@ -1018,16 +1032,19 @@ function moveTab(step: number) {
     <div v-else-if="myTask" class="sticky-actions" role="region" aria-label="Quyết định của bạn">
       <span
         ><ClipboardCheck :size="17" /><span
-          >Bạn cần quyết định:
+          >{{ opinion ? 'Bạn được xin ý kiến:' : 'Bạn cần quyết định:' }}
           <strong>{{ myTask.label || myTask.step_label || 'Phê duyệt hồ sơ' }}</strong
-          ><template v-if="myTask.on_behalf_of"> (duyệt thay {{ myTask.on_behalf_of }})</template></span
+          ><template v-if="myTask.on_behalf_of"> (thay {{ myTask.on_behalf_of }})</template
+          ><template v-if="myTask.due_at"> · hạn {{ formatDate(myTask.due_at) }}</template
+          ><small v-if="myTask.instructions" class="sticky-note">{{ myTask.instructions }}</small></span
         ></span
       >
-      <button class="button secondary" @click="ask('return')">
+      <button v-if="offers.has('return')" class="button secondary" @click="ask('return')">
         <RotateCcw :size="15" />Trả lại</button
-      ><button class="button danger" @click="ask('reject')">Từ chối</button
+      ><button v-if="offers.has('reject')" class="button danger" @click="ask('reject')">
+        {{ opinion ? 'Không đồng ý' : 'Từ chối' }}</button
       ><button class="button" @click="ask('approve')">
-        <Check :size="16" />Phê duyệt
+        <Check :size="16" />{{ opinion ? 'Đồng ý' : 'Phê duyệt' }}
       </button>
     </div>
     <div v-else-if="canEdit" class="sticky-actions" role="region" aria-label="Bản nháp">
@@ -1051,7 +1068,11 @@ function moveTab(step: number) {
       confirmation === 'submit'
         ? 'Chuyển hồ sơ để phê duyệt'
         : confirmation === 'approve'
-          ? 'Phê duyệt hồ sơ'
+          ? opinion
+            ? 'Cho ý kiến: Đồng ý'
+            : 'Phê duyệt hồ sơ'
+          : opinion && confirmation === 'reject'
+            ? 'Cho ý kiến: Không đồng ý'
           : confirmation === 'return'
             ? 'Trả hồ sơ để chỉnh sửa'
             : confirmation === 'withdraw'
@@ -1162,7 +1183,11 @@ function moveTab(step: number) {
               : confirmation === 'submit'
                 ? 'Xác nhận chuyển duyệt'
                 : confirmation === 'approve'
-                  ? 'Xác nhận phê duyệt'
+                  ? opinion
+                    ? 'Gửi ý kiến đồng ý'
+                    : 'Xác nhận phê duyệt'
+                  : opinion && confirmation === 'reject'
+                    ? 'Gửi ý kiến không đồng ý'
                   : confirmation === 'return'
                     ? 'Trả lại hồ sơ'
                     : confirmation === 'withdraw'

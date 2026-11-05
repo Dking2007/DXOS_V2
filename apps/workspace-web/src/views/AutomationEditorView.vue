@@ -41,18 +41,26 @@ import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import FlowNode from '../flow/FlowNode.vue'
 import NodeInspector from '../flow/NodeInspector.vue'
 import { FLOW_CONTEXT } from '../flow/context'
-import { KINDS, TEMPLATES, canvasEdge, toApi, toCanvas } from '../flow/nodes'
+import {
+  KINDS,
+  OUTCOMES,
+  PROCESS_TEMPLATES,
+  TEMPLATES,
+  canvasEdge,
+  outputs,
+  paintRun,
+  paletteKinds,
+  toApi,
+  toCanvas,
+  tone,
+} from '../flow/nodes'
 import { useAi } from '../ai/useAi'
-import type { ApiGraph, FlowNodeData, NodeKind, TriggerInfo } from '../flow/nodes'
-interface Step {
-  node_id: string | null
-  type: string
-  state: string
-  branch?: 'true' | 'false'
-  message?: string
-  error?: string
-  title?: string
-  recipients?: string[]
+import type { ApiGraph, FlowKind, FlowNodeData, NodeKind, RunStep, TriggerInfo } from '../flow/nodes'
+type Step = RunStep & { error?: string; recipients?: string[] }
+interface ProcessForm {
+  id: string
+  name: string
+  fields: Record<string, string>
 }
 interface Run {
   id: string
@@ -73,11 +81,17 @@ interface Rule {
   graph: ApiGraph
   scope: 'all' | 'attached'
   attached_count: number
+  kind: FlowKind
 }
 interface Catalog {
   triggers: TriggerInfo[]
   webhooks_enabled: boolean
   max_nodes: number
+  process: {
+    fields: Record<string, string>
+    sample: Record<string, unknown>
+    forms: ProcessForm[]
+  }
 }
 const route = useRoute()
 const router = useRouter()
@@ -101,7 +115,11 @@ function userName(id: string) {
   return users.data.value?.items.find((u) => u.id === id)?.display_name ?? id.slice(0, 8)
 }
 
-const name = ref('Luồng tự động mới')
+// A dossier process, or an automation reacting to events; fixed once the flow is saved.
+const flowKind = ref<FlowKind>(route.query.kind === 'process' ? 'process' : 'automation')
+const isProcess = computed(() => flowKind.value === 'process')
+const forms = computed(() => catalog.data.value?.process.forms ?? [])
+const name = ref(isProcess.value ? 'Quy trình hồ sơ mới' : 'Luồng tự động mới')
 const description = ref('')
 const scope = ref<'all' | 'attached'>('all')
 const attachedCount = ref(0)
@@ -154,20 +172,48 @@ if (ruleId.value) {
       revision.value = rule.revision
       scope.value = rule.scope
       attachedCount.value = rule.attached_count
+      flowKind.value = rule.kind ?? 'automation'
       load(rule.graph)
     })
     .catch((cause) => (error.value = cause))
+} else if (isProcess.value && route.query.from_form) {
+  // Start from the form's own approval steps, redrawn on the canvas.
+  api
+    .request<{ name: string; graph: ApiGraph }>(
+      `/automations/process-template?form_id=${encodeURIComponent(String(route.query.from_form))}`,
+    )
+    .then((template) => {
+      name.value = template.name
+      load(template.graph)
+    })
+    .catch((cause) => (error.value = cause))
 } else {
-  const template = TEMPLATES.find((t) => t.key === route.query.template) ?? TEMPLATES[0]
+  const list = isProcess.value ? PROCESS_TEMPLATES : TEMPLATES
+  const template = list.find((t) => t.key === route.query.template) ?? list[0]
   if (template.key !== 'blank') name.value = template.title
-  load(structuredClone(template.graph))
+  const graph = structuredClone(template.graph)
+  if (isProcess.value && route.query.form) {
+    const start = graph.nodes.find((node) => node.type === 'trigger')
+    if (start) start.data = { ...start.data, form_id: String(route.query.form) }
+  }
+  load(graph)
 }
 
 const selected = computed(() => nodes.value.find((node) => node.id === selectedId.value) ?? null)
 const infoOpen = ref(false)
 watch(selectedId, (id) => id && (infoOpen.value = false))
 const triggerNode = computed(() => nodes.value.find((node) => node.data?.kind === 'trigger'))
-const trigger = computed(() => triggers.value.find((t) => t.key === triggerNode.value?.data?.config.event))
+const processForm = computed(() => forms.value.find((f) => f.id === triggerNode.value?.data?.config.form_id))
+/** A process always starts when a dossier of its form is submitted. */
+const processTrigger = computed<TriggerInfo>(() => ({
+  key: 'case.submitted',
+  label: processForm.value ? `hồ sơ “${processForm.value.name}” được trình` : 'hồ sơ được trình',
+  fields: { ...(catalog.data.value?.process.fields ?? {}), ...(processForm.value?.fields ?? {}) },
+  sample: catalog.data.value?.process.sample ?? {},
+}))
+const trigger = computed(() =>
+  isProcess.value ? processTrigger.value : triggers.value.find((t) => t.key === triggerNode.value?.data?.config.event),
+)
 // Answers of "Hỏi AI" steps become fields that later conditions can test.
 const fields = computed(() => ({
   ...(trigger.value?.fields ?? {}),
@@ -233,11 +279,18 @@ function onDrop(event: DragEvent) {
   const point = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
   addNode(kind, { x: point.x - 120, y: point.y - 36 })
 }
+/** The exit a new step hangs from: the first branch still unconnected, else the first one. */
+function freeHandle(node: Node<FlowNodeData>): string | undefined {
+  const exits = outputs(node.data!.kind, node.data!.config)
+  if (!exits.length) return undefined
+  const used = new Set(edges.value.filter((edge) => edge.source === node.id).map((edge) => edge.sourceHandle))
+  return exits.find((exit) => !used.has(exit)) ?? exits[0]
+}
 function addFromPalette(kind: NodeKind) {
   // Clicking places the node after the selected one, the way most people build a flow.
   const base = selected.value ?? nodes.value.at(-1)
-  if (base && base.data?.kind !== 'if' && kind !== 'trigger') {
-    addAfter(base.id)
+  if (base?.data && !KINDS[base.data.kind].terminal && kind !== 'trigger') {
+    addAfter(base.id, freeHandle(base))
     pickQuick(kind)
   } else {
     addNode(kind, { x: (base?.position.x ?? 0) + 320, y: base?.position.y ?? 0 })
@@ -296,7 +349,7 @@ async function validate() {
   if (!nodes.value.length) return
   try {
     const result = await api.request<{ errors: { node_id: string | null; message: string }[] }>(
-      '/automations/validate',
+      `/automations/validate?kind=${flowKind.value}`,
       { method: 'POST', body: JSON.stringify(toApi(nodes.value, edges.value)) },
     )
     errors.value = result.errors
@@ -320,23 +373,9 @@ function focusNode(id: string | null) {
 const overlay = ref(false)
 const overlayTitle = ref('')
 function paint(steps: Step[], title: string) {
-  const byNode = new Map(steps.filter((s) => s.node_id).map((s) => [s.node_id!, s]))
-  for (const node of nodes.value) {
-    const step = byNode.get(node.id)
-    const status = step ? (step.state === 'cancelled' ? 'skipped' : step.state) : undefined
-    node.data = {
-      ...node.data!,
-      status: status as FlowNodeData['status'],
-      branch: step?.branch,
-      message: step?.message ?? (step?.title ? `“${step.title}”` : undefined),
-    }
-  }
-  edges.value = edges.value.map((edge) => {
-    const from = byNode.get(edge.source)
-    const active =
-      !!from && byNode.has(edge.target) && (!edge.sourceHandle || from.branch === edge.sourceHandle)
-    return { ...edge, animated: active, class: [edge.sourceHandle ? `edge-${edge.sourceHandle}` : '', active ? 'edge-active' : ''].join(' ') }
-  })
+  const painted = paintRun(nodes.value, edges.value, steps)
+  nodes.value = painted.nodes
+  edges.value = painted.edges
   overlay.value = true
   overlayTitle.value = title
 }
@@ -344,23 +383,34 @@ function clearOverlay() {
   if (!overlay.value) return
   overlay.value = false
   for (const node of nodes.value)
-    if (node.data?.status) node.data = { ...node.data, status: undefined, branch: undefined, message: undefined }
+    if (node.data?.status || node.data?.outcome)
+      node.data = { ...node.data, status: undefined, branch: undefined, message: undefined, people: undefined, outcome: undefined }
   edges.value = edges.value.map((edge) => ({
     ...edge,
     animated: false,
-    class: edge.sourceHandle ? `edge-${edge.sourceHandle}` : undefined,
+    class: edge.sourceHandle ? `edge-${tone(edge.sourceHandle)}` : undefined,
   }))
 }
 const drawer = ref<'test' | 'runs' | null>(null)
 const sample = ref('')
+/** Process samples also carry the form's answers and the decision each person takes. */
+function processSample() {
+  const decisions = Object.fromEntries(
+    nodes.value
+      .filter((node) => outputs(node.data!.kind, node.data!.config).length && node.data!.kind !== 'if')
+      .map((node) => [node.id, outputs(node.data!.kind, node.data!.config)[0]]),
+  )
+  const answers = Object.fromEntries(Object.keys(processForm.value?.fields ?? {}).map((key) => [key.slice(5), null]))
+  return { ...(trigger.value?.sample ?? {}), form: answers, decisions }
+}
 watch(
-  () => trigger.value?.key,
+  () => [trigger.value?.key, processForm.value?.id, catalog.data.value ? 1 : 0],
   () => {
-    sample.value = JSON.stringify(trigger.value?.sample ?? {}, null, 2)
+    sample.value = JSON.stringify(isProcess.value ? processSample() : (trigger.value?.sample ?? {}), null, 2)
   },
   { immediate: true },
 )
-const testResult = ref<{ valid: boolean; matched?: boolean; steps: Step[] } | null>(null)
+const testResult = ref<{ valid: boolean; matched?: boolean; steps: Step[]; outcome?: string | null } | null>(null)
 async function runTest() {
   error.value = null
   let data: Record<string, unknown>
@@ -374,7 +424,7 @@ async function runTest() {
   try {
     testResult.value = await api.request('/automations/test', {
       method: 'POST',
-      body: JSON.stringify({ graph: toApi(nodes.value, edges.value), data }),
+      body: JSON.stringify({ graph: toApi(nodes.value, edges.value), data, kind: flowKind.value }),
     })
     if (testResult.value?.valid) paint(testResult.value.steps, 'Kết quả chạy thử (không tác động thật)')
   } catch (cause) {
@@ -455,6 +505,7 @@ async function save() {
       description: description.value,
       graph: toApi(nodes.value, edges.value),
       scope: attachable.value ? scope.value : 'all',
+      kind: flowKind.value,
     }
     const rule = ruleId.value
       ? await api.request<Rule>(`/automations/${ruleId.value}`, {
@@ -509,15 +560,15 @@ onBeforeUnmount(() => {
 watch(notice, (value) => value && setTimeout(() => (notice.value = ''), 2500))
 useUnsavedGuard(dirty)
 
-provide(FLOW_CONTEXT, { triggers, userName, overlay, addAfter })
+provide(FLOW_CONTEXT, { triggers, userName, overlay, addAfter, forms })
 const ai = useAi()
+const offeredKinds = computed(() =>
+  paletteKinds(flowKind.value).filter((kind) => kind !== 'ai' || ai.on('automation_ai')),
+)
 const palette = computed(() =>
-  (['Kích hoạt', 'Logic', 'Hành động'] as const).map((group) => ({
-    group,
-    kinds: (Object.keys(KINDS) as NodeKind[]).filter(
-      (kind) => KINDS[kind].group === group && (kind !== 'ai' || ai.on('automation_ai')),
-    ),
-  })),
+  (isProcess.value ? (['Bước quy trình', 'Logic', 'Hành động'] as const) : (['Logic', 'Hành động'] as const)).map(
+    (group) => ({ group, kinds: offeredKinds.value.filter((kind) => KINDS[kind].group === group) }),
+  ),
 )
 </script>
 <template>
@@ -585,7 +636,21 @@ const palette = computed(() =>
     </header>
     <div class="flow-status" :class="{ on: enabled && ruleId, off: !enabled || !ruleId }">
       <Zap v-if="enabled && ruleId" :size="16" /><Power v-else :size="16" />
-      <span v-if="!ruleId"
+      <template v-if="isProcess">
+        <span v-if="!ruleId"
+          >Quy trình mới chưa lưu. Chọn biểu mẫu ở node kích hoạt, cấu hình từng bước → <b>Chạy thử</b> → lưu và bật
+          để mọi hồ sơ “{{ processForm?.name ?? 'của biểu mẫu' }}” trình sau đó đi theo quy trình này.</span
+        >
+        <span v-else-if="enabled"
+          >Đang áp dụng: hồ sơ <b>“{{ processForm?.name }}”</b> trình từ bây giờ đi theo quy trình này thay cho các bước
+          duyệt của biểu mẫu. Sửa quy trình không ảnh hưởng hồ sơ đang xử lý.</span
+        >
+        <span v-else
+          >Đang tắt: hồ sơ “{{ processForm?.name ?? 'của biểu mẫu' }}” vẫn đi theo các bước duyệt khai trong biểu mẫu.
+          Mỗi biểu mẫu chỉ bật được một quy trình.</span
+        >
+      </template>
+      <span v-else-if="!ruleId"
         >Luồng mới chưa lưu. Lưu → <b>Chạy thử</b> với dữ liệu mẫu → bật công tắc để luồng
         <b>tự chạy</b> mỗi khi “{{ trigger?.label ?? 'sự kiện' }}”.</span
       >
@@ -601,7 +666,7 @@ const palette = computed(() =>
         >Đang tắt: khi <b>{{ trigger?.label ?? 'sự kiện' }}</b> luồng <b>không</b> tự chạy. Bật công tắc ở góc phải
         để áp dụng, hoặc chạy ngay với một {{ familyLabel }} có sẵn.</span
       >
-      <label v-if="attachable" class="scope-select"
+      <label v-if="attachable && !isProcess" class="scope-select"
         >Áp dụng cho
         <select v-model="scope" aria-label="Phạm vi áp dụng">
           <option value="all">Mọi công việc</option>
@@ -609,7 +674,7 @@ const palette = computed(() =>
         </select></label
       >
       <button
-        v-if="ruleId"
+        v-if="ruleId && !isProcess"
         class="button secondary small"
         :disabled="dirty || busy"
         :title="dirty ? 'Lưu thay đổi trước khi chạy' : ''"
@@ -683,7 +748,7 @@ const palette = computed(() =>
         <div v-if="quickAdd" class="quick-add" role="menu" aria-label="Thêm bước tiếp theo">
           <strong>Thêm bước tiếp theo</strong>
           <button
-            v-for="kind in (Object.keys(KINDS) as NodeKind[]).filter((k) => k !== 'trigger')"
+            v-for="kind in offeredKinds"
             :key="kind"
             class="palette-item"
             :style="{ '--node-color': KINDS[kind].color }"
@@ -703,14 +768,31 @@ const palette = computed(() =>
           <div v-if="drawer === 'test'" class="drawer-test">
             <div class="field">
               <label for="sample-data"
-                >Dữ liệu sự kiện “{{ trigger?.label ?? 'chưa chọn' }}” (JSON)</label
+                >{{ isProcess ? 'Hồ sơ mẫu' : 'Dữ liệu sự kiện' }} “{{ trigger?.label ?? 'chưa chọn' }}” (JSON)</label
               ><textarea id="sample-data" v-model="sample" class="code-editor" spellcheck="false" />
+              <small v-if="isProcess" class="muted"
+                >Điền câu trả lời biểu mẫu vào <code>form</code>, số tệp vào <code>file_count</code>. Mục
+                <code>decisions</code> chọn quyết định giả lập cho từng bước: <code>approve</code>, <code>return</code>,
+                <code>reject</code> (Xin ý kiến: <code>approve</code> = đồng ý), <code>completed</code>/<code>cancelled</code>
+                cho Giao việc.</small
+              >
             </div>
             <div class="drawer-result">
               <button class="button" :disabled="busy" @click="runTest"><Play :size="15" />Chạy thử luồng</button>
-              <p class="muted"><Info :size="13" /> Chạy thử không gửi thông báo, không tạo việc, không gọi ra ngoài.</p>
+              <p class="muted">
+                <Info :size="13" /> Chạy thử không gửi thông báo, không tạo việc, không gọi ra ngoài{{
+                  isProcess ? ', không giao hồ sơ cho ai duyệt' : ''
+                }}.
+              </p>
               <template v-if="testResult">
                 <p v-if="!testResult.valid" class="overdue-text">Luồng còn lỗi cấu hình, sửa các node được đánh dấu.</p>
+                <p v-else-if="isProcess && testResult.outcome">
+                  Hồ sơ mẫu kết thúc: <strong>{{ OUTCOMES[testResult.outcome] ?? testResult.outcome }}</strong>, xem đường sáng
+                  trên canvas.
+                </p>
+                <p v-else-if="isProcess" class="overdue-text">
+                  Hồ sơ mẫu dừng giữa chừng, chưa có kết quả. Xem node báo lỗi, hoặc nối thêm bước Kết thúc.
+                </p>
                 <p v-else-if="testResult.matched">Dữ liệu này đi qua <strong>{{ testResult.steps.length }}</strong> bước, xem đường sáng trên canvas.</p>
                 <p v-else>Dữ liệu này <strong>không thỏa điều kiện</strong>; không hành động nào chạy.</p>
               </template>
@@ -770,6 +852,8 @@ const palette = computed(() =>
           :departments="departments.data.value?.items ?? []"
           :connections="connections.data.value?.items ?? []"
           :webhooks-enabled="!!catalog.data.value?.webhooks_enabled"
+          :process="isProcess"
+          :forms="forms"
           @patch="patch"
           @label="setLabel"
           @remove="removeSelected"
@@ -793,6 +877,16 @@ const palette = computed(() =>
                 <li>Chọn node để cấu hình; chọn đường nối và bấm <kbd>Delete</kbd> để xóa.</li>
                 <li><b>Chạy thử</b> tô sáng đường đi với dữ liệu mẫu, không tác động thật.</li>
                 <li>Luồng mới ở trạng thái tắt; lưu rồi bật khi đã chạy thử.</li>
+              </ul>
+            </div>
+            <div v-if="isProcess" class="flow-help">
+              <strong>Quy trình hồ sơ</strong>
+              <ul>
+                <li><b>Duyệt</b> có ba cổng: Duyệt, Trả lại, Từ chối. Cổng để trống thì hồ sơ kết thúc đúng như tên cổng.</li>
+                <li><b>Xin ý kiến</b> hỏi nhiều người cùng lúc; nối cổng Đồng ý / Không đồng ý tới bước tiếp theo.</li>
+                <li><b>Giao việc và chờ</b> tạo việc gắn với hồ sơ, chỉ đi tiếp khi việc được nghiệm thu hoặc bị hủy.</li>
+                <li><b>Điều kiện</b> đọc được câu trả lời biểu mẫu (<code>form.…</code>) và số/tên tài liệu đính kèm.</li>
+                <li>Người tạo hồ sơ xem được hồ sơ đang ở bước nào ngay trên sơ đồ này, trong tab <b>Quy trình</b>.</li>
               </ul>
             </div>
             <div v-if="errors.length" class="flow-help">

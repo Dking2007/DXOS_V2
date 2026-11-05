@@ -48,6 +48,7 @@ def create_app(settings=None, engine=None):
     from .messaging import build_router as messaging_router
     from .office import office_router
     from .packages import build_router as package_router
+    from .processes import build_router as processes_router
     from .routers import build_router
     from .tasks import build_router as tasks_router
 
@@ -60,6 +61,8 @@ def create_app(settings=None, engine=None):
     app.include_router(feed_router(app))
     app.include_router(discovery_router(app))
     app.include_router(delegations_router(app))
+    # Before the automations router: `/automations/process-template` must not read as a flow id.
+    app.include_router(processes_router(app))
     app.include_router(automations_router(app))
     app.include_router(assistant_router(app))
     app.include_router(ai_router(app))

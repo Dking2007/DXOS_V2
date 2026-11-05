@@ -9,6 +9,11 @@ A flow is a DAG of nodes and edges. The trigger node names the event; an `if` no
 to its `true` or `false` branch; action nodes run and pass on to whatever they connect to;
 a `wait` node resumes its successors later through the outbox. Each run pins the graph it
 started with, so editing a flow never changes a run already under way.
+
+The same canvas draws *process flows* (kind "process"): the route a form's dossiers follow
+once submitted. They add step nodes that wait for people (approval, opinions, a task to be
+done) and nodes that settle the dossier. Their live execution is in `processes`; this
+module validates them and dry-runs them like any other flow.
 """
 
 from __future__ import annotations
@@ -25,7 +30,7 @@ from dx_platform.errors import AppError
 from dx_platform.security import SecretBox
 from fastapi import APIRouter, Depends, Query
 from pydantic import Field, ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from . import ai_core
@@ -84,7 +89,51 @@ SAMPLES = {
     "case": {"title": "Đề xuất mua sắm thiết bị", "status": "approved", "priority": "high"},
     "post": {"audience": "organization", "official": True},
 }
-NODE_TYPES = {"trigger", "if", "notify", "create_task", "webhook", "wait", "ai"}
+PROCESS_FIELDS = {
+    "title": "Tên hồ sơ",
+    "priority": "Mức ưu tiên",
+    "department_id": "Đơn vị",
+    "owner_id": "Người tạo",
+    "file_count": "Số tài liệu đính kèm",
+    "file_names": "Tên tài liệu đính kèm",
+    "submission_no": "Lần trình",
+}
+PROCESS_SAMPLE = {
+    "title": "Đề xuất mua sắm thiết bị",
+    "status": "processing",
+    "priority": "high",
+    "file_count": 1,
+    "file_names": ["To-trinh.docx"],
+    "submission_no": 1,
+    "form": {},
+    # Dry runs only: the decision each step takes, by node id; approval is assumed otherwise.
+    "decisions": {},
+}
+KINDS = ("automation", "process")
+# Steps that only make sense inside a dossier's process.
+PROCESS_NODES = {"approval", "consult", "assign_task", "request_info", "finish"}
+NODE_TYPES = {"trigger", "if", "notify", "create_task", "webhook", "wait", "ai", *PROCESS_NODES}
+# Nodes that leave through named branches, and the branches each one has.
+BRANCHES = {
+    "if": {"true", "false"},
+    "approval": {"approve", "return", "reject"},
+    "consult": {"approve", "reject"},
+    "assign_task": {"completed", "cancelled"},
+}
+BRANCH_LABELS = {
+    "true": "Đúng",
+    "false": "Sai",
+    "approve": "Duyệt",
+    "return": "Trả lại",
+    "reject": "Từ chối",
+    "completed": "Hoàn thành",
+    "cancelled": "Bị hủy",
+}
+# An approval branch left unconnected settles the dossier the obvious way, so a one-step
+# process is just trigger → approval.
+IMPLICIT_OUTCOME = {"approve": "approved", "return": "needs_revision", "reject": "rejected"}
+TERMINAL = {"request_info", "finish"}
+OUTCOMES = {"approved": "Đã duyệt", "rejected": "Từ chối", "needs_revision": "Yêu cầu bổ sung"}
 ROLE_RECIPIENTS = {"assignee", "creator", "owner", "author", "department_manager"}
 MAX_CHAIN = 3
 MAX_NODES = 40
@@ -100,13 +149,16 @@ def fields_for(event: str) -> dict:
 
 
 class Condition(s.Input):
-    field: str = Field(pattern=r"^[a-z_]{1,40}$")
+    # `form.<key>` reads a field of the submitted form in process flows.
+    field: str = Field(pattern=r"^[a-z_]{1,40}(\.[A-Za-z][A-Za-z0-9_]{0,63})?$")
     operator: OPERATORS
     value: Any = None
 
 
 class TriggerData(s.Input):
     event: str = ""
+    # Process flows: the form whose dossiers follow this process.
+    form_id: str | None = None
 
 
 class IfData(s.Input):
@@ -146,7 +198,47 @@ class AiData(s.Input):
     output: str = Field(default="ai_label", pattern=r"^[a-z_]{1,40}$")
 
 
+class ApprovalData(s.Input):
+    """One person decides: approve, return for changes or reject."""
+
+    resolver: Literal["department_manager", "user"] = "department_manager"
+    user_id: str | None = None
+    allow_return: bool = True
+    allow_reject: bool = True
+    due_in_days: int | None = Field(default=None, ge=0, le=365)
+    instructions: str = Field(default="", max_length=1000)
+
+
+class ConsultData(s.Input):
+    """Several people give their opinion at once; the flow goes on by how they answered."""
+
+    user_ids: list[str] = Field(default_factory=list, max_length=10)
+    include_department_manager: bool = False
+    # "all": wait for everyone and agree only if all agree; "any": one agreement is enough.
+    mode: Literal["all", "any"] = "all"
+    due_in_days: int | None = Field(default=None, ge=0, le=365)
+    instructions: str = Field(default="", max_length=1000)
+
+
+class AssignTaskData(CreateTaskData):
+    """Hand work to someone and wait until it is accepted as done (or cancelled)."""
+
+
+class RequestInfoData(s.Input):
+    message: str = Field(default="", max_length=1000)
+
+
+class FinishData(s.Input):
+    result: Literal["approved", "rejected"] = "approved"
+    message: str = Field(default="", max_length=1000)
+
+
 DATA_MODELS = {
+    "approval": ApprovalData,
+    "consult": ConsultData,
+    "assign_task": AssignTaskData,
+    "request_info": RequestInfoData,
+    "finish": FinishData,
     "trigger": TriggerData,
     "if": IfData,
     "notify": NotifyData,
@@ -174,7 +266,7 @@ class Edge(s.Input):
     id: str = Field(min_length=1, max_length=90)
     source: str
     target: str
-    branch: Literal["true", "false"] | None = None
+    branch: Literal["true", "false", "approve", "return", "reject", "completed", "cancelled"] | None = None
 
 
 class Graph(s.Input):
@@ -187,6 +279,8 @@ class RuleInput(s.Input):
     description: str = Field(default="", max_length=2000)
     graph: Graph
     scope: Literal["all", "attached"] = "all"
+    # Fixed at creation; an update keeps the kind the flow already has.
+    kind: Literal["automation", "process"] = "automation"
 
 
 class RulePatch(RuleInput, s.Revision):
@@ -208,6 +302,7 @@ class ManualRun(s.Input):
 class GraphTest(s.Input):
     graph: Graph
     data: dict = Field(default_factory=dict)
+    kind: Literal["automation", "process"] = "automation"
 
 
 class ConnectionInput(s.Input):
@@ -236,17 +331,31 @@ def check_url(settings, url: str):
         )
 
 
+def value_of(data: dict, field: str):
+    """`key` or `form.key`: one level of nesting, nothing else is reachable."""
+    head, _, tail = field.partition(".")
+    value = data.get(head)
+    if not tail:
+        return value
+    return value.get(tail) if isinstance(value, dict) else None
+
+
 def condition_holds(condition: dict, data: dict) -> bool:
     """One flow condition on event data; values of the wrong kind simply do not match."""
     try:
-        return compare(condition["operator"], data.get(condition["field"]), condition.get("value"))
+        return compare(condition["operator"], value_of(data, condition["field"]), condition.get("value"))
     except FlowError:
         return False
 
 
 def render(template: str, data: dict) -> str:
-    """Replace `{key}` with event values; no attribute access or expressions are evaluated."""
-    return re.sub(r"\{([a-z_]{1,40})\}", lambda match: str(data.get(match.group(1), "")), template)
+    """Replace `{key}` / `{form.key}` with event values; no expressions are evaluated."""
+
+    def value(match):
+        found = value_of(data, match.group(1))
+        return "" if found is None else str(found)
+
+    return re.sub(r"\{([a-z_]{1,40}(?:\.[A-Za-z][A-Za-z0-9_]{0,63})?)\}", value, template)
 
 
 def recipients(db: Session, names: list[str], data: dict) -> list[str]:
@@ -326,9 +435,55 @@ def graph_of(rule: m.AutomationRule) -> dict:
     return rule.graph or legacy_graph(rule.trigger, rule.conditions or [], rule.actions or [])
 
 
-def validate_graph(db: Session, settings, graph: dict) -> list[dict]:
+def form_fields(db: Session, form_id: str | None) -> dict:
+    form = db.get(m.Form, form_id) if form_id else None
+    return {f"form.{field['key']}": field["label"] for field in (form.fields if form else [])}
+
+
+def approver(db: Session, data: dict, config: dict) -> tuple[m.User | None, str]:
+    """Who decides an approval step for this dossier, or why nobody can."""
+    if config.get("resolver") == "user":
+        user = db.get(m.User, config.get("user_id")) if config.get("user_id") else None
+    else:
+        department = db.get(m.Department, data.get("department_id")) if data.get("department_id") else None
+        user = db.get(m.User, department.manager_id) if department and department.manager_id else None
+    if not user or not user.active:
+        return None, "Bước duyệt chưa có người duyệt đang hoạt động."
+    if user.id == data.get("owner_id"):
+        return None, "Không được tự duyệt hồ sơ: người duyệt trùng người tạo."
+    return user, ""
+
+
+def consultees(db: Session, data: dict, config: dict) -> list[m.User]:
+    """People asked for an opinion: those named, plus the unit's leader if chosen; never the owner."""
+    ids = list(config.get("user_ids") or [])
+    if config.get("include_department_manager") and data.get("department_id"):
+        department = db.get(m.Department, data["department_id"])
+        if department and department.manager_id:
+            ids.append(department.manager_id)
+    people = []
+    for user_id in ids:
+        user = db.get(m.User, user_id)
+        if user and user.active and user.id != data.get("owner_id") and user not in people:
+            people.append(user)
+    return people
+
+
+def offered(kind: str, data: dict) -> set[str]:
+    """Branches a node can actually take with its configuration."""
+    branches = set(BRANCHES.get(kind, set()))
+    if kind == "approval":
+        if not data.get("allow_return", True):
+            branches.discard("return")
+        if not data.get("allow_reject", True):
+            branches.discard("reject")
+    return branches
+
+
+def validate_graph(db: Session, settings, graph: dict, kind: str = "automation") -> list[dict]:
     """Every problem in the flow, each tied to the node (or edge) it concerns."""
     errors: list[dict] = []
+    process = kind == "process"
 
     def fail(node_id, message):
         errors.append({"node_id": node_id, "message": message})
@@ -349,10 +504,16 @@ def validate_graph(db: Session, settings, graph: dict) -> list[dict]:
             fail(edge["source"], "Node không được nối vào chính nó.")
             continue
         source = nodes[edge["source"]]
-        if source["type"] == "if" and edge.get("branch") not in {"true", "false"}:
-            fail(source["id"], "Đường ra từ node Điều kiện phải là nhánh Đúng hoặc Sai.")
-        if source["type"] != "if" and edge.get("branch"):
-            fail(source["id"], "Chỉ node Điều kiện có nhánh Đúng/Sai.")
+        branches = BRANCHES.get(source["type"])
+        if source["type"] in TERMINAL:
+            fail(source["id"], "Node kết thúc quy trình không có bước tiếp theo.")
+        elif branches and edge.get("branch") not in branches:
+            labels = [BRANCH_LABELS[b] for b in sorted(branches, key=list(BRANCH_LABELS).index)]
+            names = ", ".join(labels[:-1]) + " hoặc " + labels[-1]
+            where = "node Điều kiện" if source["type"] == "if" else "node này"
+            fail(source["id"], f"Đường ra từ {where} phải là nhánh {names}.")
+        elif not branches and edge.get("branch"):
+            fail(source["id"], "Node này không có nhánh; nối thẳng tới bước tiếp theo.")
         if nodes[edge["target"]]["type"] == "trigger":
             fail(edge["target"], "Không nối vào node kích hoạt.")
         outgoing[edge["source"]].append(edge)
@@ -379,10 +540,15 @@ def validate_graph(db: Session, settings, graph: dict) -> list[dict]:
                 continue
             reachable.add(node_id)
             stack.extend(edge["target"] for edge in outgoing.get(node_id, []))
+    form_id = (triggers[0].get("data") or {}).get("form_id") if len(triggers) == 1 else None
+    known_fields = {**PROCESS_FIELDS, **form_fields(db, form_id)} if process else None
     for node in nodes.values():
         node_id, kind = node["id"], node["type"]
         if kind not in NODE_TYPES:
             fail(node_id, "Loại node chưa được hỗ trợ.")
+            continue
+        if kind in PROCESS_NODES and not process:
+            fail(node_id, "Bước này chỉ dùng trong quy trình hồ sơ.")
             continue
         try:
             data = DATA_MODELS[kind].model_validate(node.get("data") or {})
@@ -391,8 +557,19 @@ def validate_graph(db: Session, settings, graph: dict) -> list[dict]:
             continue
         if kind != "trigger" and node_id not in reachable:
             fail(node_id, "Node chưa được nối từ node kích hoạt.")
+        taken = {e.get("branch") for e in outgoing.get(node_id, [])} - {None}
+        unused = taken - offered(kind, data.model_dump())
+        if kind in BRANCHES and unused:
+            fail(node_id, "Có nhánh đã tắt trong cấu hình nhưng vẫn được nối: " + ", ".join(
+                BRANCH_LABELS.get(b, str(b)) for b in sorted(unused, key=str)
+            ) + ".")
         if kind == "trigger":
-            if data.event not in TRIGGERS:
+            if process:
+                if data.event != "case.submitted":
+                    fail(node_id, "Quy trình bắt đầu khi hồ sơ được trình.")
+                if not data.form_id or not db.get(m.Form, data.form_id):
+                    fail(node_id, "Chọn biểu mẫu áp dụng quy trình.")
+            elif data.event not in TRIGGERS:
                 fail(node_id, "Chọn sự kiện kích hoạt.")
             if not outgoing.get(node_id):
                 fail(node_id, "Nối node kích hoạt tới bước tiếp theo.")
@@ -401,19 +578,42 @@ def validate_graph(db: Session, settings, graph: dict) -> list[dict]:
                 fail(node_id, "Thêm ít nhất một điều kiện.")
             if not outgoing.get(node_id):
                 fail(node_id, "Nối ít nhất một nhánh Đúng hoặc Sai.")
+            if known_fields is not None:
+                for condition in data.conditions:
+                    if condition.field not in known_fields:
+                        fail(node_id, f"Trường “{condition.field}” không có trong hồ sơ hoặc biểu mẫu.")
         elif kind == "notify":
             if not data.recipients or not data.title.strip():
                 fail(node_id, "Thông báo cần người nhận và nội dung.")
             for name in data.recipients:
                 if name not in ROLE_RECIPIENTS and not db.get(m.User, name):
                     fail(node_id, "Người nhận thông báo không tồn tại.")
-        elif kind == "create_task":
+        elif kind in {"create_task", "assign_task"}:
             if not data.title.strip():
                 fail(node_id, "Việc được tạo cần tiêu đề.")
             if data.assignee_id and not db.get(m.User, data.assignee_id):
                 fail(node_id, "Người nhận việc không tồn tại.")
             if data.department_id and not db.get(m.Department, data.department_id):
                 fail(node_id, "Đơn vị nhận việc không tồn tại.")
+            if kind == "assign_task":
+                if not data.assignee_id and not data.department_id:
+                    fail(node_id, "Chọn người hoặc đơn vị nhận việc.")
+                if not outgoing.get(node_id):
+                    fail(node_id, "Nối bước sẽ chạy khi việc hoàn thành.")
+        elif kind == "approval":
+            if data.resolver == "user":
+                user = db.get(m.User, data.user_id) if data.user_id else None
+                if not user or not user.active:
+                    fail(node_id, "Chọn người duyệt đang hoạt động.")
+        elif kind == "consult":
+            if not data.user_ids and not data.include_department_manager:
+                fail(node_id, "Chọn ít nhất một người cho ý kiến.")
+            for user_id in data.user_ids:
+                user = db.get(m.User, user_id)
+                if not user or not user.active:
+                    fail(node_id, "Người cho ý kiến không tồn tại hoặc đã bị khóa.")
+            if not outgoing.get(node_id):
+                fail(node_id, "Nối bước tiếp theo cho nhánh Đồng ý hoặc Không đồng ý.")
         elif kind == "webhook":
             connection = db.get(m.Connection, data.connection_id) if data.connection_id else None
             if not connection:
@@ -433,6 +633,8 @@ def validate_graph(db: Session, settings, graph: dict) -> list[dict]:
                 fail(node_id, "Nối bước tiếp theo, thường là một node Điều kiện dùng kết quả AI.")
         elif kind == "wait" and not outgoing.get(node_id):
             fail(node_id, "Nối bước sẽ chạy sau khi chờ.")
+    if process and not any(n["type"] in {"approval", "finish", "request_info"} for n in nodes.values()):
+        fail(None, "Quy trình cần ít nhất một bước Duyệt hoặc node Kết thúc để hồ sơ có kết quả.")
     return errors
 
 
@@ -440,8 +642,16 @@ def trigger_event(graph: dict) -> str:
     return next(n["data"].get("event", "") for n in graph["nodes"] if n["type"] == "trigger")
 
 
-def require_valid(db: Session, settings, graph: dict):
-    errors = validate_graph(db, settings, graph)
+def trigger_form(graph: dict) -> str | None:
+    return next((n["data"].get("form_id") for n in graph["nodes"] if n["type"] == "trigger"), None)
+
+
+def kind_of(rule: m.AutomationRule) -> str:
+    return rule.kind or "automation"
+
+
+def require_valid(db: Session, settings, graph: dict, kind: str = "automation"):
+    errors = validate_graph(db, settings, graph, kind)
     if errors:
         raise AppError(422, "flow_invalid", errors[0]["message"])
 
@@ -492,6 +702,9 @@ class Execution:
         self.run, self.rule, self.chain, self.event = run, rule, chain or [], event or {}
         self.nodes = {node["id"]: node for node in graph["nodes"]}
         self.steps: list[dict] = []
+        # Process flows: set once the dossier is settled; nothing after that runs.
+        self.outcome: str | None = None
+        self.done = "would_run" if dry_run else "succeeded"
 
     def successors(self, node_id: str, branch: str | None = None) -> list[str]:
         return [
@@ -502,7 +715,7 @@ class Execution:
 
     def walk(self, start: list[str]):
         queue, seen = list(start), set()
-        while queue:
+        while queue and self.outcome is None:
             node_id = queue.pop(0)
             if node_id in seen or node_id not in self.nodes:
                 continue
@@ -510,11 +723,66 @@ class Execution:
             queue.extend(self.step(self.nodes[node_id]))
         return self.steps
 
+    def follow(self, node, branch: str) -> list[str]:
+        """Where a step goes after taking `branch`; an unconnected approval branch settles the dossier."""
+        following = self.successors(node["id"], branch)
+        if not following and node["type"] == "approval":
+            self.conclude(IMPLICIT_OUTCOME[branch], node)
+        return following
+
+    def conclude(self, outcome: str, node, message: str = ""):
+        """Settle the dossier. A dry run only says so; `processes` applies it for real."""
+        self.outcome = outcome
+        self.steps.append(
+            {
+                "node_id": None,
+                "type": "outcome",
+                "state": self.done,
+                "outcome": outcome,
+                "source": node["id"],
+                "message": message,
+            }
+        )
+
+    def process_step(self, node, kind, data) -> list[str]:
+        """Dry run of a process step: who would be asked, and the path a sample decision takes."""
+        if kind == "finish":
+            self.record(node, self.done, outcome=data.get("result", "approved"))
+            self.conclude(data.get("result", "approved"), node, render(data.get("message", ""), self.data))
+            return []
+        if kind == "request_info":
+            self.record(node, self.done, outcome="needs_revision")
+            self.conclude("needs_revision", node, render(data.get("message", ""), self.data))
+            return []
+        detail: dict = {}
+        if kind == "approval":
+            person, problem = approver(self.db, self.data, data)
+            if not person:
+                self.record(node, "failed", error="approver_unresolved", message=problem)
+                return []
+            detail["people"] = [person.display_name]
+        elif kind == "consult":
+            people = consultees(self.db, self.data, data)
+            if not people:
+                self.record(node, "failed", error="consultees_missing", message="Không có ai để xin ý kiến.")
+                return []
+            detail["people"] = [person.display_name for person in people]
+        elif kind == "assign_task":
+            detail["title"] = render(data.get("title", ""), self.data)
+        default = "completed" if kind == "assign_task" else "approve"
+        branch = (self.data.get("decisions") or {}).get(node["id"], default)
+        if branch not in offered(kind, data):
+            branch = default
+        self.record(node, "would_run", branch=branch, **detail)
+        return self.follow(node, branch)
+
     def record(self, node, state, **extra):
         self.steps.append({"node_id": node["id"], "type": node["type"], "state": state, **extra})
 
     def step(self, node) -> list[str]:
         kind, data = node["type"], node.get("data") or {}
+        if kind in PROCESS_NODES:
+            return self.process_step(node, kind, data)
         if kind == "trigger":
             self.record(node, "succeeded")
             return self.successors(node["id"])
@@ -568,6 +836,31 @@ class Execution:
         self.record(node, detail.pop("state", "would_run" if self.dry_run else "succeeded"), **detail)
         return self.successors(node["id"])
 
+    def make_task(self, data) -> m.Task:
+        owner = self.db.get(m.User, self.rule.created_by)
+        if not owner or not owner.active:
+            raise AppError(403, "rule_owner_inactive", "Người tạo luật đã bị khóa.")
+        due = (
+            m.utcnow() + timedelta(days=data["due_in_days"]) if data.get("due_in_days") is not None else None
+        )
+        # Runs as the flow's author, with that person's permissions at run time.
+        with self.db.begin_nested():
+            return create_task(
+                self.db,
+                owner,
+                TaskCreate(
+                    title=render(data.get("title", ""), self.data),
+                    description=render(data.get("description", ""), self.data),
+                    assignee_id=data.get("assignee_id") or None,
+                    department_id=data.get("department_id") or None,
+                    priority=data.get("priority", "normal"),
+                    due_at=due,
+                    case_id=self.data.get("case_id"),
+                    source=TaskSource(type="automation", id=self.rule.id, label=self.rule.name),
+                ),
+                origin={"rules": [*self.chain, self.rule.id]},
+            )
+
     def act(self, node, kind, data) -> dict:
         if kind == "notify":
             people = recipients(self.db, data.get("recipients", []), self.data)
@@ -587,31 +880,7 @@ class Execution:
             if self.dry_run:
                 return {"title": title}
 
-            owner = self.db.get(m.User, self.rule.created_by)
-            if not owner or not owner.active:
-                raise AppError(403, "rule_owner_inactive", "Người tạo luật đã bị khóa.")
-            due = (
-                m.utcnow() + timedelta(days=data["due_in_days"])
-                if data.get("due_in_days") is not None
-                else None
-            )
-            # Runs as the flow's author, with that person's permissions at run time.
-            with self.db.begin_nested():
-                task = create_task(
-                    self.db,
-                    owner,
-                    TaskCreate(
-                        title=title,
-                        description=render(data.get("description", ""), self.data),
-                        assignee_id=data.get("assignee_id") or None,
-                        department_id=data.get("department_id") or None,
-                        priority=data.get("priority", "normal"),
-                        due_at=due,
-                        case_id=self.data.get("case_id"),
-                        source=TaskSource(type="automation", id=self.rule.id, label=self.rule.name),
-                    ),
-                    origin={"rules": [*self.chain, self.rule.id]},
-                )
+            task = self.make_task(data)
             return {"title": title, "task_id": task.id}
         # webhook
         if self.dry_run:
@@ -632,6 +901,12 @@ class Execution:
 
 def settle(run: m.AutomationRun):
     states = {step["state"] for step in run.steps}
+    if run.submission_id:
+        # A process run is done only when the dossier is settled (`processes.settle`); a late
+        # webhook result never marks it succeeded on its own.
+        if run.state not in {"succeeded", "cancelled", "failed"}:
+            run.state = "waiting" if states & {"queued", "waiting"} else "failed"
+        return
     if states & {"queued", "waiting"}:
         run.state = "waiting" if "waiting" in states else "running"
     elif "failed" in states or "unknown" in states:
@@ -649,7 +924,9 @@ def dispatch(db: Session, payload: dict):
     chain = origin.get("rules", [])
     for rule in db.scalars(
         select(m.AutomationRule).where(
-            m.AutomationRule.trigger == event_type, m.AutomationRule.enabled.is_(True)
+            m.AutomationRule.trigger == event_type,
+            m.AutomationRule.enabled.is_(True),
+            or_(m.AutomationRule.kind.is_(None), m.AutomationRule.kind != "process"),
         )
     ):
         if db.scalar(
@@ -870,7 +1147,10 @@ def build_router(app):
 
     def rule_data(db, rule):
         data = serial(rule)
+        data["kind"] = kind_of(rule)
         data["graph"] = graph_of(rule)
+        form = db.get(m.Form, rule.form_id) if rule.form_id else None
+        data["form_name"] = form.name if form else None
         data.pop("conditions", None)
         data.pop("actions", None)
         last = db.scalar(
@@ -916,9 +1196,32 @@ def build_router(app):
             raise AppError(404, "rule_not_found", "Không tìm thấy luồng tự động.")
         return rule
 
+    def check_single_process(db, rule_id: str | None, form_id: str | None):
+        """A form follows one process at a time, or a dossier would not know which to take."""
+        other = db.scalar(
+            select(m.AutomationRule).where(
+                m.AutomationRule.kind == "process",
+                m.AutomationRule.form_id == form_id,
+                m.AutomationRule.enabled.is_(True),
+                m.AutomationRule.id != (rule_id or ""),
+            )
+        )
+        if other:
+            raise AppError(
+                409,
+                "process_already_enabled",
+                f"Biểu mẫu này đang dùng quy trình “{other.name}”. Tắt quy trình đó trước khi bật quy trình khác.",
+            )
+
+    def not_process(rule):
+        if kind_of(rule) == "process":
+            raise AppError(
+                422, "process_runs_on_submit", "Quy trình hồ sơ tự chạy khi hồ sơ được trình; không chạy tay."
+            )
+
     @router.get("/automations/catalog")
     def catalog(db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
-        admin(db, actor)
+        user = admin(db, actor)
         return {
             "triggers": [
                 {
@@ -932,6 +1235,19 @@ def build_router(app):
             ],
             "operators": ["eq", "ne", "gt", "gte", "lt", "lte", "contains", "in", "empty", "not_empty"],
             "recipients": sorted(ROLE_RECIPIENTS),
+            "process": {
+                "fields": PROCESS_FIELDS,
+                # The drawer's own unit, so "leader of the unit" resolves to someone in a dry run.
+                "sample": {**PROCESS_SAMPLE, "department_id": user.department_id, "owner_id": None},
+                "forms": [
+                    {"id": form.id, "name": form.name, "fields": form_fields(db, form.id)}
+                    for form in db.scalars(
+                        select(m.Form).where(m.Form.state == "published").order_by(m.Form.name)
+                    )
+                ],
+                "outcomes": OUTCOMES,
+            },
+            "branch_labels": BRANCH_LABELS,
             "webhooks_enabled": bool(allowed_hosts(settings)),
             "allowed_hosts": sorted(allowed_hosts(settings)),
             "max_nodes": MAX_NODES,
@@ -949,10 +1265,15 @@ def build_router(app):
         return rule_data(db, get_rule(db, rule_id))
 
     @router.post("/automations/validate")
-    def validate(body: Graph, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+    def validate(
+        body: Graph,
+        kind: Literal["automation", "process"] = "automation",
+        db: Session = Depends(db_dep),
+        actor: Actor = Depends(actor_dep),
+    ):
         """Check a flow while it is being drawn; problems come back tied to their node."""
         admin(db, actor)
-        errors = validate_graph(db, settings, body.model_dump())
+        errors = validate_graph(db, settings, body.model_dump(), kind)
         return {"valid": not errors, "errors": errors}
 
     @router.post("/automations/test")
@@ -960,29 +1281,34 @@ def build_router(app):
         """Dry run of an unsaved flow: the path it would take; writes nothing and calls nothing."""
         admin(db, actor)
         graph = body.graph.model_dump()
-        errors = validate_graph(db, settings, graph)
+        errors = validate_graph(db, settings, graph, body.kind)
         if errors:
             return {"valid": False, "errors": errors, "steps": []}
         trigger = next(n["id"] for n in graph["nodes"] if n["type"] == "trigger")
-        steps = Execution(db, graph, body.data, dry_run=True).walk([trigger])
+        execution = Execution(db, graph, body.data, dry_run=True)
+        steps = execution.walk([trigger])
         return {
             "valid": True,
             "errors": [],
             "steps": steps,
             "matched": any(step["type"] not in {"trigger", "if"} for step in steps),
+            "outcome": execution.outcome,
         }
 
     @router.post("/automations", status_code=201)
     def create_rule(body: RuleInput, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
         user = admin(db, actor)
         graph = body.graph.model_dump()
-        require_valid(db, settings, graph)
-        check_scope(body.scope, trigger_event(graph))
+        require_valid(db, settings, graph, body.kind)
+        if body.kind == "automation":
+            check_scope(body.scope, trigger_event(graph))
         # New flows start disabled: they are tested before they act on real events.
         rule = m.AutomationRule(
             name=body.name,
             description=body.description,
-            scope=body.scope,
+            scope=body.scope if body.kind == "automation" else "all",
+            kind=body.kind,
+            form_id=trigger_form(graph) if body.kind == "process" else None,
             trigger=trigger_event(graph),
             conditions=[],
             actions=[],
@@ -1001,24 +1327,26 @@ def build_router(app):
         rule_id: str, body: RulePatch, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)
     ):
         user = admin(db, actor)
-        get_rule(db, rule_id)
+        rule = get_rule(db, rule_id)
+        kind = kind_of(rule)
         graph = body.graph.model_dump()
-        require_valid(db, settings, graph)
-        check_scope(body.scope, trigger_event(graph))
-        cas(
-            db,
-            m.AutomationRule,
-            rule_id,
-            body.expected_revision,
-            {
-                "name": body.name,
-                "description": body.description,
-                "trigger": trigger_event(graph),
-                "scope": body.scope,
-                "graph": graph,
-                "updated_at": m.utcnow(),
-            },
-        )
+        require_valid(db, settings, graph, kind)
+        values = {
+            "name": body.name,
+            "description": body.description,
+            "trigger": trigger_event(graph),
+            "scope": body.scope,
+            "graph": graph,
+            "updated_at": m.utcnow(),
+        }
+        if kind == "process":
+            values.update(scope="all", form_id=trigger_form(graph))
+            if rule.enabled:
+                check_single_process(db, rule.id, values["form_id"])
+        else:
+            check_scope(body.scope, trigger_event(graph))
+        # Dossiers already submitted keep the flow they started with; only new ones see the edit.
+        cas(db, m.AutomationRule, rule_id, body.expected_revision, values)
         audit(db, user, "automation.updated", rule_id)
         db.commit()
         return rule_data(db, db.get(m.AutomationRule, rule_id))
@@ -1030,7 +1358,9 @@ def build_router(app):
         user = admin(db, actor)
         rule = get_rule(db, rule_id)
         if body.enabled:
-            require_valid(db, settings, graph_of(rule))
+            require_valid(db, settings, graph_of(rule), kind_of(rule))
+            if kind_of(rule) == "process":
+                check_single_process(db, rule.id, rule.form_id)
         cas(
             db,
             m.AutomationRule,
@@ -1050,8 +1380,13 @@ def build_router(app):
         admin(db, actor)
         graph = graph_of(get_rule(db, rule_id))
         trigger = next(n["id"] for n in graph["nodes"] if n["type"] == "trigger")
-        steps = Execution(db, graph, body.data, dry_run=True).walk([trigger])
-        return {"matched": any(step["type"] not in {"trigger", "if"} for step in steps), "steps": steps}
+        execution = Execution(db, graph, body.data, dry_run=True)
+        steps = execution.walk([trigger])
+        return {
+            "matched": any(step["type"] not in {"trigger", "if"} for step in steps),
+            "steps": steps,
+            "outcome": execution.outcome,
+        }
 
     @router.get("/automations/{rule_id}/candidates")
     def candidates(
@@ -1062,7 +1397,9 @@ def build_router(app):
     ):
         """Records a manual run can use: those of the trigger's kind that the user may see."""
         user = admin(db, actor)
-        family = trigger_family(get_rule(db, rule_id).trigger)
+        rule = get_rule(db, rule_id)
+        not_process(rule)
+        family = trigger_family(rule.trigger)
         needle = (q or "").strip()
         items = []
         if family == "task":
@@ -1101,6 +1438,7 @@ def build_router(app):
         """
         user = admin(db, actor)
         rule = get_rule(db, rule_id)
+        not_process(rule)
         require_valid(db, settings, graph_of(rule))
         data = event_source(db, user, trigger_family(rule.trigger), body.ref_id)
         data["manual_by"] = user.display_name

@@ -64,7 +64,9 @@ vòng phụ thuộc, và kiểm Core không import Workspace (ngược lại cũ
 ## Các lựa chọn giới hạn có chủ ý
 
 Một tổ chức mỗi deployment; chưa SaaS đa tenant. Phê duyệt tuần tự/điều kiện/trả
-lại; chưa all/any/quorum. UI là danh sách việc cần xử lý và báo cáo cơ bản, không phải
+lại, hoặc theo quy trình hồ sơ vẽ trên canvas (DAG; xin ý kiến song song cần tất cả hoặc một
+người đồng ý); chưa quorum. Quy trình canvas chạy bằng engine luồng của Workspace worker, mỗi bước
+cần người quyết định vẫn là một human task Core (xem `process-packages.md`). UI là danh sách việc cần xử lý và báo cáo cơ bản, không phải
 dashboard phân tích tùy chỉnh. Workspace đã có giao việc, nhắn tin (polling REST, chưa
 WebSocket), bảng tin, tìm kiếm, ủy quyền và tự động hóa dạng canvas kéo-thả; mô tả và giới
 hạn từng phần ở README. Chưa có AI/OCR/RAG.

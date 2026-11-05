@@ -272,6 +272,16 @@ không tồn tại để làm tài liệu trông đầy đủ. Xem [checklist](d
   trả lại qua API; quá thời gian chờ thì ghi "chưa rõ kết quả" và **không tự gửi lại**.
   Chưa có node vòng lặp, gọi HTTP đọc dữ liệu về, biểu thức tùy ý hay connector OAuth;
   editor dùng tốt nhất trên màn hình rộng (mobile xem và thêm node qua nút +).
+- **Quy trình hồ sơ** (tab *Quy trình hồ sơ* trong `/automations`, cùng quyền `automations.manage`): vẽ đường
+  đi của hồ sơ trên chính canvas tự động hóa với các bước Duyệt, Xin ý kiến (song song), Giao việc và chờ,
+  Yêu cầu bổ sung, Kết thúc, xen được Điều kiện (trường biểu mẫu `form.…`, số/tên tài liệu), Chờ, Thông báo,
+  Tạo việc, Webhook. Bắt đầu từ 5 mẫu có sẵn hoặc từ bước duyệt của biểu mẫu. Bật cho một biểu mẫu thì hồ sơ
+  trình sau đó theo quy trình thay cho bước duyệt khai trong biểu mẫu; tắt thì quay về bước duyệt cũ. Hồ sơ ghim
+  bản quy trình lúc trình; cổng Duyệt/Trả lại/Từ chối không nối thì hồ sơ kết thúc đúng như tên cổng. Mỗi lần
+  hỏi ý kiến/duyệt là một human task Core. Tab **Quy trình** trong chi tiết hồ sơ cho mọi người xem được hồ sơ
+  thấy hồ sơ đang ở bước nào, chờ ai, ai đã quyết định gì. Giới hạn: quy trình là DAG (trả lại thì trình lại từ
+  đầu, không quay về một bước giữa chừng); chưa có phê duyệt theo vai trò tùy ý hay quorum; gói nghiệp vụ chưa
+  đưa quy trình canvas vào hash cấu hình và bộ thử của gói — quy trình được kiểm bằng *Chạy thử* của canvas.
 - Office chặn submit khi phiên chỉnh sửa còn mở; phải đóng editor và nhận callback
   cuối hợp lệ trước khi trình. Đây **không phải force-save barrier**. Content ticket
   Office có TTL 8 giờ và gắn session; thu hồi share không đẩy người đang mở editor
