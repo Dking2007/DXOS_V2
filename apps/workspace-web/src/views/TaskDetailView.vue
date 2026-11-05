@@ -12,7 +12,6 @@ import {
   Check,
   CheckCheck,
   CircleAlert,
-  FileText,
   MessagesSquare,
   Play,
   Plus,
@@ -32,6 +31,7 @@ import TaskCreateDialog from '../components/TaskCreateDialog.vue'
 import TaskBreakdown from '../ai/TaskBreakdown.vue'
 import { useAi } from '../ai/useAi'
 import TaskAutomations from '../components/TaskAutomations.vue'
+import TaskFiles from '../components/TaskFiles.vue'
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -102,6 +102,7 @@ const eventLabels: Record<string, string> = {
   cancel: 'Hủy việc',
   due_changed: 'Đổi hạn',
   automation_attached: 'Gắn luồng tự động',
+  files_changed: 'Cập nhật tài liệu đính kèm',
   automation_detached: 'Gỡ luồng tự động',
   updated: 'Cập nhật',
 }
@@ -336,6 +337,15 @@ function localInput(value: string | null) {
             </div>
           </div>
         </section>
+        <TaskFiles
+          :task-id="task.id"
+          :files="task.files"
+          :revision="task.revision"
+          :closed="['completed', 'cancelled'].includes(task.status)"
+          :can-manage="canManage"
+          :is-assignee="task.assignee_id === session.user?.id"
+          @changed="detail.refetch()"
+        />
         <section class="card">
           <header class="card-header">
             <h2>Việc con</h2>
@@ -440,16 +450,6 @@ function localInput(value: string | null) {
                     task.source.type
                   ] ?? task.source.type
                 }}<span v-if="task.source.label" class="muted">: “{{ task.source.label }}”</span>
-              </dd>
-            </div>
-            <div v-if="task.files.length">
-              <dt>Tài liệu</dt>
-              <dd>
-                <span v-for="file in task.files" :key="file.id" class="file-chip"
-                  ><FileText :size="14" />{{
-                    file.restricted ? 'Tài liệu bạn chưa được cấp quyền' : file.name
-                  }}</span
-                >
               </dd>
             </div>
             <div><dt>Tạo lúc</dt><dd>{{ formatDate(task.created_at, true) }}</dd></div>

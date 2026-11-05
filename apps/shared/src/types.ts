@@ -266,7 +266,16 @@ export interface TaskDetail extends Task {
   subtasks: { id: string; title: string; status: TaskStatus; assignee_name: string }[]
   parent: { id: string; title: string } | null
   case: { id: string; title: string; code: string } | null
-  files: { id: string; name: string | null; size?: number; restricted?: boolean }[]
+  files: {
+    id: string
+    name: string | null
+    size?: number
+    mime?: string
+    owner_id?: string
+    owner_name?: string
+    /** The file was deleted from the drive after it was attached. */
+    restricted?: boolean
+  }[]
 }
 export interface ChatMessage {
   id: string

@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { Plus, Sparkles, Trash2 } from 'lucide-vue-next'
+import { FileText, FolderOpen, Plus, Sparkles, Trash2, Upload, X } from 'lucide-vue-next'
 import { api } from '../api'
 import { ApiError, errorText } from '@dx/web-shared/api.ts'
 import type { Task } from '@dx/web-shared/types.ts'
@@ -11,6 +11,8 @@ import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import { toast } from '../ui/toast'
 import { confirmDiscard } from '../ui/unsaved'
 import { useAi } from '../ai/useAi'
+import DrivePicker from './DrivePicker.vue'
+import { mergeIds, uploadToDrive, type AttachedFile } from './attachments'
 const props = defineProps<{
   parentId?: string
   caseId?: string
@@ -37,6 +39,32 @@ const priority = ref<Task['priority']>('normal')
 const dueAt = ref('')
 const checklist = ref<string[]>([])
 const watcherIds = ref<string[]>([])
+// Brief, templates or data the person will need, attached before the task is sent.
+const attachments = ref<AttachedFile[]>([])
+const uploading = ref(false)
+const picking = ref(false)
+const filePicker = ref<HTMLInputElement>()
+async function uploadPicked(event: Event) {
+  const input = event.target as HTMLInputElement
+  const chosen = [...(input.files ?? [])]
+  input.value = ''
+  uploading.value = true
+  try {
+    for (const file of chosen) {
+      const uploaded = await uploadToDrive(file)
+      if (!attachments.value.some((f) => f.id === uploaded.id)) attachments.value.push(uploaded)
+    }
+  } catch (cause) {
+    toast.error(cause)
+  } finally {
+    uploading.value = false
+  }
+}
+function attachPicked(files: AttachedFile[]) {
+  picking.value = false
+  const ids = mergeIds(attachments.value.map((f) => f.id), files.map((f) => f.id))
+  attachments.value = ids.map((id) => attachments.value.find((f) => f.id === id) ?? files.find((f) => f.id === id)!)
+}
 const busy = ref(false)
 const error = ref<unknown>(null)
 const ai = useAi()
@@ -100,6 +128,7 @@ const dirty = computed(
     !!dueAt.value ||
     priority.value !== 'normal' ||
     checklist.value.some((item) => item.trim()) ||
+    attachments.value.length > 0 ||
     watcherIds.value.length > 0,
 )
 function close() {
@@ -123,6 +152,7 @@ async function submit() {
           .filter((item) => item.trim())
           .map((text) => ({ text, done: false })),
         watcher_ids: watcherIds.value,
+        file_ids: attachments.value.map((f) => f.id),
         parent_id: props.parentId ?? null,
         case_id: props.caseId ?? null,
         source: props.source ?? null,
@@ -241,6 +271,26 @@ async function submit() {
           </select>
         </div>
         <div class="field full-width">
+          <label>Tài liệu đính kèm</label>
+          <div v-if="attachments.length" class="ai-chips">
+            <span v-for="file in attachments" :key="file.id" class="file-chip"
+              ><FileText :size="14" />{{ file.name
+              }}<button type="button" class="icon-button" :aria-label="`Bỏ ${file.name}`" @click="attachments = attachments.filter((f) => f.id !== file.id)">
+                <X :size="13" /></button
+            ></span>
+          </div>
+          <div class="inline-actions">
+            <button type="button" class="button ghost small" :disabled="uploading" @click="filePicker?.click()">
+              <Upload :size="15" />{{ uploading ? 'Đang tải lên…' : 'Tải tệp lên' }}
+            </button>
+            <button type="button" class="button ghost small" :disabled="uploading" @click="picking = true">
+              <FolderOpen :size="15" />Chọn từ kho tài liệu
+            </button>
+            <input ref="filePicker" type="file" multiple hidden @change="uploadPicked" />
+          </div>
+          <small class="muted">Người nhận việc mở được các tệp này qua công việc, không cần chia sẻ riêng.</small>
+        </div>
+        <div class="field full-width">
           <label>Checklist cần hoàn thành trước khi nộp</label>
           <div v-for="(_, index) in checklist" :key="index" class="checklist-edit">
             <input
@@ -269,10 +319,11 @@ async function submit() {
       <div class="form-actions">
         <button type="button" class="button secondary" @click="close">
           Hủy</button
-        ><button class="button" :disabled="busy || !title.trim()">
+        ><button class="button" :disabled="busy || uploading || !title.trim()">
           {{ busy ? 'Đang lưu…' : target ? 'Giao việc' : 'Lưu nháp' }}
         </button>
       </div>
     </form>
   </ModalDialog>
+  <DrivePicker v-if="picking" :exclude="attachments.map((f) => f.id)" @close="picking = false" @picked="attachPicked" />
 </template>

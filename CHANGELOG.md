@@ -7,6 +7,12 @@
 ## [Unreleased]
 
 ### Added
+- Công việc có đính kèm tệp: thẻ **Tài liệu** trong chi tiết công việc cho tải tệp lên hoặc chọn từ kho
+  tài liệu, xem trước và tải về qua công việc (`POST /tasks/{id}/files/{file_id}/download`, ghi nhật ký
+  `task.file_download`), nên người nhận việc mở được tệp mà không cần chia sẻ riêng. Người làm được thêm
+  tệp kết quả và chỉ gỡ được tệp do mình đính kèm (`task_file_not_yours`); người giao gỡ được mọi tệp.
+  Hộp thoại **Giao việc mới** đính kèm được tệp ngay khi giao. Hoạt động ghi `files_changed`. 2 test
+  backend, 1 test frontend.
 - 17 tính năng AI (migration `workspace_0016`), mô tả trong [docs/ai-features.md](docs/ai-features.md): đọc tài
   liệu để điền biểu mẫu (tạo căn cứ trường nguồn AI, câu trích phải có thật trong trang), tóm tắt hồ sơ cho
   người duyệt, soát hồ sơ trước khi trình, gợi ý ý kiến duyệt/lý do trả lại, soạn văn bản hành chính ra tệp

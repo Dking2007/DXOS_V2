@@ -3925,6 +3925,56 @@
         }
       }
     },
+    "/workspace/v1/tasks/{task_id}/files/{file_id}/download": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Task File Download",
+        "description": "A download ticket for a file attached to a task, for anyone who may see the task.",
+        "operationId": "task_file_download_workspace_v1_tasks__task_id__files__file_id__download_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/tasks/{task_id}/assign": {
       "post": {
         "tags": [
