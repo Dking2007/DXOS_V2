@@ -27,6 +27,10 @@
   tệp kết quả và chỉ gỡ được tệp do mình đính kèm (`task_file_not_yours`); người giao gỡ được mọi tệp.
   Hộp thoại **Giao việc mới** đính kèm được tệp ngay khi giao. Hoạt động ghi `files_changed`. 2 test
   backend, 1 test frontend.
+- Báo cáo theo phòng ban: bảng "Tình hình từng đơn vị" (việc đang mở, quá hạn, hoàn tất trong kỳ; hồ sơ, đang chờ
+  duyệt, quá hạn, lần trả lại), phòng nhiều việc/hồ sơ quá hạn đứng đầu (`by_department` trong
+  `/reports/overview`). Xuất CSV hồ sơ (`GET /reports/cases.csv`): bước đang chờ, người đang xử lý, hạn bước, quá
+  hạn, chỉ những hồ sơ người tải được xem. 1 test.
 - 17 tính năng AI (migration `workspace_0016`), mô tả trong [docs/ai-features.md](docs/ai-features.md): đọc tài
   liệu để điền biểu mẫu (tạo căn cứ trường nguồn AI, câu trích phải có thật trong trang), tóm tắt hồ sơ cho
   người duyệt, soát hồ sơ trước khi trình, gợi ý ý kiến duyệt/lý do trả lại, soạn văn bản hành chính ra tệp
@@ -67,6 +71,24 @@
 - CI chạy thêm `packages/flowkit/tests` (56 test) và test Node của plugin `vn-document-format` (29 test), trước đây không được chạy.
 
 ### Changed
+- **Màn "Quy trình"** thay cho hai nơi "Thiết lập › Biểu mẫu & quy trình" và "Gói nghiệp vụ": một trình 5 bước
+  (thông tin → trường → bước duyệt → quy định khi trình → xem lại) tạo biểu mẫu, quy trình và phiên bản đầu cùng
+  lúc, có thể phát hành ngay (`POST /processes`). "Sửa quy trình" tạo biểu mẫu và phiên bản mới
+  (`POST /business-packages/{id}/revise`); hồ sơ đã lập giữ phiên bản cũ. Biểu mẫu tạo trước đây chưa có quy
+  trình được liệt kê để chuyển đổi (`GET /processes/unpackaged-forms`). Tab biểu mẫu trong Thiết lập bỏ đi; liên
+  kết cũ `?tab=forms` chuyển sang màn Quy trình. 3 test.
+- **Hạn xử lý theo từng bước duyệt** (migration `workspace_0017`, `approval_tasks.due_at`): mỗi bước có "thời
+  hạn xử lý" (giờ hoặc ngày), tính từ lúc hồ sơ tới bước đó. Hồ sơ quá hạn khi một bước đang chờ quá hạn của nó;
+  lịch việc của người duyệt, danh sách Cần phê duyệt và thẻ "chờ lâu ở bước nào" (thêm số bước quá hạn) dùng hạn
+  này. Bỏ ô "Hạn xử lý" do người lập tự đặt khi tạo hồ sơ (API vẫn nhận `due_at` cho dữ liệu cũ). 2 test backend,
+  1 test frontend.
+- Tính năng AI: nút "Gói khuyến nghị" bật 13 tính năng chỉ đọc những gì người dùng đã được xem (để riêng tìm
+  theo ý nghĩa, bước AI trong luồng, trợ lý xem dữ liệu người hỏi, sinh kịch bản thử). Khi một lần gọi AI quá 6
+  giây, góc dưới màn hình báo "AI đang xử lý… N giây"; quá 15 giây nói rõ máy chủ AI của cơ quan có thể mất 1–2
+  phút. Test frontend đối chiếu danh sách tính năng với `ai_core.FEATURES`.
+- Hồ sơ: form nhập tay "Đối chiếu với tài liệu gốc" ẩn sau nút "Thêm căn cứ thủ công"; phần chính là các
+  đề xuất chờ xác nhận. Liên kết tới console Core đổi tên thành "Bảng điều khiển kỹ thuật" (vẫn chỉ hiện cho
+  Quản trị kỹ thuật); console ghi rõ là công cụ nền tảng và chỉ chỗ xem nhật ký nghiệp vụ.
 - Gọn chức năng trùng lặp (rà soát ngày 31/10/2026):
   - **Bước duyệt chỉ khai báo ở biểu mẫu.** Gói nghiệp vụ không nhận `approval_steps` riêng nữa;
     mỗi phiên bản gói chụp lại bước duyệt của biểu mẫu (giao diện vốn đã làm vậy, chỉ API cho ghi đè).
@@ -92,6 +114,11 @@
   tài liệu, chọn bản ghi khi chạy luồng, lọc cuộc trò chuyện (gõ "bao cao" ra "Báo cáo"). Dùng chung
   `dx_workspace/text.py` và `apps/shared/src/text.ts`.
 - Bỏ mũi tên ▾ ở nhãn "e-Office" trên thanh bên: không có chức năng chuyển không gian nào.
+
+### Fixed
+- Điện thoại: dòng "giờ · phạm vi" ở đầu bài viết bảng tin không còn xuống dòng từng chữ (cắt bằng dấu …,
+  nhãn "Đã ghim" chỉ còn biểu tượng); nút trợ lý AI thu sang mép phải khi cuộn xuống và trang có thêm khoảng
+  trống cuối, nên không còn che nút ở hàng cuối danh sách Việc hôm nay.
 
 ## [0.2.2] - 2026-10-31
 

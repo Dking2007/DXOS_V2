@@ -119,8 +119,24 @@ function onKey(event: KeyboardEvent) {
 function onGlobalKey(event: KeyboardEvent) {
   if (event.key === 'Escape' && assistantOpen.value) assistantOpen.value = false
 }
-onMounted(() => document.addEventListener('keydown', onGlobalKey))
-onBeforeUnmount(() => document.removeEventListener('keydown', onGlobalKey))
+// On a phone the round button floats over list rows; it slides aside while the page scrolls
+// down and comes back as soon as the person scrolls up.
+const tucked = ref(false)
+let lastY = 0
+function onScroll() {
+  const y = window.scrollY
+  if (Math.abs(y - lastY) < 8) return
+  tucked.value = y > lastY && y > 80
+  lastY = y
+}
+onMounted(() => {
+  document.addEventListener('keydown', onGlobalKey)
+  window.addEventListener('scroll', onScroll, { passive: true })
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onGlobalKey)
+  window.removeEventListener('scroll', onScroll)
+})
 watch(
   () => route.fullPath,
   () => queryClient.invalidateQueries({ queryKey: ['assistant-status'] }),
@@ -131,6 +147,7 @@ watch(
     v-if="showButton && !assistantOpen"
     type="button"
     class="assistant-fab"
+    :class="{ tucked }"
     aria-label="Mở trợ lý AI"
     title="Hỏi trợ lý AI"
     @click="assistantOpen = true"

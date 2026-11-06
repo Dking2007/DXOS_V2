@@ -236,10 +236,11 @@ class ApprovalTask(Base):
     decided_by_id: Mapped[str | None] = mapped_column(String(36))
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Process flows only: the canvas node that asked, "approval" or "opinion" (advice that
-    # does not settle the dossier), the decisions offered, and the deadline the node set.
+    # does not settle the dossier), and the decisions offered.
     node_id: Mapped[str | None] = mapped_column(String(40))
     kind: Mapped[str | None] = mapped_column(String(20))
     options: Mapped[list | None] = mapped_column(JSON)
+    # When the step is due, from the node's due_in_days or the linear step's due_hours.
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

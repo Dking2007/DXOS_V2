@@ -186,7 +186,7 @@ async function runProbe() {
         </div>
         <div class="inline-actions">
           <button class="button secondary" type="button" @click="packagesOpen = true">
-            <PackageOpen :size="16" />Nhập từ gói nghiệp vụ
+            <PackageOpen :size="16" />Nhập từ quy trình
           </button>
           <button class="button" type="button" @click="openNew"><Plus :size="16" />Viết bài</button>
         </div>
@@ -294,7 +294,7 @@ async function runProbe() {
       </div>
     </form>
   </ModalDialog>
-  <ModalDialog v-if="packagesOpen" title="Nhập quy trình từ gói nghiệp vụ" @close="packagesOpen = false">
+  <ModalDialog v-if="packagesOpen" title="Nhập kiến thức từ quy trình" @close="packagesOpen = false">
     <p class="muted" style="margin-bottom: 14px">
       Tạo bài mô tả quy trình (thông tin cần điền, tài liệu, các bước duyệt) từ phiên bản đang áp dụng của mỗi gói.
       Khi gói đổi phiên bản, bấm “Cập nhật” để làm mới bài.
@@ -304,7 +304,7 @@ async function runProbe() {
       :error="packages.error.value"
       :empty="packages.data.value?.items.length === 0"
       compact
-      title="Chưa có gói nghiệp vụ nào đang áp dụng"
+      title="Chưa có quy trình nào đang áp dụng"
       @retry="packages.refetch()"
     />
     <div v-for="item in packages.data.value?.items" :key="item.package_id" class="list-row">

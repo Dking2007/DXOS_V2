@@ -26,6 +26,42 @@ export type AiFeature =
   | 'assistant_my_data'
   | 'package_scenarios'
 
+export const ALL_FEATURES: AiFeature[] = [
+  'case_extract',
+  'case_summary',
+  'case_check',
+  'decision_draft',
+  'document_draft',
+  'document_qa',
+  'semantic_search',
+  'file_labels',
+  'task_parse',
+  'task_breakdown',
+  'daily_digest',
+  'report_narrative',
+  'chat_summary',
+  'writing_help',
+  'automation_ai',
+  'assistant_my_data',
+  'package_scenarios',
+]
+
+/**
+ * What most offices can switch on safely to start with: features that only read what the person
+ * already sees and answer in text. Left for a deliberate choice: search by meaning (needs a
+ * vector model), the flow step (runs on every event), the chat reading people's own work, and
+ * test scenarios for packages.
+ */
+export const RECOMMENDED_FEATURES: AiFeature[] = ALL_FEATURES.filter(
+  (key) =>
+    ![
+      'semantic_search',
+      'automation_ai',
+      'assistant_my_data',
+      'package_scenarios',
+    ].includes(key),
+)
+
 interface AiStatus {
   enabled: AiFeature[]
   semantic_ready: boolean

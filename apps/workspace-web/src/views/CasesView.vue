@@ -75,7 +75,6 @@ const packageVersionId = ref('')
 const payload = ref<Record<string, unknown>>({})
 const fileIds = ref<string[]>([])
 const priority = ref<'low' | 'normal' | 'high' | 'urgent'>('normal')
-const dueAt = ref('')
 const errors = ref<Record<string, string>>({})
 const error = ref<unknown>(null)
 const busy = ref(false)
@@ -103,7 +102,6 @@ function openCreate() {
   error.value = null
   intent.value = newIntent()
   priority.value = 'normal'
-  dueAt.value = ''
 }
 const createDirty = computed(
   () =>
@@ -124,12 +122,6 @@ watch(
   },
   { immediate: true },
 )
-/** The local datetime input value as the timezone-aware instant the API requires. */
-function dueInstant() {
-  if (!dueAt.value) return null
-  const parsed = new Date(dueAt.value)
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
-}
 async function create() {
   if (!selectedForm.value) return
   errors.value = validatePayload(selectedForm.value.fields, payload.value)
@@ -147,7 +139,6 @@ async function create() {
         payload: payload.value,
         file_ids: fileIds.value,
         priority: priority.value,
-        due_at: dueInstant(),
       } satisfies components['schemas']['CaseCreate']),
     })
     await queryClient.invalidateQueries({ queryKey: ['cases'] })
@@ -346,10 +337,6 @@ async function create() {
               <option value="high">Cao</option>
               <option value="urgent">Khẩn</option>
             </select>
-          </div>
-          <div class="field">
-            <label for="case-due">Hạn xử lý</label
-            ><input id="case-due" v-model="dueAt" type="datetime-local" />
           </div>
         </div>
         <template v-if="selectedForm"

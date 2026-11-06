@@ -28,6 +28,7 @@ import MobileNav from './components/shell/MobileNav.vue'
 import NotificationPanel from './components/shell/NotificationPanel.vue'
 import OnboardingTour from './components/shell/OnboardingTour.vue'
 import AssistantWidget from './assistant/AssistantWidget.vue'
+import AiBusy from './ai/AiBusy.vue'
 const route = useRoute()
 const session = useSession()
 const sidebar = ref(false)
@@ -144,9 +145,9 @@ function toggleSidebarCollapsed() {
           v-if="session.user?.roles?.includes('technical_admin')"
           href="/console/"
           class="console-link"
-          aria-label="Mở trang quản trị hệ thống"
-          title="Mở trang quản trị hệ thống"
-          ><span class="console-link-text">Quản trị hệ thống</span><span aria-hidden="true">↗</span></a
+          aria-label="Mở bảng điều khiển kỹ thuật của nền tảng"
+          title="Công cụ cho quản trị kỹ thuật: schema, luồng, lượt chạy, nhật ký nền tảng. Không dùng cho nghiệp vụ hằng ngày."
+          ><span class="console-link-text">Bảng điều khiển kỹ thuật</span><span aria-hidden="true">↗</span></a
         >
         <div class="sidebar-version">
           <span class="connection-dot" /> Bản pilot · e-Office
@@ -214,6 +215,7 @@ function toggleSidebarCollapsed() {
     <CommandPalette ref="palette" />
     <OnboardingTour />
     <AssistantWidget />
+    <AiBusy />
   </div>
   <AppToaster />
 </template>

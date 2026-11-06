@@ -36,6 +36,28 @@ class VersionCreate(s.Input):
     required_file_count: int = Field(default=0, ge=0, le=30)
 
 
+class ProcessCreate(s.Input):
+    """Everything an administrator decides about one kind of dossier, on one screen."""
+
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=3000)
+    fields: list[s.FormField] = Field(min_length=1, max_length=80)
+    approval_steps: list[s.ApprovalStep] = Field(min_length=1, max_length=10)
+    required_file_count: int = Field(default=0, ge=0, le=30)
+    allowed_roles: list[Literal["staff", "manager", "director", "technical_admin"]] = Field(default_factory=list)
+    publish: bool = True
+
+
+class ProcessRevise(s.Input):
+    """A change to a process: a new form and a new version; dossiers already filed keep theirs."""
+
+    description: str | None = Field(default=None, max_length=3000)
+    fields: list[s.FormField] = Field(min_length=1, max_length=80)
+    approval_steps: list[s.ApprovalStep] = Field(min_length=1, max_length=10)
+    required_file_count: int | None = Field(default=None, ge=0, le=30)
+    publish: bool = True
+
+
 class TemplateImport(s.Input):
     version_id: str
     name: str = Field(min_length=1, max_length=200)
@@ -488,6 +510,77 @@ def build_router(app):
                                                          "config_hash": version.config_hash})
         db.commit()
         return serial(version)
+
+    def release(db, actor, version: dict) -> dict:
+        """Check and publish a fresh version: the same two steps an administrator would take."""
+        checked = validate_version(version["id"], s.Revision(expected_revision=version["revision"]), db, actor)
+        return publish(version["id"], s.Revision(expected_revision=checked["revision"]), db, actor)
+
+    @router.post("/processes", status_code=201)
+    def create_process(body: ProcessCreate, idempotency_key: str | None = Header(None),
+                       db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        """Create the form, the package and its first version together, and publish them if asked."""
+        user = user_for(db, actor)
+        require(db, user, "forms.manage")
+        form_body = s.FormCreate(name=body.name, description=body.description, fields=body.fields,
+                                 approval_steps=body.approval_steps)
+        idem, replay = idem_begin(db, actor.subject, "process.create", idempotency_key, body.model_dump())
+        if replay:
+            return replay
+        db.commit()
+        form = app.state.create_form(body=form_body, idempotency_key=idempotency_key + ":form", db=db, actor=actor)
+        package = create_package(
+            PackageCreate(name=body.name, description=body.description, form_id=form["id"],
+                          required_file_count=body.required_file_count, allowed_roles=body.allowed_roles),
+            idempotency_key=idempotency_key + ":package", db=db, actor=actor,
+        )
+        version = release(db, actor, package["version"]) if body.publish else package["version"]
+        response = {**package, "version": version}
+        idem = db.get(m.Idempotency, idem.id)
+        idem.response = response
+        db.commit()
+        return response
+
+    @router.post("/business-packages/{package_id}/revise", status_code=201)
+    def revise_process(package_id: str, body: ProcessRevise, idempotency_key: str | None = Header(None),
+                       db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        """Change a process. Forms never change in place, so this makes a new form and version."""
+        user = user_for(db, actor)
+        package = db.get(m.BusinessPackage, package_id)
+        if not package:
+            raise AppError(404, "package_not_found", "Không tìm thấy gói nghiệp vụ.")
+        manage(db, user, package)
+        latest = db.scalar(select(m.PackageVersion).where(m.PackageVersion.package_id == package.id)
+                           .order_by(m.PackageVersion.version_no.desc()).limit(1))
+        previous_form = db.get(m.Form, latest.form_id) if latest else None
+        form_body = s.FormCreate(
+            name=package.name,
+            description=body.description if body.description is not None else (previous_form.description if previous_form else ""),
+            fields=body.fields, approval_steps=body.approval_steps,
+        )
+        idem, replay = idem_begin(db, actor.subject, "process.revise:" + package_id, idempotency_key, body.model_dump())
+        if replay:
+            return replay
+        db.commit()
+        form = app.state.create_form(body=form_body, idempotency_key=idempotency_key + ":form", db=db, actor=actor)
+        files = body.required_file_count if body.required_file_count is not None else (latest.required_file_count if latest else 0)
+        version = create_version(package.id, VersionCreate(form_id=form["id"], required_file_count=files),
+                                 idempotency_key=idempotency_key + ":version", db=db, actor=actor)
+        if body.publish:
+            version = release(db, actor, version)
+        idem = db.get(m.Idempotency, idem.id)
+        idem.response = version
+        db.commit()
+        return version
+
+    @router.get("/processes/unpackaged-forms")
+    def unpackaged_forms(db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        """Forms made before processes existed, so they can be turned into one."""
+        user = user_for(db, actor)
+        require(db, user, "forms.manage")
+        used = set(db.scalars(select(m.PackageVersion.form_id)))
+        return page([f for f in db.scalars(select(m.Form).where(m.Form.state == "published").order_by(m.Form.name))
+                     if f.id not in used])
 
     @router.get("/cases/{case_id}/explanation")
     def explanation(case_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):

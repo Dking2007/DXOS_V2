@@ -46,6 +46,17 @@ interface Overview {
     pending_my_approval: number
   }
   storage: { my_files: number; my_bytes: number }
+  by_department: {
+    department_id: string | null
+    name: string
+    tasks_open: number
+    tasks_overdue: number
+    tasks_completed: number
+    cases_total: number
+    cases_waiting: number
+    cases_overdue: number
+    returns: number
+  }[]
   automations?: { failed_in_period: number; enabled_rules: number }
 }
 const session = useSession()
@@ -90,8 +101,8 @@ function bars(record: Record<string, number>) {
         <option :value="365">12 tháng</option>
       </select>
       <a class="button secondary" :href="`/workspace/v1/reports/tasks.csv?scope=${scope}`"
-        ><Download :size="16" />Xuất CSV</a
-      >
+        ><Download :size="16" />CSV công việc</a
+      ><a class="button secondary" href="/workspace/v1/reports/cases.csv"><Download :size="16" />CSV hồ sơ</a>
     </div>
   </header>
   <section v-if="report.isPending.value || report.error.value" class="card">
@@ -223,6 +234,40 @@ function bars(record: Record<string, number>) {
         </section>
       </aside>
     </div>
+    <section v-if="data.by_department.length" class="card" style="margin-top: 20px">
+      <header class="card-header">
+        <div><span class="eyebrow">THEO PHÒNG BAN</span><h2>Tình hình từng đơn vị</h2></div>
+        <span class="muted" style="font-size: 13px">Phòng có nhiều việc, hồ sơ quá hạn đứng đầu</span>
+      </header>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Đơn vị</th>
+              <th>Việc đang mở</th>
+              <th>Việc quá hạn</th>
+              <th>Hoàn tất trong kỳ</th>
+              <th>Hồ sơ</th>
+              <th>Đang chờ duyệt</th>
+              <th>Hồ sơ quá hạn</th>
+              <th>Lần trả lại</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in data.by_department" :key="row.department_id ?? 'none'">
+              <td>{{ row.name }}</td>
+              <td>{{ row.tasks_open }}</td>
+              <td :class="{ 'overdue-text': row.tasks_overdue }">{{ row.tasks_overdue }}</td>
+              <td>{{ row.tasks_completed }}</td>
+              <td>{{ row.cases_total }}</td>
+              <td>{{ row.cases_waiting }}</td>
+              <td :class="{ 'overdue-text': row.cases_overdue }">{{ row.cases_overdue }}</td>
+              <td>{{ row.returns }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
     <ProcessWaitCard v-if="canSeeProcess" :days="days" />
   </template>
 </template>

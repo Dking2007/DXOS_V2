@@ -96,3 +96,17 @@ def test_only_settled_dossiers_can_be_archived(world):  # noqa: F811
         f"{API}/cases/{case['id']}/archive", json={"expected_revision": 1, "archived": True}
     )
     assert response.status_code == 409 and response.json()["code"] == "case_not_settled"
+
+
+def test_reports_split_by_department_and_export_dossiers(world):  # noqa: F811
+    case = make_case(world, make_form(world))
+    report = act(world, "director").get(API + "/reports/overview").json()
+    rows = {r["name"]: r for r in report["by_department"]}
+    staff_unit = next(r for r in rows.values() if r["cases_total"])
+    assert staff_unit["cases_total"] == 1 and staff_unit["cases_waiting"] == 0
+    exported = act(world, "director").get(API + "/reports/cases.csv")
+    assert exported.status_code == 200 and exported.headers["content-type"].startswith("text/csv")
+    lines = exported.text.lstrip("\ufeff").splitlines()
+    assert lines[0].startswith("ma_ho_so,ten_ho_so") and f"HS-{case['number']:06d}" in lines[1]
+    # The export only lists dossiers the person may see.
+    assert len(act(world, "outsider").get(API + "/reports/cases.csv").text.lstrip("\ufeff").splitlines()) == 1

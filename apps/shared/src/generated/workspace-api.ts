@@ -883,6 +883,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/v1/processes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Process
+         * @description Create the form, the package and its first version together, and publish them if asked.
+         */
+        post: operations["create_process_workspace_v1_processes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/business-packages/{package_id}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revise Process
+         * @description Change a process. Forms never change in place, so this makes a new form and version.
+         */
+        post: operations["revise_process_workspace_v1_business_packages__package_id__revise_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/processes/unpackaged-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Unpackaged Forms
+         * @description Forms made before processes existed, so they can be turned into one.
+         */
+        get: operations["unpackaged_forms_workspace_v1_processes_unpackaged_forms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/cases/{case_id}/explanation": {
         parameters: {
             query?: never;
@@ -1564,6 +1624,26 @@ export interface paths {
         };
         /** Tasks Csv */
         get: operations["tasks_csv_workspace_v1_reports_tasks_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/reports/cases.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cases Csv
+         * @description Every dossier this person may see, with where it waits and whether it is late.
+         */
+        get: operations["cases_csv_workspace_v1_reports_cases_csv_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2620,6 +2700,8 @@ export interface components {
             /** User Id */
             user_id?: string | null;
             condition?: components["schemas"]["Condition"] | null;
+            /** Due Hours */
+            due_hours?: number | null;
         };
         /** ArchiveInput */
         ArchiveInput: {
@@ -3331,6 +3413,54 @@ export interface components {
              * @default 0
              */
             file_count: number;
+        };
+        /**
+         * ProcessCreate
+         * @description Everything an administrator decides about one kind of dossier, on one screen.
+         */
+        ProcessCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Fields */
+            fields: components["schemas"]["FormField"][];
+            /** Approval Steps */
+            approval_steps: components["schemas"]["ApprovalStep"][];
+            /**
+             * Required File Count
+             * @default 0
+             */
+            required_file_count: number;
+            /** Allowed Roles */
+            allowed_roles?: ("staff" | "manager" | "director" | "technical_admin")[];
+            /**
+             * Publish
+             * @default true
+             */
+            publish: boolean;
+        };
+        /**
+         * ProcessRevise
+         * @description A change to a process: a new form and a new version; dossiers already filed keep theirs.
+         */
+        ProcessRevise: {
+            /** Description */
+            description?: string | null;
+            /** Fields */
+            fields: components["schemas"]["FormField"][];
+            /** Approval Steps */
+            approval_steps: components["schemas"]["ApprovalStep"][];
+            /** Required File Count */
+            required_file_count?: number | null;
+            /**
+             * Publish
+             * @default true
+             */
+            publish: boolean;
         };
         /** ProviderInput */
         ProviderInput: {
@@ -5783,6 +5913,98 @@ export interface operations {
             };
         };
     };
+    create_process_workspace_v1_processes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revise_process_workspace_v1_business_packages__package_id__revise_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                package_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessRevise"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unpackaged_forms_workspace_v1_processes_unpackaged_forms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     explanation_workspace_v1_cases__case_id__explanation_get: {
         parameters: {
             query?: never;
@@ -7403,6 +7625,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cases_csv_workspace_v1_reports_cases_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

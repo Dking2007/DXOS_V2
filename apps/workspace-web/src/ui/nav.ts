@@ -84,7 +84,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         to: '/packages',
-        label: 'Gói nghiệp vụ',
+        label: 'Quy trình',
         icon: PackageOpen,
         hint: 'Quy trình duyệt cho từng loại hồ sơ',
         capability: 'forms.manage',
@@ -96,7 +96,7 @@ export const NAV_GROUPS: NavGroup[] = [
         hint: 'Kiến thức và dịch vụ AI của trợ lý',
         capability: 'assistant.manage',
       },
-      { to: '/settings', label: 'Thiết lập', icon: Settings2, hint: 'Mẫu biểu, tổ chức, vai trò, giao diện' },
+      { to: '/settings', label: 'Thiết lập', icon: Settings2, hint: 'Tổ chức, vai trò, nhật ký, giao diện' },
     ],
   },
 ]

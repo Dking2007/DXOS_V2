@@ -969,3 +969,46 @@
   color: var(--violet-ink);
   cursor: pointer;
 }
+
+/* Narrow screens: the name and "time · audience" line shorten with an ellipsis instead of
+   breaking word by word, and the pinned badge keeps only its icon. */
+@media (max-width: 640px) {
+  .feed-post-head {
+    gap: 10px;
+    padding: 14px 10px 0 14px;
+  }
+  .feed-post-head strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .feed-post-head small {
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .feed-post-head small time {
+    flex: none;
+  }
+  .feed-scope {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .feed-scope svg {
+    flex: none;
+  }
+  .feed-scope {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+  }
+  .feed-pin {
+    padding: 4px;
+  }
+  .feed-pin-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+}
