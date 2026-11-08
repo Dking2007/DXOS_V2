@@ -20,7 +20,8 @@ export const router = createRouter({
     {
       path: '/drive',
       component: () => import('./views/DriveView.vue'),
-      meta: { title: 'Kho tài liệu' },
+      // Edge to edge under the top bar, like a file manager; the main navigation stays.
+      meta: { title: 'Kho tài liệu', bleed: true },
     },
     {
       path: '/drive/:id/edit',

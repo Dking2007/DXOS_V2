@@ -636,7 +636,7 @@ a.stat-tile:hover {
 }
 .folder-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
   gap: 12px;
   padding: 20px 22px;
   border-bottom: 1px solid var(--border);
@@ -1115,13 +1115,11 @@ a.stat-tile:hover {
   .login-form-side {
     padding: 28px;
   }
+  /* One folder per row on a phone, so its name is readable and its tools sit beside it. */
   .folder-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     padding: 18px;
     gap: 10px;
-  }
-  .folder-tools {
-    flex-direction: column;
   }
   .intro-strip {
     align-items: flex-start;

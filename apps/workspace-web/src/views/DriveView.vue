@@ -510,16 +510,6 @@ function pickFile(event: Event) {
 }
 </script>
 <template>
-  <header class="drive-hero">
-    <div>
-      <h1>Tài liệu</h1>
-      <p>Tìm, sắp xếp và cộng tác trên tài liệu của bạn.</p>
-    </div>
-    <label class="drive-search"><Search :size="20" /><span class="sr-only">Tìm tài liệu trong toàn kho</span>
-      <input v-model="search" type="search" placeholder="Tìm trong toàn bộ tài liệu" />
-      <button v-if="search" type="button" aria-label="Xóa từ khóa" @click="search = ''"><X :size="17" /></button>
-    </label>
-  </header>
   <div v-if="error && !modal" class="notice error error-inline" role="alert">
     {{ errorText(error) }}
   </div>
@@ -546,7 +536,11 @@ function pickFile(event: Event) {
     </aside>
     <section class="drive-panel" aria-label="Nội dung tài liệu" :class="{ 'drag-over': dragging }" @dragenter.prevent="dragging = true" @dragover.prevent @dragleave.prevent="dragging = false" @drop.prevent="onDrop">
       <div class="drive-panel-head">
-        <div><span class="eyebrow">{{ trash ? 'ĐÃ XÓA' : searchQuery ? 'TÌM KIẾM' : 'KHÔNG GIAN CỦA BẠN' }}</span><h2>{{ currentLocation }}</h2></div>
+        <h1 class="drive-title">{{ currentLocation }}</h1>
+        <label class="drive-search"><Search :size="20" /><span class="sr-only">Tìm tài liệu trong toàn kho</span>
+          <input v-model="search" type="search" placeholder="Tìm trong toàn bộ tài liệu" />
+          <button v-if="search" type="button" aria-label="Xóa từ khóa" @click="search = ''"><X :size="17" /></button>
+        </label>
         <div class="drive-panel-controls">
           <button class="drive-control drive-rail-toggle" :aria-label="railCollapsed ? 'Mở rộng cột tài liệu' : 'Thu gọn cột tài liệu'" :title="railCollapsed ? 'Mở rộng cột tài liệu' : 'Thu gọn cột tài liệu'" :aria-expanded="!railCollapsed" @click="toggleRailCollapsed"><PanelLeftOpen v-if="railCollapsed" :size="18" /><PanelLeftClose v-else :size="18" /></button>
           <label class="drive-sort"><span class="sr-only">Sắp xếp</span><select v-model="sortBy"><option value="created">Được thêm gần đây</option><option value="name">Tên</option><option value="size">Dung lượng</option></select></label>
@@ -1081,15 +1075,13 @@ function pickFile(event: Event) {
   />
 </template>
 <style scoped>
-.drive-hero { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 25px; }
-.drive-hero h1 { margin: 4px 0 0; }
-.drive-hero p { margin-top: 5px; color: var(--muted); }
-.drive-search { display: flex; align-items: center; gap: 12px; width: min(440px, 48%); min-height: 48px; padding: 0 15px; background: var(--surface-3); border: 1px solid transparent; border-radius: 25px; color: #688198; }
+.drive-search { display: flex; align-items: center; gap: 12px; flex: 1; max-width: 640px; min-height: 44px; padding: 0 15px; background: var(--surface-3); border: 1px solid transparent; border-radius: 25px; color: #688198; }
 .drive-search:focus-within { background: var(--surface); border-color: var(--teal-line); box-shadow: 0 0 0 3px var(--teal-line); }
 .drive-search input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; box-shadow: none; padding: 8px 0; color: var(--navy); }
 .drive-search button { display: grid; place-items: center; border: 0; background: transparent; color: inherit; cursor: pointer; }
-.drive-workspace { display: grid; grid-template-columns: 185px minmax(0, 1fr); gap: 18px; align-items: start; min-height: 580px; }
-.drive-rail { position: sticky; top: 18px; padding: 5px 0; min-width: 0; }
+/* The file area fills the page under the top bar: no frame, no page title. */
+.drive-workspace { display: grid; grid-template-columns: 220px minmax(0, 1fr); align-items: stretch; height: calc(100dvh - 72px); background: var(--surface); }
+.drive-rail { padding: 20px 8px; min-width: 0; overflow-y: auto; border-right: 1px solid var(--border); }
 .drive-new-wrap { position: relative; margin: 0 8px 24px; }
 .drive-new { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 22px; border: 1px solid var(--border); border-radius: 17px; background: var(--surface); color: var(--navy); box-shadow: 0 3px 10px #102d4620; font-weight: 700; cursor: pointer; }
 .drive-new:hover { background: var(--surface-2); border-color: var(--teal-line); }
@@ -1117,18 +1109,21 @@ function pickFile(event: Event) {
   .rail-collapsed .drive-rail-note { display: none; }
   .rail-collapsed .drive-nav button { justify-content: center; padding: 0; border-radius: 12px; }
 }
-.drive-panel { min-width: 0; min-height: 570px; position: relative; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); overflow: hidden; box-shadow: 0 5px 22px #152f4209; }
+.drive-panel { min-width: 0; position: relative; background: var(--surface); overflow-y: auto; }
 .drive-panel.drag-over { outline: 3px dashed #4098a6; outline-offset: -9px; background: var(--surface-2); }
 .drive-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 84px; padding: 18px 23px; }
-.drive-panel-head h2 { margin: 3px 0 0; font-size: 20px; }
+.drive-panel-head { gap: 16px; }
+.drive-title { margin: 0; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .drive-panel-controls { display: flex; align-items: center; gap: 5px; }
-.drive-sort select { min-height: 35px; max-width: 125px; border: 0; background: transparent; color: var(--navy); font-size: 13px; cursor: pointer; }
-.drive-control { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
+.drive-sort select { min-height: 40px; max-width: 125px; border: 0; background: transparent; color: var(--navy); font-size: 13px; cursor: pointer; }
+.drive-control { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
 .drive-control:hover, .drive-control.active { background: var(--surface-3); color: var(--teal-ink); }
 .drive-control-divider { height: 21px; width: 1px; background: var(--border); margin: 0 5px; }
 .drive-sync { margin: 0 20px 12px; }
 .drive-panel :deep(.drive-location) { padding: 10px 23px 16px; border-bottom: 0; }
 .drive-panel :deep(.folder-grid) { padding: 12px 23px 24px; gap: 12px; }
+/* Folder tools take room only while pointed at, so the name stays readable. */
+@media (hover: hover) { .drive-panel :deep(.folder-tools) { opacity: 0; transition: opacity 0.15s; } .drive-panel :deep(.folder-card:hover .folder-tools), .drive-panel :deep(.folder-card:focus-within .folder-tools) { opacity: 1; } }
 .drive-panel :deep(.folder-card) { border-radius: 10px; background: var(--surface-2); }
 .drive-panel :deep(.folder-card:hover) { background: var(--teal-soft); }
 .drive-table th { background: var(--surface); text-transform: none; }
@@ -1163,6 +1158,6 @@ function pickFile(event: Event) {
 .drive-action-bar button:hover { background: var(--teal-soft); }
 .drive-action-bar > .drive-owner-note { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 0 8px; color: var(--muted); font-size: 13px; font-weight: 500; }
 .drive-panel :deep(.pagination) { padding: 16px 23px; }
-@media (max-width: 1100px) { .drive-workspace { grid-template-columns: 155px minmax(0, 1fr); gap: 10px; } .drive-panel-head { flex-wrap: wrap; } }
-@media (max-width: 700px) { .drive-hero { flex-direction: column; align-items: stretch; } .drive-search { width: 100%; } .drive-workspace { display: block; } .drive-rail { position: static; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 0; } .drive-new-wrap { margin: 0; } .drive-nav { display: flex; flex: 1; } .drive-nav button { min-height: 45px; padding: 0 10px; border-radius: 10px; justify-content: center; } .drive-rail-folders, .drive-rail-note, .drive-rail-toggle { display: none; } .drive-panel-head { padding: 16px; } .drive-panel :deep(.folder-grid) { padding: 10px 16px 17px; } .drive-file-grid { padding: 15px; } .drive-sort select { max-width: 105px; } }
+@media (max-width: 1100px) { .drive-workspace { grid-template-columns: 180px minmax(0, 1fr); } .drive-panel-head { flex-wrap: wrap; } .drive-search { order: 3; flex-basis: 100%; max-width: none; } }
+@media (max-width: 700px) { .drive-workspace { display: block; height: auto; min-height: calc(100dvh - 72px); } .drive-rail { border-right: 0; border-bottom: 1px solid var(--border); } .drive-rail { position: static; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 0; } .drive-new-wrap { margin: 0; } .drive-nav { display: flex; flex: 1; } .drive-nav button { min-height: 45px; padding: 0 10px; border-radius: 10px; justify-content: center; } .drive-rail-folders, .drive-rail-note, .drive-rail-toggle { display: none; } .drive-panel-head { padding: 16px; } .drive-panel :deep(.folder-grid) { padding: 10px 16px 17px; } .drive-file-grid { padding: 15px; } .drive-sort select { max-width: 105px; } }
 </style>
