@@ -42,6 +42,12 @@ export interface User {
   roles?: string[]
   csrf_token?: string
   capabilities?: string[]
+  job_title?: string | null
+  phone?: string | null
+  contact_email?: string | null
+  about?: string | null
+  /** Address of the profile photo; null when the person has none. */
+  avatar_url?: string | null
 }
 export interface Department {
   id: string
@@ -335,6 +341,8 @@ export interface Conversation {
   member_count: number
   updated_at: string
   last_message: ChatMessage | null
+  /** In a direct conversation, the other person. */
+  peer_id?: string | null
   members?: { user_id: string; display_name: string; role: string; last_read_seq: number }[]
 }
 export interface Post {
@@ -368,6 +376,7 @@ export interface PostMedia {
 }
 export interface PostComment {
   id: string
+  author_id?: string
   author_name: string
   body: string
   created_at: string

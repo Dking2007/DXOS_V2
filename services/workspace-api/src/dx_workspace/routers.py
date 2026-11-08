@@ -34,6 +34,7 @@ from .policies import (
     resolve_steps,
     would_create_cycle,
 )
+from .profile import user_data
 from .services import (
     audit,
     cas,
@@ -175,7 +176,7 @@ def build_router(app):
     @router.get("/me", tags=["identity"])
     def me(request: Request, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
         user = context(db, actor)
-        result = serial(user)
+        result = user_data(user)
         result.update(
             roles=[user.role],
             capabilities=sorted(permissions(db, user)),
@@ -261,6 +262,7 @@ def build_router(app):
             ),
             limit,
             cursor,
+            transform=user_data,
         )
 
     @router.post("/users", tags=["organization"], status_code=201)
@@ -276,7 +278,7 @@ def build_router(app):
         db.flush()
         audit(db, user, "user.created", value.id)
         db.commit()
-        return serial(value)
+        return user_data(value)
 
     @router.patch("/users/{user_id}", tags=["organization"])
     def patch_user(
@@ -296,7 +298,7 @@ def build_router(app):
             setattr(value, key, value_)
         audit(db, user, "user.updated", value.id, {"fields": list(changes)})
         db.commit()
-        return serial(value)
+        return user_data(value)
 
     @router.get("/roles", tags=["organization"])
     def roles(db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):

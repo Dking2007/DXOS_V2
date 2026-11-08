@@ -189,6 +189,18 @@ export const HELP: Record<string, HelpTopic> = {
     ],
     tips: ['Mọi tính năng AI mặc định tắt; chỉ người có quyền quản lý trợ lý mới bật được.'],
   },
+  '/profile': {
+    purpose: 'Ảnh đại diện và thông tin liên hệ mà đồng nghiệp nhìn thấy.',
+    steps: [
+      'Bấm "Tải ảnh lên" để chọn ảnh PNG, JPEG hoặc WebP (tối đa 2 MB).',
+      'Sửa họ tên, chức danh, số điện thoại, email liên hệ và giới thiệu ngắn.',
+      'Bấm "Lưu thay đổi". "Hoàn tác" đưa các ô về như trước khi sửa.',
+    ],
+    tips: [
+      'Ảnh hiện ở thanh trên cùng, trong Nhắn tin và Bảng tin.',
+      'Vai trò và phòng ban do quản trị viên thay đổi trong Thiết lập.',
+    ],
+  },
   '/settings': {
     purpose: 'Cơ cấu tổ chức, vai trò và quyền, nhật ký và giao diện.',
     steps: [

@@ -20,6 +20,7 @@ import {
 import type { Post, PostComment } from '@dx/web-shared/types.ts'
 import { formatDate } from '@dx/web-shared/api.ts'
 import { useSession } from '../stores/session'
+import AvatarPhoto from '../components/AvatarPhoto.vue'
 import { useDismiss } from '../ui/popover'
 import { avatarHue, initials, isLong, linkify, REACTIONS, relativeTime } from './text'
 import MediaViewer from './MediaViewer.vue'
@@ -94,7 +95,7 @@ const me = computed(() => session.user?.display_name ?? '')
     <header class="feed-post-head">
       <span class="feed-avatar" :style="{ '--hue': avatarHue(post.author_name) }" aria-hidden="true">{{
         initials(post.author_name)
-      }}</span>
+      }}<AvatarPhoto :user-id="post.author_id" /></span>
       <div class="grow">
         <strong>{{ post.author_name }}</strong>
         <small>
@@ -208,7 +209,7 @@ const me = computed(() => session.user?.display_name ?? '')
       <div v-for="item in comments" :key="item.id" class="feed-comment">
         <span class="feed-avatar small" :style="{ '--hue': avatarHue(item.author_name) }" aria-hidden="true">{{
           initials(item.author_name)
-        }}</span>
+        }}<AvatarPhoto :user-id="item.author_id" /></span>
         <div class="feed-bubble">
           <strong>{{ item.author_name }}</strong>
           <p>
@@ -224,7 +225,7 @@ const me = computed(() => session.user?.display_name ?? '')
         </small>
       </div>
       <form class="feed-comment-form" @submit.prevent="sendComment">
-        <span class="feed-avatar small" :style="{ '--hue': avatarHue(me) }" aria-hidden="true">{{ initials(me) }}</span>
+        <span class="feed-avatar small" :style="{ '--hue': avatarHue(me) }" aria-hidden="true">{{ initials(me) }}<AvatarPhoto :url="session.user?.avatar_url" /></span>
         <input ref="commentInput" v-model="draft" placeholder="Viết bình luận…" aria-label="Viết bình luận" maxlength="3000" />
         <button class="icon-button" type="submit" aria-label="Gửi bình luận" :disabled="busy || !draft.trim()">
           <SendHorizontal :size="17" />

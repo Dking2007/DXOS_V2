@@ -11,6 +11,7 @@ const SUBJECTS: Record<string, { label: string; route?: string }> = {
   file: { label: 'Tài liệu' },
   folder: { label: 'Thư mục' },
   user: { label: 'Thành viên' },
+  profile: { label: 'Hồ sơ cá nhân' },
   department: { label: 'Phòng ban' },
   role: { label: 'Vai trò' },
   post: { label: 'Bảng tin' },
@@ -24,6 +25,8 @@ const SUBJECTS: Record<string, { label: string; route?: string }> = {
 
 const VERBS: Record<string, string> = {
   created: 'tạo mới',
+  avatar_changed: 'đổi ảnh đại diện',
+  avatar_removed: 'gỡ ảnh đại diện',
   updated: 'cập nhật',
   deleted: 'xóa',
   submitted: 'trình duyệt',

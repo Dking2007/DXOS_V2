@@ -7,6 +7,11 @@
 ## [Unreleased]
 
 ### Added
+- **Hồ sơ cá nhân** (`/profile`, migration `workspace_0021`): mỗi người tự sửa họ tên, chức danh, số điện thoại,
+  email liên hệ, giới thiệu ngắn (`PATCH /me/profile`) và ảnh đại diện PNG/JPEG/WebP tối đa 2 MB
+  (`PUT`/`DELETE /me/avatar`, lưu ở Core, xem qua `GET /users/{id}/avatar`). Vai trò và phòng ban vẫn do quản
+  trị viên đổi. Ảnh hiện ở thanh trên cùng, Bảng tin và Nhắn tin (hội thoại riêng có thêm `peer_id`); người chưa
+  có ảnh vẫn hiện chữ cái đầu. Nhật ký ghi lại việc sửa hồ sơ và đổi/gỡ ảnh. 3 test backend.
 - **Hỏi đáp AI về hồ sơ** (tính năng `case_qa`, `POST /ai/cases/{id}/ask`): nút “Hỏi AI về hồ sơ” mở ngăn kéo hỏi
   đáp ngay trên trang hồ sơ. AI đọc nội dung biểu mẫu, quy trình đã đi qua (bước, người quyết định, lý do, người
   đang chờ, hạn), công việc gắn hồ sơ trong quyền người hỏi và tài liệu kèm; trả lời kèm nguồn đã đối chiếu với hồ

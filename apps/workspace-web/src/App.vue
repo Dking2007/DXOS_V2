@@ -20,6 +20,7 @@ import { badgeText, visibleGroups } from './ui/nav'
 import { useOverview } from './ui/overview'
 import { cycleTheme, isDark, theme } from './ui/theme'
 import { roleLabel } from './ui/labels'
+import AvatarPhoto from './components/AvatarPhoto.vue'
 import AppToaster from './components/shell/AppToaster.vue'
 import CommandPalette from './components/shell/CommandPalette.vue'
 import CreateMenu from './components/shell/CreateMenu.vue'
@@ -183,13 +184,13 @@ function toggleSidebarCollapsed() {
           </button>
           <NotificationPanel data-tour="notifications" />
           <span class="topbar-separator" />
-          <div class="user-profile">
-            <span class="avatar" aria-hidden="true">{{ initials }}</span>
+          <RouterLink to="/profile" class="user-profile" title="Hồ sơ cá nhân" aria-label="Hồ sơ cá nhân">
+            <span class="avatar" aria-hidden="true">{{ initials }}<AvatarPhoto :url="session.user?.avatar_url" /></span>
             <div>
               <strong>{{ session.user?.display_name }}</strong
-              ><small>{{ roleLabel(session.user?.role) }}</small>
+              ><small>{{ session.user?.job_title || roleLabel(session.user?.role) }}</small>
             </div>
-          </div>
+          </RouterLink>
           <button class="icon-button" aria-label="Đăng xuất" title="Đăng xuất" @click="logout">
             <LogOut :size="18" />
           </button>

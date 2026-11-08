@@ -46,6 +46,15 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(40), default="staff")
     department_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # What a person tells colleagues about themselves; they edit it on their profile page.
+    job_title: Mapped[str | None] = mapped_column(String(120))
+    phone: Mapped[str | None] = mapped_column(String(30))
+    contact_email: Mapped[str | None] = mapped_column(String(200))
+    about: Mapped[str | None] = mapped_column(String(500))
+    # The photo is a Core file; the version changes its address so browsers fetch the new one.
+    avatar_file_id: Mapped[str | None] = mapped_column(String(36))
+    avatar_mime: Mapped[str | None] = mapped_column(String(40))
+    avatar_version: Mapped[int] = mapped_column(default=0, server_default="0")
 
 
 class Role(Base):

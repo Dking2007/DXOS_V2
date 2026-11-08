@@ -4,6 +4,7 @@
 import { computed, nextTick, ref } from 'vue'
 import { AlertCircle, Building2, Globe2, ImagePlus, Megaphone, Play, ScanText, SendHorizontal, X } from 'lucide-vue-next'
 import { useSession } from '../stores/session'
+import AvatarPhoto from '../components/AvatarPhoto.vue'
 import { toast } from '../ui/toast'
 import { MAX_MEDIA, MEDIA_ACCEPT, useMediaUploads } from './media'
 import { avatarHue, initials } from './text'
@@ -112,7 +113,7 @@ defineExpose({ focus, reset, hasMedia })
     @drop.prevent="onDrop"
   >
     <div class="feed-composer-main">
-      <span class="feed-avatar" :style="{ '--hue': avatarHue(name) }" aria-hidden="true">{{ initials(name) }}</span>
+      <span class="feed-avatar" :style="{ '--hue': avatarHue(name) }" aria-hidden="true">{{ initials(name) }}<AvatarPhoto :url="session.user?.avatar_url" /></span>
       <textarea
         ref="textarea"
         v-model="body"

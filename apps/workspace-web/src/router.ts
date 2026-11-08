@@ -44,6 +44,11 @@ export const router = createRouter({
       meta: { title: 'Cần phê duyệt' },
     },
     {
+      path: '/profile',
+      component: () => import('./views/ProfileView.vue'),
+      meta: { title: 'Hồ sơ cá nhân' },
+    },
+    {
       path: '/settings',
       component: () => import('./views/SettingsView.vue'),
       meta: { title: 'Thiết lập' },

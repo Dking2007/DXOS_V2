@@ -444,3 +444,133 @@ time {
   border-bottom: 1px solid var(--border);
 }
 
+/* Profile photos sit over the initials circle and take its shape. */
+.avatar,
+.chat-avatar,
+.feed-avatar {
+  position: relative;
+  overflow: hidden;
+}
+.avatar-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  background: var(--surface);
+}
+.chat-avatar.hidden .avatar-photo {
+  display: none;
+}
+
+/* The person in the top bar opens their profile. */
+a.user-profile {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 10px;
+  padding: 4px 8px 4px 4px;
+  margin: -4px 0;
+}
+a.user-profile:hover {
+  background: var(--surface-2);
+}
+a.user-profile:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+/* Profile page */
+.profile-page {
+  display: grid;
+  gap: 16px;
+  max-width: 820px;
+}
+.profile-card {
+  padding: 24px;
+}
+.profile-photo {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.profile-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  font-size: 32px;
+}
+.profile-photo-actions {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.profile-photo-actions strong {
+  font-size: 18px;
+  color: var(--navy);
+}
+.profile-photo-actions small {
+  color: var(--muted);
+}
+.profile-photo-actions .row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.profile-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  color: var(--navy);
+}
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+}
+.profile-grid .full-width {
+  grid-column: 1 / -1;
+}
+.profile-grid textarea {
+  resize: vertical;
+}
+.profile-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+.profile-note {
+  margin: -8px 0 14px;
+  color: var(--muted);
+}
+.profile-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 18px;
+  margin: 0;
+}
+.profile-facts dt {
+  font-size: 13px;
+  color: var(--muted);
+}
+.profile-facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+}
+@media (max-width: 640px) {
+  .profile-card {
+    padding: 18px;
+  }
+  .profile-photo {
+    flex-direction: column;
+    text-align: center;
+  }
+  .profile-photo-actions .row-actions {
+    justify-content: center;
+  }
+  .profile-grid,
+  .profile-facts {
+    grid-template-columns: 1fr;
+  }
+}
