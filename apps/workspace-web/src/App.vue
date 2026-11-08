@@ -26,6 +26,7 @@ import CreateMenu from './components/shell/CreateMenu.vue'
 import MobileNav from './components/shell/MobileNav.vue'
 import NotificationPanel from './components/shell/NotificationPanel.vue'
 import OnboardingTour from './components/shell/OnboardingTour.vue'
+import PageHelp from './components/shell/PageHelp.vue'
 import AssistantWidget from './assistant/AssistantWidget.vue'
 import AiBusy from './ai/AiBusy.vue'
 const route = useRoute()
@@ -154,7 +155,7 @@ function toggleSidebarCollapsed() {
           >
             <Menu :size="21" /></button
           ><span class="topbar-crumb">Không gian nội bộ</span><span class="topbar-divider" aria-hidden="true">/</span
-          ><strong>{{ route.meta.title }}</strong>
+          ><strong>{{ route.meta.title }}</strong><PageHelp />
         </div>
         <button
           class="topbar-search"

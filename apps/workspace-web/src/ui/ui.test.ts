@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { badgeText, visibleGroups } from './nav'
 import { PERMISSION_GROUPS, PERMISSIONS, permissionLabel, roleLabel } from './labels'
 import { stepsFor } from './tour'
+import { HELP } from './help'
+import routerSource from '../router.ts?raw'
 // The backend's role templates are the source of truth for which permission codes exist.
 import policies from '../../../../services/workspace-api/src/dx_workspace/policies.py?raw'
 
@@ -70,5 +72,20 @@ describe('toasts', () => {
     vi.advanceTimersByTime(4000)
     expect(toasts).toHaveLength(0)
     vi.useRealTimers()
+  })
+})
+
+describe('page help', () => {
+  it('explains every screen people can open', () => {
+    // Every route with a screen of its own, read from the router source (the router needs a browser).
+    const screens = [...routerSource.matchAll(/path: '([^']+)',\s*component:/g)]
+      .map((match) => match[1]!)
+      .filter((path) => path !== '/login' && !path.includes('pathMatch'))
+    expect(screens.length).toBeGreaterThan(10)
+    expect(screens.filter((path) => !HELP[path])).toEqual([])
+    for (const topic of Object.values(HELP)) {
+      expect(topic.purpose.length).toBeGreaterThan(20)
+      expect(topic.steps.length).toBeGreaterThan(0)
+    }
   })
 })
