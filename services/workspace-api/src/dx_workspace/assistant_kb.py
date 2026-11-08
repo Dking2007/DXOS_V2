@@ -116,6 +116,20 @@ FIELD_TYPES = {
 }
 
 
+def process_steps(graph: dict) -> list[dict]:
+    """The decision steps of a flow in drawing order, in the shape the article describes."""
+    nodes = sorted(graph.get("nodes", []), key=lambda node: node.get("position", {}).get("x", 0))
+    return [
+        {
+            "label": node.get("label") or "Duyệt hồ sơ",
+            "resolver": (node.get("data") or {}).get("resolver", "department_manager"),
+            "user_id": (node.get("data") or {}).get("user_id"),
+        }
+        for node in nodes
+        if node.get("type") == "approval"
+    ]
+
+
 def package_article(package_name: str, description: str, form, steps: list, files: int, names: dict) -> str:
     """Describe a published business package as plain text the assistant can explain."""
     labels = {f.get("key"): f.get("label") or f.get("key") for f in form.fields or []}

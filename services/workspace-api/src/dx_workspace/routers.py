@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-from types import SimpleNamespace
 from typing import Literal
 
 from dx_platform.auth import Actor
@@ -13,9 +12,10 @@ from fastapi import Form as MultipartForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import ai_core, ai_index, processes
+from . import ai_core, ai_index, process_versions, processes
 from . import models as m
 from . import schemas as s
+from .automations import owner_of, subject_of
 from .core_client import CoreClient
 from .policies import (
     ALLOWED_PERMISSIONS,
@@ -146,14 +146,30 @@ def build_router(app):
 
     def task_data(db, value):
         data = serial(value)
-        case = db.get(m.Case, value.case_id)
+        case = db.get(m.Case, value.case_id) if value.case_id else None
         user = db.get(m.User, value.assignee_id)
+        run = processes.run_of(db, value)
+        facts = (run.data or {}) if run else {}
         data.update(
-            case_title=case.title, case_number=case.number, assignee_name=user.display_name if user else ""
+            case_title=case.title if case else str(facts.get("title") or value.label),
+            case_number=case.number if case else None,
+            assignee_name=user.display_name if user else "",
+            # What a request from a flow on a task or post is about, for screens without a dossier.
+            subject=subject_of(facts) if not case else None,
         )
         decider = db.get(m.User, value.decided_by_id) if value.decided_by_id else None
         data["decided_by_name"] = decider.display_name if decider else ""
-        data["instructions"] = processes.instructions_for(db, value)
+        config = processes.node_config(db, value)
+        data["instructions"] = str(config.get("instructions") or "")
+        # What the screen needs to offer on this step, as the pinned process configured it.
+        data["step"] = {
+            "fields": config.get("fields") or [],
+            "allow_files": bool(config.get("allow_files")),
+            "editable_fields": config.get("editable_fields") or [],
+            "allow_forward": bool(config.get("allow_forward")),
+            "result_fields": config.get("result_fields") or [],
+            "require_files": config.get("require_files") or 0,
+        }
         return data
 
     @router.get("/me", tags=["identity"])
@@ -851,33 +867,7 @@ def build_router(app):
         form = db.get(m.Form, body.form_id)
         if not form or form.state != "published":
             raise AppError(422, "form_invalid", "Biểu mẫu chưa được phát hành.")
-        active_for_form = db.scalar(
-            select(m.PackageVersion.id)
-            .join(m.BusinessPackage, m.BusinessPackage.active_version_id == m.PackageVersion.id)
-            .where(m.PackageVersion.form_id == form.id)
-            .limit(1)
-        )
-        if active_for_form and not body.package_version_id:
-            raise AppError(
-                422, "package_version_required", "Cần chọn gói quy trình đã phát hành cho biểu mẫu."
-            )
-        package_version = (
-            db.get(m.PackageVersion, body.package_version_id) if body.package_version_id else None
-        )
-        if body.package_version_id:
-            package = db.get(m.BusinessPackage, package_version.package_id) if package_version else None
-            if (
-                not package_version
-                or package_version.state != "published"
-                or not package
-                or package.active_version_id != package_version.id
-                or package_version.form_id != form.id
-            ):
-                raise AppError(
-                    422, "package_version_invalid", "Phiên bản gói không còn được phát hành cho biểu mẫu này."
-                )
-            if package.allowed_roles and user.role not in package.allowed_roles:
-                raise AppError(403, "package_use_denied", "Vai trò của bạn chưa được dùng gói nghiệp vụ này.")
+        process_version = process_versions.choose_version(db, user, form.id, body.process_id)
         payload = s.validate_payload(form, body.payload)
         for file_id in body.file_ids:
             get_file(db, user, file_id)
@@ -896,7 +886,7 @@ def build_router(app):
             title=body.title,
             number=next_number(db),
             form_id=form.id,
-            package_version_id=package_version.id if package_version else None,
+            process_version_id=process_version.id if process_version else None,
             owner_id=user.id,
             department_id=user.department_id,
             payload_record_id=record["id"],
@@ -920,6 +910,7 @@ def build_router(app):
         result = case_data(db, value)
         form = db.get(m.Form, value.form_id)
         record = app.state.core_service.get(f"/records/{value.payload_record_id}")
+        allowed_fields, hide_files = processes.step_limits(db, user, value)
         result.update(
             files=[
                 {
@@ -956,6 +947,21 @@ def build_router(app):
                 )
             ],
         )
+        # Someone here only because a step asked them sees what that step shows.
+        if hide_files:
+            result["files"] = []
+        if allowed_fields is not None or hide_files:
+            result["history"] = []
+        for submission in result["submissions"]:
+            if hide_files:
+                submission["files_snapshot"] = []
+            if allowed_fields is not None:
+                submission["payload_snapshot"] = {
+                    key: item for key, item in (submission["payload_snapshot"] or {}).items() if key in allowed_fields
+                }
+        if allowed_fields is not None:
+            result["payload"] = {key: item for key, item in result["payload"].items() if key in allowed_fields}
+            result["form"]["fields"] = [f for f in result["form"]["fields"] if f["key"] in allowed_fields]
         return result
 
     @router.post("/cases/{case_id}/files/{file_id}/download", tags=["cases"])
@@ -968,6 +974,8 @@ def build_router(app):
     ):
         user = context(db, actor)
         value = get_case(db, user, case_id)
+        if processes.step_limits(db, user, value)[1]:
+            raise AppError(403, "files_hidden_at_step", "Bước của bạn không được xem tài liệu của hồ sơ.")
         submission = (
             db.scalar(
                 select(m.Submission)
@@ -1045,10 +1053,7 @@ def build_router(app):
         value = get_case(db, user, case_id)
         form = db.get(m.Form, value.form_id)
         payload = app.state.core_service.get(f"/records/{value.payload_record_id}")["payload"]
-        package_version = (
-            db.get(m.PackageVersion, value.package_version_id) if value.package_version_id else None
-        )
-        process = processes.rule_for_form(db, value.form_id)
+        process = process_versions.pinned_or_live(db, value)
         if process:
             people = processes.expected_approvers(db, value, process.graph, payload)
             return page(
@@ -1063,10 +1068,7 @@ def build_router(app):
                 ],
                 transform=lambda v: v,
             )
-        configured_form = (
-            SimpleNamespace(approval_steps=package_version.approval_steps) if package_version else form
-        )
-        steps = resolve_steps(db, value, configured_form, payload)
+        steps = resolve_steps(db, value, form, payload)
         return page(
             [
                 {
@@ -1111,21 +1113,18 @@ def build_router(app):
                 "Payload đã thay đổi ngoài hồ sơ. Tải lại và xác nhận dữ liệu trước khi trình.",
             )
         s.validate_payload(form, record["payload"])
-        package_version = (
-            db.get(m.PackageVersion, value.package_version_id) if value.package_version_id else None
-        )
-        if package_version and len(value.file_ids) < package_version.required_file_count:
-            raise AppError(422, "required_documents_missing", "Hồ sơ chưa đủ số tài liệu bắt buộc của gói.")
-        # A form with a switched-on canvas process follows it; otherwise its linear steps.
-        process = processes.rule_for_form(db, value.form_id)
+        # A draft opened before its form had a process follows the one in force now.
+        process = process_versions.pinned_or_live(db, value)
+        if process and not value.process_version_id:
+            value.process_version_id = process.id
+        if process and len(value.file_ids) < process.required_file_count:
+            raise AppError(422, "required_documents_missing", f"Quy trình này cần ít nhất {process.required_file_count} tài liệu, hồ sơ mới có {len(value.file_ids)}.")
+        # A dossier with a published process follows it; otherwise its form's linear steps.
         if process:
             steps, routing_evidence = [], []
         else:
-            configured_form = (
-                SimpleNamespace(approval_steps=package_version.approval_steps) if package_version else form
-            )
-            steps = resolve_steps(db, value, configured_form, record["payload"])
-            routing_evidence = s.step_evidence(configured_form.approval_steps, record["payload"], steps)
+            steps = resolve_steps(db, value, form, record["payload"])
+            routing_evidence = s.step_evidence(form.approval_steps, record["payload"], steps)
         snapshots = []
         # The same logical-file lock orders editor open/save and submission pinning.
         for file_id in sorted(value.file_ids):
@@ -1372,11 +1371,44 @@ def build_router(app):
             raise AppError(404, "approval_not_found", "Không tìm thấy nhiệm vụ được giao.")
         if task.state != "pending" or not task.core_task_id:
             raise AppError(409, "approval_closed", "Nhiệm vụ đã xử lý hoặc chưa đồng bộ với Core.")
-        case = db.get(m.Case, task.case_id)
-        if case.owner_id == user.id:
+        case = db.get(m.Case, task.case_id) if task.case_id else None
+        run = processes.run_of(db, task)
+        owner_id = case.owner_id if case else (owner_of(run.data or {}) if run else None)
+        # A form-filling step may ask the owner for more; deciding on your own dossier never.
+        if owner_id == user.id and task.kind not in {"input", "acknowledge"}:
             raise AppError(403, "self_approval_denied", "Không được tự duyệt hồ sơ.")
         if task.options and body.decision not in task.options:
             raise AppError(422, "decision_not_offered", "Bước này không cho phép lựa chọn đó.")
+        if body.decision == "submit" and task.kind not in {"input", "acknowledge"}:
+            raise AppError(422, "decision_not_offered", "Bước này không cho phép lựa chọn đó.")
+        config = processes.node_config(db, task)
+        if task.assignee_id != user.id and not config.get("allow_delegation", True):
+            raise AppError(403, "delegation_not_allowed", "Bước này người được giao phải tự xử lý.")
+        form = db.get(m.Form, case.form_id) if case else None
+        answers, corrections = processes.step_values(db, task, body.values, body.decision)
+        if corrections and not case:
+            raise AppError(403, "field_not_editable", "Bước này không cho sửa trường đó.")
+        needed = (config.get("require_files") or 0) if body.decision in {"approve", "submit"} else 0
+        if len(body.file_ids) < needed:
+            raise AppError(422, "step_result_required", f"Bước này cần nộp ít nhất {needed} tệp kết quả.")
+        if body.file_ids and not processes.takes_files(config, task):
+            raise AppError(403, "files_not_allowed", "Bước này không nhận tệp đính kèm.")
+        files = []
+        for file_id in body.file_ids:
+            item = get_file(db, user, file_id)
+            files.append({"id": item.id, "name": item.name})
+        if files and case:
+            case.file_ids = list(dict.fromkeys([*case.file_ids, *body.file_ids]))
+        if corrections:
+            # A correction changes the dossier's data; what was submitted stays in the snapshot.
+            record = app.state.core_service.get(f"/records/{case.payload_record_id}")
+            payload = s.validate_payload(form, {**record["payload"], **corrections})
+            updated = app.state.core_service.patch(
+                f"/records/{case.payload_record_id}",
+                {"expected_revision": record["revision"], "payload": payload},
+                key=f"{task_id}:correction",
+            )
+            case.payload_revision = updated["revision"]
         cas(
             db,
             m.ApprovalTask,
@@ -1388,6 +1420,7 @@ def build_router(app):
                 "reason": body.reason,
                 "decided_at": m.utcnow(),
                 "decided_by_id": user.id,
+                "submitted_values": {**answers, **corrections, **({"_files": files} if files else {})} or None,
             },
         )
         enqueue(db, "approval.complete", task_id)
@@ -1396,18 +1429,42 @@ def build_router(app):
             db,
             user,
             "case.decision",
-            task.case_id,
+            task.case_id or task_id,
             {
                 "task_id": task_id,
                 "decision": body.decision,
                 "reason": body.reason,
                 "on_behalf_of": task.assignee_id if task.assignee_id != user.id else None,
+                **({"values": {**answers, **corrections}} if answers or corrections else {}),
             },
         )
         response = task_data(db, db.get(m.ApprovalTask, task_id))
         idem.response = response
         db.commit()
         return response
+
+    @router.post("/approval-tasks/{task_id}/forward", tags=["approvals"], status_code=202)
+    def forward_task(
+        task_id: str, body: s.ForwardInput, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)
+    ):
+        """Pass a request to someone else, where the step allows it."""
+        user = context(db, actor)
+        task = db.scalar(
+            select(m.ApprovalTask)
+            .where(m.ApprovalTask.id == task_id, m.ApprovalTask.assignee_id.in_(approval_assignees(db, user)))
+            .with_for_update()
+        )
+        if not task or not task.node_id:
+            raise AppError(404, "approval_not_found", "Không tìm thấy nhiệm vụ được giao.")
+        if task.state != "pending" or task.revision != body.expected_revision:
+            raise AppError(409, "approval_closed", "Nhiệm vụ đã xử lý hoặc vừa thay đổi.")
+        person = db.get(m.User, body.user_id)
+        if not person:
+            raise AppError(422, "assignee_invalid", "Người được chuyển không tồn tại.")
+        processes.forward(db, app.state.core_service, task, person, body.reason)
+        audit(db, user, "case.step_forwarded", task.case_id or task_id, {"task_id": task_id, "to": person.id, "reason": body.reason})
+        db.commit()
+        return {"forwarded_to": person.display_name}
 
     @router.get("/notifications", tags=["notifications"])
     def notifications(
@@ -1488,8 +1545,6 @@ def build_router(app):
             transform=transform,
         )
 
-    # The process screen creates a form and its package in one step.
-    app.state.create_form = create_form
     # Shared with the AI features, which save drafted documents the same way as uploads.
     app.state.save_upload = save_upload
     return router

@@ -47,13 +47,13 @@ def create_app(settings=None, engine=None):
     from .insights import build_router as insights_router
     from .messaging import build_router as messaging_router
     from .office import office_router
-    from .packages import build_router as package_router
+    from .process_versions import build_router as process_versions_router
     from .processes import build_router as processes_router
     from .routers import build_router
     from .tasks import build_router as tasks_router
 
     app.include_router(build_router(app))
-    app.include_router(package_router(app))
+    app.include_router(process_versions_router(app))
     app.include_router(insights_router(app))
     app.include_router(office_router(app))
     app.include_router(tasks_router(app))

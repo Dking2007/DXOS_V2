@@ -206,7 +206,8 @@ class FormCreate(Input):
 class CaseCreate(Input):
     title: str = Field(min_length=1, max_length=250)
     form_id: str
-    package_version_id: str | None = None
+    # Needed only when the form has several published processes this person may use.
+    process_id: str | None = None
     payload: dict[str, Any]
     file_ids: list[str] = Field(default_factory=list, max_length=30)
     priority: Literal["low", "normal", "high", "urgent"] = "normal"
@@ -243,13 +244,22 @@ class ArchiveInput(Revision):
     archived: bool
 
 
+class ForwardInput(Revision):
+    user_id: str
+    reason: str = Field(default="", max_length=500)
+
+
 class DecisionInput(Revision):
-    decision: Literal["approve", "reject", "return"]
+    # "submit" answers a form-filling step; the others decide on the dossier.
+    decision: Literal["approve", "reject", "return", "submit"]
     reason: str = Field(default="", max_length=3000)
+    # Filled in at a form-filling step, or fields of the form the step lets this person correct.
+    values: dict[str, Any] = Field(default_factory=dict)
+    file_ids: list[str] = Field(default_factory=list, max_length=30)
 
     @model_validator(mode="after")
     def reason_required(self):
-        if self.decision != "approve" and not self.reason.strip():
+        if self.decision not in {"approve", "submit"} and not self.reason.strip():
             raise ValueError("Cần ghi lý do khi từ chối hoặc trả lại.")
         return self
 

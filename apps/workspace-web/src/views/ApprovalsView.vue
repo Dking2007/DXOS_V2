@@ -1,6 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
+import StepAnswerDialog from '../components/StepAnswerDialog.vue'
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
@@ -86,11 +87,16 @@ const tasks = useQuery({
 function stepLate(task: { due_at?: string | null; state?: string; status?: string }) {
   return !!task.due_at && new Date(task.due_at).getTime() < Date.now() && (task.state || task.status) === 'pending'
 }
+const answering = ref<ApprovalTask | null>(null)
+async function answered() {
+  answering.value = null
+  await tasks.refetch()
+}
 </script>
 <template>
+  <StepAnswerDialog v-if="answering" :task="answering" mode="answer" @close="answering = null" @done="answered" />
   <header class="page-head">
     <div>
-      <span class="eyebrow">HỘP VIỆC CỦA BẠN</span>
       <h1>Cần phê duyệt</h1>
       <p>Xem nội dung, đối chiếu tài liệu và ra quyết định có căn cứ.</p>
     </div>
@@ -136,11 +142,13 @@ function stepLate(task: { due_at?: string | null; state?: string; status?: strin
               <div class="primary-cell">
                 <span class="file-icon"><ClipboardCheck :size="20" /></span>
                 <div>
-                  <RouterLink class="row-link" :to="`/cases/${task.case_id}`">{{
+                  <RouterLink v-if="task.case_id" class="row-link" :to="`/cases/${task.case_id}`">{{
                     task.case_title || 'Hồ sơ cần phê duyệt'
-                  }}</RouterLink
-                  ><small class="mono">{{
-                    task.case_code || 'Hồ sơ'
+                  }}</RouterLink>
+                  <RouterLink v-else-if="task.subject?.link" class="row-link" :to="task.subject.link">{{ task.case_title }}</RouterLink>
+                  <span v-else>{{ task.case_title }}</span>
+                  <small class="mono">{{
+                    task.case_id ? task.case_code || 'Hồ sơ' : task.subject?.type === 'post' ? 'Bài viết' : 'Công việc'
                   }}</small
                   ><small v-if="task.on_behalf_of" class="delegated-note"
                     ><UserRoundCheck :size="12" /> Duyệt thay {{ task.on_behalf_of }}</small
@@ -158,10 +166,12 @@ function stepLate(task: { due_at?: string | null; state?: string; status?: strin
             </td>
             <td>
               <RouterLink
+                v-if="task.case_id"
                 :to="`/cases/${task.case_id}`"
                 class="button secondary small"
                 >Xem hồ sơ <ArrowRight :size="15"
               /></RouterLink>
+              <button v-else class="button secondary small" @click="answering = task">Xử lý</button>
             </td>
           </tr>
         </tbody>
@@ -196,7 +206,7 @@ function stepLate(task: { due_at?: string | null; state?: string; status?: strin
     <p
       v-if="!delegations.data.value?.items.length"
       class="card-body muted"
-      style="font-size: 14px"
+      style="font-size: 15px"
     >
       Ủy quyền cho đồng nghiệp duyệt thay trong một khoảng thời gian. Người nhận chỉ xử lý
       hồ sơ được giao cho bạn, quyết định ghi rõ ai duyệt thay ai.

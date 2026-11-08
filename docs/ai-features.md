@@ -46,7 +46,7 @@ model trò chuyện với model tạo vector (theo tên model; Gemini theo khả
 | | 14. Hỗ trợ viết bài bảng tin | Khung soạn bài | Viết gọn, sửa chính tả, gợi ý tiêu đề, mô tả ảnh cho trình đọc màn hình (lưu ở `post_attachments.alt`). |
 | Mở rộng | 15. Bước "Hỏi AI" trong luồng | Trình thiết kế luồng | AI chọn một đáp án; node Điều kiện rẽ nhánh theo trường kết quả (mặc định `ai_label`). |
 | | 16. Trợ lý trả lời về dữ liệu của người hỏi | Trợ lý AI | Thêm vào lời dặn: hồ sơ, việc, việc chờ duyệt của chính người hỏi. Không bao giờ của người khác. |
-| | 17. Sinh kịch bản thử cho Gói nghiệp vụ | Gói nghiệp vụ › Chạy thử | Kết quả mong đợi lấy từ lần chạy thử thật của gói, người dùng kiểm tra lại trước khi lưu. |
+| | 17. Sinh kịch bản thử cho Quy trình nghiệp vụ | Quy trình nghiệp vụ › Phát hành › Kịch bản thử | Kết quả mong đợi lấy từ lần chạy thử thật của quy trình, người dùng kiểm tra lại trước khi lưu. |
 
 ## Đọc tài liệu
 

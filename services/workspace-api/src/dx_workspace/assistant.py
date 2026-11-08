@@ -27,7 +27,7 @@ from . import assistant_llm as llm
 from . import models as m
 from . import schemas as s
 from .ai import personal_context
-from .assistant_kb import CATEGORIES, chunk_article, fold, package_article, search
+from .assistant_kb import CATEGORIES, chunk_article, fold, package_article, process_steps, search
 from .policies import ROLE_TEMPLATES, current_user, permissions, require
 from .services import audit, check_revision, page
 
@@ -580,11 +580,13 @@ def build_router(app):
     def package_sources(db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
         manager(db, actor)
         result = []
-        for package in db.scalars(select(m.BusinessPackage).order_by(m.BusinessPackage.name)):
-            version = (
-                db.get(m.PackageVersion, package.active_version_id) if package.active_version_id else None
-            )
-            if not version or version.state != "published":
+        for package in db.scalars(
+            select(m.AutomationRule)
+            .where(m.AutomationRule.kind == "process", m.AutomationRule.active_version_id.is_not(None))
+            .order_by(m.AutomationRule.name)
+        ):
+            version = db.get(m.ProcessVersion, package.active_version_id)
+            if not version:
                 continue
             article = db.scalar(
                 select(m.AssistantArticle).where(
@@ -607,22 +609,23 @@ def build_router(app):
     @router.post("/assistant/articles/from-package")
     def import_package(body: PackageImport, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
         user = manager(db, actor)
-        package = db.get(m.BusinessPackage, body.package_id)
+        package = db.get(m.AutomationRule, body.package_id)
         version = (
-            db.get(m.PackageVersion, package.active_version_id)
+            db.get(m.ProcessVersion, package.active_version_id)
             if package and package.active_version_id
             else None
         )
-        if not package or not version or version.state != "published":
-            raise AppError(404, "package_not_published", "Gói nghiệp vụ chưa có phiên bản đang áp dụng.")
+        if not version:
+            raise AppError(404, "package_not_published", "Quy trình chưa có phiên bản đang áp dụng.")
         form = db.get(m.Form, version.form_id)
-        user_ids = [step.get("user_id") for step in version.approval_steps if step.get("user_id")]
+        steps = process_steps(version.graph)
+        user_ids = [step.get("user_id") for step in steps if step.get("user_id")]
         names = {u.id: u.display_name for u in db.scalars(select(m.User).where(m.User.id.in_(user_ids)))}
         text = package_article(
             package.name,
             package.description,
             form,
-            version.approval_steps,
+            steps,
             version.required_file_count,
             names,
         )

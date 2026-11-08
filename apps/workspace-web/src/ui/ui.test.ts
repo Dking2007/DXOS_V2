@@ -12,10 +12,11 @@ describe('navigation', () => {
     const staff = visibleGroups(() => false).flatMap((group) => group.links.map((link) => link.to))
     expect(staff).toContain('/tasks')
     expect(staff).toContain('/settings')
-    expect(staff).not.toContain('/automations')
-    expect(staff).not.toContain('/packages')
+    expect(staff).not.toContain('/processes')
     const admin = visibleGroups(() => true).flatMap((group) => group.links.map((link) => link.to))
-    expect(admin).toContain('/automations')
+    expect(admin).toContain('/processes')
+    expect(admin).not.toContain('/automations')
+    expect(admin).not.toContain('/packages')
   })
 
   it('counts badges from the overview and caps the text', () => {

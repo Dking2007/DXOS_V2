@@ -401,15 +401,26 @@ def test_every_other_feature_answers_through_its_own_checks(world):  # noqa: F81
     assert digest["text"] and as_(world, "manager").get(API + "/ai/digest").json()["digest"] == digest
     assert as_(world, "director").post(API + "/ai/reports/narrative", json={"days": 30}).json()["text"]
     assert as_(world, "staff").post(API + "/ai/write", json={"action": "title", "text": "Mai họp giao ban lúc 8h"}).json() == {"titles": ["Họp giao ban"]}
-    package = as_(world, "manager").post(
-        API + "/business-packages", json={"name": "Mua sắm", "form_id": form["id"]}, headers={"Idempotency-Key": "pkg-ai"}
+    process = as_(world, "director").post(
+        API + "/automations",
+        json={
+            "name": "Mua sắm",
+            "kind": "process",
+            "graph": {
+                "nodes": [
+                    {"id": "start", "type": "trigger", "position": {"x": 0, "y": 0},
+                     "data": {"event": "case.submitted", "form_id": form["id"]}},
+                    {"id": "a", "type": "approval", "position": {"x": 300, "y": 0},
+                     "data": {"resolver": "user", "user_id": world[7]["manager"]}},
+                ],
+                "edges": [{"id": "e", "source": "start", "target": "a"}],
+            },
+        },
     ).json()
-    fixtures = as_(world, "manager").post(f"{API}/ai/package-versions/{package['version']['id']}/scenarios").json()["fixtures"]
-    assert fixtures[0]["name"] == "Đủ hồ sơ" and fixtures[0]["decisions"] == {
-        "review_0": {"decision": "approve"}, "review_1": {"decision": "approve"}
-    }  # fmt: skip
-    # The expectation is what the package really does: the manager would be approving their own case.
-    assert fixtures[0]["expected_error_code"] == "self_approval_denied" and fixtures[0]["expected_path"] == []
+    fixtures = as_(world, "director").post(f"{API}/ai/processes/{process['id']}/scenarios").json()["fixtures"]
+    # The expectation is what the process really does, worked out by walking it.
+    assert fixtures[0]["name"] == "Đủ hồ sơ" and fixtures[0]["decisions"] == {}
+    assert fixtures[0]["expected_outcome"] == "approved" and fixtures[0]["expected_path"] == ["start", "a"]
     remaining = as_(world, "staff").get(API + "/ai/features").json()["remaining"]
     assert remaining is not None and remaining < 50
 

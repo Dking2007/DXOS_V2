@@ -33,7 +33,7 @@ const queryClient = useQueryClient()
 type SettingsTab = 'organization' | 'permissions' | 'audit' | 'appearance'
 const requestedTab = String(useRoute().query.tab ?? '')
 // Forms and their approval steps are designed on the process screen now.
-if (requestedTab === 'forms') void useRouter().replace('/packages')
+if (requestedTab === 'forms') void useRouter().replace('/processes')
 const tab = ref<SettingsTab>(
   (['organization', 'permissions', 'audit', 'appearance'] as const).find(
     (key) => key === requestedTab && (key !== 'audit' || session.can('audit.read')),
@@ -159,8 +159,7 @@ const roleLabels: Record<string, string> = {
 <template>
   <header class="page-head">
     <div>
-      <span class="eyebrow">CẤU HÌNH NGHIỆP VỤ</span>
-      <h1>Thiết lập không gian</h1>
+      <h1>Thiết lập</h1>
       <p>Cơ cấu tổ chức, vai trò và quyền, nhật ký. Biểu mẫu và bước duyệt thiết kế ở màn Quy trình.</p>
     </div>
   </header>
@@ -325,7 +324,7 @@ const roleLabels: Record<string, string> = {
       <header class="card-header">
         <div>
           <h2>Quyền của bạn</h2>
-          <p class="muted" style="font-size: 13px; margin-top: 5px">
+          <p class="muted" style="font-size: 14px; margin-top: 5px">
             Máy chủ vẫn kiểm tra quyền ở từng tài nguyên và thao tác.
           </p>
         </div>

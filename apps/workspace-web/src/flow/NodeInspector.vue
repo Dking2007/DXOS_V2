@@ -3,12 +3,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Copy, Plus, Trash2 } from 'lucide-vue-next'
-import { KINDS, OPERATORS, RECIPIENTS, RESOLVERS, waitLabel } from './nodes'
-import type { FlowCondition, FlowNodeData, TriggerInfo } from './nodes'
+import { KINDS, OPERATORS, RECIPIENTS, nodeReference, waitLabel } from './nodes'
+import StepOptions from './StepOptions.vue'
+import NodeSettings from './NodeSettings.vue'
+import FieldListEditor, { type StepField } from './FieldListEditor.vue'
+import type { FlowCondition, FlowNodeData, NodeKind, TriggerInfo } from './nodes'
 const props = defineProps<{
-  /** Drawing a dossier's process: the trigger picks a form instead of an event. */
+  id: string
   process?: boolean
-  forms?: { id: string; name: string }[]
+  forms?: { id: string; name: string; fields?: Record<string, string> }[]
+  /** Published processes this one can call as a step. */
+  subprocesses?: { id: string; name: string }[]
   data: FlowNodeData
   triggers: TriggerInfo[]
   /** Event fields available to conditions and text, from the flow's trigger. */
@@ -49,13 +54,26 @@ function toggleRecipient(key: string) {
   const list = (c.value.recipients as string[]) ?? []
   set('recipients', list.includes(key) ? list.filter((r) => r !== key) : [...list, key])
 }
-function toggleUser(key: string, id: string) {
-  const list = (c.value[key] as string[]) ?? []
-  set(key, list.includes(id) ? list.filter((item) => item !== id) : [...list, id].slice(0, 10))
-}
-function setDays(event: Event) {
-  const value = (event.target as HTMLInputElement).value
-  set('due_in_days', value === '' ? null : Math.min(365, Math.max(0, Number(value))))
+const inputFields = computed(() => (c.value.fields as StepField[]) ?? [])
+const reference = computed(() => nodeReference(props.id, c.value))
+const SETTINGS_KINDS: NodeKind[] = [
+  'switch',
+  'parallel',
+  'join',
+  'wait_until',
+  'set_value',
+  'update_record',
+  'create_document',
+  'file_share',
+  'create_case',
+  'send_message',
+  'send_email',
+  'http_request',
+  'ai_extract',
+]
+/** A form belongs to dossiers being submitted, so another event drops it. */
+function setEvent(event: string) {
+  emit('patch', { event, ...(event === 'case.submitted' ? {} : { form_id: null }) })
 }
 function insert(key: string, field: string) {
   const current = String(c.value[key] ?? '')
@@ -114,47 +132,33 @@ const waitUnit = computed(() => {
         />
       </div>
 
-      <template v-if="data.kind === 'trigger' && process">
+      <template v-if="data.kind === 'trigger'">
         <div class="field">
-          <label for="node-form">Áp dụng cho biểu mẫu</label
+          <label for="node-event">Chạy khi</label>
+          <select id="node-event" :value="c.event" @change="setEvent(($event.target as HTMLSelectElement).value)">
+            <option v-for="t in triggers" :key="t.key" :value="t.key">{{ t.label }}</option>
+          </select>
+        </div>
+        <div v-if="c.event === 'case.submitted'" class="field">
+          <label for="node-form">Là đường đi của biểu mẫu</label
           ><select
             id="node-form"
             :value="c.form_id ?? ''"
             @change="set('form_id', ($event.target as HTMLSelectElement).value || null)"
           >
-            <option value="">Chọn biểu mẫu…</option>
+            <option value="">Không: chỉ phản ứng khi hồ sơ được trình</option>
             <option v-for="f in forms ?? []" :key="f.id" :value="f.id">{{ f.name }}</option>
           </select>
-          <small>Quy trình chạy mỗi khi một hồ sơ của biểu mẫu này được trình (kể cả trình lại).</small>
+          <small>Chọn biểu mẫu thì hồ sơ của biểu mẫu đó đi theo luồng này thay cho bước duyệt khai trong biểu mẫu, và kết quả luồng là kết quả của hồ sơ.</small>
         </div>
         <div class="field-help">
-          <span class="section-label">Dữ liệu hồ sơ dùng được trong điều kiện và nội dung</span>
+          <span class="section-label">Dữ liệu dùng được trong điều kiện và nội dung</span>
           <code v-for="(label, key) in fields" :key="key" class="var-chip" :title="label">{{ key }}</code>
         </div>
       </template>
 
       <template v-else-if="data.kind === 'approval'">
-        <div class="field">
-          <label for="node-resolver">Người duyệt</label
-          ><select
-            id="node-resolver"
-            :value="c.resolver ?? 'department_manager'"
-            @change="set('resolver', ($event.target as HTMLSelectElement).value)"
-          >
-            <option v-for="(label, key) in RESOLVERS" :key="key" :value="key">{{ label }}</option>
-          </select>
-        </div>
-        <div v-if="c.resolver === 'user'" class="field">
-          <label for="node-approver">Chọn người</label
-          ><select
-            id="node-approver"
-            :value="c.user_id ?? ''"
-            @change="set('user_id', ($event.target as HTMLSelectElement).value || null)"
-          >
-            <option value="">Chọn người duyệt…</option>
-            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.display_name }}</option>
-          </select>
-        </div>
+        <StepOptions kind="approval" :node-id="id" :config="c" :users="users" :departments="departments" :fields="fields" @patch="emit('patch', $event)" />
         <div class="field">
           <label>Lựa chọn của người duyệt</label>
           <label class="checkbox-label"><input type="checkbox" checked disabled /> Duyệt</label>
@@ -177,10 +181,6 @@ const waitUnit = computed(() => {
           <small>Cổng nào không nối tiếp thì hồ sơ kết thúc theo đúng tên cổng (duyệt, cần bổ sung, bị từ chối).</small>
         </div>
         <div class="field">
-          <label for="node-due-a">Hạn xử lý (ngày)</label
-          ><input id="node-due-a" type="number" min="0" max="365" :value="c.due_in_days ?? ''" @change="setDays" />
-        </div>
-        <div class="field">
           <label for="node-instr">Hướng dẫn cho người duyệt</label
           ><textarea
             id="node-instr"
@@ -194,53 +194,7 @@ const waitUnit = computed(() => {
       </template>
 
       <template v-else-if="data.kind === 'consult'">
-        <div class="field">
-          <label>Người cho ý kiến</label>
-          <label class="checkbox-label"
-            ><input
-              type="checkbox"
-              :checked="!!c.include_department_manager"
-              @change="set('include_department_manager', ($event.target as HTMLInputElement).checked)"
-            />
-            Lãnh đạo đơn vị của hồ sơ</label
-          >
-          <select
-            aria-label="Thêm người cho ý kiến"
-            value=""
-            @change="
-              (event) => {
-                const value = (event.target as HTMLSelectElement).value
-                if (value) toggleUser('user_ids', value)
-                ;(event.target as HTMLSelectElement).value = ''
-              }
-            "
-          >
-            <option value="">+ Thêm người…</option>
-            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.display_name }}</option>
-          </select>
-          <div class="chip-select">
-            <button
-              v-for="id in (c.user_ids as string[]) ?? []"
-              :key="id"
-              type="button"
-              class="active"
-              @click="toggleUser('user_ids', id)"
-            >
-              {{ users.find((u) => u.id === id)?.display_name ?? id.slice(0, 8) }} ✕
-            </button>
-          </div>
-        </div>
-        <div class="field">
-          <label for="node-cmode">Đi cổng Đồng ý khi</label
-          ><select id="node-cmode" :value="c.mode ?? 'all'" @change="set('mode', ($event.target as HTMLSelectElement).value)">
-            <option value="all">Tất cả đã trả lời và đều đồng ý</option>
-            <option value="any">Có một người đồng ý (không chờ người còn lại)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="node-due-c">Hạn cho ý kiến (ngày)</label
-          ><input id="node-due-c" type="number" min="0" max="365" :value="c.due_in_days ?? ''" @change="setDays" />
-        </div>
+        <StepOptions kind="consult" :node-id="id" :config="c" :users="users" :departments="departments" :fields="fields" @patch="emit('patch', $event)" />
         <div class="field">
           <label for="node-cinstr">Nội dung xin ý kiến</label
           ><textarea
@@ -250,6 +204,58 @@ const waitUnit = computed(() => {
             :value="String(c.instructions ?? '')"
             @change="set('instructions', ($event.target as HTMLTextAreaElement).value)"
           />
+        </div>
+      </template>
+
+      <template v-else-if="data.kind === 'input'">
+        <StepOptions kind="input" :node-id="id" :config="c" :users="users" :departments="departments" :fields="fields" @patch="emit('patch', $event)" />
+        <div class="field">
+          <label>Trường cần nhập</label>
+          <FieldListEditor :fields="inputFields" :reference="reference" @update="set('fields', $event)" />
+          <small>Giá trị cũng dùng được trong điều kiện qua <code>form.&lt;mã&gt;</code>.</small>
+        </div>
+        <label class="checkbox-label"><input type="checkbox" :checked="!!c.allow_files" @change="set('allow_files', ($event.target as HTMLInputElement).checked)" /> Cho phép đính kèm tệp</label>
+        <div class="field">
+          <label for="node-iinstr">Hướng dẫn</label
+          ><textarea id="node-iinstr" rows="3" maxlength="1000" :value="String(c.instructions ?? '')" @change="set('instructions', ($event.target as HTMLTextAreaElement).value)" />
+        </div>
+      </template>
+
+      <template v-else-if="data.kind === 'acknowledge'">
+        <StepOptions kind="acknowledge" :node-id="id" :config="c" :users="users" :departments="departments" :fields="fields" @patch="emit('patch', $event)" />
+        <div class="field">
+          <label for="node-amode">Đi tiếp khi</label>
+          <select id="node-amode" :value="c.mode ?? 'all'" @change="set('mode', ($event.target as HTMLSelectElement).value)">
+            <option value="all">Tất cả đã xác nhận</option>
+            <option value="any">Có một người xác nhận</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="node-ainstr">Nội dung cần đọc</label
+          ><textarea id="node-ainstr" rows="3" maxlength="1000" :value="String(c.instructions ?? '')" @change="set('instructions', ($event.target as HTMLTextAreaElement).value)" />
+        </div>
+      </template>
+
+      <NodeSettings
+        v-else-if="SETTINGS_KINDS.includes(data.kind)"
+        :id="id"
+        :kind="data.kind"
+        :config="c"
+        :fields="fields"
+        :users="users"
+        :connections="connections"
+        :forms="forms ?? []"
+        @patch="emit('patch', $event)"
+      />
+
+      <template v-else-if="data.kind === 'subprocess'">
+        <div class="field">
+          <label for="node-sub">Quy trình chạy tại bước này</label>
+          <select id="node-sub" :value="c.process_id ?? ''" @change="set('process_id', ($event.target as HTMLSelectElement).value || null)">
+            <option value="">Chọn quy trình đã phát hành…</option>
+            <option v-for="item in subprocesses ?? []" :key="item.id" :value="item.id">{{ item.name }}</option>
+          </select>
+          <small>Kết quả của quy trình con chọn cổng đi tiếp; cổng không nối thì hồ sơ kết thúc theo kết quả đó. Quy trình này giữ phiên bản con lúc phát hành: con đổi thì phải phát hành lại.</small>
         </div>
       </template>
 
@@ -285,19 +291,6 @@ const waitUnit = computed(() => {
           />
         </div>
         <p class="field-help muted">Khi tới node này, các bước khác còn đang chờ được đóng lại.</p>
-      </template>
-
-      <template v-else-if="data.kind === 'trigger'">
-        <div class="field">
-          <label for="node-event">Sự kiện</label
-          ><select id="node-event" :value="c.event" @change="set('event', ($event.target as HTMLSelectElement).value)">
-            <option v-for="t in triggers" :key="t.key" :value="t.key">{{ t.label }}</option>
-          </select>
-        </div>
-        <div class="field-help">
-          <span class="section-label">Dữ liệu sự kiện mang theo</span>
-          <code v-for="(label, key) in fields" :key="key" class="var-chip" :title="label">{{ key }}</code>
-        </div>
       </template>
 
       <template v-else-if="data.kind === 'if'">
@@ -458,13 +451,13 @@ const waitUnit = computed(() => {
           </select>
           <div class="chip-select">
             <button
-              v-for="id in ((c.recipients as string[]) ?? []).filter((r) => !(r in RECIPIENTS))"
-              :key="id"
+              v-for="person in ((c.recipients as string[]) ?? []).filter((r) => !(r in RECIPIENTS))"
+              :key="person"
               type="button"
               class="active"
-              @click="toggleRecipient(id)"
+              @click="toggleRecipient(person)"
             >
-              {{ users.find((u) => u.id === id)?.display_name ?? id.slice(0, 8) }} ✕
+              {{ users.find((u) => u.id === person)?.display_name ?? person.slice(0, 8) }} ✕
             </button>
           </div>
         </div>
@@ -480,6 +473,13 @@ const waitUnit = computed(() => {
       </template>
 
       <template v-else-if="data.kind === 'create_task' || data.kind === 'assign_task'">
+        <template v-if="data.kind === 'assign_task'">
+          <div class="field">
+            <label for="node-treq">Số tệp kết quả phải nộp</label>
+            <input id="node-treq" type="number" min="0" max="30" :value="c.require_files ?? 0" @change="set('require_files', Number(($event.target as HTMLInputElement).value))" />
+            <small>Người làm chưa đính kèm đủ thì không nộp được. Đọc ở bước sau: <code>{{ `{${reference}.file_names}` }}</code></small>
+          </div>
+        </template>
         <div class="field">
           <label for="node-ttitle">Tên việc</label
           ><input id="node-ttitle" :value="c.title" maxlength="250" @input="set('title', ($event.target as HTMLInputElement).value)" />

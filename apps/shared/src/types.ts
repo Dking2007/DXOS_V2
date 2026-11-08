@@ -153,11 +153,22 @@ export interface ApprovalTask {
   decided_by_id?: string | null
   decided_by_name?: string
   /** Process flows: "opinion" asks for advice (agree / disagree) rather than a decision. */
-  kind?: 'approval' | 'opinion' | null
+  kind?: 'approval' | 'opinion' | 'input' | 'acknowledge' | null
   /** Decisions this step offers; absent means approve, return and reject. */
-  options?: ('approve' | 'return' | 'reject')[] | null
+  options?: ('approve' | 'return' | 'reject' | 'submit')[] | null
   node_id?: string | null
   instructions?: string
+  /** What the process step offers on this request. */
+  step?: {
+    fields: { key: string; label: string; type: string; required?: boolean; options?: string[] }[]
+    allow_files: boolean
+    editable_fields: string[]
+    allow_forward: boolean
+    result_fields?: { key: string; label: string; type: string; required?: boolean; options?: string[] }[]
+    require_files?: number
+  }
+  /** What a request is about when no dossier stands behind it. */
+  subject?: { type: 'task' | 'case' | 'post'; id: string; title: string; link: string | null } | null
 }
 export interface HistoryEvent {
   id?: string

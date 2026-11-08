@@ -79,24 +79,23 @@ export const router = createRouter({
       meta: { title: 'Tìm kiếm' },
     },
     {
-      path: '/automations',
+      path: '/processes',
       component: () => import('./views/AutomationsView.vue'),
-      meta: { title: 'Tự động hóa', capability: 'automations.manage' },
+      meta: { title: 'Quy trình nghiệp vụ', capability: 'automations.manage' },
     },
     {
-      path: '/automations/:id',
+      path: '/processes/:id',
       component: () => import('./views/AutomationEditorView.vue'),
-      meta: { title: 'Thiết kế luồng', capability: 'automations.manage', wide: true },
+      meta: { title: 'Thiết kế quy trình', capability: 'automations.manage', wide: true },
     },
+    // Links saved before Tự động hóa and Gói nghiệp vụ became one screen.
+    { path: '/automations', redirect: (to) => ({ path: '/processes', query: { tab: 'automation', ...to.query } }) },
+    { path: '/automations/:id', redirect: (to) => ({ path: `/processes/${String(to.params.id)}`, query: to.query }) },
+    { path: '/packages', redirect: '/processes' },
     {
       path: '/assistant',
       component: () => import('./views/AssistantAdminView.vue'),
       meta: { title: 'Trợ lý AI', capability: 'assistant.manage' },
-    },
-    {
-      path: '/packages',
-      component: () => import('./views/PackagesView.vue'),
-      meta: { title: 'Quy trình' },
     },
     {
       path: '/:pathMatch(.*)*',

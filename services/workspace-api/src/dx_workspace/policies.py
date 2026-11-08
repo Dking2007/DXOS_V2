@@ -56,7 +56,7 @@ ROLE_TEMPLATES = {
     "staff": ("Cán bộ / nhân viên", ["cases.create", "drive.use", "tasks.create", "feed.post"]),
     "technical_admin": (
         "Quản trị kỹ thuật",
-        ["organization.manage", "audit.read", "automations.manage", "assistant.manage"],
+        ["organization.manage", "forms.manage", "audit.read", "automations.manage", "assistant.manage"],
     ),
 }
 ALLOWED_PERMISSIONS = {value for _, permissions in ROLE_TEMPLATES.values() for value in permissions}

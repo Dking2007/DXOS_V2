@@ -62,6 +62,7 @@ import CaseAiPanel from '../ai/CaseAiPanel.vue'
 import { useAi } from '../ai/useAi'
 import { OPERATORS } from '../flow/nodes'
 import ProcessCanvas from '../flow/ProcessCanvas.vue'
+import StepAnswerDialog from '../components/StepAnswerDialog.vue'
 import { toast } from '../ui/toast'
 import { previewKind } from '../ui/preview'
 import FilePreview from '../components/FilePreview.vue'
@@ -211,6 +212,31 @@ const myTask = computed(() =>
 /** Process steps may ask for an opinion, or leave out returning / rejecting. */
 const opinion = computed(() => myTask.value?.kind === 'opinion')
 const offers = computed(() => new Set(myTask.value?.options ?? ['approve', 'return', 'reject']))
+const fillingIn = computed(() => ['input', 'acknowledge'].includes(String(myTask.value?.kind)))
+const acknowledging = computed(() => myTask.value?.kind === 'acknowledge')
+const stepDialog = ref<'answer' | 'forward' | null>(null)
+const answering = ref<string | undefined>()
+function fill() {
+  answering.value = 'submit'
+  stepDialog.value = 'answer'
+}
+/** Approving a step that asks for results means handing them in with the answer. */
+function approve() {
+  const step = myTask.value?.step
+  if (step?.result_fields?.length || step?.require_files) {
+    answering.value = 'approve'
+    stepDialog.value = 'answer'
+  } else ask('approve')
+}
+/** Fields this step lets the person correct when they approve. */
+const correctable = computed(() =>
+  (detail.data.value?.form.fields ?? []).filter((field) => myTask.value?.step?.editable_fields?.includes(field.key)),
+)
+const corrections = ref<Record<string, unknown>>({})
+async function stepAnswered() {
+  stepDialog.value = null
+  await refresh()
+}
 const canWithdraw = computed(
   () =>
     detail.data.value?.owner_id === session.user?.id &&
@@ -425,6 +451,15 @@ function ask(action: typeof confirmation.value) {
   error.value = null
   intent.value = newIntent()
 }
+function changedCorrections() {
+  const values: Record<string, unknown> = {}
+  for (const field of correctable.value) {
+    const value = corrections.value[field.key]
+    if (value === undefined || value === '') continue
+    values[field.key] = field.type === 'number' ? Number(value) : value
+  }
+  return values
+}
 const DONE = {
   submit: 'Đã chuyển hồ sơ đi duyệt',
   approve: 'Đã phê duyệt hồ sơ',
@@ -456,6 +491,7 @@ async function confirm() {
           expected_revision: myTask.value.revision,
           decision: confirmation.value,
           reason: reason.value,
+          values: confirmation.value === 'approve' ? changedCorrections() : {},
         } satisfies components['schemas']['DecisionInput']),
       })
     toast.success(DONE[confirmation.value ?? 'submit'])
@@ -556,7 +592,7 @@ function moveTab(step: number) {
         :size="14"
         style="vertical-align: middle; margin-right: 5px"
       />Hồ sơ</RouterLink
-    ><span>/</span
+    ><span aria-hidden="true">/</span
     ><span>{{ detail.data.value?.code || 'Chi tiết hồ sơ' }}</span>
   </div>
   <StatePanel
@@ -568,7 +604,6 @@ function moveTab(step: number) {
   <template v-if="detail.data.value">
     <header class="page-head">
       <div>
-        <span class="eyebrow">Mã hồ sơ {{ detail.data.value.code }}</span>
         <h1>{{ detail.data.value.title }}</h1>
         <div class="case-subline">
           <StatusBadge :status="detail.data.value.status" /><span v-if="detail.data.value.archived_at" class="tag"
@@ -876,7 +911,7 @@ function moveTab(step: number) {
               <select
                 v-model="selectedSubmission"
                 aria-label="Chọn lần trình"
-                style="width: auto; min-height: 34px; font-size: 13px"
+                style="width: auto; min-height: 34px; font-size: 14px"
               >
                 <option
                   v-for="item in detail.data.value.submissions"
@@ -951,14 +986,14 @@ function moveTab(step: number) {
                   <p
                     v-if="typeof event.detail === 'string'"
                     class="muted"
-                    style="font-size: 13px; margin-top: 5px"
+                    style="font-size: 14px; margin-top: 5px"
                   >
                     {{ event.detail }}
                   </p>
                   <p
                     v-else-if="event.detail?.reason"
                     class="muted"
-                    style="font-size: 13px; margin-top: 5px"
+                    style="font-size: 14px; margin-top: 5px"
                   >
                     {{ event.detail.reason }}
                   </p>
@@ -1055,13 +1090,21 @@ function moveTab(step: number) {
           ><small v-if="myTask.instructions" class="sticky-note">{{ myTask.instructions }}</small></span
         ></span
       >
-      <button v-if="offers.has('return')" class="button secondary" @click="ask('return')">
-        <RotateCcw :size="15" />Trả lại</button
-      ><button v-if="offers.has('reject')" class="button danger" @click="ask('reject')">
-        {{ opinion ? 'Không đồng ý' : 'Từ chối' }}</button
-      ><button class="button" @click="ask('approve')">
-        <Check :size="16" />{{ opinion ? 'Đồng ý' : 'Phê duyệt' }}
+      <button v-if="myTask.step?.allow_forward" class="button secondary" @click="stepDialog = 'forward'">
+        <Send :size="15" />Chuyển người xử lý
       </button>
+      <button v-if="fillingIn" class="button" @click="fill">
+        <Pencil :size="16" />{{ acknowledging ? 'Xác nhận đã đọc' : 'Nhập thông tin' }}
+      </button>
+      <template v-else>
+        <button v-if="offers.has('return')" class="button secondary" @click="ask('return')">
+          <RotateCcw :size="15" />Trả lại</button
+        ><button v-if="offers.has('reject')" class="button danger" @click="ask('reject')">
+          {{ opinion ? 'Không đồng ý' : 'Từ chối' }}</button
+        ><button class="button" @click="approve">
+          <Check :size="16" />{{ opinion ? 'Đồng ý' : 'Phê duyệt' }}
+        </button>
+      </template>
     </div>
     <div v-else-if="canEdit" class="sticky-actions" role="region" aria-label="Bản nháp">
       <span
@@ -1078,6 +1121,7 @@ function moveTab(step: number) {
       </button>
     </div>
   </template>
+  <StepAnswerDialog v-if="stepDialog && myTask" :task="myTask" :mode="stepDialog" :decision="answering" @close="stepDialog = null" @done="stepAnswered" />
   <ModalDialog
     v-if="confirmation"
     :title="
@@ -1147,6 +1191,18 @@ function moveTab(step: number) {
                     : 'Quyết định từ chối được lưu lại cùng hồ sơ và lý do.'
             }}
           </p>
+          <template v-if="confirmation === 'approve' && correctable.length">
+            <span class="section-label">Bước này cho phép sửa</span>
+            <div v-for="field in correctable" :key="field.key" class="field">
+              <label :for="`correct-${field.key}`">{{ field.label }}</label>
+              <input
+                :id="`correct-${field.key}`"
+                v-model="corrections[field.key]"
+                :type="field.type === 'number' ? 'number' : 'text'"
+                :placeholder="String(detail.data.value?.payload[field.key] ?? '')"
+              />
+            </div>
+          </template>
           <div class="field">
             <label for="decision-reason"
               >{{

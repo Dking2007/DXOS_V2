@@ -255,7 +255,7 @@ def test_withdrawal_stops_the_flow_and_its_requests(world):  # noqa: F811
         assert next(s for s in run.steps if s["node_id"] == "leader")["state"] == "cancelled"
 
 
-def test_process_validation_and_single_process_per_form(world):  # noqa: F811
+def test_process_validation(world):  # noqa: F811
     _, _, _, _, _, _, _, users, _ = world
     form = make_form(world)
     director = as_(world, "director")
@@ -264,7 +264,8 @@ def test_process_validation_and_single_process_per_form(world):  # noqa: F811
         json={"nodes": [node("start", "trigger", event="task.submitted"), node("a", "approval")],
               "edges": [edge("start", "a")]},
     ).json()
-    assert any("quy trình hồ sơ" in e["message"] for e in automation["errors"])
+    # Any flow may ask people now; the step is judged like any other.
+    assert not any("quy trình hồ sơ" in e["message"] for e in automation["errors"])
     unbound = director.post(
         API + "/automations/validate?kind=process",
         json={"nodes": [node("start", "trigger", event="case.submitted"), node("a", "approval"),
@@ -272,7 +273,7 @@ def test_process_validation_and_single_process_per_form(world):  # noqa: F811
               "edges": [edge("start", "a"), edge("a", "n", "approve"), edge("n", "a")]},
     ).json()
     messages = " ".join(e["message"] for e in unbound["errors"])
-    assert "Chọn biểu mẫu" in messages and "vòng lặp" in messages
+    assert "vòng lặp" in messages
     unknown = director.post(
         API + "/automations/validate?kind=process",
         json={"nodes": [trigger(form), node("c", "if", conditions=[{"field": "form.nope", "operator": "eq", "value": 1}]),
@@ -283,11 +284,6 @@ def test_process_validation_and_single_process_per_form(world):  # noqa: F811
     assert "form.nope" in messages and "nhánh đã tắt" in messages
 
     first = create_process(world, form, [node("a", "approval")], [edge("start", "a")], name="Một")
-    second = create_process(world, form, [node("a", "approval")], [edge("start", "a")], name="Hai", on=False)
-    clash = director.post(
-        f"{API}/automations/{second['id']}/enabled", json={"expected_revision": second["revision"], "enabled": True}
-    )
-    assert clash.status_code == 409 and clash.json()["code"] == "process_already_enabled"
     manual = director.post(f"{API}/automations/{first['id']}/run", json={"ref_id": "x"})
     assert manual.status_code == 422 and manual.json()["code"] == "process_runs_on_submit"
 

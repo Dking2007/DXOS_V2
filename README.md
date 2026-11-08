@@ -213,7 +213,7 @@ không tồn tại để làm tài liệu trông đầy đủ. Xem [checklist](d
   khi chuyển trang, chưa đẩy tức thời.
 - **Trợ lý AI** (nút góc màn hình, Ctrl + K › "Hỏi trợ lý AI"; quản trị ở `/assistant`): trả lời
   câu hỏi về quy trình nghiệp vụ và cách dùng phần mềm **chỉ từ kho kiến thức** do người có quyền
-  `assistant.manage` nhập (viết tay, tệp `.md/.txt`, hoặc sinh từ gói nghiệp vụ đang áp dụng). Mỗi
+  `assistant.manage` nhập (viết tay, tệp `.md/.txt`, hoặc sinh từ quy trình đang áp dụng). Mỗi
   câu hỏi tìm đoạn liên quan bằng BM25 trên chữ đã bỏ dấu (không cần dịch vụ tìm kiếm riêng) rồi
   gửi kèm câu hỏi tới dịch vụ AI đang chọn: Claude (SDK chính thức, mặc định `claude-opus-5-5`,
   effort thấp, bật fallback khi bị từ chối), OpenAI, Gemini hoặc DeepSeek, hoặc **cổng riêng** nói
@@ -251,7 +251,7 @@ không tồn tại để làm tài liệu trông đầy đủ. Xem [checklist](d
   dây chuyền.
 - **Thu hồi hồ sơ đã trình** khi chưa ai ra quyết định: nhiệm vụ duyệt đang chờ bị đóng
   ngay, worker hủy run Core, hồ sơ về bản nháp để trình lại.
-- **Tự động hóa** (`/automations`, quyền `automations.manage`): **trình thiết kế luồng
+- **Quy trình nghiệp vụ** (`/processes`, quyền `automations.manage`): **trình thiết kế luồng
   dạng canvas kiểu n8n** (Vue Flow). Kéo thả node Kích hoạt, Điều kiện (nhánh Đúng/Sai,
   "tất cả" hoặc "ít nhất một"), Chờ, Gửi thông báo, Tạo công việc, Gọi webhook; nối dây,
   cấu hình ở panel bên phải, chèn biến `{title}`… bằng một click; có 4 mẫu luồng. Lỗi cấu
@@ -279,9 +279,9 @@ không tồn tại để làm tài liệu trông đầy đủ. Xem [checklist](d
   trình sau đó theo quy trình thay cho bước duyệt khai trong biểu mẫu; tắt thì quay về bước duyệt cũ. Hồ sơ ghim
   bản quy trình lúc trình; cổng Duyệt/Trả lại/Từ chối không nối thì hồ sơ kết thúc đúng như tên cổng. Mỗi lần
   hỏi ý kiến/duyệt là một human task Core. Tab **Quy trình** trong chi tiết hồ sơ cho mọi người xem được hồ sơ
-  thấy hồ sơ đang ở bước nào, chờ ai, ai đã quyết định gì. Giới hạn: quy trình là DAG (trả lại thì trình lại từ
-  đầu, không quay về một bước giữa chừng); chưa có phê duyệt theo vai trò tùy ý hay quorum; gói nghiệp vụ chưa
-  đưa quy trình canvas vào hash cấu hình và bộ thử của gói — quy trình được kiểm bằng *Chạy thử* của canvas.
+  thấy hồ sơ đang ở bước nào, chờ ai, ai đã quyết định gì. Giới hạn: quy trình là DAG (chỉ cổng Trả lại được đi ngược, tối đa 5 lần mỗi
+  bước). Người xử lý, nhiều người duyệt, xử lý quá hạn, quyền theo bước và quy trình con cấu hình ngay trên node. Canvas là bản nháp; hồ sơ
+  đi theo phiên bản đã phát hành, sau khi qua phân quyền và kịch bản thử.
 - Office chặn submit khi phiên chỉnh sửa còn mở; phải đóng editor và nhận callback
   cuối hợp lệ trước khi trình. Đây **không phải force-save barrier**. Content ticket
   Office có TTL 8 giờ và gắn session; thu hồi share không đẩy người đang mở editor
@@ -306,7 +306,7 @@ audit không thay chữ ký số. Không cam kết hiệu năng/RPO/RTO khi chư
 - [Bảo mật, session/revocation và cấu hình dev](docs/security.md)
 - [Inventory bên thứ ba](docs/third-party-inventory.md)
 - [Kịch bản demo](docs/demo.md)
-- [Gói nghiệp vụ, chạy thử và truy vết quy trình](docs/process-packages.md)
+- [Quy trình nghiệp vụ, chạy thử và truy vết](docs/process-packages.md)
 
 Code tự viết: [Apache-2.0](LICENSE), xem [NOTICE](NOTICE). ONLYOFFICE, RustFS và các
 service/dependency giữ giấy phép của họ. Cần rà soát artifact, notice, source offer

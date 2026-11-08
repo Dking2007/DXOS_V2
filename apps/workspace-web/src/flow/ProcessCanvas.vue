@@ -24,7 +24,7 @@ import type { ApiGraph, Branch, FlowNodeData, RunStep } from './nodes'
 interface TaskItem {
   id: string
   node_id: string
-  kind: 'approval' | 'opinion'
+  kind: 'approval' | 'opinion' | 'input'
   label: string
   state: string
   decision: string | null
@@ -33,6 +33,7 @@ interface TaskItem {
   decided_by_name: string
   decided_at: string | null
   due_at: string | null
+  values?: Record<string, unknown> | null
 }
 type Step = RunStep & {
   answered?: number
@@ -67,7 +68,9 @@ const view = useQuery({
 const nodes = ref([]) as Ref<Node<FlowNodeData>[]>
 const edges = ref([]) as Ref<Edge[]>
 const selectedId = ref<string | null>(null)
-const { fitView, onNodeClick, onPaneClick } = useVueFlow({ id: `case-process-${props.caseId}` })
+const { fitView, onNodeClick, onNodesInitialized, onPaneClick } = useVueFlow({ id: `case-process-${props.caseId}` })
+// Sizes are known only once the nodes are measured; fitting earlier leaves wide flows cut off.
+onNodesInitialized(() => fitView({ padding: 0.15, maxZoom: 1 }))
 onNodeClick(({ node }) => (selectedId.value = node.id))
 onPaneClick(() => (selectedId.value = null))
 watch(
@@ -96,7 +99,7 @@ provide(FLOW_CONTEXT, {
   readonly: true,
 })
 
-const stepsByNode = computed(() => new Map((view.data.value?.steps ?? []).filter((s) => s.node_id).map((s) => [s.node_id!, s])))
+const stepsByNode = computed(() => new Map((view.data.value?.steps ?? []).filter((s) => !s.superseded && s.node_id).map((s) => [s.node_id!, s])))
 const waiting = computed(() =>
   nodes.value
     .filter((node) => node.data?.status === 'waiting')
@@ -107,6 +110,7 @@ const waiting = computed(() =>
         .filter((task) => task.state === 'pending' || task.state === 'syncing')
         .map((task) => task.assignee_name),
       due: tasksOf(node.id).find((task) => task.due_at && task.state === 'pending')?.due_at ?? null,
+      attempt: stepsByNode.value.get(node.id)?.attempt ?? null,
     })),
 )
 function tasksOf(nodeId: string) {
@@ -133,6 +137,7 @@ const DECISION: Record<string, string> = { approve: 'Duyệt', return: 'Trả l�
 function decisionText(task: TaskItem) {
   if (!task.decision) return ''
   if (task.kind === 'opinion') return task.decision === 'approve' ? 'Đồng ý' : 'Không đồng ý'
+  if (task.kind === 'input') return 'Đã nộp'
   return DECISION[task.decision] ?? task.decision
 }
 const modeText = computed(() => {
@@ -179,6 +184,7 @@ const modeText = computed(() => {
         <span>
           <template v-for="(item, index) in waiting" :key="item.id"
             >{{ index ? ' · ' : '' }}Đang chờ <strong>{{ item.title }}</strong
+            ><template v-if="item.attempt"> (lần {{ item.attempt }})</template
             ><template v-if="item.people.length"> — {{ item.people.join(', ') }}</template
             ><template v-if="item.due"> (hạn {{ formatDate(item.due) }})</template></template
           >
@@ -229,6 +235,7 @@ const modeText = computed(() => {
               >
             </p>
             <small v-if="task.reason">“{{ task.reason }}”</small>
+            <small v-if="task.values">{{ Object.values(task.values).join(' · ') }}</small>
           </div>
           <span class="tag">{{ decisionText(task) || TASK_STATE[task.state] || task.state }}</span>
           <small v-if="task.decided_at" class="muted">{{ formatDate(task.decided_at, true) }}</small>
@@ -276,7 +283,7 @@ const modeText = computed(() => {
   gap: 14px;
   align-items: center;
   padding: 10px 18px;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .legend::before {
   content: '';

@@ -650,6 +650,12 @@ def build_router(app):
         values: dict = {"status": target, "updated_at": m.utcnow()}
         if body.action == "accept":
             values["accepted_at"] = m.utcnow()
+        if body.action == "submit" and len(task.file_ids or []) < (task.required_file_count or 0):
+            raise AppError(
+                422,
+                "task_result_required",
+                f"Cần đính kèm ít nhất {task.required_file_count} tệp kết quả trước khi nộp.",
+            )
         if body.action == "submit":
             if any(not item.get("done") for item in task.checklist or []):
                 raise AppError(422, "checklist_incomplete", "Hoàn thành checklist trước khi nộp kết quả.")

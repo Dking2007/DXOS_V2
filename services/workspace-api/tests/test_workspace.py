@@ -178,7 +178,8 @@ def drain(world, rounds=6):
         if not process_once(engine, settings, app.state.core_service):
             break
     with Session(engine) as db:
-        pending = [job for job in db.scalars(select(Outbox)) if job.state != "sent"]
+        # A deadline job legitimately stays pending until its time comes.
+        pending = [job for job in db.scalars(select(Outbox)) if job.state != "sent" and job.kind != "process.overdue"]
         assert not pending, [(job.kind, job.state, job.error) for job in pending]
 
 

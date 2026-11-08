@@ -11,7 +11,6 @@ import {
   ListChecks,
   MessagesSquare,
   Newspaper,
-  PackageOpen,
   Settings2,
   Workflow,
 } from 'lucide-vue-next'
@@ -76,18 +75,11 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Quản trị',
     links: [
       {
-        to: '/automations',
-        label: 'Tự động hóa',
+        to: '/processes',
+        label: 'Quy trình nghiệp vụ',
         icon: Workflow,
-        hint: 'Luồng tự động khi có sự kiện',
+        hint: 'Quy trình hồ sơ và luồng tự động',
         capability: 'automations.manage',
-      },
-      {
-        to: '/packages',
-        label: 'Quy trình',
-        icon: PackageOpen,
-        hint: 'Quy trình duyệt cho từng loại hồ sơ',
-        capability: 'forms.manage',
       },
       {
         to: '/assistant',

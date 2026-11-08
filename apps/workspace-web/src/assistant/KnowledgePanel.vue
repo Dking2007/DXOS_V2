@@ -180,7 +180,7 @@ async function runProbe() {
       <header class="card-header knowledge-head">
         <div>
           <h2>Kiến thức của trợ lý</h2>
-          <p class="muted" style="font-size: 14px; margin-top: 4px">
+          <p class="muted" style="font-size: 15px; margin-top: 4px">
             Mỗi bài nên nói về một chủ đề. Trợ lý tìm đoạn liên quan nhất cho từng câu hỏi.
           </p>
         </div>
@@ -232,7 +232,7 @@ async function runProbe() {
       <section class="card">
         <header class="card-header"><h3>Thử tìm kiến thức</h3></header>
         <form class="card-body stack" @submit.prevent="runProbe">
-          <p class="muted" style="font-size: 13px">
+          <p class="muted" style="font-size: 14px">
             Gõ một câu hỏi để xem trợ lý sẽ đọc những đoạn nào. Không gọi dịch vụ AI, không tốn chi phí.
           </p>
           <div class="search-box">
@@ -240,7 +240,7 @@ async function runProbe() {
           </div>
           <button class="button secondary small" :disabled="probing || !probe.trim()">Thử tìm</button>
           <template v-if="probeResult">
-            <p v-if="!probeResult.length" class="muted" style="font-size: 13px">
+            <p v-if="!probeResult.length" class="muted" style="font-size: 14px">
               Không tìm thấy đoạn nào. Trợ lý sẽ trả lời là chưa có hướng dẫn.
             </p>
             <div v-for="(item, index) in probeResult" :key="index" class="probe-hit">
@@ -297,7 +297,7 @@ async function runProbe() {
   <ModalDialog v-if="packagesOpen" title="Nhập kiến thức từ quy trình" @close="packagesOpen = false">
     <p class="muted" style="margin-bottom: 14px">
       Tạo bài mô tả quy trình (thông tin cần điền, tài liệu, các bước duyệt) từ phiên bản đang áp dụng của mỗi gói.
-      Khi gói đổi phiên bản, bấm “Cập nhật” để làm mới bài.
+      Khi quy trình đổi phiên bản, bấm “Cập nhật” để làm mới bài.
     </p>
     <StatePanel
       :loading="packages.isPending.value"

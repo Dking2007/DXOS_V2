@@ -266,12 +266,13 @@ def build_router(app):
         overdue_cases = set()
         returns = 0
         for task, case, submission in rows:
-            group_key = (submission.package_version_id, task.label)
+            pinned = submission.process_version_id or submission.package_version_id
+            group_key = (pinned, task.label)
             group = groups.setdefault(
                 group_key,
                 {
                     "step": task.label,
-                    "package_version_id": submission.package_version_id,
+                    "package_version_id": pinned,
                     "count": 0,
                     "waiting": 0,
                     "overdue": 0,

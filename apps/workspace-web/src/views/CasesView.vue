@@ -54,15 +54,18 @@ const forms = useQuery({
   queryKey: ['forms'],
   queryFn: () => api.request<Page<FormTemplate>>('/forms'),
 })
-interface ActivePackageVersion {
+interface AvailableProcess {
   id: string
-  form_id: string
+  name: string
+  description: string
   version_no: number
-  package_name: string
+  form_id: string
+  form_name: string
+  required_file_count: number
 }
-const activePackages = useQuery({
-  queryKey: ['business-packages', 'active'],
-  queryFn: () => api.request<Page<ActivePackageVersion>>('/business-packages/active-versions'),
+const processes = useQuery({
+  queryKey: ['processes', 'available'],
+  queryFn: () => api.request<Page<AvailableProcess>>('/processes/available'),
 })
 const files = useQuery({
   queryKey: ['drive', 'case-picker'],
@@ -71,7 +74,7 @@ const files = useQuery({
 const showCreate = ref(false)
 const title = ref('')
 const formId = ref('')
-const packageVersionId = ref('')
+const processId = ref('')
 const payload = ref<Record<string, unknown>>({})
 const fileIds = ref<string[]>([])
 const priority = ref<'low' | 'normal' | 'high' | 'urgent'>('normal')
@@ -82,17 +85,24 @@ const intent = ref(newIntent())
 const selectedForm = computed(() =>
   forms.data.value?.items.find((form) => form.id === formId.value),
 )
-const matchingPackages = computed(() =>
-  activePackages.data.value?.items.filter((item) => item.form_id === formId.value) ?? [],
-)
+const selectedProcess = computed(() => processes.data.value?.items.find((item) => item.id === processId.value))
+// People start from a process they may use; a form with none of its own still works by its steps.
+const standaloneForms = computed(() => {
+  const covered = new Set(processes.data.value?.items.map((item) => item.form_id))
+  return forms.data.value?.items.filter((form) => !covered.has(form.id)) ?? []
+})
+const choice = computed({
+  get: () => (processId.value ? `process:${processId.value}` : formId.value ? `form:${formId.value}` : ''),
+  set: (value: string) => {
+    const [kind, id] = value.split(':') as [string, string | undefined]
+    processId.value = kind === 'process' ? (id ?? '') : ''
+    formId.value =
+      kind === 'process' ? (processes.data.value?.items.find((item) => item.id === id)?.form_id ?? '') : (id ?? '')
+  },
+})
 watch(formId, () => {
-  packageVersionId.value = ''
   payload.value = initialPayload(selectedForm.value?.fields ?? [])
   errors.value = {}
-})
-watch(matchingPackages, (items) => {
-  if (!items.some((item) => item.id === packageVersionId.value))
-    packageVersionId.value = items[0]?.id ?? ''
 })
 watch([status, search], () => {
   cursor.value = null
@@ -135,7 +145,7 @@ async function create() {
       body: JSON.stringify({
         title: title.value,
         form_id: formId.value,
-        package_version_id: packageVersionId.value || null,
+        process_id: processId.value || null,
         payload: payload.value,
         file_ids: fileIds.value,
         priority: priority.value,
@@ -155,8 +165,7 @@ async function create() {
 <template>
   <header class="page-head">
     <div>
-      <span class="eyebrow">HỒ SƠ ĐIỆN TỬ</span>
-      <h1>Mọi hồ sơ, một dòng xử lý.</h1>
+      <h1>Hồ sơ</h1>
       <p>Theo dõi từ bản nháp đến quyết định cuối cùng.</p>
     </div>
     <button class="button" @click="openCreate">
@@ -305,27 +314,24 @@ async function create() {
           </div>
           <div class="field full-width">
             <label for="case-form"
-              >Mẫu hồ sơ<span class="required"> *</span></label
-            ><select id="case-form" v-model="formId" required>
-              <option value="">Chọn mẫu đã phát hành</option>
-              <option
-                v-for="form in forms.data.value?.items"
-                :key="form.id"
-                :value="form.id"
-              >
-                {{ form.name }}
-              </option></select
-            ><small v-if="selectedForm?.description">{{
-              selectedForm.description
-            }}</small>
-          </div>
-          <div v-if="matchingPackages.length" class="field full-width">
-            <label for="case-package">Gói quy trình đã phát hành</label>
-            <select id="case-package" v-model="packageVersionId" required>
-              <option v-for="item in matchingPackages" :key="item.id" :value="item.id">
-                {{ item.package_name }} · phiên bản {{ item.version_no }}
-              </option>
-            </select>
+              >Quy trình<span class="required"> *</span></label
+            ><select id="case-form" v-model="choice" required>
+              <option value="">Chọn quy trình</option>
+              <optgroup v-if="processes.data.value?.items.length" label="Quy trình nghiệp vụ">
+                <option v-for="item in processes.data.value.items" :key="item.id" :value="`process:${item.id}`">
+                  {{ item.name }}
+                </option>
+              </optgroup>
+              <optgroup v-if="standaloneForms.length" label="Biểu mẫu chưa có quy trình">
+                <option v-for="form in standaloneForms" :key="form.id" :value="`form:${form.id}`">{{ form.name }}</option>
+              </optgroup></select
+            ><small v-if="selectedProcess"
+              >{{ selectedProcess.description || selectedForm?.description }} Biểu mẫu “{{ selectedProcess.form_name }}”,
+              phiên bản {{ selectedProcess.version_no
+              }}<template v-if="selectedProcess.required_file_count">
+                · cần ít nhất {{ selectedProcess.required_file_count }} tài liệu</template
+              >.</small
+            ><small v-else-if="selectedForm?.description">{{ selectedForm.description }}</small>
           </div>
         </div>
         <div class="form-grid">
@@ -355,7 +361,7 @@ async function create() {
             <p
               v-if="!files.data.value?.items.length"
               class="muted"
-              style="font-size: 14px"
+              style="font-size: 15px"
             >
               Chưa có tài liệu. Bạn có thể bổ sung sau từ kho Tài liệu.
             </p>

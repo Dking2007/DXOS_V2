@@ -22,7 +22,7 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import ai_core, ai_docx, ai_index, ai_text
+from . import ai_core, ai_docx, ai_index, ai_text, process_versions
 from . import assistant_llm as llm
 from . import models as m
 from . import schemas as s
@@ -38,6 +38,7 @@ from .policies import (
     permissions,
     require,
 )
+from .processes import step_limits
 from .services import audit, enqueue, serial
 from .tasks import visible as task_visible
 from .text import fold
@@ -347,7 +348,7 @@ def build_router(app):
         return "\n".join(f"- {labels.get(k, k)}: {v}" for k, v in payload.items() if v not in (None, "", []))
 
     def editable_case(db, user, case_id):
-        case = get_case(db, user, case_id)
+        case = whole_case(db, user, case_id)
         if case.owner_id != user.id or case.status not in {"draft", "needs_revision"}:
             raise AppError(
                 409, "case_not_editable", "Chỉ người lập được dùng tính năng này khi hồ sơ là bản nháp."
@@ -461,7 +462,7 @@ def build_router(app):
     @router.get("/ai/cases/{case_id}/summary")
     def stored_summary(case_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
         user = user_for(db, actor)
-        case = get_case(db, user, case_id)
+        case = whole_case(db, user, case_id)
         return {"summary": ai_core.cached(db, summary_key(db, case))}
 
     @router.post("/ai/cases/{case_id}/summary")
@@ -469,7 +470,7 @@ def build_router(app):
         """2. A few lines for the approver: what is asked, how much, what is attached, who said what."""
         user = user_for(db, actor)
         ai_core.require_feature(db, "case_summary")
-        case = get_case(db, user, case_id)
+        case = whole_case(db, user, case_id)
         form = db.get(m.Form, case.form_id)
         history = []
         for task in db.scalars(
@@ -523,12 +524,12 @@ def build_router(app):
             s.validate_payload(form, payload)
         except AppError as exc:
             issues.append({"level": "error", "message": exc.detail, "source": "rule"})
-        version = db.get(m.PackageVersion, case.package_version_id) if case.package_version_id else None
+        version = process_versions.pinned_or_live(db, case)
         if version and len(case.file_ids) < version.required_file_count:
             issues.append(
                 {
                     "level": "error",
-                    "message": f"Gói nghiệp vụ cần ít nhất {version.required_file_count} tài liệu, hồ sơ mới có {len(case.file_ids)}.",
+                    "message": f"Quy trình cần ít nhất {version.required_file_count} tài liệu, hồ sơ mới có {len(case.file_ids)}.",
                     "source": "rule",
                 }
             )
@@ -563,7 +564,7 @@ def build_router(app):
         """4. A polite approval note or return reason, for the person deciding to edit."""
         user = user_for(db, actor)
         ai_core.require_feature(db, "decision_draft")
-        case = get_case(db, user, case_id)
+        case = whole_case(db, user, case_id)
         pending = db.scalar(
             select(m.ApprovalTask).where(
                 m.ApprovalTask.case_id == case.id,
@@ -1132,27 +1133,27 @@ def build_router(app):
 
     # ---- 17. Test scenarios for a business package ------------------------------------
 
-    @router.post("/ai/package-versions/{version_id}/scenarios")
-    def scenarios(version_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
-        """17. Scenarios worth testing (amounts at the threshold, missing files) with their real path."""
+    @router.post("/ai/processes/{rule_id}/scenarios")
+    def scenarios(rule_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        """17. Scenarios worth testing (amounts at the threshold, missing files) with their real result."""
         user = user_for(db, actor)
         ai_core.require_feature(db, "package_scenarios")
-        version = db.get(m.PackageVersion, version_id)
-        if not version:
-            raise AppError(404, "package_version_not_found", "Không tìm thấy phiên bản gói.")
-        package = db.get(m.BusinessPackage, version.package_id)
-        require(db, user, "forms.manage")
-        if package.owner_id != user.id and user.role != "director":
-            raise AppError(404, "package_not_found", "Không tìm thấy gói nghiệp vụ.")
-        form = db.get(m.Form, version.form_id)
+        require(db, user, process_versions.MANAGE)
+        rule = db.get(m.AutomationRule, rule_id)
+        if not rule or rule.kind != "process":
+            raise AppError(404, "process_not_found", "Không tìm thấy quy trình.")
+        form = db.get(m.Form, rule.form_id) if rule.form_id else None
+        if not form:
+            raise AppError(422, "form_invalid", "Quy trình cần gắn với một biểu mẫu đã phát hành.")
+        graph = rule.graph
+        branching = {"approval", "consult", "assign_task"}
         steps = "\n".join(
-            f"- Bước {i + 1}: {step['label']}"
-            + (
-                f" (chỉ khi {step['condition']['field']} {step['condition']['operator']} {step['condition'].get('value')})"
-                if step.get("condition")
-                else ""
-            )
-            for i, step in enumerate(version.approval_steps)
+            f"- {node['id']} ({node['type']}): {node.get('label') or ''}"
+            for node in graph["nodes"]
+            if node["type"] != "trigger"
+        )
+        links = "\n".join(
+            f"- {edge['source']} --{edge.get('branch') or 'tiếp'}--> {edge['target']}" for edge in graph["edges"]
         )
         answer = ask_json(
             db,
@@ -1160,57 +1161,63 @@ def build_router(app):
             "package_scenarios",
             "Bạn là kiểm thử viên quy trình phê duyệt. Đề xuất kịch bản thử bao phủ: giá trị sát ngưỡng điều "
             "kiện (dưới, bằng, trên), thiếu tài liệu bắt buộc, trường bắt buộc để trống, có người trả lại.",
-            f"Biểu mẫu “{form.name}”:\n{form_fields_text(form)}\n\nCác bước duyệt:\n{steps}\n"
-            f"Số tài liệu bắt buộc: {version.required_file_count}\n\n"
+            f"Biểu mẫu “{form.name}”:\n{form_fields_text(form)}\n\nCác bước:\n{steps}\n\nĐường nối:\n{links}\n"
+            f"Số tài liệu bắt buộc: {rule.required_file_count}\n\n"
             'Trả về {"cases": [{"name": "tên ngắn", "payload": {"key": giá trị}, "file_count": số, "decisions": '
-            '["approve|return|reject cho từng bước theo thứ tự"], "why": "kiểm tra điều gì"}]}, 4 đến 8 kịch bản.',
+            '{"mã bước": "approve|return|reject|completed|cancelled"}, "why": "kiểm tra điều gì"}]}, 4 đến 8 kịch bản.',
             max_tokens=3000,
         )
+        known = {node["id"] for node in graph["nodes"] if node["type"] in branching}
         fixtures = []
         for item in (answer.get("cases") if isinstance(answer, dict) else None) or []:
             if not isinstance(item, dict) or not isinstance(item.get("payload"), dict):
                 continue
-            decisions = {
-                f"review_{i}": {"decision": d if d in {"approve", "return", "reject"} else "approve"}
-                for i, d in enumerate((item.get("decisions") or [])[: len(version.approval_steps)])
-            }
-            for i in range(len(version.approval_steps)):
-                decisions.setdefault(f"review_{i}", {"decision": "approve"})
+            given = item.get("decisions") if isinstance(item.get("decisions"), dict) else {}
             fixture = {
                 "name": str(item.get("name") or "Kịch bản AI")[:120],
                 "payload": item["payload"],
-                "decisions": decisions,
+                "decisions": {key: str(value) for key, value in given.items() if key in known},
                 "file_count": max(0, min(30, int(item.get("file_count") or 0))),
+                "expected_outcome": None,
                 "expected_path": [],
-                "expected_assignees": [],
                 "expected_error_code": None,
                 "why": str(item.get("why") or "")[:300],
             }
-            # The expectation is what the package actually does today; the person checks it is right.
-            try:
-                result = app.state.simulate_package(
-                    db,
-                    version,
-                    SimpleNamespace(
-                        payload=fixture["payload"],
-                        decisions=fixture["decisions"],
-                        file_count=fixture["file_count"],
-                        owner_id=user.id,
-                        department_id=user.department_id,
-                    ),
-                )
-                fixture["expected_path"] = result.get("path", [])
-            except AppError as exc:
-                fixture["expected_error_code"] = exc.code if exc.code in {
-                    "required_documents_missing", "approval_configuration_error", "form_validation_error", "self_approval_denied"
-                } else None  # fmt: skip
-                if not fixture["expected_error_code"]:
+            # The expectation is what the process does today; the person checks that it is right.
+            result = process_versions.rehearse(
+                db,
+                graph,
+                form,
+                rule.required_file_count,
+                SimpleNamespace(
+                    payload=fixture["payload"],
+                    decisions=fixture["decisions"],
+                    file_count=fixture["file_count"],
+                    owner_id=user.id,
+                    department_id=user.department_id,
+                ),
+            )
+            if result["error"]:
+                if result["error"] not in process_versions.ERROR_CODES.__args__:
                     continue
+                fixture["expected_error_code"] = result["error"]
+            else:
+                fixture["expected_outcome"] = result["outcome"]
+                fixture["expected_path"] = result["path"]
             fixtures.append(fixture)
         db.commit()
         return {"fixtures": fixtures[:10]}
 
     return router
+
+
+def whole_case(db: Session, user: m.User, case_id: str) -> m.Case:
+    """AI features read the dossier in full, so a person limited to part of it cannot use them."""
+    case = get_case(db, user, case_id)
+    fields, hide_files = step_limits(db, user, case)
+    if fields is not None or hide_files:
+        raise AppError(403, "case_partly_hidden", "Bước của bạn chỉ được xem một phần hồ sơ nên không dùng được AI ở đây.")
+    return case
 
 
 def personal_context(db: Session, user: m.User) -> str:

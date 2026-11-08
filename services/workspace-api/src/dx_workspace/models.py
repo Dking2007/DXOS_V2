@@ -168,6 +168,8 @@ class Case(Base):
     title: Mapped[str] = mapped_column(String(250))
     form_id: Mapped[str] = mapped_column(ForeignKey("form_templates.id"))
     package_version_id: Mapped[str | None] = mapped_column(ForeignKey("business_package_versions.id"))
+    # The published process this dossier follows; kept when the process is published again.
+    process_version_id: Mapped[str | None] = mapped_column(String(36), index=True)
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     department_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"))
     payload_record_id: Mapped[str] = mapped_column(String(36), unique=True)
@@ -212,6 +214,7 @@ class Submission(Base):
     # Set when the form had a canvas process: the flow ran instead of the linear steps.
     process_rule_id: Mapped[str | None] = mapped_column(String(36))
     process_run_id: Mapped[str | None] = mapped_column(String(36))
+    process_version_id: Mapped[str | None] = mapped_column(String(36))
     state: Mapped[str] = mapped_column(String(40), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -220,8 +223,11 @@ class ApprovalTask(Base):
     __tablename__ = "approval_tasks"
     __table_args__ = (UniqueConstraint("submission_id", "step_index"),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    submission_id: Mapped[str] = mapped_column(ForeignKey("case_submissions.id"), index=True)
-    case_id: Mapped[str] = mapped_column(ForeignKey("cases.id"), index=True)
+    # Empty when a flow on a task or post asks: there is no dossier behind the request then.
+    submission_id: Mapped[str | None] = mapped_column(ForeignKey("case_submissions.id"), index=True)
+    case_id: Mapped[str | None] = mapped_column(ForeignKey("cases.id"), index=True)
+    # The flow run that asked; empty for a dossier's linear approval steps.
+    run_id: Mapped[str | None] = mapped_column(String(36), index=True)
     assignee_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     step_index: Mapped[int] = mapped_column(Integer)
     label: Mapped[str] = mapped_column(String(200))
@@ -242,6 +248,8 @@ class ApprovalTask(Base):
     options: Mapped[list | None] = mapped_column(JSON)
     # When the step is due, from the node's due_in_days or the linear step's due_hours.
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # What was filled in at a form-filling step, or the fields corrected with a decision.
+    submitted_values: Mapped[dict | None] = mapped_column(JSON)
 
 
 class FieldEvidence(Base):
@@ -358,6 +366,8 @@ class Task(Base):
     parent_id: Mapped[str | None] = mapped_column(ForeignKey("tasks.id"), index=True)
     labels: Mapped[list] = mapped_column(JSON, default=list)
     file_ids: Mapped[list] = mapped_column(JSON, default=list)
+    # Result files a flow step requires before this can be handed in.
+    required_file_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     case_id: Mapped[str | None] = mapped_column(ForeignKey("cases.id"), index=True)
     # Where the task came from (a message, a post, an automation); kept as a snapshot so the
     # task stays meaningful after its source is deleted and grants no access to that source.
@@ -533,6 +543,66 @@ class AutomationRule(Base):
     revision: Mapped[int] = mapped_column(default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Processes only. `graph` above is the draft; dossiers follow the version published last.
+    # Empty lists mean no restriction; with both set, a person must match both.
+    allowed_roles: Mapped[list | None] = mapped_column(JSON, default=list)
+    allowed_department_ids: Mapped[list | None] = mapped_column(JSON, default=list)
+    required_file_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    active_version_id: Mapped[str | None] = mapped_column(String(36))
+
+
+class ProcessVersion(Base):
+    """A process as published: what dossiers opened under it keep following."""
+
+    __tablename__ = "process_versions"
+    __table_args__ = (UniqueConstraint("rule_id", "version_no"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    rule_id: Mapped[str] = mapped_column(ForeignKey("automation_rules.id"), index=True)
+    version_no: Mapped[int] = mapped_column(Integer)
+    # Only a flow a form's dossiers follow has one.
+    form_id: Mapped[str | None] = mapped_column(ForeignKey("form_templates.id"))
+    graph: Mapped[dict] = mapped_column(JSON)
+    required_file_count: Mapped[int] = mapped_column(Integer, default=0)
+    config_hash: Mapped[str] = mapped_column(String(64))
+    # "published" is the one in force; "retired" still serves the dossiers pinned to it.
+    state: Mapped[str] = mapped_column(String(20), default="published")
+    published_by: Mapped[str | None] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ProcessScenario(Base):
+    """A sample dossier and what the process should do with it; checked before publishing."""
+
+    __tablename__ = "process_scenarios"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    rule_id: Mapped[str] = mapped_column(ForeignKey("automation_rules.id"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Node id to the branch that step takes; approval is assumed where nothing is given.
+    decisions: Mapped[dict] = mapped_column(JSON, default=dict)
+    file_count: Mapped[int] = mapped_column(Integer, default=0)
+    expected_outcome: Mapped[str | None] = mapped_column(String(30))
+    expected_path: Mapped[list] = mapped_column(JSON, default=list)
+    expected_error_code: Mapped[str | None] = mapped_column(String(60))
+    # Whose dossier it pretends to be, so "leader of the unit" resolves as it would for them.
+    owner_id: Mapped[str | None] = mapped_column(String(36))
+    department_id: Mapped[str | None] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ProcessScenarioReport(Base):
+    """One run of all scenarios against the draft as it stood; a later edit makes it stale."""
+
+    __tablename__ = "process_scenario_reports"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    rule_id: Mapped[str] = mapped_column(ForeignKey("automation_rules.id"), index=True)
+    config_hash: Mapped[str] = mapped_column(String(64))
+    # Hash of the scenarios run, so adding or changing one asks for a new run.
+    scenarios_hash: Mapped[str] = mapped_column(String(64))
+    passed: Mapped[bool] = mapped_column(Boolean)
+    results: Mapped[list] = mapped_column(JSON)
+    actor_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class AutomationRun(Base):
@@ -554,6 +624,8 @@ class AutomationRun(Base):
     submission_id: Mapped[str | None] = mapped_column(String(36), unique=True, index=True)
     # How a process run ended: approved, rejected or needs_revision.
     outcome: Mapped[str | None] = mapped_column(String(30))
+    # The Core workflow its human tasks run on, when no dossier submission holds it.
+    core_workflow_id: Mapped[str | None] = mapped_column(String(36))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

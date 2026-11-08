@@ -135,14 +135,14 @@ def build_router(app):
             )
         )
         for item in approvals:
-            case = db.get(m.Case, item.case_id)
+            case = db.get(m.Case, item.case_id) if item.case_id else None
             on_behalf = item.assignee_id != user.id
             push(
                 "approval",
                 item.id,
-                case.title if case else "Hồ sơ cần duyệt",
+                case.title if case else item.label,
                 "decide",
-                f"/cases/{item.case_id}",
+                f"/cases/{item.case_id}" if item.case_id else "/approvals",
                 # The step's own deadline comes first; older dossiers may only have one of their own.
                 item.due_at or (case.due_at if case else None),
                 item.label + (" · duyệt thay" if on_behalf else ""),

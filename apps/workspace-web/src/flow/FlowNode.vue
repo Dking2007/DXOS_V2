@@ -85,7 +85,7 @@ const statusLabel: Record<string, string> = {
           class="branch-tag"
           :class="[`tag-${tone(exit)}`, { taken: data.branch === exit }]"
           :style="{ top: `calc(${top(index)} - 9px)` }"
-          >{{ branchLabel(data.kind, exit) }}</span
+          >{{ branchLabel(data.kind, exit, data.config) }}</span
         >
       </template>
     </template>

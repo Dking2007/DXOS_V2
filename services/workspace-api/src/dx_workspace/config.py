@@ -19,6 +19,13 @@ class Settings(PlatformSettings):
     # Comma-separated hosts an assistant gateway may use even though they are internal or plain
     # HTTP (e.g. a LiteLLM proxy inside the office). Public HTTPS gateways need no entry.
     assistant_allowed_hosts: str = ""
+    # Mail server for the "send email" flow step. Empty host means the step is refused.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_tls: bool = True
 
 
 @lru_cache

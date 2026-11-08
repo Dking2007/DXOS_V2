@@ -65,18 +65,51 @@
   liên kết tới hồ sơ/công việc/luồng. Trước đây quyền này có trong ma trận phân quyền nhưng không có
   màn hình nào dùng. `GET /audit-logs` trả thêm `actor_name`. Test frontend bắt buộc mọi hành động
   backend ghi nhật ký đều có nhãn tiếng Việt.
-- `GET /workspace/v1/package-versions/{id}/impact?against_id=&suite_id=`: so sánh tác động giữa hai phiên bản của một gói bằng cùng bộ fixture, chỉ đọc (không tạo task, không gửi, không phát hành). Trả về từng fixture đổi kết quả/đường đi/người nhận, nguyên nhân do quy tắc (`rule`), hash của hai phiên bản và của fixture, và cờ `recipient_drift` khi người nhận đã lưu trong báo cáo lần chạy thử gần nhất của bản gốc khác với người nhận hiện tại (cơ cấu tổ chức đổi). 3 test API mới. Giao diện tiếng Việt trong thẻ "So với vN" của màn Gói nghiệp vụ (tên hồ sơ mẫu, đổi kết quả/đường đi/người nhận, các bước duyệt hai bên, cảnh báo cơ cấu đổi; bộ thử của cả hai phiên bản đều chọn được) và 2 test vitest; đã kiểm bằng Chromium trên stack thật ở độ rộng desktop, chưa kiểm 390 px; chưa kiểm trên PostgreSQL. Cả hai phiên bản đều được đánh giá theo cơ cấu hiện tại, nên chênh lệch giữa chúng chỉ đến từ quy tắc.
 - `docs/operations.md`: kết quả diễn tập backup/restore ngày 31/10/2026 (PostgreSQL + object storage sang project riêng, số dòng và hash khớp) và lỗi `pg_restore --no-owner`; `docs/acceptance.md` ghi lượt chạy ONLYOFFICE Document Server thật.
-- Test API cho cổng phát hành gói nghiệp vụ (`test_packages.py`, 18 test, đã chỉnh theo quy tắc mới: bộ thử tùy chọn nhưng bộ đã viết phải đã chạy và đạt; cấu hình đổi, quyền, bản đã phát hành bất biến) và ma trận quyền truy cập (`test_access_matrix.py`, 9 test: tệp, hồ sơ, công việc, tìm kiếm, báo cáo với người ngoài luồng và quản trị kỹ thuật). Có thêm ca tác nhân service không được dùng API người dùng (15 route đều 403). Chưa phát hiện lỗi rò rỉ. Chat, bảng tin, đính kèm và Office callback đã có test riêng từ trước (`test_collaboration.py`, `test_office_save.py`); chưa phủ đường import evidence của AI và token khác namespace phía Workspace.
 - CI chạy thêm `packages/flowkit/tests` (56 test) và test Node của plugin `vn-document-format` (29 test), trước đây không được chạy.
 
 ### Changed
-- **Màn "Quy trình"** thay cho hai nơi "Thiết lập › Biểu mẫu & quy trình" và "Gói nghiệp vụ": một trình 5 bước
-  (thông tin → trường → bước duyệt → quy định khi trình → xem lại) tạo biểu mẫu, quy trình và phiên bản đầu cùng
-  lúc, có thể phát hành ngay (`POST /processes`). "Sửa quy trình" tạo biểu mẫu và phiên bản mới
-  (`POST /business-packages/{id}/revise`); hồ sơ đã lập giữ phiên bản cũ. Biểu mẫu tạo trước đây chưa có quy
-  trình được liệt kê để chuyển đổi (`GET /processes/unpackaged-forms`). Tab biểu mẫu trong Thiết lập bỏ đi; liên
-  kết cũ `?tab=forms` chuyển sang màn Quy trình. 3 test.
+- **Giao diện theo design system** ([design-system/desktiny/MASTER.md](design-system/desktiny/MASTER.md), tạo bằng skill
+  ui-ux-pro-max): phong cách tối giản, màu chính navy, bỏ nền chuyển sắc và bóng đổ nặng; cỡ chữ tối thiểu 12px (trước đó
+  có chữ 8px), nút tối thiểu 40px và 44px trên màn hình cảm ứng; viền focus rõ; tôn trọng giảm chuyển động. Bỏ các khẩu
+  hiệu và nhãn thừa, tiêu đề trang nói thẳng tên trang, Trang chủ bỏ banner, thay emoji bằng icon, số hiển thị có phân cách
+  hàng nghìn, thanh trên cùng không còn tràn ngang trên điện thoại.
+- **Một loại luồng** (migration `workspace_0020`): bỏ hai tab Quy trình hồ sơ và Luồng tự động. Node kích hoạt quyết định
+  luồng chạy khi nào; chọn biểu mẫu thì luồng là đường đi của hồ sơ biểu mẫu đó. Mọi loại bước dùng được cho mọi luồng,
+  kể cả Duyệt, Xin ý kiến, Nhập thông tin trên luồng của công việc hay bài viết (`approval_tasks.case_id` nay có thể trống,
+  xử lý ngay ở màn Cần phê duyệt). Mọi luồng đều phát hành theo phiên bản; `/automations/{id}/enabled` tương đương phát
+  hành hoặc ngừng áp dụng. **Kết quả của bước:** bước cần người đặt được trường và số tệp phải nộp khi đồng ý
+  (`step_result_required`), bước Giao việc chặn nộp khi thiếu tệp (`task_result_required`), và bước sau đọc được kết quả
+  qua `{ten_buoc.truong}`. **14 node mới:** Rẽ nhiều nhánh, Chạy song song, Chờ đủ nhánh, Chờ đến khi, Đặt giá trị, Xác nhận
+  đã đọc, Cập nhật hồ sơ/việc, Tạo văn bản, Lưu và chia sẻ tệp, Tạo hồ sơ khác, Nhắn tin và đăng tin, Gửi email (cấu hình
+  `SMTP_*`), Gọi API lấy dữ liệu, AI trích xuất. Các bước hành động theo quyền của người tạo luồng. 31 test backend, 4 test
+  frontend.
+- **Node quy trình cấu hình linh hoạt** (migration `workspace_0019`), mô tả trong
+  [docs/process-packages.md](docs/process-packages.md). Người xử lý theo người cụ thể, nhóm, vai trò, thành viên phòng
+  ban, lãnh đạo đơn vị hoặc người ghi trong biểu mẫu; bước Duyệt hoàn tất theo người đầu tiên, tất cả hoặc đủ số người,
+  bước Xin ý kiến thêm đủ số người. Khi quá hạn: nhắc, chuyển người khác hoặc đi cổng **Quá hạn**
+  (outbox `process.overdue`). Cổng **Trả lại** nối được về bước trước: câu trả lời cũ giữ lại và đánh dấu đã thay thế,
+  tối đa 5 lần mỗi bước (`loop_limit`); vòng lặp qua cổng khác vẫn bị từ chối. Bước mới **Nhập thông tin** (`input`): một
+  người điền thêm trường, tệp, dùng được trong điều kiện sau đó qua `form.<mã>`, kể cả người tạo hồ sơ. Từng bước đặt
+  được trường và tài liệu người ở bước đó được xem, trường được sửa khi trả lời; có áp dụng ở API, không chỉ ở giao diện.
+  Người được hỏi chuyển được cho người khác (`POST /approval-tasks/{id}/forward`) và bước có thể không nhận người được
+  ủy quyền. Bước mới **Quy trình con** (`subprocess`) chạy một quy trình đã phát hành, kết quả chọn cổng đi tiếp; phiên
+  bản cha ghim phiên bản con lúc phát hành. 32 test backend, 3 test frontend.
+- **Quy trình nghiệp vụ** gộp Tự động hóa và Gói nghiệp vụ thành một mục (`/processes`; `/automations` và `/packages`
+  chuyển hướng), migration `workspace_0018`. Luồng canvas là gốc: canvas là bản nháp, **Phát hành** tạo phiên bản
+  (`process_versions`) và hồ sơ ghim phiên bản đó khi tạo. Bảng phát hành có phân quyền sử dụng theo vai trò và phòng ban
+  (`PUT /processes/{id}/settings`), số tài liệu tối thiểu, kịch bản thử (`/processes/{id}/scenarios`,
+  `/scenario-reports`) chạy bằng đúng bộ máy thật ở chế độ không ghi dữ liệu, so sánh tác động với bản đang áp dụng
+  (`/processes/{id}/impact`) và lịch sử phiên bản. Mọi kịch bản đã viết phải đạt trên đúng bản nháp mới phát hành được
+  (`simulation_required`). Một biểu mẫu có thể có nhiều quy trình; tạo hồ sơ chọn trong các quy trình người đó được dùng
+  (`GET /processes/available`, `process_required`, `process_use_denied`). Tạo quy trình bắt đầu từ thư viện mẫu, tạo
+  hoặc sửa biểu mẫu ngay trong màn này. Mỗi gói cũ được chuyển thành một quy trình giữ nguyên id, hồ sơ đã ghim và quyền
+  được giữ, bộ thử cũ chép sang nhưng không kèm quyết định giả lập và đường đi vì chúng đặt theo node của Core; bảng gói
+  cũ giữ lại chỉ để đọc. Quản trị kỹ thuật được thêm `forms.manage`; lãnh đạo phòng không còn quản lý quy trình. Thay API
+  `/business-packages*`, `/package-versions*`; `CaseCreate.package_version_id` đổi thành `process_id`;
+  `/ai/package-versions/{id}/scenarios` đổi thành `/ai/processes/{id}/scenarios`. Đã chạy migration lên và xuống trên bản
+  sao dữ liệu PostgreSQL. 14 test backend thay `test_packages.py`, `test_processes.py`; 2 test frontend. Spec:
+  [docs/superpowers/specs/2026-11-06-quy-trinh-nghiep-vu-design.md](docs/superpowers/specs/2026-11-06-quy-trinh-nghiep-vu-design.md).
 - **Hạn xử lý theo từng bước duyệt** (migration `workspace_0017`, `approval_tasks.due_at`): mỗi bước có "thời
   hạn xử lý" (giờ hoặc ngày), tính từ lúc hồ sơ tới bước đó. Hồ sơ quá hạn khi một bước đang chờ quá hạn của nó;
   lịch việc của người duyệt, danh sách Cần phê duyệt và thẻ "chờ lâu ở bước nào" (thêm số bước quá hạn) dùng hạn
@@ -116,6 +149,7 @@
 - Bỏ mũi tên ▾ ở nhãn "e-Office" trên thanh bên: không có chức năng chuyển không gian nào.
 
 ### Fixed
+- Tab **Quy trình** trong hồ sơ và thao tác nhân đôi node đứng im do `structuredClone` không nhận dữ liệu reactive.
 - Điện thoại: dòng "giờ · phạm vi" ở đầu bài viết bảng tin không còn xuống dòng từng chữ (cắt bằng dấu …,
   nhãn "Đã ghim" chỉ còn biểu tượng); nút trợ lý AI thu sang mép phải khi cuộn xuống và trang có thêm khoảng
   trống cuối, nên không còn che nút ở hàng cuối danh sách Việc hôm nay.

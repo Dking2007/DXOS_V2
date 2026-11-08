@@ -1,20 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
+import { reactive } from 'vue'
 import { describe, expect, it } from 'vitest'
-import {
-  KINDS,
-  PROCESS_TEMPLATES,
-  TEMPLATES,
-  branchLabel,
-  outputs,
-  paintRun,
-  paletteKinds,
-  summary,
-  toApi,
-  toCanvas,
-  tone,
-  waitLabel,
-} from './nodes'
+import { KINDS, PROCESS_TEMPLATES, TEMPLATES, branchLabel, outputs, paintRun, paletteKinds, summary, toApi, toCanvas, tone, waitLabel, plainCopy, nodeOutputs } from './nodes'
 import type { FlowNodeData } from './nodes'
 
 describe('flow graph conversion', () => {
@@ -106,8 +94,7 @@ describe('process flows', () => {
     expect(outputs('approval', {})).toEqual(['approve', 'return', 'reject'])
     expect(outputs('approval', { allow_return: false })).toEqual(['approve', 'reject'])
     expect(outputs('assign_task', {})).toEqual(['completed', 'cancelled'])
-    expect(paletteKinds('automation')).not.toContain('approval')
-    expect(paletteKinds('process')).toEqual(expect.arrayContaining(['approval', 'consult', 'finish', 'notify']))
+    expect(paletteKinds()).toEqual(expect.arrayContaining(['approval', 'consult', 'finish', 'notify']))
     expect([tone('approve'), tone('return'), tone('reject')]).toEqual(['good', 'warn', 'bad'])
     expect(branchLabel('consult', 'approve')).toBe('Đồng ý')
   })
@@ -133,5 +120,68 @@ describe('process flows', () => {
     expect(summary(trigger, [], () => '', [{ id: 'f1', name: 'Đề nghị mua sắm' }])).toBe('Khi trình “Đề nghị mua sắm”')
     const approval: FlowNodeData = { kind: 'approval', label: '', config: { resolver: 'user', user_id: 'u1' } }
     expect(summary(approval, [], () => 'Giám đốc')).toBe('Giám đốc')
+  })
+})
+
+describe('copying a graph', () => {
+  it('accepts the reactive data queries hand out', () => {
+    const data = reactive({ graph: { nodes: [{ id: 'a', data: { user_ids: ['x'] } }] } })
+    const copy = plainCopy(data.graph)
+    copy.nodes[0]!.data.user_ids.push('y')
+    expect(data.graph.nodes[0]!.data.user_ids).toEqual(['x'])
+  })
+  it('draws a stored process without failing on reactive nodes', () => {
+    const graph = reactive(plainCopy(PROCESS_TEMPLATES[0]!.graph))
+    expect(toCanvas(graph).nodes.length).toBe(graph.nodes.length)
+  })
+})
+
+describe('steps added to processes', () => {
+  it('offers the overdue exit only where the step takes it', () => {
+    expect(outputs('approval', {})).not.toContain('overdue')
+    expect(outputs('approval', { overdue: { action: 'remind' } })).not.toContain('overdue')
+    expect(outputs('approval', { overdue: { action: 'branch' } })).toContain('overdue')
+    expect(outputs('input', {})).toEqual(['submitted'])
+    expect(outputs('subprocess', {})).toEqual(['approve', 'return', 'reject'])
+  })
+  it('never offers the node a sub-process ending is drawn with', () => {
+    expect(paletteKinds()).toContain('input')
+    expect(paletteKinds()).toContain('subprocess')
+    expect(paletteKinds()).not.toContain('sub_end')
+  })
+  it('paints only the latest pass of a step sent back to', () => {
+    const graph = toCanvas({
+      nodes: [{ id: 'a', type: 'approval', label: '', position: { x: 0, y: 0 }, data: {} }],
+      edges: [],
+    })
+    const painted = paintRun(graph.nodes, graph.edges, [
+      { node_id: 'a', type: 'approval', state: 'succeeded', branch: 'approve', superseded: true },
+      { node_id: 'a', type: 'approval', state: 'waiting', attempt: 2 },
+    ])
+    expect(painted.nodes[0]!.data!.status).toBe('waiting')
+    expect(painted.nodes[0]!.data!.message).toBe('Lần 2')
+  })
+})
+
+describe('results steps produce', () => {
+  it('names them after the step, or the name it was given', () => {
+    expect(nodeOutputs('Duyet-1', 'approval', {}, 'Duyệt')['duyet_1.decision']).toBe('Duyệt: Quyết định')
+    expect(Object.keys(nodeOutputs('a', 'create_document', { output_name: 'van_ban' }))).toContain('van_ban.file_id')
+  })
+  it('includes what the step asks people to hand in', () => {
+    const fields = [{ key: 'ket_luan', label: 'Kết luận' }]
+    expect(nodeOutputs('a', 'approval', { result_fields: fields }, 'Bước')['a.ket_luan']).toBe('Bước: Kết luận')
+  })
+  it('reads a value set by name directly', () => {
+    expect(nodeOutputs('a', 'set_value', { name: 'tong' })).toEqual({ tong: 'Giá trị đã đặt' })
+  })
+})
+
+describe('a switch', () => {
+  it('has one exit per case and one for the rest, labelled by its cases', () => {
+    const config = { cases: [{ label: 'Lớn' }, { label: 'Nhỏ' }] }
+    expect(outputs('switch', config)).toEqual(['case_1', 'case_2', 'default'])
+    expect(branchLabel('switch', 'case_2', config)).toBe('Nhỏ')
+    expect(branchLabel('switch', 'default', config)).toBe('Còn lại')
   })
 })
