@@ -32,6 +32,7 @@ import TaskBreakdown from '../ai/TaskBreakdown.vue'
 import { useAi } from '../ai/useAi'
 import TaskAutomations from '../components/TaskAutomations.vue'
 import TaskFiles from '../components/TaskFiles.vue'
+import { TASK_STAGES, dueText, nextStep, taskStage } from '../ui/taskGuide'
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -82,6 +83,30 @@ const transitions = computed(
     >[],
 )
 const canManage = computed(() => task.value?.actions.includes('assign') ?? false)
+// The step that moves the work forward comes first; talking about it and the rest follow.
+const primaryActions = computed(() => transitions.value.filter((action) => !actionMeta[action].tone))
+const otherActions = computed(() =>
+  transitions.value.filter((action) => actionMeta[action].tone && actionMeta[action].tone !== 'danger'),
+)
+// Destructive actions sit last, away from the step people usually want.
+const dangerActions = computed(() => transitions.value.filter((action) => actionMeta[action].tone === 'danger'))
+const stage = computed(() => (task.value ? taskStage(task.value.status) : 0))
+const due = computed(() => (task.value ? dueText(task.value.due_at, task.value.status) : ''))
+const guide = computed(() => {
+  const value = task.value
+  if (!value) return null
+  const last = [...value.events].reverse().find((event) => ['return', 'block', 'cancel'].includes(event.action))
+  return nextStep({
+    status: value.status,
+    isAssignee: value.assignee_id === session.user?.id,
+    canManage: canManage.value,
+    hasAssignee: !!value.assignee_id,
+    overdue: value.overdue,
+    reason: typeof last?.detail?.reason === 'string' ? last.detail.reason : undefined,
+    requiredFiles: (value as { required_file_count?: number }).required_file_count ?? 0,
+    fileCount: value.files.length,
+  })
+})
 const canTick = computed(
   () =>
     !!task.value &&
@@ -259,32 +284,87 @@ function localInput(value: string | null) {
             class="priority"
             :class="`priority-${task.priority}`"
             >{{ priorityLabel[task.priority] }}</span
-          ><span v-if="task.overdue" class="overdue-text"
-            ><AlarmClock :size="14" /> Quá hạn</span
+          ><span v-if="due" :class="task.overdue ? 'overdue-text' : 'muted'"
+            ><AlarmClock :size="14" /> {{ due }}</span
           >
         </div>
       </div>
       <div class="page-actions">
-        <button class="button secondary" :disabled="busy" @click="discuss">
-          <MessagesSquare :size="16" />Trao đổi
-        </button>
-        <button v-if="canManage" class="button secondary" @click="ask('assign')">
-          <UserRoundPlus :size="16" />Giao lại
+        <button
+          v-for="action in primaryActions"
+          :key="action"
+          class="button"
+          :disabled="busy"
+          @click="ask(action)"
+        >
+          <component :is="actionMeta[action].icon" :size="16" />{{ actionMeta[action].label }}
         </button>
         <button
-          v-for="action in transitions"
+          v-for="action in otherActions"
           :key="action"
           class="button"
           :class="actionMeta[action].tone"
           :disabled="busy"
           @click="ask(action)"
         >
-          <component :is="actionMeta[action].icon" :size="16" />{{
-            actionMeta[action].label
-          }}
+          <component :is="actionMeta[action].icon" :size="16" />{{ actionMeta[action].label }}
+        </button>
+        <button v-if="canManage" class="button secondary" @click="ask('assign')">
+          <UserRoundPlus :size="16" />Giao lại
+        </button>
+        <button class="button secondary" :disabled="busy" @click="discuss">
+          <MessagesSquare :size="16" />Trao đổi
+        </button>
+        <button
+          v-for="action in dangerActions"
+          :key="action"
+          class="button danger"
+          :disabled="busy"
+          @click="ask(action)"
+        >
+          <component :is="actionMeta[action].icon" :size="16" />{{ actionMeta[action].label }}
         </button>
       </div>
     </header>
+    <section class="task-summary card" aria-label="Tình trạng công việc">
+      <ol v-if="stage >= 0" class="task-stages" aria-label="Các giai đoạn">
+        <li
+          v-for="(label, index) in TASK_STAGES"
+          :key="label"
+          :class="{ done: index < stage || stage === 4, current: index === stage && stage < 4 }"
+          :aria-current="index === stage ? 'step' : undefined"
+        >
+          <span class="task-stage-dot" aria-hidden="true"
+            ><Check v-if="index < stage || stage === 4" :size="12" /></span
+          >{{ label }}
+        </li>
+      </ol>
+      <p v-if="guide" class="task-next" :class="guide.tone">{{ guide.text }}</p>
+      <dl class="task-facts">
+        <div><dt>Người giao</dt><dd>{{ task.creator_name }}</dd></div>
+        <div>
+          <dt>Người thực hiện</dt>
+          <dd>{{ task.assignee_name || task.department_name || 'Chờ phân công' }}</dd>
+        </div>
+        <div>
+          <dt>Hạn hoàn thành</dt>
+          <dd :class="{ 'overdue-text': task.overdue }">
+            {{ task.due_at ? formatDate(task.due_at, true) : 'Không đặt hạn' }}
+            <button
+              v-if="canManage && !['completed', 'cancelled'].includes(task.status)"
+              class="button ghost small"
+              @click="dueEdit = { value: localInput(task.due_at), reason: '' }"
+            >
+              <CalendarClock :size="14" />Đổi hạn
+            </button>
+          </dd>
+        </div>
+        <div v-if="task.checklist_total">
+          <dt>Checklist</dt>
+          <dd>{{ task.checklist_done }}/{{ task.checklist_total }} mục</dd>
+        </div>
+      </dl>
+    </section>
     <div v-if="error && !pending" class="notice error error-inline" role="alert">
       <div>
         {{ errorText(error)
@@ -380,7 +460,7 @@ function localInput(value: string | null) {
           </RouterLink>
         </section>
         <section class="card">
-          <header class="card-header"><h2>Trao đổi trong công việc</h2></header>
+          <header class="card-header"><h2>Bình luận</h2></header>
           <div class="card-body stack">
             <p v-if="!task.comments.length" class="muted">Chưa có bình luận.</p>
             <div v-for="item in task.comments" :key="item.id" class="comment">
@@ -404,30 +484,10 @@ function localInput(value: string | null) {
       </div>
       <aside class="stack" style="align-content: start">
         <section class="card">
-          <header class="card-header"><h3>Thông tin</h3></header>
+          <header class="card-header"><h3>Chi tiết</h3></header>
           <dl class="card-body detail-meta">
-            <div><dt>Người giao</dt><dd>{{ task.creator_name }}</dd></div>
-            <div>
-              <dt>Người chịu trách nhiệm</dt>
-              <dd>
-                {{ task.assignee_name || 'Chờ trưởng đơn vị phân công' }}
-              </dd>
-            </div>
             <div v-if="task.department_name">
               <dt>Đơn vị nhận</dt><dd>{{ task.department_name }}</dd>
-            </div>
-            <div>
-              <dt>Hạn hoàn thành</dt>
-              <dd :class="{ 'overdue-text': task.overdue }">
-                {{ formatDate(task.due_at, true) }}
-                <button
-                  v-if="canManage"
-                  class="button ghost small"
-                  @click="dueEdit = { value: localInput(task.due_at), reason: '' }"
-                >
-                  <CalendarClock :size="14" />Đổi hạn
-                </button>
-              </dd>
             </div>
             <div v-if="task.watchers.length">
               <dt>Người theo dõi</dt>

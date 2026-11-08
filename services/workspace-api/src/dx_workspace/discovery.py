@@ -439,7 +439,7 @@ def build_router(app):
             "period_days": days,
             "scope": scope,
             "definitions": {
-                "overdue_rate": "Việc chưa xong có hạn và đã quá hạn / việc chưa xong có hạn, tại thời điểm as_of.",
+                "overdue_rate": "Việc chưa xong có hạn và đã quá hạn / việc chưa xong có hạn, tại thời điểm lấy số liệu.",
                 "late_completion_rate": "Việc hoàn tất trong kỳ sau hạn / việc hoàn tất trong kỳ.",
                 "cancelled": "Việc đã hủy không tính vào việc đang mở.",
             },

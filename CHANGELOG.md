@@ -78,6 +78,11 @@
 - CI chạy thêm `packages/flowkit/tests` (56 test) và test Node của plugin `vn-document-format` (29 test), trước đây không được chạy.
 
 ### Changed
+- **Chi tiết công việc** dễ theo dõi hơn: khung tóm tắt ở đầu trang cho thấy việc đang ở bước nào (Đã giao →
+  Tiếp nhận → Đang làm → Chờ nghiệm thu → Hoàn tất), một câu nói rõ bước tiếp theo cho đúng người đang xem (người
+  làm, người giao), hạn còn bao lâu hoặc đã quá bao lâu, nút Đổi hạn ngay cạnh hạn. Nút hủy/từ chối xếp cuối, tách
+  khỏi thao tác chính. **Báo cáo** dùng lời thường cho phạm vi, kỳ và giờ; định nghĩa số liệu gom vào một mục mở
+  ra khi cần.
 - **Giao diện theo design system** ([design-system/desktiny/MASTER.md](design-system/desktiny/MASTER.md), tạo bằng skill
   ui-ux-pro-max): phong cách tối giản, màu chính navy, bỏ nền chuyển sắc và bóng đổ nặng; cỡ chữ tối thiểu 12px (trước đó
   có chữ 8px), nút tối thiểu 40px và 44px trên màn hình cảm ứng; viền focus rõ; tôn trọng giảm chuyển động. Bỏ các khẩu

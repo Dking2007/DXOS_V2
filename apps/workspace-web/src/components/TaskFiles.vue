@@ -114,7 +114,7 @@ async function download(file: AttachedFile) {
     </header>
     <p v-if="!files.length" class="step-empty" style="padding: 18px 23px">
       Chưa có tài liệu.<template v-if="canAttach()">
-        {{ canManage ? 'Đính kèm yêu cầu, mẫu biểu cho người làm.' : 'Đính kèm kết quả trước khi nộp.' }}</template
+        {{ ' ' }}{{ canManage ? 'Đính kèm yêu cầu, mẫu biểu cho người làm.' : 'Đính kèm kết quả trước khi nộp.' }}</template
       >
     </p>
     <div v-for="file in files" :key="file.id" class="list-row">

@@ -253,3 +253,101 @@ time {
 .tag {
   white-space: nowrap;
 }
+/* Card headers wrap rather than squeeze their title when the actions do not fit. */
+.card-header {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+
+/* Task: where it stands and what comes next, before the details. */
+.task-summary {
+  padding: 18px 23px;
+  margin-bottom: 20px;
+  display: grid;
+  gap: 14px;
+}
+.task-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.task-stages li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.task-stage-dot {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  color: #fff;
+}
+.task-stages li.done {
+  color: var(--ink-2);
+}
+.task-stages li.done .task-stage-dot {
+  background: var(--green-ink);
+  border-color: var(--green-ink);
+}
+.task-stages li.current {
+  color: var(--navy);
+  font-weight: 600;
+}
+.task-stages li.current .task-stage-dot {
+  border-color: var(--teal);
+  box-shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 10px var(--teal);
+}
+.task-next {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--ink-2);
+  border-left: 3px solid var(--blue-ink);
+}
+.task-next.warn {
+  background: var(--amber-soft);
+  border-left-color: var(--amber-ink);
+}
+.task-next.done {
+  background: var(--green-soft);
+  border-left-color: var(--green-ink);
+}
+.task-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px 24px;
+}
+.task-facts dt {
+  font-size: 13px;
+  color: var(--muted);
+}
+.task-facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+/* Reports: what the numbers cover, said once in plain words. */
+.report-asof {
+  font-size: 14px;
+  margin: 0 0 14px;
+}
+.report-definitions summary {
+  padding: 16px 23px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.report-definitions[open] summary {
+  border-bottom: 1px solid var(--border);
+}
+
