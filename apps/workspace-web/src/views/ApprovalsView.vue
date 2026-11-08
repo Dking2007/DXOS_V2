@@ -7,7 +7,6 @@ import { RouterLink } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   ArrowRight,
-  CheckCheck,
   ClipboardCheck,
   ChevronRight,
   UserRoundCheck,
@@ -95,14 +94,8 @@ async function answered() {
 </script>
 <template>
   <StepAnswerDialog v-if="answering" :task="answering" mode="answer" @close="answering = null" @done="answered" />
-  <header class="page-head">
-    <div>
-      <h1>Cần phê duyệt</h1>
-      <p>Xem nội dung, đối chiếu tài liệu và ra quyết định có căn cứ.</p>
-    </div>
-    <div class="date-line">
-      <CheckCheck :size="16" />Danh sách tự cập nhật mỗi 20 giây
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Cần phê duyệt</h1>
   </header>
   <section class="card">
     <header class="card-header">

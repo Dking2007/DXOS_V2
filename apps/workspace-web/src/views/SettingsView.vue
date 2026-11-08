@@ -157,11 +157,8 @@ const roleLabels: Record<string, string> = {
 }
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <h1>Thiết lập</h1>
-      <p>Cơ cấu tổ chức, vai trò và quyền, nhật ký. Biểu mẫu và bước duyệt thiết kế ở màn Quy trình.</p>
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Thiết lập</h1>
   </header>
   <nav class="subnav" aria-label="Nhóm thiết lập">
     <button

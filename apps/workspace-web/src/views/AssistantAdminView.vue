@@ -94,11 +94,8 @@ const checklist = computed(() => {
 })
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <h1>Trợ lý AI</h1>
-      <p>Trợ lý trả lời câu hỏi về quy trình nghiệp vụ và cách dùng phần mềm, dựa trên kiến thức bạn cung cấp.</p>
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Trợ lý AI</h1>
     <button class="button secondary" type="button" @click="assistantOpen = true">
       <Sparkles :size="16" />Thử hỏi trợ lý
     </button>

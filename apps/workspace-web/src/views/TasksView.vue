@@ -108,11 +108,8 @@ function closeCreate() {
 }
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <h1>Công việc</h1>
-      <p>Giao việc theo cấp quản lý, theo dõi tiến độ và nghiệm thu kết quả.</p>
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Công việc</h1>
     <div class="page-actions">
       <button class="button" @click="showCreate = true">
         <Plus :size="18" />Giao việc

@@ -163,11 +163,8 @@ async function create() {
 }
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <h1>Hồ sơ</h1>
-      <p>Theo dõi từ bản nháp đến quyết định cuối cùng.</p>
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Hồ sơ</h1>
     <button class="button" @click="openCreate">
       <FilePlus2 :size="18" />Tạo hồ sơ
     </button>

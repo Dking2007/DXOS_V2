@@ -186,6 +186,18 @@ time {
   color: #bfdbfe;
 }
 
+/* Screens open on their content: no title or tagline above it, only the page's own actions.
+   The top bar names the page; the heading is kept for screen readers. */
+.page-head.compact {
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.page-head.compact:not(:has(> :not(h1))) {
+  display: block;
+  margin: 0;
+}
+
 /* Lists on a phone never push the page sideways. */
 .flow-cards {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));

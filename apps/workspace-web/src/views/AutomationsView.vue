@@ -132,41 +132,12 @@ async function saveConnection() {
 }
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <h1>Quy trình nghiệp vụ</h1>
-      <p>
-        Mỗi luồng bắt đầu từ một sự kiện: hồ sơ được trình, công việc được nộp, bài viết mới… rồi đi qua các bước do người
-        xử lý hoặc tự động. Mọi loại bước dùng được cho mọi luồng.
-      </p>
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Quy trình nghiệp vụ</h1>
     <div class="page-actions">
       <button class="button" @click="showTemplates = true"><Plus :size="18" />Tạo luồng</button>
     </div>
   </header>
-  <section class="how-it-works" aria-label="Cách hoạt động">
-    <div>
-      <span class="how-step">1</span>
-      <div>
-        <strong>Chọn mẫu, chọn khi nào chạy</strong>
-        <small>Chọn biểu mẫu ở node đầu tiên thì hồ sơ của biểu mẫu đó đi theo luồng này.</small>
-      </div>
-    </div>
-    <div>
-      <span class="how-step">2</span>
-      <div>
-        <strong>Chỉnh bước, đặt kết quả phải nộp</strong>
-        <small>Bước sau đọc được kết quả của bước trước trong điều kiện và nội dung.</small>
-      </div>
-    </div>
-    <div>
-      <span class="how-step">3</span>
-      <div>
-        <strong>Phát hành rồi theo dõi</strong>
-        <small>Sửa canvas không ảnh hưởng ai cho đến lần phát hành sau. Mỗi hồ sơ có tab <b>Quy trình</b> cho thấy đang ở bước nào.</small>
-      </div>
-    </div>
-  </section>
   <div v-if="error && !connectionForm" class="notice error error-inline">{{ errorText(error) }}</div>
   <section v-if="rules.isPending.value || rules.error.value || !shown.length" class="card">
     <StatePanel

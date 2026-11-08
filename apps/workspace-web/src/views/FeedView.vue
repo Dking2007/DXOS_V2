@@ -163,11 +163,8 @@ async function openAnnouncement(post: Post) {
 }
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <h1>Bảng tin</h1>
-      <p>Thông báo chính thức, tin tức và lời chia sẻ trong cơ quan.</p>
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Bảng tin</h1>
   </header>
   <div class="feed-page">
     <div class="feed-main">

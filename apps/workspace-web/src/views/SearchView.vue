@@ -70,11 +70,8 @@ function go() {
 }
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <h1>Tìm kiếm</h1>
-      <p>Chỉ hiển thị và đếm những gì bạn được phép xem.</p>
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Tìm kiếm</h1>
   </header>
   <form class="search-box search-large" @submit.prevent="go">
     <Search :size="19" /><input

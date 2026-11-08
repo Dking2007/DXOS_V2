@@ -82,11 +82,8 @@ function bars(record: Record<string, number>) {
 }
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <h1>Báo cáo</h1>
-      <p>Số liệu tính trên dữ liệu bạn được phép xem; mỗi chỉ số có định nghĩa rõ ràng.</p>
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Báo cáo</h1>
     <div class="page-actions">
       <select v-model="scope" aria-label="Phạm vi" class="compact-select">
         <option value="all">Mọi việc tôi xem được</option>
