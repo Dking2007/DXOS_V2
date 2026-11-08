@@ -5,7 +5,7 @@
   width: auto;
   min-height: 36px;
   padding: 6px 10px;
-  font-size: 14px;
+  font-size: 15px;
 }
 .prewrap {
   white-space: pre-wrap;
@@ -21,7 +21,7 @@
 }
 .priority {
   display: inline-flex;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   padding: 3px 9px;
   border-radius: 999px;
@@ -80,7 +80,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 2px 2px 4px;
-  font-size: 13px;
+  font-size: 14px;
 }
 .kanban-card {
   display: flex;
@@ -106,23 +106,23 @@
   border-left-color: var(--red);
 }
 .kanban-card strong {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
 }
 .kanban-card small {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 .kanban-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .due-groups section h3 {
   padding: 18px 23px 6px;
-  font-size: 14px;
+  font-size: 15px;
 }
 .checklist-edit {
   display: flex;
@@ -140,7 +140,7 @@
 .progress-track > span {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #13a3b0, #087e8b);
+  background: linear-gradient(90deg, #1e3a5f, #1e3a5f);
   border-radius: inherit;
   transition: width 0.3s;
 }
@@ -156,11 +156,11 @@
 .comment .avatar {
   width: 32px;
   height: 32px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .comment p {
   margin-top: 4px;
-  font-size: 14px;
+  font-size: 15px;
 }
 .comment-form {
   display: flex;
@@ -175,7 +175,7 @@
   padding: 3px 9px;
   border-radius: 7px;
   background: var(--surface-3);
-  font-size: 13px;
+  font-size: 14px;
 }
 .delegated-note {
   display: flex !important;
@@ -190,7 +190,7 @@
   gap: 10px;
 }
 .task-flows-hint {
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .task-flow {
   display: flex;
@@ -209,10 +209,10 @@
   display: block;
 }
 .task-flow strong {
-  font-size: 13.5px;
+  font-size: 14px;
 }
 .task-flow small {
-  font-size: 12px;
+  font-size: 13px;
   margin-top: 2px;
 }
 .task-flows-always {
@@ -222,7 +222,7 @@
   border-top: 1px dashed var(--border);
 }
 .task-flows-always small {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 /* Shell additions */
@@ -239,7 +239,7 @@
   border-radius: 999px;
   background: #2bb5c0;
   color: #06303a;
-  font-size: 11px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 700;
   display: grid;
@@ -254,7 +254,7 @@
   right: 6px;
   min-width: 16px;
   height: 16px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .topbar-search {
   flex: 1;
@@ -274,8 +274,8 @@
 }
 .topbar-search:focus-within {
   background: var(--surface);
-  border-color: #7cc3cb;
-  box-shadow: 0 0 0 4px #087e8b1a;
+  border-color: #93b4dc;
+  box-shadow: 0 0 0 4px #1e3a5f1a;
 }
 .topbar-search input {
   border: 0;
@@ -325,7 +325,7 @@
   background: var(--surface);
   border-radius: 999px;
   padding: 4px 11px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--navy);
 }
 .chip-select button.active {
@@ -377,7 +377,7 @@
   transform: translateX(18px);
 }
 .switch input:focus-visible + span {
-  outline: 3px solid #16a9bd;
+  outline: 3px solid #2563eb;
   outline-offset: 2px;
 }
 @media (max-width: 1200px) {

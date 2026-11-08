@@ -512,7 +512,6 @@ function pickFile(event: Event) {
 <template>
   <header class="drive-hero">
     <div>
-      <span class="eyebrow">KHÔNG GIAN TÀI LIỆU</span>
       <h1>Tài liệu</h1>
       <p>Tìm, sắp xếp và cộng tác trên tài liệu của bạn.</p>
     </div>
@@ -1096,17 +1095,17 @@ function pickFile(event: Event) {
 .drive-new:hover { background: var(--surface-2); border-color: var(--teal-line); }
 .drive-new-menu { position: absolute; top: 60px; left: 0; z-index: 15; min-width: 210px; padding: 7px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 16px 38px #0d2e4530; }
 .drive-new-menu button, .drive-nav button, .drive-rail-folders button { display: flex; align-items: center; gap: 13px; width: 100%; border: 0; background: none; color: var(--navy); cursor: pointer; text-align: left; }
-.drive-new-menu button { padding: 11px 12px; border-radius: 8px; font-size: 13px; }
+.drive-new-menu button { padding: 11px 12px; border-radius: 8px; font-size: 14px; }
 .drive-new-menu button:hover, .drive-rail-folders button:hover { background: var(--surface-3); }
 .drive-nav { display: grid; gap: 3px; }
-.drive-nav button { min-height: 42px; padding: 0 14px; border-radius: 0 20px 20px 0; font-size: 13px; font-weight: 600; }
+.drive-nav button { min-height: 42px; padding: 0 14px; border-radius: 0 20px 20px 0; font-size: 14px; font-weight: 600; }
 .drive-nav button:hover { background: var(--surface-3); }
 .drive-nav button.active { background: var(--teal-soft); color: var(--teal-ink); }
 .drive-rail-folders { margin-top: 26px; border-top: 1px solid var(--border); padding-top: 17px; }
-.drive-rail-folders > span { display: block; padding: 0 13px 9px; font-size: 10px; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
-.drive-rail-folders button { padding: 9px 13px; border-radius: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.drive-rail-folders > span { display: block; padding: 0 13px 9px; font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
+.drive-rail-folders button { padding: 9px 13px; border-radius: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .drive-rail-folders svg { flex: none; color: #b5944b; }
-.drive-rail-note { margin: 24px 13px; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.drive-rail-note { margin: 24px 13px; font-size: 13px; line-height: 1.55; color: var(--muted); }
 @media (min-width: 701px) {
   .drive-workspace { transition: grid-template-columns 0.2s ease; }
   .drive-workspace.rail-collapsed { grid-template-columns: 64px minmax(0, 1fr); }
@@ -1123,7 +1122,7 @@ function pickFile(event: Event) {
 .drive-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 84px; padding: 18px 23px; }
 .drive-panel-head h2 { margin: 3px 0 0; font-size: 20px; }
 .drive-panel-controls { display: flex; align-items: center; gap: 5px; }
-.drive-sort select { min-height: 35px; max-width: 125px; border: 0; background: transparent; color: var(--navy); font-size: 12px; cursor: pointer; }
+.drive-sort select { min-height: 35px; max-width: 125px; border: 0; background: transparent; color: var(--navy); font-size: 13px; cursor: pointer; }
 .drive-control { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
 .drive-control:hover, .drive-control.active { background: var(--surface-3); color: var(--teal-ink); }
 .drive-control-divider { height: 21px; width: 1px; background: var(--border); margin: 0 5px; }
@@ -1156,13 +1155,13 @@ function pickFile(event: Event) {
 .drive-file-preview.image { color: #987bc2; background: linear-gradient(140deg, var(--violet-soft), var(--violet-soft)); }
 .drive-file-card-bottom { display: flex; padding: 12px 15px 16px; min-width: 0; }
 .drive-file-card-bottom .grow { min-width: 0; }
-.drive-file-card-bottom strong, .drive-file-card-bottom .row-link, .drive-file-card-bottom .drive-file-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
-.drive-file-card-bottom small { display: block; color: var(--muted); margin-top: 5px; font-size: 11px; }
+.drive-file-card-bottom strong, .drive-file-card-bottom .row-link, .drive-file-card-bottom .drive-file-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
+.drive-file-card-bottom small { display: block; color: var(--muted); margin-top: 5px; font-size: 12px; }
 .drive-action-bar { position: sticky; bottom: 12px; z-index: 8; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 12px 18px; padding: 8px 10px 8px 17px; border: 1px solid var(--teal-line); border-radius: 12px; background: var(--teal-soft); box-shadow: 0 7px 24px #183e5125; }
-.drive-action-bar > span { min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; }
-.drive-action-bar button { display: flex; align-items: center; gap: 5px; border: 0; border-radius: 7px; padding: 8px; color: var(--teal-ink); background: transparent; cursor: pointer; font-size: 12px; }
+.drive-action-bar > span { min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; }
+.drive-action-bar button { display: flex; align-items: center; gap: 5px; border: 0; border-radius: 7px; padding: 8px; color: var(--teal-ink); background: transparent; cursor: pointer; font-size: 13px; }
 .drive-action-bar button:hover { background: var(--teal-soft); }
-.drive-action-bar > .drive-owner-note { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 0 8px; color: var(--muted); font-size: 12px; font-weight: 500; }
+.drive-action-bar > .drive-owner-note { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 0 8px; color: var(--muted); font-size: 13px; font-weight: 500; }
 .drive-panel :deep(.pagination) { padding: 16px 23px; }
 @media (max-width: 1100px) { .drive-workspace { grid-template-columns: 155px minmax(0, 1fr); gap: 10px; } .drive-panel-head { flex-wrap: wrap; } }
 @media (max-width: 700px) { .drive-hero { flex-direction: column; align-items: stretch; } .drive-search { width: 100%; } .drive-workspace { display: block; } .drive-rail { position: static; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 0; } .drive-new-wrap { margin: 0; } .drive-nav { display: flex; flex: 1; } .drive-nav button { min-height: 45px; padding: 0 10px; border-radius: 10px; justify-content: center; } .drive-rail-folders, .drive-rail-note, .drive-rail-toggle { display: none; } .drive-panel-head { padding: 16px; } .drive-panel :deep(.folder-grid) { padding: 10px 16px 17px; } .drive-file-grid { padding: 15px; } .drive-sort select { max-width: 105px; } }

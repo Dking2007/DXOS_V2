@@ -11,63 +11,60 @@
 
 :root {
   font-family: 'Source Sans 3', sans-serif;
-  color: #172f43;
-  background: #f3f6fa;
+  color: #0f172a;
+  background: #f8fafc;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --navy: #172f43;
-  --teal: #087e8b;
-  --canvas: #f3f6fa;
-  --border: #dce4eb;
-  --muted: #5b6e81;
-  --red: #ad3346;
-  --amber: #946013;
-  --teal-strong: #066f7b;
-  --teal-soft: #e6f4f5;
+  --navy: #0f172a;
+  --teal: #1e3a5f;
+  --canvas: #f8fafc;
+  --border: #dbe2ea;
+  --muted: #475569;
+  --red: #b91c1c;
+  --amber: #92600a;
+  --teal-strong: #16304f;
+  --teal-soft: #e9eef5;
   --surface: #fff;
-  --surface-2: #f5f8fb;
-  --surface-3: #edf2f6;
-  --surface-4: #dbe3ea;
-  --border-soft: #edf1f5;
-  --border-strong: #cfd9e2;
-  --ink-2: #2c5368;
-  --teal-ink: #086b76;
-  --teal-line: #b9dde2;
-  --green-ink: #187454;
-  --green-soft: #e9f5ef;
-  --green-line: #a9d8c2;
-  --red-ink: #ad3346;
-  --red-soft: #fdecef;
-  --red-line: #ecc3cb;
-  --amber-ink: #8a5a12;
+  --surface-2: #f4f7fa;
+  --surface-3: #e9eef5;
+  --surface-4: #cbd5e1;
+  --border-soft: #e9eef5;
+  --border-strong: #cbd5e1;
+  --ink-2: #334155;
+  --teal-ink: #1e3a5f;
+  --teal-line: #cbd5e1;
+  --green-ink: #15803d;
+  --green-soft: #e8f6ee;
+  --green-line: #a7dbbc;
+  --red-ink: #b91c1c;
+  --red-soft: #fdecec;
+  --red-line: #f3c4c4;
+  --amber-ink: #854d0e;
   --amber-soft: #fff3df;
   --amber-line: #f0d8a8;
-  --blue-ink: #2f6fc0;
-  --blue-soft: #e8f0fb;
-  --blue-line: #c3d7f0;
+  --blue-ink: #1d4ed8;
+  --blue-soft: #e8effc;
+  --blue-line: #bfd3f6;
   --violet-ink: #5d43b5;
   --violet-soft: #f0ecfb;
   --violet-line: #d6cdf3;
-  --focus: #16a9bd;
-  --radius: 14px;
-  --shadow-sm: 0 1px 2px #0f2a4108, 0 1px 3px #0f2a410d;
-  --shadow-md: 0 2px 4px #0f2a410a, 0 8px 24px #0f2a4114;
-  --shadow-lg: 0 12px 40px #0f2a4126;
+  --focus: #2563eb;
+  --radius: 10px;
+  --shadow-sm: 0 1px 2px #0f172a0f;
+  --shadow-md: 0 1px 3px #0f172a14, 0 4px 12px #0f172a0f;
+  --shadow-lg: 0 12px 32px #0f172a29;
 }
 * {
   box-sizing: border-box;
 }
 body {
   margin: 0;
-  background:
-    radial-gradient(1200px 500px at 85% -10%, var(--teal-soft) 0%, transparent 60%),
-    var(--canvas);
-  background-attachment: fixed;
+  background: var(--canvas);
   min-height: 100dvh;
 }
 ::selection {
-  background: #bfe6ea;
+  background: #dbeafe;
 }
 button,
 input,
@@ -143,7 +140,7 @@ code,
 .eyebrow {
   display: block;
   font-family: 'Be Vietnam Pro', sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 600;
@@ -181,7 +178,7 @@ code,
   min-height: 40px;
   padding: 8px 16px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
   text-decoration: none;
   white-space: nowrap;
   background-image: linear-gradient(180deg, #ffffff1f, transparent);
@@ -196,7 +193,7 @@ code,
 .button:hover {
   background-color: var(--teal-strong);
   box-shadow:
-    0 4px 12px #087e8b40,
+    0 4px 12px #1e3a5f40,
     inset 0 1px 0 #ffffff26;
   text-decoration: none;
 }
@@ -238,7 +235,7 @@ code,
 }
 .button.small {
   min-height: 32px;
-  font-size: 13px;
+  font-size: 14px;
   padding: 5px 11px;
 }
 .icon-button {
@@ -297,10 +294,10 @@ table {
 th {
   font-weight: 600;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  font-size: 11px;
+  font-size: 12px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
@@ -310,7 +307,7 @@ th {
   padding: 14px 22px;
 }
 td {
-  font-size: 14px;
+  font-size: 15px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
@@ -338,7 +335,7 @@ tbody tr:hover {
   display: block;
   color: var(--muted);
   margin-top: 3px;
-  font-size: 12px;
+  font-size: 13px;
 }
 .file-icon {
   height: 37px;
@@ -376,8 +373,8 @@ tbody tr:hover {
 }
 .search-box:focus-within {
   background: var(--surface);
-  border-color: #7cc3cb;
-  box-shadow: 0 0 0 4px #087e8b1a;
+  border-color: #93b4dc;
+  box-shadow: 0 0 0 4px #1e3a5f1a;
 }
 .search-box input {
   background: transparent;
@@ -398,7 +395,7 @@ tbody tr:hover {
   color: var(--muted);
   border-radius: 8px;
   padding: 7px 13px;
-  font-size: 14px;
+  font-size: 15px;
   transition:
     background 0.15s,
     color 0.15s;
@@ -452,7 +449,7 @@ tbody tr:hover {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   border-radius: 999px;
@@ -508,11 +505,11 @@ tbody tr:hover {
 }
 .field label {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
 }
 .field small {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 input,
 select,
@@ -538,7 +535,7 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: #5fb6c0;
-  box-shadow: 0 0 0 4px #087e8b1a;
+  box-shadow: 0 0 0 4px #1e3a5f1a;
   outline: none;
 }
 .search-box input:focus {
@@ -600,7 +597,7 @@ select:disabled {
   padding: 13px 15px;
   background: var(--teal-soft);
   color: var(--teal-ink);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
 }
 .notice.error {
@@ -652,7 +649,7 @@ select:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
   margin-bottom: 18px;
   flex-wrap: wrap;
@@ -663,7 +660,7 @@ select:disabled {
 .section-label {
   display: block;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   margin-bottom: 5px;
 }
 .divider {
@@ -707,7 +704,7 @@ a.list-row:hover {
   background: linear-gradient(140deg, var(--teal-soft), var(--surface-3));
   color: var(--navy);
   font-family: 'Be Vietnam Pro', sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 .pagination {
@@ -723,7 +720,7 @@ a.list-row:hover {
   background: var(--surface-3);
   padding: 3px 7px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .sr-only {
@@ -751,11 +748,11 @@ a.list-row:hover {
 }
 .detail-meta dt {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 .detail-meta dd {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
 }
 .error-inline {
   margin-bottom: 18px;
@@ -796,7 +793,7 @@ a.list-row:hover {
   color: var(--muted);
   z-index: 1;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12px;
 }
 .rail-step.done .rail-circle {
   background: var(--teal);
@@ -817,13 +814,13 @@ a.list-row:hover {
   background: linear-gradient(transparent 28px, var(--surface-2) 28px);
 }
 .rail-content strong {
-  font-size: 12px;
+  font-size: 13px;
   display: block;
 }
 .rail-content small {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 5px;
 }
 .timeline {
@@ -853,15 +850,15 @@ a.list-row:hover {
   border: 2px solid var(--surface);
 }
 .timeline p {
-  font-size: 14px;
+  font-size: 15px;
 }
 .timeline small {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .code-editor {
   font-family: ui-monospace, monospace;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
   min-height: 230px;
 }

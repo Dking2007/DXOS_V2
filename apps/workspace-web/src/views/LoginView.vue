@@ -13,10 +13,9 @@ function login() {
     <section class="login-story" aria-label="Desktiny">
       <div class="brand">
         <span class="brand-mark">D<span /></span
-        ><span>Desktiny<small>VĂN PHÒNG SỐ</small></span>
+        ><span>Desktiny</span>
       </div>
       <div class="login-thesis">
-        <span class="eyebrow">MỘT DÒNG CHẢY CÔNG VIỆC</span>
         <h1>
           Từ tài liệu đầu tiên.<br />Đến quyết định<br /><span>cuối cùng.</span>
         </h1>

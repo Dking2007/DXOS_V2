@@ -96,7 +96,6 @@ const checklist = computed(() => {
 <template>
   <header class="page-head">
     <div>
-      <span class="eyebrow">QUẢN TRỊ</span>
       <h1>Trợ lý AI</h1>
       <p>Trợ lý trả lời câu hỏi về quy trình nghiệp vụ và cách dùng phần mềm, dựa trên kiến thức bạn cung cấp.</p>
     </div>

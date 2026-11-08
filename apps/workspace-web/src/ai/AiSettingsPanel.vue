@@ -310,7 +310,7 @@ async function reindex() {
         <header class="card-header">
           <div>
             <h2><Database :size="18" /> Tìm theo ý nghĩa</h2>
-            <p class="muted" style="font-size: 13px; margin-top: 4px">
+            <p class="muted" style="font-size: 14px; margin-top: 4px">
               Cần một dịch vụ tạo vector (embedding): Ollama, OpenAI, Gemini, vLLM hoặc cổng Chat Completions. Nội
               dung tài liệu, công việc, hồ sơ được gửi tới dịch vụ này để lập chỉ mục.
             </p>
@@ -356,7 +356,7 @@ async function reindex() {
             <button type="button" class="button secondary small" :disabled="!settings.data.value.index.ready || dirty" @click="reindex">
               <RefreshCw :size="14" />Lập chỉ mục lại
             </button>
-            <span v-if="settings.data.value.index.ready" class="muted" style="font-size: 13px">
+            <span v-if="settings.data.value.index.ready" class="muted" style="font-size: 14px">
               Đã lập chỉ mục {{ settings.data.value.index.indexed }}/{{ settings.data.value.index.total }} mục
               ({{ settings.data.value.index.by_type.file ?? 0 }} tài liệu, {{ settings.data.value.index.by_type.task ?? 0 }}
               công việc, {{ settings.data.value.index.by_type.case ?? 0 }} hồ sơ).
@@ -366,7 +366,7 @@ async function reindex() {
       </section>
 
       <div class="form-actions sticky-actions">
-        <span class="muted grow" style="font-size: 13px">
+        <span class="muted grow" style="font-size: 14px">
           Đang bật {{ enabledCount }}/{{ settings.data.value.features.length }} tính năng. Mỗi lần dùng tính năng AI
           tính vào giới hạn lượt/người/ngày ở tab Cấu hình chung.
         </span>

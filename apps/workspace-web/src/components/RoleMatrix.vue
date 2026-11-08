@@ -96,7 +96,7 @@ function reset() {
       <div>
         <span class="eyebrow">VAI TRÒ & QUYỀN</span>
         <h2>Mỗi vai trò được làm gì?</h2>
-        <p class="muted" style="font-size: 14px; margin-top: 5px">
+        <p class="muted" style="font-size: 15px; margin-top: 5px">
           Đánh dấu ô để cấp quyền cho cả vai trò. Quyền xem từng hồ sơ, tài liệu vẫn được kiểm tra riêng.
         </p>
       </div>

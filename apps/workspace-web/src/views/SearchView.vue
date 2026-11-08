@@ -72,8 +72,7 @@ function go() {
 <template>
   <header class="page-head">
     <div>
-      <span class="eyebrow">TÌM KIẾM</span>
-      <h1>Tìm trong không gian làm việc</h1>
+      <h1>Tìm kiếm</h1>
       <p>Chỉ hiển thị và đếm những gì bạn được phép xem.</p>
     </div>
   </header>

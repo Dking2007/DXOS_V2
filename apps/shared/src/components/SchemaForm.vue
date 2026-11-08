@@ -46,7 +46,9 @@ function update(field: FormField, event: Event) {
               ? modelValue[field.key]
                 ? 'Có'
                 : 'Không'
-              : (modelValue[field.key] ?? '—')
+              : field.type === 'number' && typeof modelValue[field.key] === 'number'
+                ? (modelValue[field.key] as number).toLocaleString('vi-VN')
+                : (modelValue[field.key] ?? '—')
           }}
         </p></template
       >

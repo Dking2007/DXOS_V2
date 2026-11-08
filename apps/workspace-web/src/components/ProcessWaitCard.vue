@@ -39,7 +39,7 @@ const maxWait = computed(() =>
         :empty="metrics.data.value?.sample_size === 0" compact title="Chưa đủ hồ sơ để tính thời gian chờ"
         @retry="metrics.refetch()" />
       <template v-if="metrics.data.value?.sample_size">
-        <p class="muted" style="font-size: 13px">Tính trên {{ metrics.data.value.sample_size }} lượt duyệt · {{ metrics.data.value.overdue_cases }} hồ sơ quá hạn · {{ metrics.data.value.returns }} lần trả lại<span v-if="metrics.data.value.truncated"> · chỉ lấy 2.000 lượt gần nhất</span></p>
+        <p class="muted" style="font-size: 14px">Tính trên {{ metrics.data.value.sample_size }} lượt duyệt · {{ metrics.data.value.overdue_cases }} hồ sơ quá hạn · {{ metrics.data.value.returns }} lần trả lại<span v-if="metrics.data.value.truncated"> · chỉ lấy 2.000 lượt gần nhất</span></p>
         <div v-for="step in metrics.data.value.steps" :key="`${step.package_version_id}:${step.step}`" class="metric-row">
           <div><strong>{{ step.step }}</strong><small>{{ step.count }} lượt · {{ step.waiting }} đang chờ<span v-if="step.overdue" class="overdue-text"> · {{ step.overdue }} quá hạn</span></small>
             <div v-if="step.case_ids.length" class="metric-cases"><RouterLink v-for="(caseId, n) in step.case_ids" :key="caseId" :to="`/cases/${caseId}`">Hồ sơ {{ n + 1 }}</RouterLink></div>

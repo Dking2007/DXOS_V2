@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
     <div
       v-if="!loading"
       class="notice warning"
-      style="border-radius: 0 0 8px 8px; font-size: 12px"
+      style="border-radius: 0 0 8px 8px; font-size: 13px"
     >
       <span
         >Sau khi sửa xong, hãy đóng trình soạn thảo và chờ vài giây để hệ thống

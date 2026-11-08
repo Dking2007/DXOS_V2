@@ -1,0 +1,243 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-FileCopyrightText: 2026 Desktiny contributors */
+/* Component refinements of the design system (design-system/desktiny/MASTER.md), loaded last.
+   Flat surfaces, one primary colour, comfortable targets; colour never carries meaning alone. */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.inline-icon {
+  vertical-align: -2px;
+}
+body {
+  font-size: 16px;
+  line-height: 1.5;
+}
+h1 {
+  font-size: 28px;
+  letter-spacing: -0.01em;
+}
+td,
+.mono,
+time {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keyboard focus is always visible, in both themes. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Controls: one solid primary, no gradients or glows; hovering changes colour, never position. */
+.button:not(.secondary):not(.ghost):not(.danger) {
+  background: var(--teal);
+  box-shadow: none;
+}
+.button:hover,
+.button:not(.secondary):not(.ghost):not(.danger):hover {
+  box-shadow: none;
+}
+.button:not(.secondary):not(.ghost):not(.danger):hover {
+  background: var(--teal-strong);
+}
+.button:active:not(:disabled) {
+  transform: none;
+  opacity: 0.9;
+}
+.button,
+.icon-button {
+  border-radius: 8px;
+}
+.button {
+  min-height: 40px;
+}
+.button.small {
+  min-height: 36px;
+}
+.icon-button {
+  width: 40px;
+  height: 40px;
+}
+.tab,
+.filter-chip,
+.chip,
+.agenda-filter {
+  min-height: 36px;
+}
+.card {
+  box-shadow: none;
+  border-radius: var(--radius);
+}
+@media (pointer: coarse) {
+  .button,
+  .button.small,
+  .tab {
+    min-height: 44px;
+  }
+  .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Sidebar: flat navy, a clear current item. */
+.sidebar {
+  background: #14263d;
+  box-shadow: none;
+  color: #dbe4ee;
+  padding-top: 24px;
+}
+.brand {
+  padding-bottom: 20px;
+}
+.brand-mark {
+  background: #fff;
+  color: #14263d;
+  box-shadow: none;
+}
+.nav-label {
+  color: #a9bbcd;
+}
+.nav-link {
+  color: #dbe4ee;
+}
+.nav-link.router-link-active {
+  background: #ffffff1f;
+  border-color: transparent;
+  box-shadow: inset 3px 0 0 #93c5fd;
+  color: #fff;
+}
+.nav-link.router-link-active svg {
+  color: #bfdbfe;
+}
+.nav-badge {
+  background: #dbeafe;
+  color: #14263d;
+  font-weight: 600;
+}
+
+/* Top bar: separators are decoration; the current page is the emphasis. */
+.topbar-crumb {
+  color: var(--muted);
+}
+
+/* Home: a plain greeting, not a banner. */
+.welcome-section {
+  background: none;
+  color: var(--navy);
+  padding: 0;
+  box-shadow: none;
+  border: 0;
+  min-height: 0;
+  align-items: flex-end;
+}
+.welcome-section::before,
+.welcome-section::after {
+  display: none;
+}
+.welcome-section h1 {
+  color: var(--navy);
+}
+.welcome-section p {
+  color: var(--muted);
+}
+.date-block {
+  background: var(--surface);
+  color: var(--ink-2);
+  border: 1px solid var(--border);
+}
+
+/* Flow steps: the coloured icon identifies the kind; the text stays readable. */
+.flow-node-kind,
+.flow-node-eyebrow {
+  color: var(--muted);
+}
+
+/* Decorative separators still have to be seen. */
+.topbar-divider {
+  color: var(--muted);
+}
+
+/* The step's name in its own colour was too faint on white. */
+.flow-node-text small {
+  color: var(--muted);
+}
+
+.segmented button {
+  min-height: 36px;
+  min-width: 36px;
+}
+.chat-avatar {
+  background: var(--teal-soft);
+  color: var(--teal-ink);
+}
+.login-thesis h1 span {
+  color: #bfdbfe;
+}
+
+/* Lists on a phone never push the page sideways. */
+.flow-cards {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+}
+.how-it-works > * {
+  min-width: 0;
+}
+
+/* The top bar always fits a phone: the page title gives way, the actions stay. */
+@media (max-width: 480px) {
+  .topbar {
+    gap: 4px;
+  }
+  .topbar-actions {
+    gap: 2px;
+    min-width: 0;
+  }
+  .topbar .icon-button {
+    width: 36px;
+    height: 36px;
+  }
+  .topbar-title,
+  .topbar > :first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Counts stay legible in both themes: the dark theme's red is light, so its text must be dark. */
+.icon-button .count-dot,
+.count-dot {
+  background: #b91c1c;
+  color: #fff;
+}
+.flow-node .flow-node-text small {
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.flow-card-title .tag,
+.tag {
+  white-space: nowrap;
+}

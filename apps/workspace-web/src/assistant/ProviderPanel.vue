@@ -200,7 +200,7 @@ async function remove(item: AssistantProvider) {
     <header class="card-header">
       <div>
         <h2>Dịch vụ AI</h2>
-        <p class="muted" style="font-size: 14px; margin-top: 4px">
+        <p class="muted" style="font-size: 15px; margin-top: 4px">
           Trợ lý dùng dịch vụ được đánh dấu <strong>Đang dùng</strong>. Khóa API được mã hóa và không bao giờ hiển
           thị lại.
         </p>

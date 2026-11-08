@@ -11,7 +11,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Search,
-  ShieldCheck,
   Sun,
   X,
 } from 'lucide-vue-next'
@@ -90,7 +89,7 @@ function toggleSidebarCollapsed() {
     <aside class="sidebar" :class="{ open: sidebar }">
       <RouterLink to="/home" class="brand" aria-label="Trang chủ"
         ><span class="brand-mark">D<span /></span
-        ><span>Desktiny<small>VĂN PHÒNG SỐ</small></span></RouterLink
+        ><span>Desktiny</span></RouterLink
       >
       <button
         class="icon-button sidebar-close"
@@ -99,11 +98,7 @@ function toggleSidebarCollapsed() {
       >
         <X :size="20" />
       </button>
-      <div class="workspace-label">
-        <span class="organization-icon"><ShieldCheck :size="17" /></span>
-        <div><strong>e-Office</strong><small>Không gian nội bộ</small></div>
-      </div>
-      <nav aria-label="Điều hướng chính" data-tour="nav" class="nav-groups">
+            <nav aria-label="Điều hướng chính" data-tour="nav" class="nav-groups">
         <div
           v-for="group in groups"
           :key="group.label"
@@ -136,11 +131,6 @@ function toggleSidebarCollapsed() {
           <PanelLeftClose v-else :size="18" />
           <span>{{ sidebarCollapsed ? 'Mở rộng menu' : 'Thu gọn menu' }}</span>
         </button>
-        <div class="privacy-note">
-          <ShieldCheck :size="17" /><span
-            >Đúng người. Đúng quyền.<br />Giữ trọn lịch sử.</span
-          >
-        </div>
         <a
           v-if="session.user?.roles?.includes('technical_admin')"
           href="/console/"

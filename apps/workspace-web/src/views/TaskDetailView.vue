@@ -253,7 +253,6 @@ function localInput(value: string | null) {
   <template v-if="task">
     <header class="page-head">
       <div>
-        <span class="eyebrow">CÔNG VIỆC · r{{ task.revision }}</span>
         <h1>{{ task.title }}</h1>
         <div class="inline-actions" style="margin-top: 12px">
           <StatusBadge kind="task" :status="task.status" /><span

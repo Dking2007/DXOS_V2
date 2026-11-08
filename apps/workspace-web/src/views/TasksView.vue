@@ -110,7 +110,6 @@ function closeCreate() {
 <template>
   <header class="page-head">
     <div>
-      <span class="eyebrow">ĐIỀU HÀNH CÔNG VIỆC</span>
       <h1>Công việc</h1>
       <p>Giao việc theo cấp quản lý, theo dõi tiến độ và nghiệm thu kết quả.</p>
     </div>

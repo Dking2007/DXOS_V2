@@ -11,6 +11,7 @@ import './style.css'
 import './collab.css'
 import './shell.css'
 import './ai/ai.css'
+import './refine.css'
 
 applyTheme()
 const app = createApp(App)

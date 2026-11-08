@@ -84,7 +84,6 @@ function bars(record: Record<string, number>) {
 <template>
   <header class="page-head">
     <div>
-      <span class="eyebrow">BÁO CÁO VÀ ĐIỀU HÀNH</span>
       <h1>Báo cáo</h1>
       <p>Số liệu tính trên dữ liệu bạn được phép xem; mỗi chỉ số có định nghĩa rõ ràng.</p>
     </div>
@@ -113,7 +112,7 @@ function bars(record: Record<string, number>) {
     />
   </section>
   <template v-if="data">
-    <p class="muted" style="font-size: 13px; margin-bottom: 14px">
+    <p class="muted" style="font-size: 14px; margin-bottom: 14px">
       Cập nhật lúc {{ formatDate(data.as_of, true) }} (tính khi tải trang, không phải thời gian
       thực).
     </p>
@@ -151,7 +150,7 @@ function bars(record: Record<string, number>) {
         <section class="card">
           <header class="card-header">
             <div><span class="eyebrow">CÔNG VIỆC</span><h2>Theo trạng thái</h2></div>
-            <span class="muted" style="font-size: 13px"
+            <span class="muted" style="font-size: 14px"
               >TB hoàn tất:
               {{
                 data.tasks.average_completion_hours === null
@@ -194,7 +193,7 @@ function bars(record: Record<string, number>) {
         <section class="card">
           <header class="card-header">
             <div><span class="eyebrow">HỒ SƠ</span><h2>{{ data.cases.total }} hồ sơ</h2></div>
-            <span class="muted" style="font-size: 13px"
+            <span class="muted" style="font-size: 14px"
               ><Undo2 :size="14" /> {{ data.cases.returns_in_period }} lần trả lại</span
             >
           </header>
@@ -237,7 +236,7 @@ function bars(record: Record<string, number>) {
     <section v-if="data.by_department.length" class="card" style="margin-top: 20px">
       <header class="card-header">
         <div><span class="eyebrow">THEO PHÒNG BAN</span><h2>Tình hình từng đơn vị</h2></div>
-        <span class="muted" style="font-size: 13px">Phòng có nhiều việc, hồ sơ quá hạn đứng đầu</span>
+        <span class="muted" style="font-size: 14px">Phòng có nhiều việc, hồ sơ quá hạn đứng đầu</span>
       </header>
       <div class="table-wrap">
         <table>

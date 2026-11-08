@@ -50,7 +50,7 @@ const visible = computed(() => aiActivity.running > 0 && seconds.value >= 6)
   background: var(--violet-soft);
   color: var(--violet-ink);
   box-shadow: 0 10px 28px #0d2e4526;
-  font-size: 13px;
+  font-size: 14px;
 }
 .ai-busy strong,
 .ai-busy small {

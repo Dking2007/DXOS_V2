@@ -165,7 +165,6 @@ async function openAnnouncement(post: Post) {
 <template>
   <header class="page-head">
     <div>
-      <span class="eyebrow">BẢNG TIN NỘI BỘ</span>
       <h1>Bảng tin</h1>
       <p>Thông báo chính thức, tin tức và lời chia sẻ trong cơ quan.</p>
     </div>
