@@ -213,6 +213,28 @@ const myTask = computed(() =>
 /** Process steps may ask for an opinion, or leave out returning / rejecting. */
 /** The drawer where people ask the AI about this dossier. */
 const asking = ref(false)
+const askFirst = ref('')
+const quickQuestion = ref('')
+function openAsk(question = '') {
+  askFirst.value = question.trim()
+  quickQuestion.value = ''
+  asking.value = true
+}
+/** Questions that fit where the dossier stands and who is looking at it. */
+const askSuggestions = computed(() => {
+  const data = detail.data.value
+  if (!data) return []
+  const mine = data.owner_id === session.user?.id
+  if (data.status === 'draft')
+    return mine
+      ? ['Hồ sơ còn thiếu gì trước khi trình?', 'Tài liệu kèm có khớp với nội dung đã điền không?', 'Tóm tắt hồ sơ này giúp tôi']
+      : ['Tóm tắt hồ sơ này giúp tôi', 'Hồ sơ đề nghị gì, giá trị bao nhiêu?']
+  if (data.status === 'needs_revision')
+    return ['Vì sao hồ sơ bị trả lại, cần sửa gì?', 'Ai đã trả lại và ghi chú gì?', 'Tài liệu kèm có khớp với nội dung đã điền không?']
+  if (['approved', 'rejected', 'cancelled'].includes(data.status))
+    return ['Hồ sơ đã đi qua những bước nào?', 'Ai đã quyết định và lý do là gì?', 'Tóm tắt hồ sơ này giúp tôi']
+  return ['Hồ sơ đang chờ ai xử lý, hạn khi nào?', 'Các bước trước đã có ý kiến gì?', 'Hồ sơ đề nghị gì, giá trị bao nhiêu?']
+})
 const opinion = computed(() => myTask.value?.kind === 'opinion')
 const offers = computed(() => new Set(myTask.value?.options ?? ['approve', 'return', 'reject']))
 const fillingIn = computed(() => ['input', 'acknowledge'].includes(String(myTask.value?.kind)))
@@ -617,7 +639,7 @@ function moveTab(step: number) {
         </div>
       </div>
       <div v-if="!editing" class="page-actions">
-        <button v-if="ai.on('case_qa')" class="button ai-ask" @click="asking = true">
+        <button v-if="ai.on('case_qa')" class="button ai-ask" @click="openAsk()">
           <Sparkles :size="16" />Hỏi AI về hồ sơ</button
         ><button class="button secondary" @click="discuss">
           <MessagesSquare :size="16" />Trao đổi</button
@@ -743,6 +765,8 @@ function moveTab(step: number) {
       v-if="asking"
       :case-id="id"
       :case-title="`${detail.data.value.code} · ${detail.data.value.title}`"
+      :initial-question="askFirst"
+      :suggestions="askSuggestions"
       @close="asking = false"
     />
     <div class="tabs case-tabs" role="tablist" aria-label="Nội dung hồ sơ">
@@ -1055,6 +1079,36 @@ function moveTab(step: number) {
         </section>
       </div>
       <aside v-if="tab !== 'process'" class="stack" style="align-content: start">
+        <section v-if="ai.on('case_qa')" class="card case-ask-card" aria-label="Hỏi đáp về hồ sơ">
+          <header class="card-header">
+            <h3><Sparkles :size="16" /> Hỏi đáp về hồ sơ</h3>
+          </header>
+          <div class="card-body">
+            <p class="muted">
+              Hỏi AI về hồ sơ bạn đang làm: nội dung, tài liệu kèm, đang chờ ai, ý kiến từng bước.
+            </p>
+            <form class="case-ask-form" @submit.prevent="openAsk(quickQuestion)">
+              <input
+                v-model="quickQuestion"
+                maxlength="1000"
+                placeholder="Nhập câu hỏi…"
+                aria-label="Câu hỏi về hồ sơ"
+              /><button class="button small ai-ask" :disabled="quickQuestion.trim().length < 2">Hỏi</button>
+            </form>
+            <div class="case-ask-chips">
+              <button v-for="item in askSuggestions" :key="item" type="button" @click="openAsk(item)">
+                {{ item }}
+              </button>
+            </div>
+          </div>
+        </section>
+        <div v-else-if="session.can('assistant.manage') && ai.status.data.value" class="notice">
+          <Sparkles :size="18" /><span
+            >Hỏi đáp AI về hồ sơ chưa bật.
+            <RouterLink to="/assistant?tab=features">Bật “Hỏi đáp về hồ sơ”</RouterLink> để mọi người hỏi AI ngay
+            trên trang hồ sơ.</span
+          >
+        </div>
         <section class="card">
           <header class="card-header"><h3>Tóm tắt</h3></header>
           <dl class="detail-meta card-body">

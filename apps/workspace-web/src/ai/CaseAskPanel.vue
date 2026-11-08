@@ -14,19 +14,27 @@ import { useAi } from './useAi'
  * Questions about the dossier on screen. The AI reads this dossier only (form, process, tasks,
  * attachments) and says which part it answered from. The conversation stays in this browser tab.
  */
-const props = defineProps<{ caseId: string; caseTitle: string }>()
+const props = defineProps<{
+  caseId: string
+  caseTitle: string
+  /** A question typed or picked on the dossier page, asked as soon as the drawer opens. */
+  initialQuestion?: string
+  /** Suggested questions that fit the dossier's state; a general set otherwise. */
+  suggestions?: string[]
+}>()
 const emit = defineEmits<{ close: [] }>()
 interface Turn {
   role: 'user' | 'assistant'
   content: string
   sources?: string[]
 }
-const SUGGESTIONS = [
+const GENERAL = [
   'Hồ sơ này đề nghị gì, giá trị bao nhiêu?',
   'Hồ sơ đang chờ ai xử lý, hạn khi nào?',
   'Các bước trước đã có ý kiến gì?',
   'Tài liệu đính kèm có khớp với nội dung biểu mẫu không?',
 ]
+const SUGGESTIONS = props.suggestions?.length ? props.suggestions : GENERAL
 const storageKey = `case-ask:${props.caseId}`
 function restore(): Turn[] {
   try {
@@ -102,6 +110,7 @@ onMounted(() => {
   window.addEventListener('keydown', onKey)
   scrollDown()
   input.value?.focus()
+  if (props.initialQuestion?.trim()) void send(props.initialQuestion)
 })
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>

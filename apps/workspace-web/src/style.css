@@ -1364,3 +1364,56 @@ a.stat-tile:hover {
 .split.split-full {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* Asking the AI about the dossier on screen. */
+.button.ai-ask {
+  border-color: transparent;
+  color: #fff;
+  background: linear-gradient(135deg, #6d4fd0, #3d7bb8);
+}
+.button.ai-ask:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.case-ask-card h3 {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+.case-ask-card h3 svg {
+  color: #6d4fd0;
+}
+.case-ask-card .card-body {
+  display: grid;
+  gap: 10px;
+}
+.case-ask-card p {
+  margin: 0;
+  font-size: 13.5px;
+}
+.case-ask-form {
+  display: flex;
+  gap: 6px;
+}
+.case-ask-form input {
+  flex: 1;
+  min-width: 0;
+}
+.case-ask-chips {
+  display: grid;
+  gap: 6px;
+}
+.case-ask-chips button {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.case-ask-chips button:hover {
+  border-color: #6d4fd0;
+  color: #6d4fd0;
+}
