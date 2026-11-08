@@ -88,10 +88,22 @@ function toggleSidebarCollapsed() {
     <a class="skip-link" href="#main-content">Đến nội dung chính</a>
     <div v-if="sidebar" class="sidebar-scrim" @click="sidebar = false" />
     <aside class="sidebar" :class="{ open: sidebar }">
-      <RouterLink to="/home" class="brand" aria-label="Trang chủ"
-        ><span class="brand-mark">D<span /></span
-        ><span>Desktiny</span></RouterLink
-      >
+      <div class="sidebar-head">
+        <RouterLink to="/home" class="brand" aria-label="Trang chủ"
+          ><span class="brand-mark" aria-hidden="true">D</span><span>Desktiny</span></RouterLink
+        >
+        <button
+          class="sidebar-collapse"
+          type="button"
+          :aria-label="sidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'"
+          :title="sidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'"
+          :aria-expanded="!sidebarCollapsed"
+          @click="toggleSidebarCollapsed"
+        >
+          <PanelLeftOpen v-if="sidebarCollapsed" :size="18" />
+          <PanelLeftClose v-else :size="18" />
+        </button>
+      </div>
       <button
         class="icon-button sidebar-close"
         aria-label="Đóng điều hướng"
@@ -127,11 +139,6 @@ function toggleSidebarCollapsed() {
         </div>
       </nav>
       <div class="sidebar-bottom">
-        <button class="sidebar-collapse" type="button" :aria-label="sidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'" :title="sidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'" :aria-expanded="!sidebarCollapsed" @click="toggleSidebarCollapsed">
-          <PanelLeftOpen v-if="sidebarCollapsed" :size="18" />
-          <PanelLeftClose v-else :size="18" />
-          <span>{{ sidebarCollapsed ? 'Mở rộng menu' : 'Thu gọn menu' }}</span>
-        </button>
         <a
           v-if="session.user?.roles?.includes('technical_admin')"
           href="/console/"
@@ -140,9 +147,6 @@ function toggleSidebarCollapsed() {
           title="Công cụ cho quản trị kỹ thuật: schema, luồng, lượt chạy, nhật ký nền tảng. Không dùng cho nghiệp vụ hằng ngày."
           ><span class="console-link-text">Bảng điều khiển kỹ thuật</span><span aria-hidden="true">↗</span></a
         >
-        <div class="sidebar-version">
-          <span class="connection-dot" /> Bản pilot · e-Office
-        </div>
       </div>
     </aside>
     <div class="workspace-main">

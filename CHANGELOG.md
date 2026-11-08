@@ -78,6 +78,9 @@
 - CI chạy thêm `packages/flowkit/tests` (56 test) và test Node của plugin `vn-document-format` (29 test), trước đây không được chạy.
 
 ### Changed
+- **Thanh bên** sáng và gọn: cùng nền với trang, chỉ một viền mảnh; trang đang mở tô nền nhạt và chữ đậm. Gộp còn
+  hai nhóm (việc hằng ngày và Quản trị), số đang chờ hiện nhỏ cuối dòng, nút thu gọn thành biểu tượng cạnh logo, bỏ
+  dòng phiên bản. Chế độ tối, thu gọn và ngăn kéo trên điện thoại vẫn hoạt động.
 - **Chi tiết công việc** dễ theo dõi hơn: khung tóm tắt ở đầu trang cho thấy việc đang ở bước nào (Đã giao →
   Tiếp nhận → Đang làm → Chờ nghiệm thu → Hoàn tất), một câu nói rõ bước tiếp theo cho đúng người đang xem (người
   làm, người giao), hạn còn bao lâu hoặc đã quá bao lâu, nút Đổi hạn ngay cạnh hạn. Nút hủy/từ chối xếp cuối, tách

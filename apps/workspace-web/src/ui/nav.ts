@@ -49,11 +49,6 @@ export const NAV_GROUPS: NavGroup[] = [
         badge: (counts) => counts.approvals,
       },
       { to: '/cases', label: 'Hồ sơ', icon: Files, hint: 'Lập và theo dõi hồ sơ trình duyệt' },
-    ],
-  },
-  {
-    label: 'Trao đổi',
-    links: [
       {
         to: '/chat',
         label: 'Nhắn tin',
@@ -62,11 +57,6 @@ export const NAV_GROUPS: NavGroup[] = [
         badge: (counts) => counts.chat,
       },
       { to: '/feed', label: 'Bảng tin', icon: Newspaper, hint: 'Thông báo và bài viết nội bộ' },
-    ],
-  },
-  {
-    label: 'Tài liệu & báo cáo',
-    links: [
       { to: '/drive', label: 'Kho tài liệu', icon: FolderClosed, hint: 'Tài liệu của bạn và được chia sẻ' },
       { to: '/reports', label: 'Báo cáo', icon: BarChart3, hint: 'Số liệu công việc và hồ sơ' },
     ],
