@@ -195,6 +195,8 @@ class ProcessExecution(Execution):
 
     def record(self, node, state, **extra):
         attempt = self.attempt(node["id"])
+        # When the dossier reached the step, so its journey can be told in order.
+        extra.setdefault("at", m.utcnow().isoformat())
         super().record(node, state, **({"attempt": attempt} if attempt > 1 else {}), **extra)
 
     def step(self, node) -> list[str]:
@@ -363,6 +365,7 @@ class ProcessExecution(Execution):
 
     def conclude(self, outcome: str, node, message: str = ""):
         super().conclude(outcome, node, message)
+        self.steps[-1] = dict(self.steps[-1], at=m.utcnow().isoformat())
         settle_dossier(self, outcome, message)
 
 
@@ -496,7 +499,7 @@ def advance(db: Session, core: CoreClient, run: m.AutomationRun, node_id: str, b
     )
     if position is None:
         return
-    update = dict(execution.steps[position], state="succeeded", **detail)
+    update = dict(execution.steps[position], state="succeeded", done_at=m.utcnow().isoformat(), **detail)
     if branch:
         update["branch"] = branch
     execution.steps[position] = update

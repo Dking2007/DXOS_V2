@@ -7366,6 +7366,57 @@
         }
       }
     },
+    "/workspace/v1/ai/cases/{case_id}/ask": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ask Case",
+        "description": "Questions about the dossier open on screen, answered from that dossier only.",
+        "operationId": "ask_case_workspace_v1_ai_cases__case_id__ask_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseQuestionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/ai/documents/draft": {
       "post": {
         "tags": [
@@ -8382,6 +8433,30 @@
           "expected_revision"
         ],
         "title": "CasePatch"
+      },
+      "CaseQuestionInput": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 2,
+            "title": "Question"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/Turn"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "History"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "CaseQuestionInput"
       },
       "ChatInput": {
         "properties": {

@@ -2266,6 +2266,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/v1/ai/cases/{case_id}/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask Case
+         * @description Questions about the dossier open on screen, answered from that dossier only.
+         */
+        post: operations["ask_case_workspace_v1_ai_cases__case_id__ask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/ai/documents/draft": {
         parameters: {
             query?: never;
@@ -2711,6 +2731,13 @@ export interface components {
             priority?: ("low" | "normal" | "high" | "urgent") | null;
             /** Due At */
             due_at?: string | null;
+        };
+        /** CaseQuestionInput */
+        CaseQuestionInput: {
+            /** Question */
+            question: string;
+            /** History */
+            history?: components["schemas"]["Turn"][];
         };
         /** ChatInput */
         ChatInput: {
@@ -8721,6 +8748,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DecisionDraftInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ask_case_workspace_v1_ai_cases__case_id__ask_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseQuestionInput"];
             };
         };
         responses: {

@@ -66,6 +66,15 @@ class FakeAi:
                     }
                 )
             )
+        if "hỏi đáp về một hồ sơ" in system:
+            return reply(
+                json.dumps(
+                    {
+                        "answer": "Hồ sơ xin kinh phí **100 đồng**, đang chờ Giám đốc duyệt.",
+                        "sources": ["Biểu mẫu", "Quy trình", "Tệp: bao-gia.txt", "Nguồn bịa"],
+                    }
+                )
+            )
         if "tóm tắt hồ sơ" in system:
             return reply('{"lines": ["Xin duyệt công tác", "Kinh phí 100 đồng"]}')
         if "phiếu giao việc" in system:
@@ -446,3 +455,63 @@ def test_one_service_serves_several_features_each_with_its_own_model(world):  # 
         json={"expected_revision": saved.json()["revision"], "features": {"task_parse": {"enabled": True, "model": "x"}}},
     )
     assert orphan.status_code == 422 and orphan.json()["code"] == "ai_model_needs_provider"
+
+
+def test_questions_about_a_dossier_are_answered_from_that_dossier(world):  # noqa: F811
+    fake = setup(world, ["case_qa"])
+    form = make_form(world, two_steps=True)
+    quotation = upload(world, "bao-gia.txt", QUOTATION)
+    staff = as_(world, "staff")
+    case = staff.post(
+        API + "/cases",
+        json={
+            "title": "Mua máy chiếu",
+            "form_id": form["id"],
+            "payload": {"reason": "Phòng họp tầng 3", "amount": 100},
+            "file_ids": [quotation["id"]],
+        },
+        headers={"Idempotency-Key": "case-qa"},
+    ).json()
+    submitted = staff.post(
+        f"{API}/cases/{case['id']}/submit",
+        json={"expected_revision": case["revision"]},
+        headers={"Idempotency-Key": "submit-qa"},
+    )
+    assert submitted.status_code == 202, submitted.text
+    drain(world)
+    manager = as_(world, "manager")
+    task = manager.get(API + "/approval-tasks").json()["items"][0]
+    decided = manager.post(
+        f"{API}/approval-tasks/{task['id']}/decisions",
+        json={"expected_revision": task["revision"], "decision": "approve", "reason": "Đúng nhu cầu phòng"},
+        headers={"Idempotency-Key": "decide-qa"},
+    )
+    assert decided.status_code == 202, decided.text
+    drain(world)
+
+    staff = as_(world, "staff")
+    asked = staff.post(
+        f"{API}/ai/cases/{case['id']}/ask",
+        json={
+            "question": "Hồ sơ đang chờ ai?",
+            "history": [
+                {"role": "user", "content": "Hồ sơ xin gì?"},
+                {"role": "assistant", "content": "Xin mua máy chiếu."},
+            ],
+        },
+    )
+    assert asked.status_code == 200, asked.text
+    body = asked.json()
+    assert body["answer"].startswith("Hồ sơ xin kinh phí")
+    # Only parts the dossier really has are kept as sources.
+    assert body["sources"] == ["Biểu mẫu", "Quy trình", "Tệp: bao-gia.txt"]
+    prompt = fake.calls[-1]["messages"][-1]["content"]
+    assert "Phòng họp tầng 3" in prompt and QUOTE in prompt
+    assert "Trưởng phòng A đồng ý" in prompt and "Đúng nhu cầu phòng" in prompt
+    assert "đang chờ Giám đốc" in prompt
+    assert "Người hỏi: Hồ sơ xin gì?" in prompt and "Câu hỏi: Hồ sơ đang chờ ai?" in prompt
+
+    # Someone who cannot see the dossier cannot ask about it.
+    outsider = as_(world, "outsider").post(f"{API}/ai/cases/{case['id']}/ask", json={"question": "Xin gì?"})
+    assert outsider.status_code == 404
+

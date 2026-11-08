@@ -38,6 +38,7 @@ GROUPS = {
 FEATURES = {
     "case_extract": ("cases", "Đọc tài liệu, tự điền biểu mẫu", "Đọc báo giá, đơn, hợp đồng đính kèm hồ sơ và đề xuất giá trị cho từng trường, ghi rõ trang và câu trích để người lập xác nhận.", True),
     "case_summary": ("cases", "Tóm tắt hồ sơ cho người duyệt", "3–5 dòng ở đầu trang hồ sơ: nội dung xin duyệt, số tiền, tài liệu kèm, ý kiến các bước trước.", False),
+    "case_qa": ("cases", "Hỏi đáp về hồ sơ", "Hỏi AI về chính hồ sơ đang mở: nội dung xin duyệt, tài liệu kèm, đang chờ ai, các bước trước đã nói gì; câu trả lời nêu nguồn.", False),
     "case_check": ("cases", "Soát hồ sơ trước khi trình", "Chỉ ra chỗ có thể chưa ổn: số tiền khác báo giá, ngày không khớp, thiếu tài liệu.", False),
     "decision_draft": ("cases", "Gợi ý ý kiến duyệt, lý do trả lại", "Soạn sẵn ý kiến phê duyệt hoặc lý do trả lại lịch sự, dựa trên điểm còn thiếu.", False),
     "document_draft": ("documents", "Soạn văn bản hành chính", "Từ vài ý chính soạn tờ trình, công văn, thông báo theo thể thức Nghị định 30/2020, lưu thành tệp Word mở được trong ONLYOFFICE.", False),

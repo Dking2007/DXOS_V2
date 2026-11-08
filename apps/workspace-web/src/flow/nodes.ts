@@ -106,6 +106,8 @@ export interface FlowNodeData {
   outcome?: string
   /** Who was asked at this step, from a run. */
   people?: string[]
+  /** Position(s) of this step on the dossier's journey, 1 = first; a step done twice has two. */
+  order?: number[]
 }
 /** The graph shape the Workspace API stores. */
 export interface ApiGraph {

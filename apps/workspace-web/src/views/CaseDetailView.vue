@@ -59,6 +59,7 @@ import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import SchemaForm from '@dx/web-shared/components/SchemaForm.vue'
 import TaskCreateDialog from '../components/TaskCreateDialog.vue'
 import CaseAiPanel from '../ai/CaseAiPanel.vue'
+import CaseAskPanel from '../ai/CaseAskPanel.vue'
 import { useAi } from '../ai/useAi'
 import { OPERATORS } from '../flow/nodes'
 import ProcessCanvas from '../flow/ProcessCanvas.vue'
@@ -210,6 +211,8 @@ const myTask = computed(() =>
   ),
 )
 /** Process steps may ask for an opinion, or leave out returning / rejecting. */
+/** The drawer where people ask the AI about this dossier. */
+const asking = ref(false)
 const opinion = computed(() => myTask.value?.kind === 'opinion')
 const offers = computed(() => new Set(myTask.value?.options ?? ['approve', 'return', 'reject']))
 const fillingIn = computed(() => ['input', 'acknowledge'].includes(String(myTask.value?.kind)))
@@ -614,7 +617,9 @@ function moveTab(step: number) {
         </div>
       </div>
       <div v-if="!editing" class="page-actions">
-        <button class="button secondary" @click="discuss">
+        <button v-if="ai.on('case_qa')" class="button ai-ask" @click="asking = true">
+          <Sparkles :size="16" />Hỏi AI về hồ sơ</button
+        ><button class="button secondary" @click="discuss">
           <MessagesSquare :size="16" />Trao đổi</button
         ><button
           v-if="session.can('tasks.create')"
@@ -734,6 +739,12 @@ function moveTab(step: number) {
         </div>
       </div>
     </section>
+    <CaseAskPanel
+      v-if="asking"
+      :case-id="id"
+      :case-title="`${detail.data.value.code} · ${detail.data.value.title}`"
+      @close="asking = false"
+    />
     <div class="tabs case-tabs" role="tablist" aria-label="Nội dung hồ sơ">
       <button
         v-for="item in tabs"
@@ -753,7 +764,7 @@ function moveTab(step: number) {
         }}<span v-if="item.count" class="tab-count">{{ item.count }}</span>
       </button>
     </div>
-    <div class="split">
+    <div class="split" :class="{ 'split-full': tab === 'process' }">
       <div
         :id="`case-panel-${tab}`"
         class="stack"
@@ -1043,7 +1054,7 @@ function moveTab(step: number) {
           </div>
         </section>
       </div>
-      <aside class="stack" style="align-content: start">
+      <aside v-if="tab !== 'process'" class="stack" style="align-content: start">
         <section class="card">
           <header class="card-header"><h3>Tóm tắt</h3></header>
           <dl class="detail-meta card-body">

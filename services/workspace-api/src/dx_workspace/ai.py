@@ -26,6 +26,7 @@ from . import ai_core, ai_docx, ai_index, ai_text, process_versions
 from . import assistant_llm as llm
 from . import models as m
 from . import schemas as s
+from .automations import BRANCH_LABELS, OUTCOMES
 from .policies import (
     approval_assignees,
     case_filter,
@@ -103,6 +104,60 @@ class QuestionInput(s.Input):
     question: str = Field(min_length=2, max_length=1000)
 
 
+class Turn(s.Input):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class CaseQuestionInput(s.Input):
+    question: str = Field(min_length=2, max_length=1000)
+    # The conversation so far, kept only in the browser tab; the latest turns give follow-ups context.
+    history: list[Turn] = Field(default_factory=list, max_length=12)
+
+
+CASE_STATUS = {
+    "draft": "Bản nháp",
+    "pending_workflow_start": "Đang chuyển duyệt",
+    "processing": "Đang xử lý",
+    "approved": "Đã duyệt",
+    "rejected": "Bị từ chối",
+    "needs_revision": "Cần bổ sung",
+    "cancelled": "Đã hủy",
+}
+STEP_STATE = {
+    "succeeded": "đã xong",
+    "waiting": "đang chờ",
+    "failed": "không thực hiện được",
+    "cancelled": "đã dừng",
+    "queued": "đang gửi",
+    "skipped": "bỏ qua",
+    "unknown": "chưa rõ kết quả",
+}
+DECISION_TEXT = {"approve": "đồng ý / duyệt", "reject": "không đồng ý / từ chối", "return": "trả lại"}
+STEP_KIND = {
+    "approval": "Duyệt",
+    "consult": "Xin ý kiến",
+    "assign_task": "Giao việc",
+    "request_info": "Yêu cầu bổ sung",
+    "finish": "Kết thúc",
+    "notify": "Thông báo",
+    "create_task": "Tạo việc",
+    "wait": "Chờ",
+    "if": "Điều kiện",
+}
+TASK_STATUS = {
+    "draft": "nháp",
+    "assigned": "đã giao",
+    "accepted": "đã nhận",
+    "in_progress": "đang làm",
+    "submitted": "đã nộp kết quả",
+    "completed": "đã nghiệm thu",
+    "returned": "bị trả lại",
+    "blocked": "vướng mắc",
+    "cancelled": "đã hủy",
+}
+
+
 class SearchInput(s.Input):
     q: str = Field(min_length=2, max_length=300)
     limit: int = Field(default=12, ge=1, le=30)
@@ -128,6 +183,20 @@ class WriteInput(s.Input):
 
 def now_vn() -> datetime:
     return datetime.now(UTC).astimezone(VIETNAM)
+
+
+def when(moment: datetime | str | None) -> str:
+    """A stored moment as people read it here: Vietnam time, day first."""
+    if isinstance(moment, str):
+        try:
+            moment = datetime.fromisoformat(moment)
+        except ValueError:
+            return ""
+    if not moment:
+        return ""
+    if moment.tzinfo is None:  # SQLite drops the zone; stored values are UTC
+        moment = moment.replace(tzinfo=UTC)
+    return f"{moment.astimezone(VIETNAM):%d/%m/%Y %H:%M}"
 
 
 def today_text() -> str:
@@ -595,6 +664,115 @@ def build_router(app):
         )
         db.commit()
         return {"text": answer.strip()[:3000]}
+
+    def process_text(db, case: m.Case) -> str:
+        """Every submission of the dossier: the steps in the order it went through them, who said what."""
+        lines = []
+        for submission in db.scalars(
+            select(m.Submission).where(m.Submission.case_id == case.id).order_by(m.Submission.number)
+        ):
+            lines.append(f"Lần trình {submission.number} ({when(submission.created_at)}):")
+            run = db.get(m.AutomationRun, submission.process_run_id) if submission.process_run_id else None
+            labels = {
+                n["id"]: n.get("label") or STEP_KIND.get(n["type"], n["type"]) for n in (run.graph if run else {}).get("nodes", [])
+            }
+            for step in (run.steps if run else None) or []:
+                if not step.get("node_id") or step["type"] in {"trigger", "if"}:
+                    continue
+                text = f"  - Bước “{labels.get(step['node_id'], step['node_id'])}”: {STEP_STATE.get(step['state'], step['state'])}"
+                if step.get("branch"):
+                    text += f", đi nhánh {BRANCH_LABELS.get(step['branch'], step['branch'])}"
+                if step.get("people"):
+                    text += f", người được hỏi: {', '.join(step['people'])}"
+                if step.get("superseded"):
+                    text += " (lượt cũ, sau đó hồ sơ quay lại bước trước)"
+                if step.get("message"):
+                    text += f" — {step['message']}"
+                lines.append(text)
+            for task in db.scalars(
+                select(m.ApprovalTask)
+                .where(m.ApprovalTask.submission_id == submission.id)
+                .order_by(m.ApprovalTask.step_index)
+            ):
+                person = db.get(m.User, task.decided_by_id or task.assignee_id)
+                name = person.display_name if person else ""
+                if task.decision:
+                    text = f"  * {task.label}: {name} {DECISION_TEXT.get(task.decision, task.decision)} lúc {when(task.decided_at)}"
+                    text += f" — “{task.reason}”" if task.reason else ""
+                elif task.state == "pending":
+                    text = f"  * {task.label}: đang chờ {name}" + (f", hạn {when(task.due_at)}" if task.due_at else "")
+                else:
+                    text = f"  * {task.label}: {name}, yêu cầu đã đóng"
+                lines.append(text)
+            outcome = (run.outcome if run else None) or (submission.state if submission.state in OUTCOMES else None)
+            lines.append(f"  Kết quả lần trình: {OUTCOMES.get(outcome, 'chưa có')}")
+        return "\n".join(lines) or "(hồ sơ chưa được trình)"
+
+    def related_tasks_text(db, user, case: m.Case) -> str:
+        lines = []
+        for task in db.scalars(select(m.Task).where(m.Task.case_id == case.id).order_by(m.Task.created_at)):
+            if not task_visible(db, user, task):
+                continue
+            person = db.get(m.User, task.assignee_id) if task.assignee_id else None
+            lines.append(
+                f"- {task.title}: {TASK_STATUS.get(task.status, task.status)}"
+                + (f", người làm {person.display_name}" if person else "")
+                + (f", hạn {when(task.due_at)}" if task.due_at else "")
+            )
+        return "\n".join(lines) or "(không có)"
+
+    @router.post("/ai/cases/{case_id}/ask")
+    def ask_case(
+        case_id: str, body: CaseQuestionInput, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)
+    ):
+        """Questions about the dossier open on screen, answered from that dossier only."""
+        user = user_for(db, actor)
+        ai_core.require_feature(db, "case_qa")
+        case = whole_case(db, user, case_id)
+        form = db.get(m.Form, case.form_id)
+        owner = db.get(m.User, case.owner_id)
+        department = db.get(m.Department, case.department_id) if case.department_id else None
+        dossier = (
+            f"Hồ sơ HS-{case.number:06d}: {case.title}\nMẫu: {form.name}\n"
+            f"Trạng thái: {CASE_STATUS.get(case.status, case.status)}; ưu tiên: {case.priority}"
+            + (f"; hạn xử lý: {when(case.due_at)}" if case.due_at else "")
+            + f"\nNgười tạo: {owner.display_name if owner else ''}"
+            + (f" ({department.name})" if department else "")
+            + f"; tạo lúc {when(case.created_at)}, cập nhật {when(case.updated_at)}\n\n"
+            f"## Biểu mẫu\n{payload_text(form, case_payload(case)) or '(trống)'}\n\n"
+            f"## Quy trình\n{process_text(db, case)}\n\n"
+            f"## Công việc gắn với hồ sơ\n{related_tasks_text(db, user, case)}\n\n"
+            f"## Tài liệu kèm\n{attachments_text(db, user, case, 'case_qa', limit_files=5, limit_chars=8000)}"
+        )
+        conversation = "\n".join(
+            f"{'Người hỏi' if turn.role == 'user' else 'Trợ lý'}: {turn.content}" for turn in body.history[-8:]
+        )
+        answer = ask_json(
+            db,
+            user,
+            "case_qa",
+            "Bạn là trợ lý hỏi đáp về một hồ sơ hành chính cụ thể. Chỉ trả lời từ dữ liệu hồ sơ được cung cấp "
+            "(biểu mẫu, quy trình, công việc, tài liệu kèm). Điều gì không có trong hồ sơ thì nói rõ là hồ sơ không "
+            "đề cập, không đoán. Trả lời tiếng Việt, ngắn gọn, nêu số liệu và tên cụ thể; được dùng gạch đầu dòng. "
+            "Không quyết định thay người duyệt và không khuyên duyệt hay từ chối. " + ai_core.DATA_RULE,
+            ai_core.wrap(dossier)
+            + (f"\n\nTrao đổi trước đó:\n{conversation}" if conversation else "")
+            + f"\n\nCâu hỏi: {body.question}\n\n"
+            'Trả về {"answer": "câu trả lời", "sources": ["Biểu mẫu" | "Quy trình" | "Công việc" | "Tệp: <tên tệp>"]} '
+            "với sources là những phần của hồ sơ đã dùng để trả lời.",
+            max_tokens=1500,
+        )
+        known = {"Biểu mẫu", "Quy trình", "Công việc"} | {
+            f"Tệp: {file.name}" for file in (db.get(m.DriveFile, file_id) for file_id in case.file_ids) if file
+        }
+        sources = []
+        for item in (answer.get("sources") if isinstance(answer, dict) else None) or []:
+            label = str(item).strip()
+            if label in known and label not in sources:
+                sources.append(label)
+        text = str(answer.get("answer") or "").strip() if isinstance(answer, dict) else str(answer).strip()
+        db.commit()
+        return {"answer": text[:6000] or "AI chưa trả lời được câu hỏi này.", "sources": sources[:5]}
 
     # ---- 5–8. Documents ---------------------------------------------------------------
 

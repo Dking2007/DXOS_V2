@@ -55,6 +55,12 @@ const statusLabel: Record<string, string> = {
       <span>{{ text }}</span>
       <em v-if="data.outcome" class="flow-node-outcome">→ {{ OUTCOMES[data.outcome] ?? data.outcome }}</em>
     </div>
+    <span
+      v-if="data.order?.length"
+      class="flow-node-order"
+      :title="`Bước thứ ${data.order.join(', ')} trên đường đi của hồ sơ`"
+      >{{ data.order.join(' · ') }}</span
+    >
     <span v-if="data.errors?.length" class="flow-node-flag error" aria-label="Cấu hình chưa hợp lệ"
       ><AlertTriangle :size="13"
     /></span>

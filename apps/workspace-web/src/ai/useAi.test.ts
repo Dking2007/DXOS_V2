@@ -13,7 +13,7 @@ describe('AI feature list', () => {
   })
 
   it('recommends only features that read what people already see', () => {
-    expect(RECOMMENDED_FEATURES).toHaveLength(13)
+    expect(RECOMMENDED_FEATURES).toHaveLength(14)
     expect(RECOMMENDED_FEATURES).not.toContain('assistant_my_data')
     expect(RECOMMENDED_FEATURES).not.toContain('automation_ai')
   })

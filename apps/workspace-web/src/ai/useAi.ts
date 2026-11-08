@@ -10,6 +10,7 @@ import { useSession } from '../stores/session'
 export type AiFeature =
   | 'case_extract'
   | 'case_summary'
+  | 'case_qa'
   | 'case_check'
   | 'decision_draft'
   | 'document_draft'
@@ -29,6 +30,7 @@ export type AiFeature =
 export const ALL_FEATURES: AiFeature[] = [
   'case_extract',
   'case_summary',
+  'case_qa',
   'case_check',
   'decision_draft',
   'document_draft',

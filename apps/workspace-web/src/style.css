@@ -1361,3 +1361,8 @@ a.stat-tile:hover {
     flex: 1;
   }
 }
+
+/* A dossier's process needs the whole width to be read. */
+.split.split-full {
+  grid-template-columns: minmax(0, 1fr);
+}

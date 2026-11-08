@@ -7,6 +7,15 @@
 ## [Unreleased]
 
 ### Added
+- **Hỏi đáp AI về hồ sơ** (tính năng `case_qa`, `POST /ai/cases/{id}/ask`): nút “Hỏi AI về hồ sơ” mở ngăn kéo hỏi
+  đáp ngay trên trang hồ sơ. AI đọc nội dung biểu mẫu, quy trình đã đi qua (bước, người quyết định, lý do, người
+  đang chờ, hạn), công việc gắn hồ sơ trong quyền người hỏi và tài liệu kèm; trả lời kèm nguồn đã đối chiếu với hồ
+  sơ, nhớ ngữ cảnh các câu hỏi trước trong cùng tab. Cùng quyền với tóm tắt hồ sơ. 1 test backend.
+- Tab **Quy trình** của hồ sơ làm lại: chiếm hết bề ngang, sơ đồ cao hơn, chế độ toàn màn hình, bản đồ thu nhỏ;
+  dải trạng thái (kết quả, đang chờ ai, hạn, tiến độ); đường đã đi tô liền, nhánh chưa đi mờ, đoạn đang chờ chạy
+  hiệu ứng; mỗi bước đã qua có số thứ tự; cột **Đường đi của hồ sơ** liệt kê các bước theo thời gian (kể cả lượt
+  quay lại), bấm để zoom tới bước và xem người xử lý, quyết định, lý do, thời điểm. Lượt chạy quy trình ghi thêm
+  thời điểm tới bước (`at`) và xong bước (`done_at`).
 - **Quy trình hồ sơ trên canvas tự động hóa** (migration `workspace_0017`): tab **Quy trình hồ sơ** trong
   `/automations` vẽ đường đi của hồ sơ bằng đúng trình thiết kế luồng, thêm các bước **Duyệt** (lãnh đạo đơn vị
   hoặc người cụ thể; cổng Duyệt / Trả lại / Từ chối, tắt được từng lựa chọn, hạn xử lý, hướng dẫn cho người
