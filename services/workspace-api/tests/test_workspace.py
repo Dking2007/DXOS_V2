@@ -1032,3 +1032,54 @@ def test_empty_optional_number_is_treated_as_absent(world):
     )
     assert response.status_code == 201, response.text
     assert "amount" not in stored_payload(world, response.json())
+
+
+def test_shared_with_me_lists_what_no_open_folder_leads_to(world):
+    client, _, _, _, _, actors, current, users, _ = world
+    # A file shared alone from inside a private folder, and a shared folder holding a file.
+    private = make_folder(world, name="Riêng")
+    lone = put_file_in(world, private["id"], name="le.txt")
+    team = make_folder(world, name="Chung")
+    inside = put_file_in(world, team["id"], name="trong.txt")
+    current[0] = actors["staff"]
+    assert client.put(
+        f"/workspace/v1/drive/files/{lone['id']}/shares",
+        json={"expected_revision": lone["revision"], "user_id": users["staff_b"], "access": "read"},
+    ).status_code == 200
+    assert client.put(
+        f"/workspace/v1/drive/folders/{team['id']}/shares",
+        json={"expected_revision": 1, "user_id": users["staff_b"], "access": "read"},
+    ).status_code == 200
+    drain(world)
+
+    current[0] = actors["outsider"]
+    files = [f["id"] for f in client.get("/workspace/v1/drive/files?shared=true").json()["items"]]
+    folders = [f["id"] for f in client.get("/workspace/v1/drive/folders?shared=true").json()["items"]]
+    assert files == [lone["id"]] and folders == [team["id"]]
+    # The file inside the shared folder is reached by opening it, not listed twice.
+    assert [f["id"] for f in client.get(f"/workspace/v1/drive/files?folder_id={team['id']}").json()["items"]] == [
+        inside["id"]
+    ]
+    # "My documents" holds only one's own at its root.
+    assert client.get("/workspace/v1/drive/files").json()["items"] == []
+    assert client.get("/workspace/v1/drive/folders").json()["items"] == []
+    current[0] = actors["staff"]
+    assert client.get("/workspace/v1/drive/files?shared=true").json()["items"] == []
+    assert {f["id"] for f in client.get("/workspace/v1/drive/folders").json()["items"]} == {private["id"], team["id"]}
+
+
+def test_dossier_list_says_who_it_waits_for(world):
+    client, _, _, _, _, actors, current, _, _ = world
+    form = make_form(world, two_steps=True)
+    case = make_case(world, form, key="create-waiting")
+    assert client.get("/workspace/v1/cases").json()["items"][0]["waiting_on"] == []
+    submitted = client.post(
+        f"/workspace/v1/cases/{case['id']}/submit",
+        json={"expected_revision": 1},
+        headers={"Idempotency-Key": "submit-waiting"},
+    )
+    assert submitted.status_code == 202, submitted.text
+    drain(world)
+    current[0] = actors["staff"]
+    waiting = client.get("/workspace/v1/cases").json()["items"][0]["waiting_on"]
+    assert [(w["name"], w["label"]) for w in waiting] == [("Trưởng phòng A", "Trưởng phòng")]

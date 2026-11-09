@@ -185,7 +185,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Folders */
+        /**
+         * Folders
+         * @description A folder's subfolders; at the root, one's own. `shared` lists what others opened to you.
+         */
         get: operations["folders_workspace_v1_drive_folders_get"];
         put?: never;
         /** Create Folder */
@@ -1585,6 +1588,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/v1/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Profile */
+        patch: operations["patch_profile_workspace_v1_me_profile_patch"];
+        trace?: never;
+    };
+    "/workspace/v1/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Avatar */
+        put: operations["put_avatar_workspace_v1_me_avatar_put"];
+        post?: never;
+        /** Delete Avatar */
+        delete: operations["delete_avatar_workspace_v1_me_avatar_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/users/{user_id}/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Avatar */
+        get: operations["avatar_workspace_v1_users__user_id__avatar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/cases/{case_id}/process": {
         parameters: {
             query?: never;
@@ -2666,6 +2721,14 @@ export interface components {
              */
             published: boolean;
         };
+        /** Body_put_avatar_workspace_v1_me_avatar_put */
+        Body_put_avatar_workspace_v1_me_avatar_put: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
+        };
         /** Body_upload_attachment_workspace_v1_conversations__conversation_id__attachments_post */
         Body_upload_attachment_workspace_v1_conversations__conversation_id__attachments_post: {
             /**
@@ -3303,6 +3366,19 @@ export interface components {
              * @default 0
              */
             required_file_count: number;
+        };
+        /** ProfilePatch */
+        ProfilePatch: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Job Title */
+            job_title?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Contact Email */
+            contact_email?: string | null;
+            /** About */
+            about?: string | null;
         };
         /** ProviderInput */
         ProviderInput: {
@@ -4068,6 +4144,7 @@ export interface operations {
         parameters: {
             query?: {
                 parent_id?: string | null;
+                shared?: boolean;
                 limit?: number;
                 cursor?: string | null;
             };
@@ -4237,6 +4314,7 @@ export interface operations {
                 folder_id?: string | null;
                 q?: string;
                 trash?: boolean;
+                shared?: boolean;
                 sort_by?: "created" | "name" | "size";
                 descending?: boolean;
                 limit?: number;
@@ -5945,7 +6023,7 @@ export interface operations {
     list_tasks_workspace_v1_tasks_get: {
         parameters: {
             query?: {
-                scope?: "mine" | "created" | "watching" | "managed" | "all";
+                scope?: "mine" | "review" | "created" | "watching" | "managed" | "all";
                 status?: string | null;
                 q?: string | null;
                 overdue?: boolean | null;
@@ -7317,6 +7395,125 @@ export interface operations {
             header?: never;
             path: {
                 delegation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_profile_workspace_v1_me_profile_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfilePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_avatar_workspace_v1_me_avatar_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_put_avatar_workspace_v1_me_avatar_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_avatar_workspace_v1_me_avatar_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    avatar_workspace_v1_users__user_id__avatar_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
             };
             cookie?: never;
         };

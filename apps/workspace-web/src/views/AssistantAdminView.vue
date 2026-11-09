@@ -14,6 +14,7 @@ import { assistantOpen } from '../assistant/state'
 import ProviderPanel from '../assistant/ProviderPanel.vue'
 import KnowledgePanel from '../assistant/KnowledgePanel.vue'
 import AiSettingsPanel from '../ai/AiSettingsPanel.vue'
+import { useAi } from '../ai/useAi'
 
 const queryClient = useQueryClient()
 const route = useRoute()
@@ -82,6 +83,8 @@ async function refresh() {
 }
 
 const active = computed(() => admin.data.value?.providers.find((p) => p.active))
+const ai = useAi()
+const myData = computed(() => ai.on('assistant_my_data'))
 const checklist = computed(() => {
   const data = admin.data.value
   if (!data) return []
@@ -90,6 +93,14 @@ const checklist = computed(() => {
     { done: active.value?.last_test_ok === true, text: 'Đã kiểm tra kết nối thành công', go: 'providers' as Tab },
     { done: data.published_count > 0, text: `Có kiến thức (${data.published_count} bài đang dùng)`, go: 'knowledge' as Tab },
     { done: data.config.enabled, text: 'Đã bật trợ lý cho mọi người', go: 'overview' as Tab },
+    {
+      done: myData.value,
+      text: myData.value
+        ? 'Trả lời về dữ liệu của người hỏi: đang bật'
+        : 'Trả lời về dữ liệu của người hỏi: đang tắt (không bắt buộc)',
+      go: 'features' as Tab,
+      optional: true,
+    },
   ]
 })
 </script>
@@ -160,16 +171,20 @@ const checklist = computed(() => {
               <CheckCircle2 v-if="item.done" :size="18" /><Circle v-else :size="18" />
               <span>{{ item.text }}</span>
               <button v-if="!item.done && item.go !== 'overview'" type="button" class="link-button" @click="tab = item.go">
-                Làm ngay
+                {{ 'optional' in item ? 'Xem' : 'Làm ngay' }}
               </button>
             </li>
           </ul>
         </section>
         <div class="notice">
           <Sparkles :size="18" /><span
-            >Trợ lý đọc phần <strong>Kiến thức</strong>. Nó chỉ xem thêm hồ sơ, công việc của chính người hỏi khi bạn bật
-            “Trợ lý trả lời về dữ liệu của người hỏi” ở tab <strong>Tính năng AI</strong>; không bao giờ xem dữ liệu của
-            người khác. Câu hỏi được gửi tới dịch vụ AI bạn chọn.</span
+            >Trợ lý luôn trả lời từ phần <strong>Kiến thức</strong>. Khi bật “Trợ lý trả lời về dữ liệu của người hỏi” ở
+            tab <strong>Tính năng AI</strong>
+            <template v-if="myData">(đang bật)</template><template v-else>(đang tắt)</template>, trợ lý xem thêm những
+            gì chính người hỏi mở được: công việc được giao, đã giao, điều phối hoặc theo dõi; bàn giao việc và ủy quyền
+            phê duyệt; hồ sơ của họ và hồ sơ đang chờ họ duyệt; tài liệu của họ, tài liệu được chia sẻ với họ và đã chia
+            sẻ cho người khác. Trợ lý không bao giờ xem dữ liệu ngoài quyền của người hỏi. Câu hỏi được gửi tới dịch vụ
+            AI bạn chọn.</span
           >
         </div>
       </aside>

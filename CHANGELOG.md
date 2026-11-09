@@ -6,6 +6,28 @@
 
 ## [Unreleased]
 
+### Changed
+- Rà soát giao diện theo góp ý người dùng:
+  - Công việc: tab mới **Chờ tôi nghiệm thu** (`GET /tasks?scope=review`) khớp đúng số trên menu; các tab hiện số
+    đếm; trang tự mở tab đang có việc chờ.
+  - Kho tài liệu: mục **Được chia sẻ với tôi** (`shared=true` cho `/drive/files` và `/drive/folders`) liệt kê tệp,
+    thư mục người khác chia sẻ mà không thư mục nào mình mở được dẫn tới; gốc “Tài liệu của tôi” chỉ còn đồ của
+    mình; dòng tệp ghi “chia sẻ bởi …”.
+  - Danh sách hồ sơ: cột **Đang chờ** (người, bước, hạn; trả về trong `waiting_on`) thay cột “Lần sửa”; bản nháp
+    của mình có nút **Tiếp tục soạn** và **Trình** ngay trên dòng.
+  - Chân trang không còn bị nút trợ lý AI che; gợi ý bật hỏi đáp AI chỉ cho người quản trị AI, có nút ẩn.
+  - Trang Trợ lý AI: lời giải thích đúng phạm vi dữ liệu trợ lý đọc; “Mức sẵn sàng” cho biết tính năng dữ liệu
+    của người hỏi đang bật hay tắt.
+  - Bỏ chữ kỹ thuật (`AUTOMATION_ALLOWED_HOSTS`, “độ sâu 3”, mã tài khoản đăng nhập); “Thêm thành viên” thay
+    “Thêm hồ sơ thành viên”.
+  - Cần phê duyệt: bỏ chữ “Hồ sơ” thừa, bỏ nhãn in hoa; ủy quyền chia nhóm “Bạn đang ủy quyền cho” / “Bạn đang
+    được ủy quyền”, mục đã hết hạn gập lại.
+  - Chi tiết công việc: luồng áp dụng cho mọi công việc chỉ hiện với quản trị luồng; người không gắn được luồng
+    chỉ thấy luồng đang gắn.
+  - Thành viên: ô tìm, lọc theo phòng ban, ảnh đại diện và chức danh.
+  - Tìm kiếm: bỏ ô tìm trùng, dùng ô tìm trên thanh trên cùng (nút “Đổi từ khóa” mở sẵn từ khóa).
+  - Trình thiết kế quy trình: ô tìm bước, nhóm bước thu gọn được; nút Lưu chuyển “Đã lưu” khi không có thay đổi.
+
 ### Added
 - **Hồ sơ cá nhân** (`/profile`, migration `workspace_0021`): mỗi người tự sửa họ tên, chức danh, số điện thoại,
   email liên hệ, giới thiệu ngắn (`PATCH /me/profile`) và ảnh đại diện PNG/JPEG/WebP tối đa 2 MB

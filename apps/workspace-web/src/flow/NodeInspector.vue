@@ -540,7 +540,7 @@ const waitUnit = computed(() => {
 
       <template v-else-if="data.kind === 'webhook'">
         <div v-if="!webhooksEnabled" class="notice warning">
-          Triển khai chưa cho phép gọi ra ngoài (<code>AUTOMATION_ALLOWED_HOSTS</code> đang trống).
+          Hệ thống chưa cho phép gửi dữ liệu sang hệ thống khác; liên hệ bộ phận kỹ thuật để mở.
         </div>
         <div class="field">
           <label for="node-conn">Kết nối</label

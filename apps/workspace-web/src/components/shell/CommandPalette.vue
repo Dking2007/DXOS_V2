@@ -165,11 +165,11 @@ const sections = computed(() => {
   return out
 })
 
-async function show() {
+async function show(prefill = '') {
   if (open.value) return
   previous = document.activeElement
-  text.value = ''
-  debounced.value = ''
+  text.value = prefill
+  debounced.value = prefill
   active.value = 0
   open.value = true
   await nextTick()

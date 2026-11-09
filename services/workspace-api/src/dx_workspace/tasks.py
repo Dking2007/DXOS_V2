@@ -409,7 +409,7 @@ def build_router(app):
 
     @router.get("/tasks")
     def list_tasks(
-        scope: Literal["mine", "created", "watching", "managed", "all"] = "all",
+        scope: Literal["mine", "review", "created", "watching", "managed", "all"] = "all",
         status: str | None = None,
         q: str | None = Query(None, max_length=200),
         overdue: bool | None = None,
@@ -430,6 +430,11 @@ def build_router(app):
                 task.assignee_id == user.id
                 or not task.assignee_id
                 and manages_department(db, user, task.department_id)
+            ):
+                return False
+            # Results waiting for this person to accept: the same rule as the menu count.
+            if scope == "review" and not (
+                task.status == "submitted" and task.assignee_id != user.id and manages(db, user, task)
             ):
                 return False
             if scope == "created" and task.creator_id != user.id:

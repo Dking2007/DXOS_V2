@@ -30,6 +30,7 @@ import {
   Sparkles,
   Tags,
   Trash2,
+  Users as UsersIcon,
   Upload,
   X,
 } from 'lucide-vue-next'
@@ -93,6 +94,9 @@ watch(search, (value) => {
 })
 onBeforeUnmount(() => clearTimeout(timer))
 const trash = ref(false)
+/** Where browsing started: one's own documents, or what others shared. */
+const origin = ref<'mine' | 'shared'>('mine')
+const sharedRoot = computed(() => origin.value === 'shared' && !folder.value && !trash.value && !searchQuery.value)
 const railCollapsed = ref(window.localStorage.getItem('dx-drive-rail-collapsed') === '1')
 function toggleRailCollapsed() {
   railCollapsed.value = !railCollapsed.value
@@ -111,20 +115,21 @@ const files = useQuery({
     folder.value,
     searchQuery.value,
     trash.value,
+    sharedRoot.value,
     cursor.value,
     sortBy.value,
     sortDescending.value,
   ]),
   queryFn: () =>
     api.request<Page<DriveFile>>(
-      `/drive/files${queryString({ folder_id: folder.value, q: searchQuery.value, trash: trash.value, cursor: cursor.value, sort_by: sortBy.value, descending: sortDescending.value })}`,
+      `/drive/files${queryString({ folder_id: folder.value, q: searchQuery.value, trash: trash.value, shared: sharedRoot.value || undefined, cursor: cursor.value, sort_by: sortBy.value, descending: sortDescending.value })}`,
     ),
 })
 const folders = useQuery({
-  queryKey: computed(() => ['folders', folder.value]),
+  queryKey: computed(() => ['folders', folder.value, sharedRoot.value]),
   queryFn: () =>
     api.request<Page<Folder>>(
-      `/drive/folders${queryString({ parent_id: folder.value })}`,
+      `/drive/folders${queryString({ parent_id: folder.value, shared: sharedRoot.value || undefined })}`,
     ),
 })
 const users = useQuery({
@@ -226,7 +231,8 @@ async function drafted(file: { id: string; name: string }) {
 }
 const activeFile = computed(() => visibleFiles.value.find(item => item.id === fileMenuId.value) ?? null)
 const sortedFolders = computed(() => [...(folders.data.value?.items ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'vi')))
-const currentLocation = computed(() => trash.value ? 'Thùng rác' : searchQuery.value ? 'Kết quả tìm kiếm' : crumbs.value.at(-1)?.name ?? 'Tài liệu của tôi')
+const rootLabel = computed(() => (origin.value === 'shared' ? 'Được chia sẻ với tôi' : 'Tài liệu của tôi'))
+const currentLocation = computed(() => trash.value ? 'Thùng rác' : searchQuery.value ? 'Kết quả tìm kiếm' : crumbs.value.at(-1)?.name ?? rootLabel.value)
 watch(sortBy, value => { sortDescending.value = value !== 'name'; cursor.value = null })
 watch(sortDescending, () => { cursor.value = null })
 function fileKind(item: DriveFile) {
@@ -301,6 +307,10 @@ function go(index: number) {
   folder.value = index < 0 ? null : crumbs.value[index]!.id
   cursor.value = null
 }
+function goRoot(kind: 'mine' | 'shared') {
+  origin.value = kind
+  go(-1)
+}
 function showTrash(value: boolean) {
   trash.value = value
   cursor.value = null
@@ -322,7 +332,8 @@ function toggleFileMenu(item: DriveFile) {
 function onDrop(event: DragEvent) {
   dragging.value = false
   const dropped = event.dataTransfer?.files?.[0]
-  if (!dropped || trash.value) return
+  // At the top of "shared with me" there is no folder to drop into.
+  if (!dropped || trash.value || sharedRoot.value) return
   open('upload')
   uploadFile.value = dropped
 }
@@ -525,7 +536,8 @@ function pickFile(event: Event) {
         </div>
       </div>
       <nav class="drive-nav" aria-label="Vị trí tài liệu">
-        <button :class="{ active: !trash && !folder && !searchQuery }" aria-label="Tài liệu của tôi" title="Tài liệu của tôi" @click="go(-1)"><FolderClosed :size="19" /><span>Tài liệu của tôi</span></button>
+        <button :class="{ active: origin === 'mine' && !trash && !folder && !searchQuery }" aria-label="Tài liệu của tôi" title="Tài liệu của tôi" @click="goRoot('mine')"><FolderClosed :size="19" /><span>Tài liệu của tôi</span></button>
+        <button :class="{ active: sharedRoot }" aria-label="Được chia sẻ với tôi" title="Được chia sẻ với tôi" @click="goRoot('shared')"><UsersIcon :size="19" /><span>Được chia sẻ với tôi</span></button>
         <button :class="{ active: trash }" aria-label="Thùng rác" title="Thùng rác" @click="showTrash(true)"><Trash2 :size="19" /><span>Thùng rác</span></button>
       </nav>
       <div v-if="!trash && !searchQuery && sortedFolders.length" class="drive-rail-folders">
@@ -553,10 +565,11 @@ function pickFile(event: Event) {
       <p v-if="anyFolderSyncing" class="notice drive-sync" role="status">Đang cấp lại quyền sau thay đổi chia sẻ hoặc di chuyển thư mục. Tài liệu có thể tạm thời chưa mở được.</p>
     <div v-if="!trash && !searchQuery" class="drive-location">
       <button @click="go(-1)">
-        <FolderClosed
+        <component
+          :is="origin === 'shared' ? UsersIcon : FolderClosed"
           :size="14"
           style="vertical-align: middle; margin-right: 6px"
-        />Tài liệu</button
+        />{{ origin === 'shared' ? 'Được chia sẻ với tôi' : 'Tài liệu' }}</button
       ><template v-for="(crumb, index) in crumbs" :key="crumb.id"
         ><ChevronRight :size="13" /><button @click="go(index)">
           {{ crumb.name }}
@@ -610,14 +623,18 @@ function pickFile(event: Event) {
           ? 'Thùng rác đang trống'
           : searchQuery
             ? 'Không tìm thấy tài liệu'
-            : 'Chưa có tài liệu trong thư mục này'
+            : sharedRoot
+              ? 'Chưa có ai chia sẻ tài liệu với bạn'
+              : 'Chưa có tài liệu trong thư mục này'
       "
       :description="
         trash
           ? 'Tệp đã đưa vào thùng rác có thể khôi phục tại đây.'
           : searchQuery
             ? 'Thử tìm bằng một từ khóa khác.'
-            : 'Tải lên tài liệu đầu tiên hoặc tạo một văn bản mới.'
+            : sharedRoot
+              ? 'Tài liệu và thư mục người khác chia sẻ cho bạn sẽ hiện ở đây.'
+              : 'Tải lên tài liệu đầu tiên hoặc tạo một văn bản mới.'
       "
       @retry="files.refetch()"
     />
@@ -649,7 +666,9 @@ function pickFile(event: Event) {
                     >{{ item.name }}</RouterLink
                   ><button v-else-if="!trash" class="drive-file-name" :title="previewKind(item.name) ? 'Bấm để xem' : 'Bấm để tải về'" @click="openFile(item)">{{ item.name }}</button
                   ><strong v-else>{{ item.name }}</strong
-                  ><small>{{ fileKind(item) }} · bản sửa {{ item.revision }}</small>
+                  ><small>{{ fileKind(item) }}<template v-if="!owns(item)"> · chia sẻ bởi {{ ownerName(item) }}</template
+                    ><template v-else> · bản sửa {{ item.revision }}</template></small
+                  >
                   <ul v-if="item.labels?.length" class="label-chips">
                     <li v-for="label in item.labels" :key="label">
                       {{ label }}

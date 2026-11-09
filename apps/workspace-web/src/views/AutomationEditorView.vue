@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
   FlaskConical,
   History,
   Info,
@@ -61,6 +62,7 @@ import {
   tone,
 } from '../flow/nodes'
 import { useAi } from '../ai/useAi'
+import { fold } from '@dx/web-shared/text.ts'
 import type { ApiGraph, FlowKind, FlowNodeData, NodeKind, RunStep, TriggerInfo } from '../flow/nodes'
 type Step = RunStep & { error?: string; recipients?: string[] }
 interface ProcessForm {
@@ -588,11 +590,26 @@ const ai = useAi()
 const offeredKinds = computed(() =>
   paletteKinds().filter((kind) => !['ai', 'ai_extract'].includes(kind) || ai.on('automation_ai')),
 )
-const palette = computed(() =>
-  (['Bước cần người', 'Logic', 'Hành động', 'Dữ liệu và tài liệu'] as const).map(
-    (group) => ({ group, kinds: offeredKinds.value.filter((kind) => KINDS[kind].group === group) }),
-  ),
-)
+// A long list of step kinds: find one by name or purpose, and fold the groups you do not need.
+const paletteQuery = ref('')
+const foldedGroups = ref<string[]>([])
+const palette = computed(() => {
+  const needle = fold(paletteQuery.value.trim())
+  return (['Bước cần người', 'Logic', 'Hành động', 'Dữ liệu và tài liệu'] as const)
+    .map((group) => ({
+      group,
+      kinds: offeredKinds.value.filter(
+        (kind) =>
+          KINDS[kind].group === group && (!needle || fold(`${KINDS[kind].title} ${KINDS[kind].hint}`).includes(needle)),
+      ),
+    }))
+    .filter((section) => section.kinds.length)
+})
+function toggleGroup(group: string) {
+  foldedGroups.value = foldedGroups.value.includes(group)
+    ? foldedGroups.value.filter((item) => item !== group)
+    : [...foldedGroups.value, group]
+}
 </script>
 <template>
   <div class="flow-editor">
@@ -661,8 +678,16 @@ const palette = computed(() =>
         >
           <History :size="15" />Lịch sử chạy
         </button>
-        <button class="button small" :disabled="busy || (!dirty && !!ruleId)" title="Ctrl+S" @click="save">
-          <Save :size="15" />{{ busy ? 'Đang lưu…' : 'Lưu' }}
+        <button
+          class="button small"
+          :class="{ secondary: !dirty && !!ruleId }"
+          :disabled="busy || (!dirty && !!ruleId)"
+          :title="!dirty && !!ruleId ? 'Không có thay đổi cần lưu' : 'Ctrl+S'"
+          @click="save"
+        >
+          <component :is="!dirty && !!ruleId && !busy ? CheckCircle2 : Save" :size="15" />{{
+            busy ? 'Đang lưu…' : !dirty && ruleId ? 'Đã lưu' : 'Lưu'
+          }}
         </button>
       </div>
     </header>
@@ -721,9 +746,29 @@ const palette = computed(() =>
     </div>
     <div class="flow-body">
       <aside class="flow-palette" aria-label="Các loại bước">
+        <label class="search-box palette-search"
+          ><Search :size="15" /><input
+            v-model="paletteQuery"
+            type="search"
+            placeholder="Tìm bước…"
+            aria-label="Tìm loại bước"
+        /></label>
         <p class="muted">Kéo thả vào canvas hoặc bấm để thêm sau bước đang chọn.</p>
+        <p v-if="!palette.length" class="muted">Không có bước nào khớp “{{ paletteQuery }}”.</p>
         <div v-for="section in palette" :key="section.group" class="palette-group">
-          <span class="section-label">{{ section.group }}</span>
+          <button
+            type="button"
+            class="palette-group-head"
+            :aria-expanded="!!paletteQuery || !foldedGroups.includes(section.group)"
+            @click="toggleGroup(section.group)"
+          >
+            <ChevronDown
+              :size="14"
+              :class="{ folded: !paletteQuery && foldedGroups.includes(section.group) }"
+            /><span class="section-label">{{ section.group }}</span
+            ><small class="muted">{{ section.kinds.length }}</small>
+          </button>
+          <template v-if="paletteQuery || !foldedGroups.includes(section.group)">
           <button
             v-for="kind in section.kinds"
             :key="kind"
@@ -739,6 +784,7 @@ const palette = computed(() =>
               ><strong>{{ KINDS[kind].title }}</strong><small>{{ KINDS[kind].hint }}</small></span
             >
           </button>
+          </template>
         </div>
       </aside>
       <section class="flow-canvas" @drop.prevent="onDrop" @dragover.prevent>

@@ -1417,3 +1417,68 @@ a.stat-tile:hover {
   border-color: #6d4fd0;
   color: #6d4fd0;
 }
+
+/* The AI assistant button sits in the bottom-right corner; keep the footer text clear of it. */
+body:has(.assistant-fab) .app-footer {
+  padding-right: 96px;
+}
+
+/* Dossier list: who it waits for, and quick actions on one's own drafts. */
+.waiting-cell {
+  min-width: 180px;
+}
+.waiting-cell > div {
+  display: grid;
+  gap: 1px;
+}
+.waiting-cell > div + div {
+  margin-top: 6px;
+}
+.waiting-cell small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.member-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 0 18px 12px;
+}
+.member-filters .search-box {
+  flex: 1;
+  min-width: 200px;
+}
+
+.delegation-groups {
+  display: grid;
+  gap: 16px;
+}
+.delegation-group {
+  display: grid;
+  gap: 4px;
+}
+.delegation-group > p {
+  margin: 0;
+  font-size: 14px;
+}
+.delegation-past summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.search-refine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+}

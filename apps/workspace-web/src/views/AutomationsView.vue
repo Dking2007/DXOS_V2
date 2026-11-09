@@ -239,8 +239,8 @@ async function saveConnection() {
       </button>
     </header>
     <p v-if="catalog.data.value && !catalog.data.value.webhooks_enabled" class="card-body muted">
-      Triển khai chưa cho phép gọi ra ngoài. Quản trị hệ thống cần đặt
-      <code>AUTOMATION_ALLOWED_HOSTS</code> với danh sách máy chủ được phép.
+      Hệ thống chưa cho phép gửi dữ liệu sang hệ thống khác. Liên hệ bộ phận kỹ thuật để mở danh sách máy chủ được
+      phép kết nối.
     </p>
     <p v-else-if="catalog.data.value" class="card-body muted" style="padding-bottom: 0">
       Máy chủ được phép: <code>{{ catalog.data.value.allowed_hosts.join(', ') }}</code>. Khóa bí mật được mã hóa và
@@ -356,7 +356,7 @@ async function saveConnection() {
     </form>
   </ModalDialog>
   <p class="muted" style="margin-top: 18px; font-size: 14px">
-    <Workflow :size="14" style="vertical-align: -2px" /> Mỗi sự kiện chỉ kích hoạt một luồng một lần; luồng không tự
-    kích hoạt lại chính nó, chuỗi luồng dừng ở độ sâu 3.
+    <Workflow :size="14" style="vertical-align: -2px" /> Mỗi sự kiện chỉ chạy mỗi luồng một lần. Luồng không tự chạy
+    lại vì chính việc nó làm, và các luồng nối tiếp nhau sẽ dừng sau vài bước để tránh chạy vòng mãi.
   </p>
 </template>

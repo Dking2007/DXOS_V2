@@ -9,7 +9,9 @@ import {
   ChevronRight,
   FilePlus2,
   Files,
+  Pencil,
   Search,
+  Send,
 } from 'lucide-vue-next'
 import { api } from '../api'
 import {
@@ -32,6 +34,10 @@ import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import SchemaForm from '@dx/web-shared/components/SchemaForm.vue'
 const route = useRoute()
 const session = useSession()
+/** One's own draft or returned dossier: offer to continue it or submit it straight from the list. */
+function isMyDraft(item: CaseItem) {
+  return ['draft', 'needs_revision'].includes(item.status) && item.owner_id === session.user?.id
+}
 const router = useRouter()
 const queryClient = useQueryClient()
 // Archived dossiers are a separate pile rather than a status: they keep their result.
@@ -219,8 +225,8 @@ async function create() {
           <tr>
             <th>Hồ sơ</th>
             <th>Trạng thái</th>
+            <th>Đang chờ</th>
             <th>Cập nhật</th>
-            <th>Lần sửa</th>
             <th />
           </tr>
         </thead>
@@ -238,11 +244,36 @@ async function create() {
               </div>
             </td>
             <td><StatusBadge :status="item.status" /></td>
+            <td class="waiting-cell">
+              <template v-if="item.waiting_on?.length">
+                <div v-for="(who, index) in item.waiting_on.slice(0, 2)" :key="index">
+                  <strong>{{ who.name || 'Chưa có người nhận' }}</strong>
+                  <small
+                    >{{ who.label
+                    }}<template v-if="who.due_at">
+                      ·
+                      <span :class="{ 'overdue-text': new Date(who.due_at) < new Date() }"
+                        >hạn {{ formatDate(who.due_at) }}</span
+                      ></template
+                    ></small
+                  >
+                </div>
+                <small v-if="item.waiting_on.length > 2" class="muted"
+                  >và {{ item.waiting_on.length - 2 }} người khác</small
+                >
+              </template>
+              <div v-else-if="isMyDraft(item)" class="row-actions">
+                <RouterLink :to="`/cases/${item.id}?action=edit`" class="button secondary small"
+                  ><Pencil :size="14" />Tiếp tục soạn</RouterLink
+                ><RouterLink :to="`/cases/${item.id}?action=submit`" class="button small"
+                  ><Send :size="14" />Trình</RouterLink
+                >
+              </div>
+              <span v-else-if="item.status === 'pending_workflow_start'" class="muted">Đang chuyển duyệt…</span>
+              <span v-else class="muted">—</span>
+            </td>
             <td class="muted">
               {{ formatDate(item.updated_at || item.created_at, true) }}
-            </td>
-            <td>
-              <span class="tag">{{ item.revision > 1 ? `${item.revision - 1} lần` : 'Chưa sửa' }}</span>
             </td>
             <td>
               <RouterLink

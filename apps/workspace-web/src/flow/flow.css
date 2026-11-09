@@ -1005,3 +1005,32 @@ kbd {
     animation: none;
   }
 }
+
+/* Step palette: search and foldable groups. */
+.palette-search {
+  min-width: 0;
+  margin-bottom: 6px;
+}
+.palette-group-head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.palette-group-head .section-label {
+  margin: 0;
+}
+.palette-group-head small {
+  margin-left: auto;
+}
+.palette-group-head svg {
+  transition: transform 0.15s;
+}
+.palette-group-head svg.folded {
+  transform: rotate(-90deg);
+}

@@ -18,6 +18,7 @@ import { errorText } from '@dx/web-shared/api.ts'
 import { useSession } from './stores/session'
 import { badgeText, visibleGroups } from './ui/nav'
 import { useOverview } from './ui/overview'
+import { paletteRequest } from './ui/palette'
 import { cycleTheme, isDark, theme } from './ui/theme'
 import { roleLabel } from './ui/labels'
 import AvatarPhoto from './components/AvatarPhoto.vue'
@@ -36,6 +37,7 @@ const sidebar = ref(false)
 const sidebarCollapsed = ref(readCollapsed())
 const sessionError = ref('')
 const palette = ref<InstanceType<typeof CommandPalette>>()
+watch(paletteRequest, (request) => request && palette.value?.show(request.text))
 const groups = computed(() => visibleGroups(session.can))
 const overview = useOverview()
 const counts = computed(() => overview.data.value?.counts)

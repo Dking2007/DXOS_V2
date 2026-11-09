@@ -116,6 +116,10 @@ export interface CaseItem {
   /** How many times it was submitted; 0 means a draft nobody has seen, which may be deleted. */
   submission_no?: number
   archived_at?: string | null
+  due_at?: string | null
+  overdue?: boolean
+  /** In the list only: who the dossier waits for now (step, person, deadline). */
+  waiting_on?: { label: string; name: string; due_at: string | null }[]
 }
 export interface Submission {
   id: string

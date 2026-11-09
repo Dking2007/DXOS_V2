@@ -31,6 +31,7 @@ import {
   Sparkles,
   Trash2,
   Workflow,
+  X,
   XCircle,
 } from 'lucide-vue-next'
 import { api } from '../api'
@@ -214,6 +215,23 @@ const myTask = computed(() =>
 /** The drawer where people ask the AI about this dossier. */
 const asking = ref(false)
 const askFirst = ref('')
+// Administrators who chose not to switch the feature on are not reminded on every dossier.
+function readHint() {
+  try {
+    return localStorage.getItem('dx-case-ask-hint') === 'hidden'
+  } catch {
+    return false
+  }
+}
+const askHintHidden = ref(readHint())
+function hideAskHint() {
+  askHintHidden.value = true
+  try {
+    localStorage.setItem('dx-case-ask-hint', 'hidden')
+  } catch {
+    // Without storage the hint only stays hidden on this page.
+  }
+}
 const quickQuestion = ref('')
 function openAsk(question = '') {
   askFirst.value = question.trim()
@@ -423,6 +441,21 @@ function userName(userId?: string) {
     (userId ? userId.slice(0, 8) : '—')
   )
 }
+// Arriving from the list's "Continue" or "Submit" buttons opens that action once the dossier is loaded.
+let actionDone = false
+watch(
+  () => detail.data.value,
+  (data) => {
+    if (actionDone || !data || !canEdit.value) return
+    const action = route.query.action
+    if (action !== 'edit' && action !== 'submit') return
+    actionDone = true
+    void router.replace({ query: { ...route.query, action: undefined } })
+    if (action === 'edit') startEdit()
+    else ask('submit')
+  },
+  { immediate: true },
+)
 function startEdit() {
   if (!detail.data.value) return
   editTitle.value = detail.data.value.title
@@ -1102,12 +1135,17 @@ function moveTab(step: number) {
             </div>
           </div>
         </section>
-        <div v-else-if="session.can('assistant.manage') && ai.status.data.value" class="notice">
+        <div
+          v-else-if="session.can('assistant.manage') && ai.status.data.value && !askHintHidden"
+          class="notice case-ask-hint"
+        >
           <Sparkles :size="18" /><span
             >Hỏi đáp AI về hồ sơ chưa bật.
             <RouterLink to="/assistant?tab=features">Bật “Hỏi đáp về hồ sơ”</RouterLink> để mọi người hỏi AI ngay
-            trên trang hồ sơ.</span
-          >
+            trên trang hồ sơ. <small class="muted">Chỉ người quản trị AI thấy dòng này.</small></span
+          ><button class="icon-button" type="button" aria-label="Ẩn gợi ý này" title="Ẩn" @click="hideAskHint">
+            <X :size="15" />
+          </button>
         </div>
         <section class="card">
           <header class="card-header"><h3>Tóm tắt</h3></header>

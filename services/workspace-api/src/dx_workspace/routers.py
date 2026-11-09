@@ -145,6 +145,42 @@ def build_router(app):
         data["form_name"] = form.name if form else ""
         return data
 
+    def waiting_on(db, value) -> list[dict]:
+        """Who the dossier is waiting for right now, and by when: what its author most wants to know."""
+        if value.status not in {"pending_workflow_start", "processing"}:
+            return []
+        submission = db.scalar(
+            select(m.Submission).where(m.Submission.case_id == value.id, m.Submission.number == value.submission_no)
+        )
+        if not submission:
+            return []
+        result = []
+        for item in db.scalars(
+            select(m.ApprovalTask)
+            .where(m.ApprovalTask.submission_id == submission.id, m.ApprovalTask.state.in_(["pending", "syncing"]))
+            .order_by(m.ApprovalTask.step_index)
+        ):
+            person = db.get(m.User, item.assignee_id)
+            result.append(
+                {"label": item.label, "name": person.display_name if person else "", "due_at": item.due_at}
+            )
+        run = db.get(m.AutomationRun, submission.process_run_id) if submission.process_run_id else None
+        for step in (run.steps if run else None) or []:
+            if step.get("type") != "assign_task" or step.get("state") != "waiting" or step.get("superseded"):
+                continue
+            work = db.get(m.Task, step.get("task_id")) if step.get("task_id") else None
+            if work:
+                person = db.get(m.User, work.assignee_id) if work.assignee_id else None
+                department = db.get(m.Department, work.department_id) if work.department_id else None
+                result.append(
+                    {
+                        "label": work.title,
+                        "name": person.display_name if person else (department.name if department else ""),
+                        "due_at": work.due_at,
+                    }
+                )
+        return result
+
     def task_data(db, value):
         data = serial(value)
         case = db.get(m.Case, value.case_id) if value.case_id else None
@@ -337,20 +373,36 @@ def build_router(app):
     @router.get("/drive/folders", tags=["drive"])
     def folders(
         parent_id: str | None = None,
+        shared: bool = False,
         limit: int = Query(100, ge=1, le=200),
         cursor: str | None = None,
         db: Session = Depends(db_dep),
         actor: Actor = Depends(actor_dep),
     ):
+        """A folder's subfolders; at the root, one's own. `shared` lists what others opened to you."""
         user = context(db, actor)
-        candidates = list(
-            db.scalars(
-                select(m.Folder)
-                .where(m.Folder.parent_id == parent_id, m.Folder.deleted_at.is_(None))
-                .order_by(m.Folder.name, m.Folder.id)
-            )
-        )
+        if shared:
+            # Top of each share: a folder whose parent the person cannot open (or has none).
+            candidates = [
+                v
+                for v in db.scalars(
+                    select(m.Folder)
+                    .where(m.Folder.owner_id != user.id, m.Folder.deleted_at.is_(None))
+                    .order_by(m.Folder.name, m.Folder.id)
+                )
+                if folder_access(db, user, v) and not reachable_parent(db, user, v.parent_id)
+            ]
+            return page(candidates, limit, cursor)
+        statement = select(m.Folder).where(m.Folder.parent_id == parent_id, m.Folder.deleted_at.is_(None))
+        if parent_id is None:
+            statement = statement.where(m.Folder.owner_id == user.id)
+        candidates = list(db.scalars(statement.order_by(m.Folder.name, m.Folder.id)))
         return page([v for v in candidates if folder_access(db, user, v)], limit, cursor)
+
+    def reachable_parent(db, user, folder_id: str | None) -> bool:
+        """Whether the person can already reach an item by opening the folder it sits in."""
+        folder = db.get(m.Folder, folder_id) if folder_id else None
+        return bool(folder and not folder.deleted_at and folder_access(db, user, folder))
 
     @router.post("/drive/folders", tags=["drive"], status_code=201)
     def create_folder(body: s.FolderCreate, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
@@ -466,6 +518,7 @@ def build_router(app):
         folder_id: str | None = None,
         q: str = "",
         trash: bool = False,
+        shared: bool = False,
         sort_by: Literal["created", "name", "size"] = "created",
         descending: bool = True,
         limit: int = Query(100, ge=1, le=200),
@@ -477,11 +530,25 @@ def build_router(app):
         statement = select(m.DriveFile).where(
             m.DriveFile.deleted_at.is_not(None) if trash else m.DriveFile.deleted_at.is_(None)
         )
-        if not q:
-            statement = statement.where(m.DriveFile.folder_id == folder_id)
-        candidates = [
-            v for v in db.scalars(statement) if (not q or matches(q, v.name)) and file_access(db, user, v)
-        ]
+        if shared and not trash:
+            # Files of others that no folder the person can open leads to; the rest sit in those folders.
+            statement = statement.where(m.DriveFile.owner_id != user.id)
+            candidates = [
+                v
+                for v in db.scalars(statement)
+                if (not q or matches(q, v.name))
+                and file_access(db, user, v)
+                and not reachable_parent(db, user, v.folder_id)
+            ]
+        else:
+            if not q:
+                statement = statement.where(m.DriveFile.folder_id == folder_id)
+                if folder_id is None and not trash:
+                    # The root of "my documents" holds one's own; what others share has its own place.
+                    statement = statement.where(m.DriveFile.owner_id == user.id)
+            candidates = [
+                v for v in db.scalars(statement) if (not q or matches(q, v.name)) and file_access(db, user, v)
+            ]
         if sort_by == "name":
             candidates.sort(key=lambda value: (value.name.casefold(), value.id), reverse=descending)
         elif sort_by == "size":
@@ -851,7 +918,7 @@ def build_router(app):
             ],
             limit,
             cursor,
-            transform=lambda v: case_data(db, v),
+            transform=lambda v: {**case_data(db, v), "waiting_on": waiting_on(db, v)},
         )
 
     @router.post("/cases", tags=["cases"], status_code=201)

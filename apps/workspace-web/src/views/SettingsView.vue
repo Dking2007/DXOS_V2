@@ -9,6 +9,7 @@ import {
   Check,
   Plus,
   Save,
+  Search,
   ShieldCheck,
   UserPlus,
 } from 'lucide-vue-next'
@@ -25,6 +26,9 @@ import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import RoleMatrix from '../components/RoleMatrix.vue'
 import AppearanceSettings from '../components/AppearanceSettings.vue'
 import AuditLog from '../components/AuditLog.vue'
+import AvatarPhoto from '../components/AvatarPhoto.vue'
+import { initialsOf } from '../ui/people'
+import { fold } from '@dx/web-shared/text.ts'
 import { permissionLabel, PERMISSIONS, roleLabel } from '../ui/labels'
 import { toast } from '../ui/toast'
 import { confirmDiscard } from '../ui/unsaved'
@@ -43,6 +47,18 @@ const tab = ref<SettingsTab>(
 const users = useQuery({
   queryKey: ['users'],
   queryFn: () => api.request<Page<User>>('/users'),
+})
+// A unit with many people needs finding someone by name, title or unit.
+const memberQuery = ref('')
+const memberDepartment = ref('')
+const members = computed(() => {
+  const needle = fold(memberQuery.value.trim())
+  return (users.data.value?.items ?? []).filter((user) => {
+    if (memberDepartment.value === 'none' && user.department_id) return false
+    if (memberDepartment.value && memberDepartment.value !== 'none' && user.department_id !== memberDepartment.value)
+      return false
+    return !needle || fold([user.display_name, user.job_title, user.contact_email].filter(Boolean).join(' ')).includes(needle)
+  })
 })
 const departments = useQuery({
   queryKey: ['departments'],
@@ -265,17 +281,34 @@ const roleLabels: Record<string, string> = {
             class="button secondary small"
             @click="open('user')"
           >
-            <UserPlus :size="16" />Thêm hồ sơ thành viên
+            <UserPlus :size="16" />Thêm thành viên
           </button>
         </header>
+        <div v-if="(users.data.value?.items.length ?? 0) > 0" class="toolbar member-filters">
+          <label class="search-box"
+            ><Search :size="16" /><input
+              v-model="memberQuery"
+              type="search"
+              placeholder="Tìm theo tên, chức danh…"
+              aria-label="Tìm thành viên"
+          /></label>
+          <select v-model="memberDepartment" aria-label="Lọc theo phòng ban" class="compact-select">
+            <option value="">Mọi phòng ban</option>
+            <option value="none">Chưa phân phòng</option>
+            <option v-for="item in departments.data.value?.items" :key="item.id" :value="item.id">
+              {{ item.name }}
+            </option>
+          </select>
+          <small class="muted">{{ members.length }} / {{ users.data.value?.items.length }} người</small>
+        </div>
         <StatePanel
           :loading="users.isPending.value"
           :error="users.error.value"
-          :empty="users.data.value?.items.length === 0"
-          title="Chưa có thành viên"
+          :empty="users.data.value?.items.length === 0 || (!!users.data.value && !members.length)"
+          :title="users.data.value?.items.length ? 'Không có thành viên phù hợp' : 'Chưa có thành viên'"
           @retry="users.refetch()"
         />
-        <div v-if="users.data.value?.items.length" class="table-wrap">
+        <div v-if="members.length" class="table-wrap">
           <table>
             <thead>
               <tr>
@@ -285,16 +318,16 @@ const roleLabels: Record<string, string> = {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="user in users.data.value.items" :key="user.id">
+              <tr v-for="user in members" :key="user.id">
                 <td>
                   <div class="primary-cell">
-                    <span class="avatar">{{
-                      user.display_name.split(' ').slice(-1)[0]?.slice(0, 1)
-                    }}</span>
+                    <span class="avatar" aria-hidden="true"
+                      >{{ initialsOf(user.display_name) }}<AvatarPhoto :url="user.avatar_url"
+                    /></span>
                     <div>
                       <strong>{{ user.display_name }}</strong
-                      ><small class="mono">{{
-                        user.subject.slice(0, 18)
+                      ><small v-if="user.job_title || user.contact_email">{{
+                        [user.job_title, user.contact_email].filter(Boolean).join(' · ')
                       }}</small>
                     </div>
                   </div>
@@ -367,7 +400,7 @@ const roleLabels: Record<string, string> = {
         ? editDepartment
           ? 'Cập nhật phòng ban'
           : 'Thêm phòng ban'
-        : 'Thêm hồ sơ thành viên'
+        : 'Thêm thành viên'
     "
     @close="closeModal"
   >

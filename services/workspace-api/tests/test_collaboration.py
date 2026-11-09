@@ -944,3 +944,17 @@ def test_audit_log_names_who_acted_and_is_admin_only(world):  # noqa: F811
     created = next(e for e in entries if e["action"] == "task.created" and e["resource_id"] == task["id"])
     assert created["actor_name"] and created["actor_name"] != created["actor_id"]
     assert as_(world, "staff").get(API + "/audit-logs").status_code == 403
+
+
+def test_review_tab_lists_exactly_what_the_menu_counts(world):  # noqa: F811
+    users = world[7]
+    task = new_task(world, by="manager", title="Báo cáo tuần", assignee_id=users["staff"])
+    staff = as_(world, "staff")
+    task = transition(staff, task, "accept").json()
+    assert transition(staff, task, "submit").status_code == 200
+    manager = as_(world, "manager")
+    counts = manager.get(API + "/me/overview").json()["counts"]
+    review = manager.get(API + "/tasks?scope=review").json()["items"]
+    assert counts["tasks_to_review"] == len(review) == 1 and review[0]["id"] == task["id"]
+    # The person who did the work waits for acceptance; it is not theirs to review.
+    assert as_(world, "staff").get(API + "/tasks?scope=review").json()["items"] == []
