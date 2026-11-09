@@ -2,13 +2,27 @@
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { computed, h, type VNode } from 'vue'
+import { RouterLink } from 'vue-router'
+import { ExternalLink } from 'lucide-vue-next'
+import type { AssistantItem } from '@dx/web-shared/types.ts'
 import { parseMarkdown, type Inline } from './markdown'
 
-const props = defineProps<{ text: string }>()
+const props = defineProps<{ text: string; items?: AssistantItem[] }>()
+const byRef = computed(() => new Map((props.items ?? []).map((item) => [item.ref, item])))
 const blocks = computed(() => parseMarkdown(props.text))
 
 function inline(parts: Inline[]): (VNode | string)[] {
   return parts.map((part) => {
+    if (part.t === 'ref') {
+      // A reference the answer was not given (or made up) shows nothing rather than a dead "@7".
+      const item = byRef.value.get(part.n)
+      if (!item) return ''
+      return h(
+        RouterLink,
+        { to: item.link, class: 'assistant-ref', title: `Mở: ${item.title}`, 'aria-label': `Mở ${item.title}` },
+        () => h(ExternalLink, { size: 12, 'aria-hidden': 'true' }),
+      )
+    }
     if (part.t === 'bold') return h('strong', part.v)
     if (part.t === 'code') return h('code', part.v)
     if (part.t === 'cite') return h('sup', { class: 'assistant-cite' }, `[${part.n}]`)

@@ -673,3 +673,58 @@ body .toaster {
     grid-template-columns: 1fr;
   }
 }
+
+/* Links to the asker's own tasks, dossiers and files that an answer mentioned. */
+.assistant-ref {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin: 0 2px;
+  border-radius: 6px;
+  vertical-align: -3px;
+  background: var(--teal-soft);
+  color: var(--teal-ink);
+}
+.assistant-ref:hover {
+  background: var(--teal);
+  color: #fff;
+}
+.assistant-items {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.assistant-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: 14px;
+}
+.assistant-item:hover {
+  background: var(--surface-2);
+}
+.assistant-item svg {
+  flex: none;
+  color: var(--teal-ink);
+}
+.assistant-item span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.assistant-item small {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+}

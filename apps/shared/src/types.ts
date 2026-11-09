@@ -387,6 +387,8 @@ export interface AssistantStatus {
   ready: boolean
   welcome: string
   suggestions: string[]
+  /** Whether the assistant may answer about the asker's own tasks, dossiers and files. */
+  my_data?: boolean
   provider: string | null
   remaining: number | null
   daily_limit: number
@@ -398,10 +400,18 @@ export interface AssistantSource {
   title: string
   category: string
 }
+/** Something of the asker's that an answer pointed at with @n. */
+export interface AssistantItem {
+  ref: number
+  kind: 'task' | 'case' | 'file' | 'folder' | 'approval'
+  title: string
+  link: string
+}
 export interface AssistantReply {
   answer: string
   truncated: boolean
   sources: AssistantSource[]
+  items?: AssistantItem[]
   remaining: number | null
 }
 export interface AssistantProvider {

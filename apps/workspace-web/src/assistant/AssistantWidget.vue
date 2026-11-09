@@ -4,13 +4,43 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { BookOpen, Bot, Check, Copy, RotateCcw, SendHorizontal, Settings2, Sparkles, X } from 'lucide-vue-next'
+import {
+  BookOpen,
+  Bot,
+  Check,
+  ClipboardCheck,
+  Copy,
+  FileText,
+  FolderOpen,
+  ListTodo,
+  RotateCcw,
+  SendHorizontal,
+  Settings2,
+  Sparkles,
+  X,
+} from 'lucide-vue-next'
 import type { AssistantReply, AssistantStatus } from '@dx/web-shared/types.ts'
 import { errorText } from '@dx/web-shared/api.ts'
 import { api } from '../api'
 import { useSession } from '../stores/session'
 import AssistantText from './AssistantText.vue'
+import type { AssistantItem } from '@dx/web-shared/types.ts'
 import './assistant.css'
+
+const ITEM_ICON: Record<AssistantItem['kind'], typeof FileText> = {
+  task: ListTodo,
+  case: ClipboardCheck,
+  approval: ClipboardCheck,
+  file: FileText,
+  folder: FolderOpen,
+}
+const ITEM_KIND: Record<AssistantItem['kind'], string> = {
+  task: 'Công việc',
+  case: 'Hồ sơ',
+  approval: 'Phê duyệt',
+  file: 'Tài liệu',
+  folder: 'Thư mục',
+}
 import { assistantOpen, historyFor, type ChatTurn } from './state'
 
 const session = useSession()
@@ -80,7 +110,13 @@ async function send(text = draft.value) {
       method: 'POST',
       body: JSON.stringify({ messages: historyFor(turns.value) }),
     })
-    turns.value.push({ role: 'assistant', content: reply.answer, sources: reply.sources, truncated: reply.truncated })
+    turns.value.push({
+      role: 'assistant',
+      content: reply.answer,
+      sources: reply.sources,
+      items: reply.items,
+      truncated: reply.truncated,
+    })
     remaining.value = reply.remaining
     save()
   } catch (cause) {
@@ -160,7 +196,11 @@ watch(
         <span class="assistant-avatar" aria-hidden="true"><Bot :size="20" /></span>
         <div class="grow">
           <strong>Trợ lý Desktiny</strong>
-          <small>{{ ready ? 'Quy trình & cách dùng phần mềm' : 'Chưa sẵn sàng' }}</small>
+          <small>{{ !ready
+              ? 'Chưa sẵn sàng'
+              : status.data.value?.my_data
+                ? 'Quy trình, việc & tài liệu của bạn'
+                : 'Quy trình & cách dùng phần mềm' }}</small>
         </div>
         <button
           v-if="turns.length"
@@ -204,7 +244,20 @@ watch(
           <template v-for="(turn, index) in turns" :key="index">
             <div v-if="turn.role === 'user'" class="assistant-msg me">{{ turn.content }}</div>
             <div v-else class="assistant-msg bot">
-              <AssistantText :text="turn.content" />
+              <AssistantText :text="turn.content" :items="turn.items" />
+              <div v-if="turn.items?.length" class="assistant-items" aria-label="Mở nhanh">
+                <RouterLink
+                  v-for="item in turn.items.slice(0, 8)"
+                  :key="item.ref"
+                  :to="item.link"
+                  class="assistant-item"
+                  :title="item.title"
+                >
+                  <component :is="ITEM_ICON[item.kind]" :size="14" aria-hidden="true" />
+                  <span>{{ item.title }}</span>
+                  <small>{{ ITEM_KIND[item.kind] }}</small>
+                </RouterLink>
+              </div>
               <p v-if="turn.truncated" class="assistant-note">Câu trả lời bị cắt vì quá dài. Hãy hỏi cụ thể hơn.</p>
               <div v-if="turn.sources?.length" class="assistant-sources">
                 <BookOpen :size="13" />

@@ -83,6 +83,13 @@
 - CI chạy thêm `packages/flowkit/tests` (56 test) và test Node của plugin `vn-document-format` (29 test), trước đây không được chạy.
 
 ### Changed
+- **Trợ lý AI trả lời về dữ liệu của người hỏi** (tính năng `assistant_my_data`, vẫn tắt mặc định) mở rộng: ngoài hồ sơ
+  mình lập, việc được giao và việc chờ duyệt, trợ lý còn biết việc mình giao, điều phối, theo dõi, việc xong 30 ngày
+  qua; bàn giao việc 60 ngày qua và ủy quyền duyệt; hồ sơ mình đã xử lý; tài liệu của mình và đang chia sẻ với ai,
+  tài liệu và thư mục người khác chia sẻ cho mình. Chỉ những gì người hỏi mở được; mỗi nhóm tối đa 12 mục, ưu tiên
+  mục khớp câu hỏi. Câu trả lời ghi mã `@n` cạnh từng mục, giao diện biến thành nút mở và danh sách **Mở nhanh**
+  (`items` trong `POST /assistant/chat`); mã cũ bị bỏ khỏi lịch sử gửi lại. `GET /assistant` có `my_data` và
+  thêm câu hỏi gợi ý. 2 test backend, 2 test giao diện.
 - **Thanh bên** sáng và gọn: cùng nền với trang, chỉ một viền mảnh; trang đang mở tô nền nhạt và chữ đậm. Gộp còn
   hai nhóm (việc hằng ngày và Quản trị), số đang chờ hiện nhỏ cuối dòng, nút thu gọn thành biểu tượng cạnh logo, bỏ
   dòng phiên bản. Chế độ tối, thu gọn và ngăn kéo trên điện thoại vẫn hoạt động.

@@ -113,6 +113,8 @@ class FakeAi:
             return reply('{"cases": [{"name": "Đủ hồ sơ", "payload": {"reason": "Họp", "amount": 10}, "file_count": 0, "decisions": ["approve"]}]}')
         if "tiêu đề ngắn" in system:
             return reply('{"titles": ["Họp giao ban"]}')
+        if "Trợ lý Desktiny" in system and "<du_lieu_cua_ban>" in system and "mã" in prompt:
+            return reply("Xem @1 và @2; còn @99 không có.")
         if "Trợ lý Desktiny" in system:
             return reply("Hồ sơ của bạn đang chờ duyệt." if "<du_lieu_cua_ban>" in system else "Chưa rõ.")
         return reply('{"issues": []}')
