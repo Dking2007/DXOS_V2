@@ -1,0 +1,139 @@
+{
+  "key": "process-outgoing-doc",
+  "title": "Trình ký văn bản đi",
+  "description": "Lãnh đạo đơn vị kiểm tra nội dung, ban giám đốc ký duyệt, văn thư vào số, đóng dấu và phát hành rồi báo người soạn.",
+  "graph": {
+    "nodes": [
+      {
+        "id": "trigger",
+        "type": "trigger",
+        "label": "",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "data": {
+          "event": "case.submitted",
+          "form_id": null,
+          "required_documents": [
+            "Dự thảo văn bản"
+          ]
+        }
+      },
+      {
+        "id": "review",
+        "type": "approval",
+        "label": "Lãnh đạo đơn vị kiểm tra nội dung",
+        "position": {
+          "x": 320,
+          "y": 0
+        },
+        "data": {
+          "resolver": "department_manager",
+          "user_id": null,
+          "allow_return": true,
+          "allow_reject": true,
+          "due_in_days": 3,
+          "instructions": ""
+        }
+      },
+      {
+        "id": "sign",
+        "type": "approval",
+        "label": "Ban giám đốc ký duyệt",
+        "position": {
+          "x": 680,
+          "y": 0
+        },
+        "data": {
+          "resolver": "role",
+          "user_id": null,
+          "allow_return": true,
+          "allow_reject": true,
+          "due_in_days": 3,
+          "instructions": "",
+          "role": "director",
+          "role_scope": "organization"
+        }
+      },
+      {
+        "id": "issue",
+        "type": "assign_task",
+        "label": "Văn thư phát hành",
+        "position": {
+          "x": 1040,
+          "y": 0
+        },
+        "data": {
+          "title": "Vào số, đóng dấu, phát hành: {title}",
+          "priority": "normal",
+          "due_in_days": 1,
+          "require_files": 1,
+          "required_documents": [
+            "Bản đã ký, đóng dấu"
+          ]
+        }
+      },
+      {
+        "id": "tell_owner",
+        "type": "notify",
+        "label": "",
+        "position": {
+          "x": 1400,
+          "y": -60
+        },
+        "data": {
+          "recipients": [
+            "owner"
+          ],
+          "title": "Văn bản đã được phát hành: {title}"
+        }
+      },
+      {
+        "id": "issued",
+        "type": "finish",
+        "label": "Hoàn tất",
+        "position": {
+          "x": 1760,
+          "y": -60
+        },
+        "data": {
+          "result": "approved",
+          "message": "Văn bản đã ký và phát hành."
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger->review",
+        "source": "trigger",
+        "target": "review",
+        "branch": null
+      },
+      {
+        "id": "review:approve->sign",
+        "source": "review",
+        "target": "sign",
+        "branch": "approve"
+      },
+      {
+        "id": "sign:approve->issue",
+        "source": "sign",
+        "target": "issue",
+        "branch": "approve"
+      },
+      {
+        "id": "issue:completed->tell_owner",
+        "source": "issue",
+        "target": "tell_owner",
+        "branch": "completed"
+      },
+      {
+        "id": "tell_owner->issued",
+        "source": "tell_owner",
+        "target": "issued",
+        "branch": null
+      }
+    ]
+  }
+}

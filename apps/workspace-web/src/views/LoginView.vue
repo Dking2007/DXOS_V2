@@ -4,10 +4,19 @@
      through the organisation's SSO. Everything moves gently and stays still for reduced motion. -->
 <script setup lang="ts">
 import { ChevronRight, TriangleAlert } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { appearance, brand } from '../ui/appearance'
 
 const route = useRoute()
+// The sector pack in force may name the organisation, change the titles and the ground.
+const entry = computed(() => appearance.value?.login ?? {})
+const style = computed(() => entry.value.style ?? 'framed')
+const ground = computed(() =>
+  style.value === 'image' && entry.value.background_url
+    ? { backgroundImage: `linear-gradient(160deg, rgba(8, 22, 52, 0.78), rgba(8, 22, 52, 0.55)), url("${entry.value.background_url}")` }
+    : undefined,
+)
 const busy = ref(false)
 function login() {
   busy.value = true
@@ -35,9 +44,9 @@ const SPECKS = [
 </script>
 
 <template>
-  <main class="entry">
-    <div class="entry-light" aria-hidden="true" />
-    <div class="entry-specks" aria-hidden="true">
+  <main class="entry" :class="`entry-${style}`" :style="ground">
+    <div v-if="style === 'framed'" class="entry-light" aria-hidden="true" />
+    <div v-if="style === 'framed'" class="entry-specks" aria-hidden="true">
       <i
         v-for="(speck, index) in SPECKS"
         :key="index"
@@ -48,7 +57,7 @@ const SPECKS = [
         }"
       />
     </div>
-    <div class="entry-frame" aria-hidden="true">
+    <div v-if="style === 'framed'" class="entry-frame" aria-hidden="true">
       <svg
         v-for="corner in ['tl', 'tr', 'bl', 'br']"
         :key="corner"
@@ -66,24 +75,29 @@ const SPECKS = [
 
     <section class="entry-card" aria-labelledby="entry-title">
       <p class="entry-org rise" style="--d: 0.15s">
-        <span>VĂN PHÒNG ĐIỆN TỬ</span>
+        <span>{{ brand.org ? brand.org.toLocaleUpperCase('vi') : 'VĂN PHÒNG ĐIỆN TỬ' }}</span>
       </p>
 
       <div class="entry-emblem rise" style="--d: 0.3s" aria-hidden="true">
         <span class="entry-emblem-ring"
-          ><span class="entry-emblem-core">D</span></span
+          ><span class="entry-emblem-core" :class="{ 'has-logo': !!brand.logo }"
+            ><img v-if="brand.logo" :src="brand.logo" alt="" /><template v-else>{{
+              brand.name.charAt(0)
+            }}</template></span
+          ></span
         >
       </div>
 
-      <p class="entry-kicker rise" style="--d: 0.5s"><span>DESKTINY</span></p>
+      <p class="entry-kicker rise" style="--d: 0.5s"><span>{{ brand.name.toLocaleUpperCase('vi') }}</span></p>
       <h1 id="entry-title" class="entry-title rise" style="--d: 0.65s">
-        Hệ thống văn phòng điện tử<br />hồ sơ, tài liệu và phê duyệt
+        <template v-if="entry.title">{{ entry.title }}</template
+        ><template v-else>Hệ thống văn phòng điện tử<br />hồ sơ, tài liệu và phê duyệt</template>
       </h1>
       <div class="entry-divider rise" style="--d: 0.85s" aria-hidden="true">
         <i />
       </div>
       <p class="entry-code rise" style="--d: 0.95s">
-        E-OFFICE · KHÔNG GIAN NỘI BỘ
+        {{ entry.subtitle || 'E-OFFICE · KHÔNG GIAN NỘI BỘ' }}
       </p>
 
       <div class="entry-actions rise" style="--d: 1.15s">
@@ -103,7 +117,7 @@ const SPECKS = [
           <ChevronRight :size="20" aria-hidden="true" />
         </button>
         <p class="entry-note">
-          Đăng nhập bằng tài khoản của tổ chức. Desktiny không lưu mật khẩu của
+          Đăng nhập bằng tài khoản của tổ chức. {{ brand.name }} không lưu mật khẩu của
           bạn.
         </p>
       </div>
@@ -112,6 +126,25 @@ const SPECKS = [
 </template>
 
 <style scoped>
+/* Pack login styles: "flat" keeps the card on the pack's main colour, "image" puts it on a photo. */
+.entry.entry-flat {
+  background: linear-gradient(160deg, var(--teal-strong, #16304f), var(--teal, #1e3a5f));
+}
+.entry.entry-image {
+  background-size: cover;
+  background-position: center;
+}
+.entry-emblem-core.has-logo {
+  overflow: hidden;
+  padding: 18%;
+  background: #fff;
+  border-radius: 50%;
+}
+.entry-emblem-core.has-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 .entry {
   --ink: #e8eef8;
   --soft: #b9c6db;

@@ -32,6 +32,16 @@
   - Trình thiết kế quy trình: ô tìm bước, nhóm bước thu gọn được; nút Lưu chuyển “Đã lưu” khi không có thay đổi.
 
 ### Added
+- **Gói ngành (`desktiny-pack/1`), tầng 1 của hướng phát triển plugin/giao diện** (migration `workspace_0022`,
+  [docs/packs.md](docs/packs.md)). Màn **Quản trị › Gói ngành** (`organization.manage`): cài gói `.zip` hoặc gói có
+  sẵn trong `packs/` sau khi **xem trước**, nâng cấp cùng `id`, gỡ (quy trình đã có hồ sơ chỉ ngừng phát hành), xuất
+  `.zip`. Phần giao diện: tên ứng dụng và cơ quan, logo, favicon, màu sáng/tối (kiểm tương phản WCAG AA cả hai
+  giao diện), phông, mật độ, bo góc, trang đăng nhập (khung/phẳng/ảnh nền), từ ngữ, ẩn/sắp menu, khối trang chủ;
+  áp khi tải ứng dụng qua `GET /appearance` công khai. Phần nghiệp vụ: quy trình (biểu mẫu + đồ thị, phát hành
+  sẵn), biểu mẫu, mẫu quy trình, luồng tự động (cài ở trạng thái tắt), bài kiến thức. **Trình tạo gói** của cơ quan
+  (`local.*`) có xem trước trực tiếp. SVG được lọc bỏ mã; tài nguyên phục vụ với CSP riêng. 17 mẫu quy trình chuyển
+  từ mã sang gói mặc định `desktiny.core`; gói mẫu `packs/truong-hoc`. Gateway thêm Content-Security-Policy và
+  `frame-ancestors` cho ứng dụng web. 6 test backend, 5 test frontend.
 - **12 quy trình mẫu mới** trong Tạo luồng: hồ sơ khẩn trình thẳng ban giám đốc, nghỉ phép theo số ngày, mua sắm theo
   giá trị, công tác và tạm ứng, công văn đến, trình ký văn bản đi, rà soát hợp đồng song song, thanh toán theo chứng từ,
   sửa chữa tài sản, đề xuất tuyển dụng, ban hành quy định có xác nhận đã đọc, quá hạn thì chuyển cấp trên. Bước ban

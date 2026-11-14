@@ -5772,6 +5772,397 @@
         }
       }
     },
+    "/workspace/v1/appearance": {
+      "get": {
+        "tags": [
+          "packs"
+        ],
+        "summary": "Current Appearance",
+        "operationId": "current_appearance_workspace_v1_appearance_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "packs"
+        ],
+        "summary": "Choose Appearance",
+        "operationId": "choose_appearance_workspace_v1_appearance_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppearanceChoice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/appearance/assets/{asset_id}": {
+      "get": {
+        "tags": [
+          "packs"
+        ],
+        "summary": "Appearance Asset",
+        "operationId": "appearance_asset_workspace_v1_appearance_assets__asset_id__get",
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Asset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/packs/templates": {
+      "get": {
+        "tags": [
+          "packs"
+        ],
+        "summary": "Templates",
+        "description": "Ready-made flows from every installed pack, the core pack first.",
+        "operationId": "templates_workspace_v1_packs_templates_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/packs": {
+      "get": {
+        "tags": [
+          "packs"
+        ],
+        "summary": "Packs",
+        "operationId": "packs_workspace_v1_packs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "packs"
+        ],
+        "summary": "Install",
+        "description": "Install a pack, or upgrade it when the same id is installed; one transaction.",
+        "operationId": "install_workspace_v1_packs_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_install_workspace_v1_packs_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/packs/preview": {
+      "post": {
+        "tags": [
+          "packs"
+        ],
+        "summary": "Preview",
+        "description": "What installing would add or change; writes nothing.",
+        "operationId": "preview_workspace_v1_packs_preview_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_preview_workspace_v1_packs_preview_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/packs/{pack_id}": {
+      "delete": {
+        "tags": [
+          "packs"
+        ],
+        "summary": "Uninstall",
+        "operationId": "uninstall_workspace_v1_packs__pack_id__delete",
+        "parameters": [
+          {
+            "name": "pack_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pack Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "packs"
+        ],
+        "summary": "Save Local",
+        "description": "Create or update the organisation's own pack from the pack builder.",
+        "operationId": "save_local_workspace_v1_packs__pack_id__put",
+        "parameters": [
+          {
+            "name": "pack_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pack Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalPackInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/packs/{pack_id}/export": {
+      "get": {
+        "tags": [
+          "packs"
+        ],
+        "summary": "Export",
+        "operationId": "export_workspace_v1_packs__pack_id__export_get",
+        "parameters": [
+          {
+            "name": "pack_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pack Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/packs/{pack_id}/assets": {
+      "post": {
+        "tags": [
+          "packs"
+        ],
+        "summary": "Upload Asset",
+        "description": "A logo, favicon or login background for the organisation's own pack, checked like a pack file.",
+        "operationId": "upload_asset_workspace_v1_packs__pack_id__assets_post",
+        "parameters": [
+          {
+            "name": "pack_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pack Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_asset_workspace_v1_packs__pack_id__assets_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/automations/catalog": {
       "get": {
         "tags": [
@@ -8257,6 +8648,141 @@
         ],
         "title": "AiEvidenceImport"
       },
+      "Appearance": {
+        "properties": {
+          "app_name": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "App Name",
+            "default": ""
+          },
+          "org_name": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Org Name",
+            "default": ""
+          },
+          "logo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo"
+          },
+          "favicon": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Favicon"
+          },
+          "colors": {
+            "$ref": "#/components/schemas/Colors"
+          },
+          "font": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "source-sans-3",
+                  "be-vietnam-pro"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Font"
+          },
+          "density": {
+            "type": "string",
+            "enum": [
+              "comfortable",
+              "compact"
+            ],
+            "title": "Density",
+            "default": "comfortable"
+          },
+          "radius": {
+            "type": "string",
+            "enum": [
+              "small",
+              "medium",
+              "large"
+            ],
+            "title": "Radius",
+            "default": "medium"
+          },
+          "login": {
+            "$ref": "#/components/schemas/LoginLook"
+          },
+          "terminology": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "maxProperties": 60,
+            "title": "Terminology"
+          },
+          "menu": {
+            "$ref": "#/components/schemas/MenuLook"
+          },
+          "home": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Appearance"
+      },
+      "AppearanceChoice": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "pack_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pack Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision"
+        ],
+        "title": "AppearanceChoice"
+      },
       "ApprovalStep": {
         "properties": {
           "label": {
@@ -8420,6 +8946,69 @@
         ],
         "title": "ArticlePatch"
       },
+      "Body_install_workspace_v1_packs_post": {
+        "properties": {
+          "file": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "binary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          },
+          "builtin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Builtin"
+          },
+          "activate": {
+            "type": "boolean",
+            "title": "Activate",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "Body_install_workspace_v1_packs_post"
+      },
+      "Body_preview_workspace_v1_packs_preview_post": {
+        "properties": {
+          "file": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "binary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          },
+          "builtin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Builtin"
+          }
+        },
+        "type": "object",
+        "title": "Body_preview_workspace_v1_packs_preview_post"
+      },
       "Body_put_avatar_workspace_v1_me_avatar_put": {
         "properties": {
           "file": {
@@ -8433,6 +9022,30 @@
           "file"
         ],
         "title": "Body_put_avatar_workspace_v1_me_avatar_put"
+      },
+      "Body_upload_asset_workspace_v1_packs__pack_id__assets_post": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "logo",
+              "favicon",
+              "background"
+            ],
+            "title": "Role"
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "file"
+        ],
+        "title": "Body_upload_asset_workspace_v1_packs__pack_id__assets_post"
       },
       "Body_upload_attachment_workspace_v1_conversations__conversation_id__attachments_post": {
         "properties": {
@@ -8729,6 +9342,27 @@
           "text"
         ],
         "title": "ChecklistItem"
+      },
+      "Colors": {
+        "properties": {
+          "light": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Light"
+          },
+          "dark": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Dark"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Colors"
       },
       "Condition": {
         "properties": {
@@ -9743,6 +10377,137 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "LocalInclude": {
+        "properties": {
+          "processes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 60,
+            "title": "Processes"
+          },
+          "automations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 60,
+            "title": "Automations"
+          },
+          "knowledge": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Knowledge"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "LocalInclude"
+      },
+      "LocalPackInput": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "title": "Version",
+            "default": "1.0.0"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Description",
+            "default": ""
+          },
+          "license": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "License",
+            "default": "Apache-2.0"
+          },
+          "appearance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Appearance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "include": {
+            "$ref": "#/components/schemas/LocalInclude"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "LocalPackInput"
+      },
+      "LoginLook": {
+        "properties": {
+          "style": {
+            "type": "string",
+            "enum": [
+              "framed",
+              "flat",
+              "image"
+            ],
+            "title": "Style",
+            "default": "framed"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Title",
+            "default": ""
+          },
+          "subtitle": {
+            "type": "string",
+            "maxLength": 160,
+            "title": "Subtitle",
+            "default": ""
+          },
+          "background": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Background"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "LoginLook"
+      },
       "ManualRun": {
         "properties": {
           "ref_id": {
@@ -9782,6 +10547,29 @@
           "user_ids"
         ],
         "title": "MembersAdd"
+      },
+      "MenuLook": {
+        "properties": {
+          "hide": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Hide"
+          },
+          "order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Order"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MenuLook"
       },
       "MessageCreate": {
         "properties": {

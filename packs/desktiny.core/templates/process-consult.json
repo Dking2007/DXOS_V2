@@ -1,0 +1,75 @@
+{
+  "key": "process-consult",
+  "title": "Xin ý kiến các bên rồi lãnh đạo quyết",
+  "description": "Gửi xin ý kiến nhiều người cùng lúc; dù đồng ý hay không, lãnh đạo đơn vị là người quyết định cuối và được thấy các ý kiến.",
+  "graph": {
+    "nodes": [
+      {
+        "id": "trigger",
+        "type": "trigger",
+        "label": "",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "data": {
+          "event": "case.submitted",
+          "form_id": null
+        }
+      },
+      {
+        "id": "opinions",
+        "type": "consult",
+        "label": "Xin ý kiến các phòng",
+        "position": {
+          "x": 320,
+          "y": 0
+        },
+        "data": {
+          "user_ids": [],
+          "include_department_manager": false,
+          "mode": "all",
+          "due_in_days": 2,
+          "instructions": ""
+        }
+      },
+      {
+        "id": "leader",
+        "type": "approval",
+        "label": "Lãnh đạo quyết định",
+        "position": {
+          "x": 720,
+          "y": 0
+        },
+        "data": {
+          "resolver": "department_manager",
+          "user_id": null,
+          "allow_return": true,
+          "allow_reject": true,
+          "due_in_days": 3,
+          "instructions": ""
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger->opinions",
+        "source": "trigger",
+        "target": "opinions",
+        "branch": null
+      },
+      {
+        "id": "opinions:approve->leader",
+        "source": "opinions",
+        "target": "leader",
+        "branch": "approve"
+      },
+      {
+        "id": "opinions:reject->leader",
+        "source": "opinions",
+        "target": "leader",
+        "branch": "reject"
+      }
+    ]
+  }
+}

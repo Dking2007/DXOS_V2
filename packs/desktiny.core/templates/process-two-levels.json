@@ -1,0 +1,72 @@
+{
+  "key": "process-two-levels",
+  "title": "Hai cấp: đơn vị rồi ban giám đốc",
+  "description": "Lãnh đạo đơn vị duyệt trước; được duyệt thì chuyển ban giám đốc duyệt tiếp.",
+  "graph": {
+    "nodes": [
+      {
+        "id": "trigger",
+        "type": "trigger",
+        "label": "",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "data": {
+          "event": "case.submitted",
+          "form_id": null
+        }
+      },
+      {
+        "id": "leader",
+        "type": "approval",
+        "label": "Lãnh đạo đơn vị duyệt",
+        "position": {
+          "x": 320,
+          "y": 0
+        },
+        "data": {
+          "resolver": "department_manager",
+          "user_id": null,
+          "allow_return": true,
+          "allow_reject": true,
+          "due_in_days": 3,
+          "instructions": ""
+        }
+      },
+      {
+        "id": "board",
+        "type": "approval",
+        "label": "Ban giám đốc duyệt",
+        "position": {
+          "x": 680,
+          "y": -40
+        },
+        "data": {
+          "resolver": "role",
+          "user_id": null,
+          "allow_return": true,
+          "allow_reject": true,
+          "due_in_days": 3,
+          "instructions": "",
+          "role": "director",
+          "role_scope": "organization"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger->leader",
+        "source": "trigger",
+        "target": "leader",
+        "branch": null
+      },
+      {
+        "id": "leader:approve->board",
+        "source": "leader",
+        "target": "board",
+        "branch": "approve"
+      }
+    ]
+  }
+}
