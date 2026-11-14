@@ -49,6 +49,7 @@ import { FLOW_CONTEXT } from '../flow/context'
 import {
   KINDS,
   OUTCOMES,
+  PROCESS_TEMPLATES,
   nodeOutputs,
   plainCopy,
   TEMPLATES,
@@ -61,7 +62,6 @@ import {
   tone,
 } from '../flow/nodes'
 import { useAi } from '../ai/useAi'
-import { fetchPackTemplates } from '../flow/templates'
 import { fold } from '@dx/web-shared/text.ts'
 import type { ApiGraph, FlowKind, FlowNodeData, NodeKind, RunStep, TriggerInfo } from '../flow/nodes'
 type Step = RunStep & { error?: string; recipients?: string[] }
@@ -200,16 +200,8 @@ if (ruleId.value) {
     })
     .catch((cause) => (error.value = cause))
 } else {
-  const wanted = route.query.template ? String(route.query.template) : ''
-  const builtIn = TEMPLATES.find((t) => t.key === wanted)
-  // Process templates live in the installed sector packs; event flows ship with the app.
-  if (builtIn || !wanted) startFrom(builtIn ?? TEMPLATES[0]!)
-  else
-    fetchPackTemplates()
-      .then((items) => startFrom(items.find((t) => t.key === wanted) ?? TEMPLATES[0]!))
-      .catch((cause) => (error.value = cause))
-}
-function startFrom(template: { key: string; title: string; graph: ApiGraph }) {
+  const list = [...TEMPLATES, ...PROCESS_TEMPLATES]
+  const template = list.find((t) => t.key === route.query.template) ?? list[0]
   if (template.key !== 'blank') name.value = template.title
   const graph = plainCopy(template.graph)
   if (route.query.form) {

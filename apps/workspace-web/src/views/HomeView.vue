@@ -29,7 +29,6 @@ import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import DigestCard from '../ai/DigestCard.vue'
 import { useAi } from '../ai/useAi'
-import { appearance, term } from '../ui/appearance'
 const session = useSession()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -44,15 +43,6 @@ const firstName = computed(
 )
 const overview = useOverview()
 const ai = useAi()
-// A sector pack may choose which home blocks show; on the right they follow its order.
-const blocks = computed(() => appearance.value?.home ?? null)
-function shows(key: string) {
-  return !blocks.value || blocks.value.includes(key)
-}
-function placeOf(key: string) {
-  return blocks.value ? blocks.value.indexOf(key) : 0
-}
-const sideBlocks = computed(() => ['quick.start', 'cases.recent'].filter(shows))
 const agenda = computed(() => overview.data.value?.agenda ?? [])
 const overdueCount = computed(() => agenda.value.filter((item) => item.overdue).length)
 
@@ -155,9 +145,9 @@ const summary = computed(() => {
     </div>
     <div class="date-block"><CalendarDays :size="16" />{{ today }}</div>
   </section>
-  <DigestCard v-if="ai.on('daily_digest') && shows('ai.digest')" />
-  <div class="home-columns" :class="{ 'home-single': !shows('tasks.today') || !sideBlocks.length }">
-    <section v-if="shows('tasks.today')" class="card agenda-card" data-tour="agenda">
+  <DigestCard v-if="ai.on('daily_digest')" />
+  <div class="home-columns">
+    <section class="card agenda-card" data-tour="agenda">
       <header class="card-header">
         <div>
           <h2>Việc cần làm hôm nay</h2>
@@ -213,8 +203,8 @@ const summary = computed(() => {
         </div>
       </div>
     </section>
-    <aside v-if="sideBlocks.length" class="stack" style="align-content: start">
-      <section v-if="shows('quick.start')" class="card" :style="{ order: placeOf('quick.start') }">
+    <aside class="stack" style="align-content: start">
+      <section class="card">
         <header class="card-header"><h2>Bắt đầu nhanh</h2></header>
         <RouterLink v-if="session.can('tasks.create')" to="/tasks?create=1" class="home-launcher"
           ><span><ListChecks :size="21" /></span>
@@ -239,9 +229,9 @@ const summary = computed(() => {
           <ArrowRight :size="17"
         /></RouterLink>
       </section>
-      <section v-if="shows('cases.recent')" class="card" :style="{ order: placeOf('cases.recent') }">
+      <section class="card">
         <header class="card-header">
-          <h2>{{ term('Hồ sơ gần đây') }}</h2>
+          <h2>Hồ sơ gần đây</h2>
           <RouterLink to="/cases" class="button ghost small">Tất cả <ArrowRight :size="15" /></RouterLink>
         </header>
         <StatePanel

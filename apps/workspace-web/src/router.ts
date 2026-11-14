@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
-import { brand, term } from './ui/appearance'
 import { createRouter, createWebHistory } from 'vue-router'
 import { useSession } from './stores/session'
 
@@ -105,11 +104,6 @@ export const router = createRouter({
       meta: { title: 'Trợ lý AI', capability: 'assistant.manage' },
     },
     {
-      path: '/packs',
-      component: () => import('./views/PacksView.vue'),
-      meta: { title: 'Gói ngành', capability: 'organization.manage' },
-    },
-    {
       path: '/:pathMatch(.*)*',
       component: () => import('./views/NotFoundView.vue'),
       meta: { title: 'Không tìm thấy' },
@@ -117,7 +111,7 @@ export const router = createRouter({
   ],
 })
 router.beforeEach(async (to) => {
-  document.title = `${term(String(to.meta.title ?? 'Không gian làm việc'))} · ${brand.value.name}`
+  document.title = `${String(to.meta.title ?? 'Không gian làm việc')} · Desktiny`
   const session = useSession()
   if (to.meta.public) return true
   if (!session.ready) {

@@ -19,7 +19,6 @@ import { useSession } from './stores/session'
 import { badgeText, visibleGroups } from './ui/nav'
 import { useOverview } from './ui/overview'
 import { paletteRequest } from './ui/palette'
-import { brand, term } from './ui/appearance'
 import { cycleTheme, isDark, theme } from './ui/theme'
 import { roleLabel } from './ui/labels'
 import AvatarPhoto from './components/AvatarPhoto.vue'
@@ -94,13 +93,7 @@ function toggleSidebarCollapsed() {
     <aside class="sidebar" :class="{ open: sidebar }">
       <div class="sidebar-head">
         <RouterLink to="/home" class="brand" aria-label="Trang chủ"
-          ><span class="brand-mark" :class="{ 'has-logo': !!brand.logo }" aria-hidden="true"
-            ><img v-if="brand.logo" :src="brand.logo" alt="" /><template v-else>{{
-              brand.name.charAt(0)
-            }}</template></span
-          ><span class="brand-text"
-            ><span>{{ brand.name }}</span><small v-if="brand.org">{{ brand.org }}</small></span
-          ></RouterLink
+          ><span class="brand-mark" aria-hidden="true">D</span><span>Desktiny</span></RouterLink
         >
         <button
           class="sidebar-collapse"
@@ -169,7 +162,7 @@ function toggleSidebarCollapsed() {
           >
             <Menu :size="21" /></button
           ><span class="topbar-crumb">Không gian nội bộ</span><span class="topbar-divider" aria-hidden="true">/</span
-          ><strong>{{ term(String(route.meta.title ?? '')) }}</strong><PageHelp />
+          ><strong>{{ route.meta.title }}</strong><PageHelp />
         </div>
         <button
           class="topbar-search"
@@ -212,7 +205,7 @@ function toggleSidebarCollapsed() {
         <RouterView :key="String(route.params.id ?? route.path)" />
       </main>
       <footer v-if="!route.meta.wide && !route.meta.bleed" class="app-footer">
-        <span>{{ brand.org || brand.name }}</span
+        <span>Desktiny</span
         ><span>Dữ liệu nghiệp vụ được kiểm soát theo quyền truy cập.</span>
       </footer>
     </div>

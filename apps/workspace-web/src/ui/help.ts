@@ -189,20 +189,6 @@ export const HELP: Record<string, HelpTopic> = {
     ],
     tips: ['Mọi tính năng AI mặc định tắt; chỉ người có quyền quản lý trợ lý mới bật được.'],
   },
-  '/packs': {
-    purpose: 'Gói ngành: giao diện (tên, logo, màu, trang đăng nhập, từ ngữ, menu) và quy trình mẫu theo ngành, cài và gỡ được.',
-    steps: [
-      'Gói có sẵn: bấm "Xem và cài", đọc phần xem trước (sẽ thêm gì, đổi gì) rồi "Cài gói".',
-      'Gói từ cơ quan khác: "Tải gói lên (.zip)", xem trước rồi cài.',
-      '"Tạo gói của cơ quan": chỉnh giao diện có xem trước sáng/tối, chọn quy trình đưa vào gói, rồi "Lưu gói".',
-      'Bấm "Dùng giao diện này" để áp dụng cho mọi người; "Về giao diện mặc định" để trở lại như cũ.',
-    ],
-    tips: [
-      'Màu khó đọc (tương phản dưới 4,5:1) bị từ chối, ở cả giao diện sáng và tối.',
-      'Gỡ gói không xoá quy trình đã có hồ sơ; quy trình đó chỉ ngừng phát hành.',
-      '"Xuất" tạo tệp .zip để cài ở cơ quan khác.',
-    ],
-  },
   '/profile': {
     purpose: 'Ảnh đại diện và thông tin liên hệ mà đồng nghiệp nhìn thấy.',
     steps: [

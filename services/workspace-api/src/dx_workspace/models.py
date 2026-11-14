@@ -5,17 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import (
-    JSON,
-    Boolean,
-    DateTime,
-    ForeignKey,
-    Integer,
-    LargeBinary,
-    String,
-    Text,
-    UniqueConstraint,
-)
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -792,72 +782,3 @@ class AiEmbedding(Base):
     model: Mapped[str] = mapped_column(String(160))
     content_hash: Mapped[str] = mapped_column(String(64))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-
-
-class InstalledPack(Base):
-    """A sector pack (gói ngành) in force: its checked manifest and what installing it created.
-
-    `source` is "file" (uploaded .zip), "builtin" (shipped in `packs/`) or "local" (made on the
-    pack builder by this organisation; such a pack points at things that already existed and
-    never deletes them). `created` maps each pack file to the id it produced, so an upgrade
-    updates the same objects and an uninstall knows what to take back.
-    """
-
-    __tablename__ = "installed_packs"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    pack_id: Mapped[str] = mapped_column(String(80), unique=True, index=True)
-    name: Mapped[str] = mapped_column(String(120))
-    version: Mapped[str] = mapped_column(String(40))
-    source: Mapped[str] = mapped_column(String(20), default="file")
-    manifest: Mapped[dict] = mapped_column(JSON)
-    # Text files of the pack (processes, templates, knowledge…), kept for export and upgrade.
-    files: Mapped[dict] = mapped_column(JSON, default=dict)
-    created: Mapped[dict] = mapped_column(JSON, default=dict)
-    # Local packs only: existing objects the organisation chose to put in its pack.
-    includes: Mapped[dict] = mapped_column(JSON, default=dict)
-    installed_by: Mapped[str | None] = mapped_column(String(36))
-    revision: Mapped[int] = mapped_column(Integer, default=1)
-    installed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-
-
-class PackAsset(Base):
-    """A logo, favicon or login background of a pack, already checked (SVG cleaned).
-
-    Kept here rather than in Core: Core refuses SVG uploads, and the login page must show the
-    logo before anyone is signed in.
-    """
-
-    __tablename__ = "pack_assets"
-    __table_args__ = (UniqueConstraint("pack_id", "path"),)
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    pack_id: Mapped[str] = mapped_column(String(80), index=True)
-    path: Mapped[str] = mapped_column(String(200))
-    mime: Mapped[str] = mapped_column(String(40))
-    data: Mapped[bytes] = mapped_column(LargeBinary)
-    digest: Mapped[str] = mapped_column(String(64))
-
-
-class PackTemplate(Base):
-    """A ready-made flow offered in the "new flow" dialog, brought by a pack (the core pack too)."""
-
-    __tablename__ = "pack_templates"
-    __table_args__ = (UniqueConstraint("pack_id", "key"),)
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    pack_id: Mapped[str] = mapped_column(String(80), index=True)
-    key: Mapped[str] = mapped_column(String(80))
-    title: Mapped[str] = mapped_column(String(200))
-    description: Mapped[str] = mapped_column(Text, default="")
-    graph: Mapped[dict] = mapped_column(JSON)
-    position: Mapped[int] = mapped_column(Integer, default=0)
-
-
-class ActiveAppearance(Base):
-    """The one pack whose appearance is in force (id is always "default"); none means stock Desktiny."""
-
-    __tablename__ = "active_appearance"
-    id: Mapped[str] = mapped_column(String(20), primary_key=True, default="default")
-    pack_id: Mapped[str | None] = mapped_column(String(80))
-    revision: Mapped[int] = mapped_column(Integer, default=1)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-
