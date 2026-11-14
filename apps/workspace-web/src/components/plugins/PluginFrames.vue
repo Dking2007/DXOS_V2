@@ -3,13 +3,20 @@
 <!-- Frames of connected plugins for one slot. Each frame is sandboxed without same-origin rights, so
      it can read nothing of Desktiny; it talks to this host over postMessage (protocol `desktiny: 1`):
      "ready" → context (place, record, viewer, theme, the sector pack's colours), "token" → a short-lived
-     session token for that context only, "resize" → its height. Messages count only when they come from
-     the frame's own window; the page's CSP frame-src keeps frames from navigating anywhere else. -->
+     session token for that context only, "resize" → its height. Commands a frame may give: "toast" (a
+     short notice under the plugin's name), "navigate" (an in-app path only), "refresh" (reload what is on
+     screen after the plugin wrote), "close" (end the dialog it runs in, with a result) and "confirm"
+     (Desktiny asks the person in its own dialog and answers "confirm_result"). Messages count only when
+     they come from the frame's own window; the page's CSP frame-src keeps frames from navigating anywhere
+     else; device features (`allow`) are only those an administrator approved. -->
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { useRouter } from 'vue-router'
 import { Puzzle } from 'lucide-vue-next'
+import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import { api } from '../../api'
+import { toast } from '../../ui/toast'
 import { useSession } from '../../stores/session'
 import { brand } from '../../ui/appearance'
 import { isDark } from '../../ui/theme'
@@ -22,10 +29,21 @@ export interface PluginSlotItem {
   url: string
   origin: string
   height: number
+  /** Device features approved for the plugin, for the iframe's `allow`. */
+  allow?: string
 }
+export type PluginPlace =
+  | 'case.side'
+  | 'case.tab'
+  | 'case.action'
+  | 'task.side'
+  | 'task.action'
+  | 'home.widget'
+  | 'page'
+  | 'admin.page'
 const props = withDefaults(
   defineProps<{
-    place: 'case.side' | 'task.side' | 'home.widget' | 'page'
+    place: PluginPlace
     context?: { case_id?: string; task_id?: string }
     /** Show only this entry (a plugin's own page). */
     only?: { plugin_id: string; index: number }
@@ -33,7 +51,14 @@ const props = withDefaults(
   }>(),
   { context: () => ({}), only: undefined, bare: false },
 )
+const emit = defineEmits<{ close: [result: unknown]; refresh: [] }>()
 const session = useSession()
+const router = useRouter()
+const queryClient = useQueryClient()
+// A frame's "confirm" is asked in Desktiny's own dialog, never in one the frame draws to look like ours.
+const asking = ref<{ item: PluginSlotItem; id?: string; text: string } | null>(null)
+// An in-app path only: one "/", then not "/" or a backslash (which would leave Desktiny).
+const INTERNAL_PATH = /^\/(?![/\\])\S*$/
 const slots = useQuery({
   queryKey: computed(() => ['plugin-slots', props.place]),
   queryFn: () => api.request<{ items: PluginSlotItem[] }>(`/plugin-slots?slot=${props.place}`).then((r) => r.items),
@@ -74,8 +99,41 @@ function send(item: PluginSlotItem, message: Record<string, unknown>) {
 }
 async function onMessage(event: MessageEvent) {
   const item = items.value.find((entry) => frames.value[keyOf(entry)]?.contentWindow === event.source)
-  const data = event.data as { desktiny?: number; type?: string; height?: number; id?: string }
+  const data = event.data as {
+    desktiny?: number
+    type?: string
+    height?: number
+    id?: string
+    text?: unknown
+    tone?: unknown
+    path?: unknown
+    result?: unknown
+  }
   if (!item || !data || data.desktiny !== 1) return
+  const text = typeof data.text === 'string' ? data.text.slice(0, 300) : ''
+  if (data.type === 'toast' && text) {
+    const notice = `${item.plugin_name}: ${text}`
+    if (data.tone === 'error') toast.error(notice)
+    else toast.success(notice)
+    return
+  }
+  if (data.type === 'navigate') {
+    if (typeof data.path === 'string' && INTERNAL_PATH.test(data.path)) void router.push(data.path)
+    return
+  }
+  if (data.type === 'refresh') {
+    await queryClient.invalidateQueries()
+    emit('refresh')
+    return
+  }
+  if (data.type === 'close') {
+    emit('close', data.result ?? null)
+    return
+  }
+  if (data.type === 'confirm' && text) {
+    asking.value = { item, id: data.id, text }
+    return
+  }
   if (data.type === 'ready' || data.type === 'context') {
     send(item, { type: 'context', context: contextFor(item) })
   } else if (data.type === 'resize' && typeof data.height === 'number') {
@@ -98,6 +156,11 @@ async function onMessage(event: MessageEvent) {
     }
   }
 }
+function answer(ok: boolean) {
+  if (!asking.value) return
+  send(asking.value.item, { type: 'confirm_result', id: asking.value.id, ok })
+  asking.value = null
+}
 onMounted(() => window.addEventListener('message', onMessage))
 onBeforeUnmount(() => window.removeEventListener('message', onMessage))
 </script>
@@ -115,6 +178,7 @@ onBeforeUnmount(() => window.removeEventListener('message', onMessage))
         :title="item.title"
         :style="{ height: `${heights[keyOf(item)] ?? item.height}px` }"
         sandbox="allow-scripts allow-forms allow-popups"
+        :allow="item.allow || undefined"
         referrerpolicy="no-referrer"
         loading="lazy"
       />
@@ -127,9 +191,19 @@ onBeforeUnmount(() => window.removeEventListener('message', onMessage))
       :title="item.title"
       :style="{ height: `${heights[keyOf(item)] ?? item.height}px` }"
       sandbox="allow-scripts allow-forms allow-popups"
+      :allow="item.allow || undefined"
       referrerpolicy="no-referrer"
     />
   </template>
+  <ModalDialog v-if="asking" :title="`Xác nhận (${asking.item.plugin_name})`" @close="answer(false)">
+    <div class="stack">
+      <p class="prewrap">{{ asking.text }}</p>
+      <div class="form-actions">
+        <button type="button" class="button secondary" @click="answer(false)">Không</button
+        ><button type="button" class="button" @click="answer(true)">Đồng ý</button>
+      </div>
+    </div>
+  </ModalDialog>
 </template>
 <style scoped>
 .plugin-frame-card {

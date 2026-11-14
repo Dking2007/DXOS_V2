@@ -110,6 +110,12 @@ export const router = createRouter({
       meta: { title: 'Plugin', capability: 'organization.manage' },
     },
     {
+      path: '/plugins/:pluginId/admin/:index',
+      component: () => import('./views/PluginPageView.vue'),
+      props: { place: 'admin.page' },
+      meta: { title: 'Quản trị plugin', capability: 'organization.manage' },
+    },
+    {
       path: '/apps/:pluginId/:index',
       component: () => import('./views/PluginPageView.vue'),
       meta: { title: 'Ứng dụng' },

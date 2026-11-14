@@ -76,9 +76,20 @@ SCOPES = {
 SESSION_ONLY = {"cases.fields.write", "tasks.write"}
 SLOTS = {
     "case.side": "Cột phải trang hồ sơ",
+    "case.tab": "Tab trong trang hồ sơ",
+    "case.action": "Nút thao tác hồ sơ (mở hộp thoại)",
     "task.side": "Cột phải trang công việc",
+    "task.action": "Nút thao tác công việc (mở hộp thoại)",
     "home.widget": "Khối trên trang chủ",
     "page": "Trang riêng có mục trên thanh bên",
+    "admin.page": "Trang quản trị của plugin (Quản trị › Plugin)",
+}
+SlotName = Literal["case.side", "case.tab", "case.action", "task.side", "task.action", "home.widget", "page", "admin.page"]
+# Device features a frame may use once approved; set on the iframe's `allow`, nothing else.
+FRAME_PERMISSIONS = {
+    "geolocation": "Vị trí (GPS) của thiết bị",
+    "camera": "Máy ảnh",
+    "clipboard-write": "Ghi vào bộ nhớ tạm",
 }
 # A path on the plugin's own server: starts with one "/", never "//" (which would name another host).
 PATH = r"^/([A-Za-z0-9._~!$&'()*+,;=:@%-][A-Za-z0-9._~!$&'()*+,;=:@%/-]{0,198})?$"
@@ -151,7 +162,7 @@ class PluginNode(s.Input):
 
 
 class PluginUi(s.Input):
-    slot: Literal["case.side", "task.side", "home.widget", "page"]
+    slot: SlotName
     title: str = Field(min_length=1, max_length=80)
     url: str = Field(pattern=PATH)
     height: int = Field(default=240, ge=80, le=1200)
@@ -215,6 +226,8 @@ class PluginManifest(BaseModel):
     emits: list[PluginEvent] = Field(default_factory=list, max_length=30)
     # What each organisation fills in for the plugin (agency code, an outside system's API key…).
     settings_schema: ConfigSchema = Field(default_factory=ConfigSchema)
+    frame_permissions: list[Literal["geolocation", "camera", "clipboard-write"]] = Field(default_factory=list,
+                                                                                         max_length=3)  # fmt: skip
     # GET here answers 2xx when the plugin's server is well; the plugin page shows it.
     health_endpoint: str | None = Field(default=None, pattern=PATH)
 
@@ -248,6 +261,7 @@ def asked(manifest: dict) -> dict[str, list[str]]:
         "permissions": list(manifest.get("permissions", [])),
         "events": list(manifest.get("events", [])),
         "fields": list((manifest.get("writes") or {}).get("fields", [])),
+        "frame_permissions": list(manifest.get("frame_permissions", [])),
     }
 
 
@@ -623,6 +637,7 @@ class Approval(s.Revision):
     permissions: list[str] = Field(default_factory=list)
     events: list[str] = Field(default_factory=list)
     fields: list[str] = Field(default_factory=list)
+    frame_permissions: list[str] = Field(default_factory=list)
     # Forms whose dossiers `cases.list` may list (and so read).
     list_forms: list[str] = Field(default_factory=list, max_length=100)
 
@@ -669,7 +684,7 @@ def clean_settings(schema: dict, values: dict, kept_secrets: dict, incoming: dic
 
 class SessionInput(s.Input):
     plugin_id: str = Field(min_length=1, max_length=80)
-    slot: Literal["case.side", "task.side", "home.widget", "page"]
+    slot: SlotName
     case_id: str | None = Field(default=None, max_length=36)
     task_id: str | None = Field(default=None, max_length=36)
 
@@ -715,6 +730,7 @@ def build_router(app):
             "ui": [{"slot": u["slot"], "slot_label": SLOTS[u["slot"]], "title": u["title"]} for u in data.get("ui", [])],
             "fields": asked(data)["fields"],
             "emits": [{"type": e["type"], "title": e["title"]} for e in data.get("emits", [])],
+            "frame_permissions": [{"key": key, "label": FRAME_PERMISSIONS[key]} for key in data.get("frame_permissions", [])],
             "requires": (data.get("requires") or {}).get("desktiny", ">=1"),
         }
 
@@ -850,7 +866,8 @@ def build_router(app):
         if row.revision != body.expected_revision:
             raise AppError(409, "revision_conflict", "Plugin vừa được người khác thay đổi. Tải lại để xem.")
         wanted = asked(row.manifest or {})
-        chosen = {"permissions": body.permissions, "events": body.events, "fields": body.fields}
+        chosen = {"permissions": body.permissions, "events": body.events, "fields": body.fields,
+                  "frame_permissions": body.frame_permissions}  # fmt: skip
         if any(set(values) - set(wanted[key]) for key, values in chosen.items()):
             raise AppError(422, "plugin_grant_invalid", "Chỉ duyệt được những gì plugin đã xin.")
         if body.fields and "cases.fields.write" not in body.permissions:
@@ -1043,12 +1060,10 @@ def build_router(app):
         return {"items": items}
 
     @router.get("/plugin-slots")
-    def slots(
-        slot: Literal["case.side", "task.side", "home.widget", "page"],
-        db: Session = Depends(db_dep),
-        actor: Actor = Depends(actor_dep),
-    ):
-        person(db, actor)
+    def slots(slot: SlotName, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        user = person(db, actor)
+        if slot == "admin.page" and MANAGE not in permissions(db, user):
+            return {"items": []}
         items = []
         for row in db.scalars(select(m.Plugin).where(m.Plugin.state == "enabled").order_by(m.Plugin.name)):
             if not host_allowed(settings, row.base_url):
@@ -1065,6 +1080,8 @@ def build_router(app):
                             "url": target(row, ui["url"]),
                             "origin": f"{parts.scheme}://{parts.netloc}",
                             "height": ui["height"],
+                            # Only what was approved: the frame cannot ask the browser for more.
+                            "allow": "; ".join((row.granted or {}).get("frame_permissions", [])),
                         }
                     )
         return {"items": items}
@@ -1076,6 +1093,8 @@ def build_router(app):
         row = get_plugin(db, body.plugin_id)
         if row.state != "enabled" or not any(ui["slot"] == body.slot for ui in (row.manifest or {}).get("ui", [])):
             raise AppError(404, "plugin_slot_not_found", "Plugin không có khung ở vị trí này hoặc đang tắt.")
+        if body.slot == "admin.page" and MANAGE not in permissions(db, user):
+            raise AppError(403, "permission_denied", "Trang quản trị của plugin dành cho người quản lý tổ chức.")
         context = {"slot": body.slot}
         if body.case_id:
             context["case_id"] = get_case(db, user, body.case_id).id

@@ -42,11 +42,18 @@ interface PluginSummary {
   ui: { slot: string; slot_label: string; title: string }[]
   fields: string[]
   requires: string
+  frame_permissions: Labelled[]
   host_allowed: boolean
 }
 interface PluginRow extends PluginSummary {
   state: 'pending' | 'enabled' | 'disabled'
-  granted: { permissions: string[]; events: string[]; fields: string[]; list_forms: string[] }
+  granted: {
+    permissions: string[]
+    events: string[]
+    fields: string[]
+    list_forms: string[]
+    frame_permissions: string[]
+  }
   list_form_names: Record<string, string>
   revision: number
   approved_at: string | null
@@ -93,12 +100,13 @@ const preview = ref<(PluginSummary & { upgrade_from: string | null }) | null>(nu
 const previewFile = ref<File | null>(null)
 const previewError = ref<unknown>(null)
 const approving = ref<PluginRow | null>(null)
-const chosen = ref<{ permissions: string[]; events: string[]; fields: string[]; list_forms: string[] }>({
-  permissions: [],
-  events: [],
-  fields: [],
-  list_forms: [],
-})
+const chosen = ref<{
+  permissions: string[]
+  events: string[]
+  fields: string[]
+  list_forms: string[]
+  frame_permissions: string[]
+}>({ permissions: [], events: [], fields: [], list_forms: [], frame_permissions: [] })
 // Forms whose dossiers a plugin with cases.list may list: chosen here, at approval.
 const forms = useQuery({
   queryKey: ['forms', 'published'],
@@ -227,6 +235,7 @@ function openApprove(row: PluginRow) {
     events: row.events.map((item) => item.key),
     fields: [...row.fields],
     list_forms: [...(row.granted.list_forms ?? [])],
+    frame_permissions: row.frame_permissions.map((item) => item.key),
   }
 }
 function toggleIn(list: string[], key: string) {
@@ -398,6 +407,16 @@ async function copy(text: string) {
             <li v-if="row.ui.length">
               <strong>Khung giao diện:</strong> {{ row.ui.map((u) => `${u.title} (${u.slot_label})`).join(', ') }}
             </li>
+            <li v-if="row.frame_permissions.length">
+              <strong>Quyền thiết bị:</strong>
+              <span
+                v-for="item in row.frame_permissions"
+                :key="item.key"
+                class="chip"
+                :class="{ off: !row.granted.frame_permissions?.includes(item.key) }"
+                >{{ item.label }}</span
+              >
+            </li>
             <li v-if="row.state !== 'pending'" class="muted">
               24 giờ qua: {{ row.last_day.sent ?? 0 }} lần thành công<template v-if="row.last_day.failed">
                 · <span class="overdue-text">{{ row.last_day.failed }} bị từ chối</span></template
@@ -432,6 +451,14 @@ async function copy(text: string) {
           <button v-if="row.state !== 'pending'" class="button ghost small" :disabled="busy" @click="act(row, 'rotate')">
             <KeyRound :size="15" />Đổi khoá
           </button>
+          <RouterLink
+            v-for="(page, index) in row.state === 'enabled' ? row.ui : []"
+            v-show="page.slot === 'admin.page'"
+            :key="`admin-${index}`"
+            class="button ghost small"
+            :to="`/plugins/${encodeURIComponent(row.id)}/admin/${index}`"
+            ><Puzzle :size="15" />{{ page.title }}</RouterLink
+          >
           <button
             v-if="Object.keys(row.settings_schema.properties).length"
             class="button ghost small"
@@ -495,6 +522,7 @@ async function copy(text: string) {
           <ul>
             <li v-for="node in preview.nodes" :key="node.kind">Bước quy trình: {{ node.title }}</li>
             <li v-for="ui in preview.ui" :key="ui.title">Khung “{{ ui.title }}” ở {{ ui.slot_label.toLowerCase() }}</li>
+            <li v-for="item in preview.frame_permissions" :key="item.key">Dùng {{ item.label.toLowerCase() }}</li>
           </ul>
         </div>
       </div>
@@ -544,6 +572,16 @@ async function copy(text: string) {
           />{{ item.name }}</label
         >
         <small class="muted">Plugin chỉ liệt kê (và đọc) hồ sơ của các quy trình được chọn; không chọn thì không thấy hồ sơ nào.</small>
+      </div>
+      <div v-if="approving.frame_permissions.length">
+        <span class="section-label">Quyền thiết bị cho khung giao diện</span>
+        <label v-for="item in approving.frame_permissions" :key="item.key" class="checkbox-label"
+          ><input
+            type="checkbox"
+            :checked="chosen.frame_permissions.includes(item.key)"
+            @change="toggleIn(chosen.frame_permissions, item.key)"
+          />{{ item.label }}</label
+        >
       </div>
       <div v-if="approving.events.length">
         <span class="section-label">Sự kiện được gửi</span>

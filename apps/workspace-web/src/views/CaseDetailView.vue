@@ -24,6 +24,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  Puzzle,
   RotateCcw,
   Save,
   Undo2,
@@ -65,6 +66,8 @@ import { useAi } from '../ai/useAi'
 import { OPERATORS } from '../flow/nodes'
 import ProcessCanvas from '../flow/ProcessCanvas.vue'
 import PluginFrames from '../components/plugins/PluginFrames.vue'
+import PluginActions from '../components/plugins/PluginActions.vue'
+import type { PluginSlotItem } from '../components/plugins/PluginFrames.vue'
 import StepAnswerDialog from '../components/StepAnswerDialog.vue'
 import { toast } from '../ui/toast'
 import { isOfficeFile, previewKind } from '../ui/preview'
@@ -679,9 +682,22 @@ function fieldLabel(key: string) {
   const name = key.replace(/^payload\./, '')
   return detail.data.value?.form.fields.find((field) => field.key === name)?.label ?? name
 }
-type CaseTab = 'info' | 'process' | 'files' | 'history' | 'route'
+// Plugin tabs are keyed "plugin:<plugin id>:<index>".
+type CaseTab = 'info' | 'process' | 'files' | 'history' | 'route' | `plugin:${string}`
 const TAB_KEYS: CaseTab[] = ['info', 'process', 'files', 'history', 'route']
-const tab = ref<CaseTab>(TAB_KEYS.includes(route.query.tab as CaseTab) ? (route.query.tab as CaseTab) : 'info')
+const queryTab = String(route.query.tab ?? '')
+const tab = ref<CaseTab>(
+  TAB_KEYS.includes(queryTab as CaseTab) || queryTab.startsWith('plugin:') ? (queryTab as CaseTab) : 'info',
+)
+const pluginTabs = useQuery({
+  queryKey: ['plugin-slots', 'case.tab'],
+  queryFn: () => api.request<{ items: PluginSlotItem[] }>('/plugin-slots?slot=case.tab').then((r) => r.items),
+  staleTime: 60_000,
+})
+const pluginTab = computed(() => {
+  const [, pluginId, index] = tab.value.startsWith('plugin:') ? tab.value.split(':') : []
+  return pluginId ? { plugin_id: pluginId, index: Number(index) } : null
+})
 const tabs = computed(() => {
   const data = detail.data.value
   const items: { key: CaseTab; label: string; icon: typeof Info; count?: number }[] = [
@@ -691,6 +707,8 @@ const tabs = computed(() => {
     { key: 'history', label: 'Lịch sử & bản đã trình', icon: History, count: data?.submissions.length },
   ]
   if (data?.submissions.length) items.push({ key: 'route', label: 'Vì sao đi đường này', icon: GitBranch })
+  for (const item of pluginTabs.data.value ?? [])
+    items.push({ key: `plugin:${item.plugin_id}:${item.index}`, label: item.title, icon: Puzzle })
   return items
 })
 function moveTab(step: number) {
@@ -739,7 +757,11 @@ function moveTab(step: number) {
           @click="showTask = true"
         >
           <ListPlus :size="16" />Tạo việc</button
-        ><button v-if="canWithdraw" class="button secondary" @click="ask('withdraw')">
+        ><PluginActions place="case.action" :context="{ case_id: id }" /><button
+          v-if="canWithdraw"
+          class="button secondary"
+          @click="ask('withdraw')"
+        >
           <Undo2 :size="16" />Thu hồi</button
         ><button v-if="canDelete" class="button secondary" @click="askClosing('delete')">
           <Trash2 :size="16" />Xóa bản nháp</button
@@ -1124,6 +1146,15 @@ function moveTab(step: number) {
           :form-name="detail.data.value.form.name"
           @open="openStepFile"
         />
+        <section v-if="pluginTab" class="card plugin-tab">
+          <PluginFrames
+            :key="tab"
+            place="case.tab"
+            :context="{ case_id: id }"
+            :only="pluginTab"
+            bare
+          />
+        </section>
         <section v-if="tab === 'route'" class="card">
           <header class="card-header"><h2>Vì sao hồ sơ được chuyển đến những người này?</h2></header>
           <div class="card-body">

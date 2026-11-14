@@ -6679,9 +6679,13 @@
             "schema": {
               "enum": [
                 "case.side",
+                "case.tab",
+                "case.action",
                 "task.side",
+                "task.action",
                 "home.widget",
-                "page"
+                "page",
+                "admin.page"
               ],
               "type": "string",
               "title": "Slot"
@@ -10732,6 +10736,13 @@
             "type": "array",
             "title": "Fields"
           },
+          "frame_permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Frame Permissions"
+          },
           "list_forms": {
             "items": {
               "type": "string"
@@ -13692,9 +13703,13 @@
             "type": "string",
             "enum": [
               "case.side",
+              "case.tab",
+              "case.action",
               "task.side",
+              "task.action",
               "home.widget",
-              "page"
+              "page",
+              "admin.page"
             ],
             "title": "Slot"
           },

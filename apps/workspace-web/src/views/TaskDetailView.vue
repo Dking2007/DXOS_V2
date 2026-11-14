@@ -32,6 +32,7 @@ import TaskBreakdown from '../ai/TaskBreakdown.vue'
 import { useAi } from '../ai/useAi'
 import TaskAutomations from '../components/TaskAutomations.vue'
 import PluginFrames from '../components/plugins/PluginFrames.vue'
+import PluginActions from '../components/plugins/PluginActions.vue'
 import TaskFiles from '../components/TaskFiles.vue'
 import { TASK_STAGES, dueText, nextStep, taskStage } from '../ui/taskGuide'
 const route = useRoute()
@@ -291,6 +292,7 @@ function localInput(value: string | null) {
         </div>
       </div>
       <div class="page-actions">
+        <PluginActions place="task.action" :context="{ task_id: task.id }" />
         <button
           v-for="action in primaryActions"
           :key="action"

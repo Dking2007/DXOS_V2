@@ -196,12 +196,18 @@ export const HELP: Record<string, HelpTopic> = {
       '"Duyệt quyền": chỉ chọn quyền và sự kiện plugin thật sự cần, rồi "Duyệt và bật".',
       'Sao chép khoá ký và token vừa cấp (chỉ hiện một lần) vào cấu hình máy chủ plugin.',
       '"Nhật ký" xem sự kiện đã gửi, bước đã gọi, dữ liệu plugin đã đọc; gửi lại sự kiện bị lỗi.',
+      '"Cấu hình" điền giá trị riêng của cơ quan (ô bí mật không hiện lại); "Kiểm tra" hỏi sức khoẻ máy chủ plugin.',
     ],
     tips: [
       'Tắt plugin thì mọi token của nó hết hiệu lực ngay.',
       'Máy chủ plugin phải có trong danh sách được phép của triển khai (PLUGIN_ALLOWED_HOSTS).',
       'Mất khoá thì bấm "Đổi khoá"; khoá cũ hết hiệu lực.',
     ],
+  },
+  '/plugins/:pluginId/admin/:index': {
+    purpose: 'Trang quản trị của một plugin kết nối: cấu hình nghiệp vụ của plugin (ca làm, bậc lương, mẫu giấy tờ…).',
+    steps: ['Thao tác trong khung của plugin; plugin chỉ làm được những gì quản trị viên đã duyệt cho nó.'],
+    tips: ['Chỉ người quản lý tổ chức mở được trang này.'],
   },
   '/apps/:pluginId/:index': {
     purpose: 'Trang riêng của một plugin kết nối, hiện trong khung cách ly ngay trong phần mềm.',

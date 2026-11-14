@@ -3477,6 +3477,8 @@ export interface components {
             events?: string[];
             /** Fields */
             fields?: string[];
+            /** Frame Permissions */
+            frame_permissions?: string[];
             /** List Forms */
             list_forms?: string[];
         };
@@ -4571,7 +4573,7 @@ export interface components {
              * Slot
              * @enum {string}
              */
-            slot: "case.side" | "task.side" | "home.widget" | "page";
+            slot: "case.side" | "case.tab" | "case.action" | "task.side" | "task.action" | "home.widget" | "page" | "admin.page";
             /** Case Id */
             case_id?: string | null;
             /** Task Id */
@@ -9346,7 +9348,7 @@ export interface operations {
     slots_workspace_v1_plugin_slots_get: {
         parameters: {
             query: {
-                slot: "case.side" | "task.side" | "home.widget" | "page";
+                slot: "case.side" | "case.tab" | "case.action" | "task.side" | "task.action" | "home.widget" | "page" | "admin.page";
             };
             header?: never;
             path?: never;

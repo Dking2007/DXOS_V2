@@ -765,3 +765,38 @@ def test_health_checks_and_a_failing_plugin_is_reported_without_switching_it_off
     titles = [n["title"] for n in director.get(API + "/notifications").json()["items"]]
     assert any("lỗi 5 lần liên tiếp" in title for title in titles)
     assert director.post(f"{API}/plugins/{MANIFEST['id']}/health").status_code == 409  # no health_endpoint
+
+
+# ---- Frames (5.6) ----------------------------------------------------------------------------------
+
+FRAMED = {
+    **MANIFEST,
+    "id": "vn.vi-du.cham-cong-gps",
+    "permissions": ["cases.read"],
+    "events": [],
+    "nodes": [],
+    "frame_permissions": ["geolocation", "clipboard-write"],
+    "ui": [
+        {"slot": "case.tab", "title": "Sổ văn bản", "url": "/ui/so"},
+        {"slot": "case.action", "title": "Ký số", "url": "/ui/ky"},
+        {"slot": "task.action", "title": "Ghi giờ làm", "url": "/ui/gio"},
+        {"slot": "admin.page", "title": "Ca làm", "url": "/ui/ca"},
+    ],
+}
+
+
+def test_new_frame_places_get_only_the_device_rights_approved(world, plugin):  # noqa: F811
+    approved = approve(world, FRAMED, frame_permissions=["geolocation"])
+    assert approved["granted"]["frame_permissions"] == ["geolocation"]
+    assert [p["key"] for p in approved["frame_permissions"]] == ["geolocation", "clipboard-write"]
+    staff = as_(world, "staff")
+    tab = staff.get(API + "/plugin-slots?slot=case.tab").json()["items"]
+    assert tab[0]["title"] == "Sổ văn bản" and tab[0]["allow"] == "geolocation"
+    assert staff.get(API + "/plugin-slots?slot=admin.page").json()["items"] == []
+    denied = staff.post(API + "/plugin-sessions", json={"plugin_id": FRAMED["id"], "slot": "admin.page"})
+    assert denied.status_code == 403
+    director = as_(world, "director")
+    assert director.get(API + "/plugin-slots?slot=admin.page").json()["items"][0]["title"] == "Ca làm"
+    assert director.post(API + "/plugin-sessions", json={"plugin_id": FRAMED["id"], "slot": "admin.page"}).status_code == 201
+    camera = {**FRAMED, "version": "1.1.0", "frame_permissions": ["geolocation", "clipboard-write", "camera"]}
+    assert upload(director, "/plugins", camera).json()["state"] == "pending"
