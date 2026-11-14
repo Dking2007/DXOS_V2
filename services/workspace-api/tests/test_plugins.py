@@ -370,3 +370,79 @@ def test_asking_for_more_fields_on_upgrade_goes_back_to_approval(world, plugin):
     director = as_(world, "director")
     upgraded = upload(director, "/plugins", {**WRITER, "version": "1.1.0", "writes": {"fields": ["amount", "reason"]}})
     assert upgraded.json()["state"] == "pending" and upgraded.json()["granted"]["fields"] == ["amount"]
+
+
+# ---- Files (5.2) ---------------------------------------------------------------------------
+
+FILER = {
+    **MANIFEST,
+    "id": "vn.vi-du.ky-so",
+    "permissions": ["cases.read", "files.read", "cases.attach"],
+    "events": ["case.submitted"],
+}
+
+
+def test_a_plugin_reads_the_dossier_files_and_attaches_its_result(world, plugin):  # noqa: F811
+    fake, _, _ = plugin
+    token = approve(world, FILER)["issued"]["token"]
+    staff = as_(world, "staff")
+    uploaded = staff.post(API + "/drive/files", files={"file": ("don.pdf", b"%PDF-1.4 don", "application/pdf")},
+                          headers={"Idempotency-Key": "up-don"})  # fmt: skip
+    assert uploaded.status_code == 201, uploaded.text
+    form = make_form(world)
+    case = make_case(world, form, key="f-case", files=[uploaded.json()["id"]])
+    assert plugin_get(world, token, f"/cases/{case['id']}/files").status_code == 404  # not told yet
+    submit(world, case, "f-submit")
+    listed = plugin_get(world, token, f"/cases/{case['id']}/files").json()["items"]
+    assert [item["name"] for item in listed] == ["don.pdf"]
+    content = world[0].get(listed[0]["content_url"], headers={"Authorization": f"Bearer {token}"})
+    assert content.status_code == 200 and content.content == b"%PDF-1.4 don"
+    assert content.headers["x-content-sha256"] and content.headers["content-type"] == "application/pdf"
+    path = f"/cases/{case['id']}/files"
+    signed = {"file": ("don-da-ky.pdf", b"%PDF-1.4 signed", "application/pdf")}
+    first = plugin_call(world, token, "POST", path, "a1", files=signed, data={"role": "result", "node_id": "trigger"})
+    assert first.status_code == 201, first.text
+    again = plugin_call(world, token, "POST", path, "a1", files=signed, data={"role": "result", "node_id": "trigger"})
+    assert again.json()["id"] == first.json()["id"]
+    detail = staff.get(f"{API}/cases/{case['id']}").json()
+    assert "don-da-ky.pdf" in [f["name"] for f in detail["files"]]
+    assert any(h["action"] == "plugin.write.attach" for h in detail["history"])
+    steps = staff.get(f"{API}/cases/{case['id']}/process").json()["files"]
+    assert [f["source"] for f in steps["trigger"]["attached"] if f["name"] == "don-da-ky.pdf"] == ["plugin"]
+    # Size and daily quota hold per plugin.
+    world[8].plugin_upload_max_bytes = 4
+    too_big = plugin_call(world, token, "POST", path, "a2", files={"file": ("x.bin", b"12345", "application/octet-stream")})
+    assert too_big.status_code == 413
+    world[8].plugin_upload_max_bytes = 1000
+    world[8].plugin_upload_daily_bytes = 20
+    over = plugin_call(world, token, "POST", path, "a3", files={"file": ("y.bin", b"123456", "application/octet-stream")})
+    assert over.status_code == 429 and over.json()["code"] == "plugin_upload_quota"
+
+
+def test_the_plugin_step_can_be_handed_the_file_list(world, plugin):  # noqa: F811
+    fake, _, _ = plugin
+    director = as_(world, "director")
+
+    def node(node_id, kind, **data):
+        return {"id": node_id, "type": kind, "position": {"x": 0, "y": 0}, "data": data}
+
+    graph = {
+        "nodes": [
+            node("start", "trigger", event="case.submitted"),
+            node("tra_cuu", "plugin_action", plugin_id=MANIFEST["id"], node="tra_cuu_mst",
+                 config={"ma_so": "0101"}, send_files=True),  # fmt: skip
+            node("bao", "notify", recipients=["owner"], title="Xong"),
+        ],
+        "edges": [{"id": "a", "source": "start", "target": "tra_cuu"},
+                  {"id": "b", "source": "tra_cuu", "target": "bao", "branch": "success"}],  # fmt: skip
+    }
+    rule = director.post(API + "/automations", json={"name": "Gửi tệp", "graph": graph})
+    assert rule.status_code == 201, rule.text
+    rule = rule.json()
+    director.post(f"{API}/automations/{rule['id']}/enabled", json={"expected_revision": rule["revision"], "enabled": True})
+    staff = as_(world, "staff")
+    uploaded = staff.post(API + "/drive/files", files={"file": ("a.txt", b"abc", "text/plain")},
+                          headers={"Idempotency-Key": "up-a"}).json()  # fmt: skip
+    case = make_case(world, make_form(world), key="sf-case", files=[uploaded["id"]])
+    submit(world, case, "sf-submit")
+    assert fake.calls[0]["files"] == [{"id": uploaded["id"], "name": "a.txt", "type": "text/plain"}]

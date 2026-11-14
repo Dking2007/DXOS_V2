@@ -84,7 +84,7 @@ export interface StepFile {
   size: number | null
   by: string
   at: string | null
-  source: 'dossier' | 'step' | 'task'
+  source: 'dossier' | 'step' | 'task' | 'plugin'
   available: boolean
 }
 interface StepFiles {
@@ -240,6 +240,7 @@ const FILE_SOURCE: Record<StepFile['source'], string> = {
   dossier: 'Kèm khi trình',
   step: 'Nộp ở bước này',
   task: 'Kết quả công việc',
+  plugin: 'Plugin gắn vào',
 }
 /** Whether a file can be read in the browser: office documents in the editor, others in the viewer. */
 function viewable(file: StepFile) {

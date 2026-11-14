@@ -66,6 +66,8 @@ SCOPES = {
     "cases.fields.write": "Ghi các trường biểu mẫu đã khai (writes.fields) của hồ sơ",
     "tasks.write": "Tạo công việc, bình luận và chuyển trạng thái công việc thay người dùng",
     "notifications.send": "Gửi thông báo trong ứng dụng",
+    "files.read": "Đọc tài liệu của hồ sơ (danh sách và nội dung)",
+    "cases.attach": "Gắn tài liệu vào hồ sơ",
 }
 # Writes that need a person behind them: the frame's viewer, never the installation alone.
 SESSION_ONLY = {"cases.fields.write", "tasks.write"}
@@ -401,11 +403,14 @@ def call_node(db: Session, settings, run: m.AutomationRun, node: dict) -> tuple[
     }
     subject = subject_of(facts)
     row = log(db, plugin.plugin_id, "node", event_type=spec["kind"], event_id=run.id, subject=subject, state="pending")
-    body = json.dumps(
-        {"call_id": row.id, "run_id": run.id, "node_id": node["id"], "step": spec["kind"],
-         "config": config, "subject": subject},
-        ensure_ascii=False,
-    ).encode()  # fmt: skip
+    call = {"call_id": row.id, "run_id": run.id, "node_id": node["id"], "step": spec["kind"],
+            "config": config, "subject": subject}  # fmt: skip
+    if data.get("send_files") and subject and subject["type"] == "case":
+        # Ids and names only; the plugin fetches content through the API if it holds files.read.
+        case = db.get(m.Case, subject["id"])
+        files = [db.get(m.DriveFile, file_id) for file_id in (case.file_ids if case else [])]
+        call["files"] = [{"id": f.id, "name": f.name, "type": f.mime} for f in files if f and not f.deleted_at]
+    body = json.dumps(call, ensure_ascii=False).encode()
     stamp = str(int(time.time()))
     headers = {
         "Content-Type": "application/json",

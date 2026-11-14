@@ -1206,6 +1206,17 @@ def build_router(app):
                         )
                         if item
                     ]
+        # Files a plugin attached to a given step (cases.attach with node_id).
+        for entry in db.scalars(
+            select(m.Audit)
+            .where(m.Audit.resource_id == case.id, m.Audit.action == "plugin.write.attach")
+            .order_by(m.Audit.created_at)
+        ):
+            detail = entry.detail or {}
+            item = about(detail.get("file_id", ""), None, entry.created_at, "plugin", detail.get("name", ""))
+            if item and detail.get("node_id") in result:
+                item["by"] = f"Plugin {detail.get('plugin_name', '')}".strip()
+                result[detail["node_id"]]["attached"].append(item)
         return result
 
     @router.get("/automations/process-template", tags=["automations"])

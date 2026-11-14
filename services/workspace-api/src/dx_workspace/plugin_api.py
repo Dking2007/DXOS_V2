@@ -14,17 +14,20 @@ over answers 429 with `Retry-After`.
 
 from __future__ import annotations
 
+import hashlib
 import time
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Literal
+from urllib.parse import quote
 
 from dx_platform.errors import AppError
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, File, Header, Response, UploadFile
+from fastapi import Form as MultipartForm
 from fastapi.encoders import jsonable_encoder
 from pydantic import Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import models as m
@@ -270,6 +273,106 @@ def plugin_api(app) -> APIRouter:
             "job_title": person.job_title,
             "department": department.name if department else None,
         }
+
+    # ---- Files ------------------------------------------------------------------------------
+
+    def case_files(db, who: Caller, case_id: str) -> tuple[m.Case, list[m.DriveFile]]:
+        need(who, "files.read")
+        case, _, hide_files = case_for(db, who, case_id)
+        if hide_files:
+            raise AppError(403, "files_hidden_at_step", "Ở bước hiện tại người dùng không được xem tài liệu của hồ sơ.")
+        files = [db.get(m.DriveFile, file_id) for file_id in case.file_ids or []]
+        return case, [file for file in files if file and not file.deleted_at]
+
+    @router.get("/cases/{case_id}/files")
+    def list_files(case_id: str, db: Session = Depends(db_dep), who: Caller = Depends(reader)):
+        case, files = case_files(db, who, case_id)
+        record(db, who, "GET /cases/files", {"type": "case", "id": case.id})
+        db.commit()
+        return {
+            "items": [
+                {"id": f.id, "name": f.name, "type": f.mime, "size": f.size, "created_at": f.created_at,
+                 "content_url": f"{API_PREFIX}/files/{f.id}/content?case_id={case.id}"}
+                for f in files
+            ]
+        }  # fmt: skip
+
+    @router.get("/files/{file_id}/content")
+    def file_content(file_id: str, case_id: str, db: Session = Depends(db_dep), who: Caller = Depends(reader)):
+        """The file's current bytes, read from Core; only a file of a dossier the caller may reach."""
+        case, files = case_files(db, who, case_id)
+        file = next((f for f in files if f.id == file_id), None)
+        if not file:
+            raise AppError(404, "file_not_found", "Hồ sơ không có tài liệu này.")
+        core = app.state.core_service
+        _, version = core.file_version(file.core_file_id)
+        ticket = core.post(f"/storage/versions/{version['id']}/download-tickets", {})
+        content = core.get(f"/storage/download/{ticket['ticket']}", raw=True)
+        record(db, who, "GET /files/content", {"type": "case", "id": case.id})
+        db.commit()
+        return Response(
+            content,
+            media_type=file.mime or "application/octet-stream",
+            headers={
+                "X-Content-SHA256": hashlib.sha256(content).hexdigest(),
+                "Content-Disposition": f"attachment; filename*=UTF-8''{quote(file.name)}",
+            },
+        )
+
+    @router.post("/cases/{case_id}/files", status_code=201)
+    async def attach_file(
+        case_id: str,
+        file: UploadFile = File(...),
+        node_id: str | None = MultipartForm(None, max_length=80),
+        role: Literal["result", "attachment"] = MultipartForm("attachment"),
+        idempotency_key: str | None = Header(None),
+        db: Session = Depends(db_dep),
+        who: Caller = Depends(writer),
+    ):
+        """Attach a file to the dossier, optionally to one step (`node_id`) of its process."""
+        need(who, "cases.attach")
+        case, _, _ = case_for(db, who, case_id)
+        limit = min(settings.plugin_upload_max_bytes, settings.max_upload_bytes)
+        data = await file.read(limit + 1)
+        if not data or len(data) > limit:
+            raise AppError(413, "file_too_large", f"Tệp rỗng hoặc vượt {limit // (1024 * 1024)} MB.")
+        since = m.utcnow() - timedelta(days=1)
+        used = db.scalar(
+            select(func.coalesce(func.sum(m.PluginDelivery.size), 0)).where(
+                m.PluginDelivery.plugin_id == who.plugin.plugin_id, m.PluginDelivery.created_at >= since
+            )
+        )
+        if used + len(data) > settings.plugin_upload_daily_bytes:
+            raise AppError(429, "plugin_upload_quota", "Plugin đã tải lên quá dung lượng cho phép trong 24 giờ.",
+                           {"Retry-After": "3600"})  # fmt: skip
+        name = (file.filename or "Tài liệu").replace("\\", "/").split("/")[-1].strip()[:250] or "Tài liệu"
+        mime = file.content_type or "application/octet-stream"
+        digest_hex = hashlib.sha256(data).hexdigest()
+
+        def work():
+            core = app.state.core_service
+            stored = core.upload(name, mime, data, f"plugin:{who.plugin.plugin_id}:{idempotency_key}")
+            core_id = stored.get("file_id", stored.get("id"))
+            metadata = core.get(f"/storage/files/{core_id}")
+            grants = core.get(f"/resources/{metadata['resource_id']}/grants")
+            value = m.DriveFile(name=name, mime=mime, size=len(data), owner_id=who.user.id if who.user else case.owner_id,
+                                core_file_id=core_id, resource_id=metadata["resource_id"],
+                                grants_revision=grants.get("revision", 1))  # fmt: skip
+            db.add(value)
+            db.flush()
+            case.file_ids = list(dict.fromkeys([*(case.file_ids or []), value.id]))
+            case.revision += 1
+            case.updated_at = m.utcnow()
+            audit(db, who.actor, "plugin.write.attach", case.id,
+                  {"file_id": value.id, "name": name, "node_id": node_id, "role": role, **who.via})  # fmt: skip
+            entry = log(db, who.plugin.plugin_id, "write", event_type="POST /cases/files",
+                        subject={"type": "case", "id": case.id}, event_id=who.user.id if who.user else None)  # fmt: skip
+            entry.size = len(data)
+            return {"id": value.id, "name": name, "type": mime, "size": len(data), "sha256": digest_hex,
+                    "node_id": node_id, "role": role}  # fmt: skip
+
+        return once(db, who, f"case.attach:{case.id}", idempotency_key,
+                    {"name": name, "sha256": digest_hex, "node_id": node_id, "role": role}, work)  # fmt: skip
 
     # ---- Writing ----------------------------------------------------------------------------
 

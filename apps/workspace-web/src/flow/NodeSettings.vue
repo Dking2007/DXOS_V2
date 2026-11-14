@@ -379,6 +379,10 @@ function toggleUser(id: string) {
         />
         <small v-if="field.description">{{ field.description }}</small>
       </div>
+      <label class="checkbox-label"
+        ><input type="checkbox" :checked="c.send_files === true" @change="set('send_files', checked($event))" /> Gửi
+        danh sách tài liệu của hồ sơ (chỉ mã và tên, không gửi nội dung)</label
+      >
       <small class="muted"
         >Chỉ các ô trên (đã điền giá trị) được gửi cho plugin, có chữ ký. Bước sau đọc kết quả:
         <code v-for="(label, key) in pluginStep.outputs" :key="key" :title="label">{{ placeholder(String(key)) }} </code></small

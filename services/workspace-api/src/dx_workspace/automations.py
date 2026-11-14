@@ -428,6 +428,8 @@ class PluginActionData(s.Input):
     config: dict = Field(default_factory=dict)
     # Labels of the values the plugin returns, copied from its manifest for later steps to offer.
     outputs: dict[str, str] = Field(default_factory=dict, max_length=20)
+    # Hand the plugin the dossier's file list (ids, names, types; never the content).
+    send_files: bool = False
     output_name: str | None = OUTPUT_NAME
 
 
