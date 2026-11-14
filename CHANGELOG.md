@@ -7,6 +7,9 @@
 ## [Unreleased]
 
 ### Changed
+- **Trang đăng nhập** làm lại: thẻ tiêu đề có khung viền trang trí trên nền xanh đậm, luôn vừa một màn hình, hiệu
+  ứng xuất hiện, vệt sáng, hạt sáng, vòng biểu tượng xoay, ánh kim trên tiêu đề và nút; tắt khi máy đặt giảm chuyển
+  động. Một nút "Đăng nhập bằng SSO".
 - Rà soát giao diện theo góp ý người dùng:
   - Công việc: tab mới **Chờ tôi nghiệm thu** (`GET /tasks?scope=review`) khớp đúng số trên menu; các tab hiện số
     đếm; trang tự mở tab đang có việc chờ.
