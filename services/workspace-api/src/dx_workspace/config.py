@@ -26,6 +26,9 @@ class Settings(PlatformSettings):
     smtp_password: str = ""
     smtp_from: str = ""
     smtp_tls: bool = True
+    # Folder of the sector packs shipped with the release (`packs/` in the repository). Empty
+    # means: look next to the source tree, then in /app/packs (the API image).
+    packs_dir: str = ""
 
 
 @lru_cache

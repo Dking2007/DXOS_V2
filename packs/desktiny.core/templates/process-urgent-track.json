@@ -1,0 +1,103 @@
+{
+  "key": "process-urgent-track",
+  "title": "Hồ sơ khẩn trình thẳng ban giám đốc",
+  "description": "Hồ sơ có mức ưu tiên Khẩn đi thẳng tới ban giám đốc; hồ sơ thường qua lãnh đạo đơn vị trước rồi mới tới ban giám đốc.",
+  "graph": {
+    "nodes": [
+      {
+        "id": "trigger",
+        "type": "trigger",
+        "label": "",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "data": {
+          "event": "case.submitted",
+          "form_id": null
+        }
+      },
+      {
+        "id": "is_urgent",
+        "type": "if",
+        "label": "",
+        "position": {
+          "x": 320,
+          "y": 0
+        },
+        "data": {
+          "mode": "all",
+          "conditions": [
+            {
+              "field": "priority",
+              "operator": "eq",
+              "value": "urgent"
+            }
+          ]
+        }
+      },
+      {
+        "id": "leader",
+        "type": "approval",
+        "label": "Lãnh đạo đơn vị duyệt",
+        "position": {
+          "x": 680,
+          "y": 140
+        },
+        "data": {
+          "resolver": "department_manager",
+          "user_id": null,
+          "allow_return": true,
+          "allow_reject": true,
+          "due_in_days": 3,
+          "instructions": ""
+        }
+      },
+      {
+        "id": "board",
+        "type": "approval",
+        "label": "Ban giám đốc duyệt",
+        "position": {
+          "x": 1040,
+          "y": -60
+        },
+        "data": {
+          "resolver": "role",
+          "user_id": null,
+          "allow_return": true,
+          "allow_reject": true,
+          "due_in_days": 3,
+          "instructions": "",
+          "role": "director",
+          "role_scope": "organization"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger->is_urgent",
+        "source": "trigger",
+        "target": "is_urgent",
+        "branch": null
+      },
+      {
+        "id": "is_urgent:true->board",
+        "source": "is_urgent",
+        "target": "board",
+        "branch": "true"
+      },
+      {
+        "id": "is_urgent:false->leader",
+        "source": "is_urgent",
+        "target": "leader",
+        "branch": "false"
+      },
+      {
+        "id": "leader:approve->board",
+        "source": "leader",
+        "target": "board",
+        "branch": "approve"
+      }
+    ]
+  }
+}

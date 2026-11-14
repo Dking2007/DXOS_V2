@@ -6,6 +6,7 @@ import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import App from './App.vue'
 import { router } from './router'
 import { applyTheme } from './ui/theme'
+import { loadAppearance } from './ui/appearance'
 import '@dx/web-shared/style.css'
 import './style.css'
 import './collab.css'
@@ -24,4 +25,5 @@ app.use(VueQueryPlugin, {
   }),
 })
 app.use(router)
-app.mount('#app')
+// The sector pack's look first, so nobody sees the stock colours flash; it gives up quickly.
+void loadAppearance().finally(() => app.mount('#app'))

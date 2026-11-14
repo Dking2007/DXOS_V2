@@ -11,7 +11,8 @@ import type { Page } from '@dx/web-shared/api.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
-import { KINDS, PROCESS_TEMPLATES, TEMPLATES } from '../flow/nodes'
+import { KINDS, TEMPLATES } from '../flow/nodes'
+import { usePackTemplates } from '../flow/templates'
 import ProcessFormDialog from '../flow/ProcessFormDialog.vue'
 import '../flow/flow.css'
 import type { ApiGraph, FlowKind } from '../flow/nodes'
@@ -52,6 +53,7 @@ const catalog = useQuery({
       process: { forms: { id: string; name: string }[] }
     }>('/automations/catalog'),
 })
+const packTemplates = usePackTemplates()
 const forms = computed(() => catalog.data.value?.process.forms ?? [])
 const rules = useQuery({
   queryKey: ['automations'],
@@ -285,15 +287,20 @@ async function saveConnection() {
         <small>Vẽ lại đúng các bước duyệt đang khai trong biểu mẫu (kể cả điều kiện) để chỉnh tiếp trên canvas.</small>
       </button>
       <button
-        v-for="template in PROCESS_TEMPLATES"
-        :key="template.key"
+        v-for="template in packTemplates.data.value ?? []"
+        :key="`${template.pack_id}:${template.key}`"
         class="template-card"
         @click="openProcess({ template: template.key })"
       >
         <span class="template-dots">
-          <i v-for="node in template.graph.nodes" :key="node.id" :style="{ background: KINDS[node.type].color }" />
+          <i
+            v-for="node in template.graph.nodes"
+            :key="node.id"
+            :style="{ background: KINDS[node.type]?.color ?? '#8fa3b5' }"
+          />
         </span>
         <strong>{{ template.title }}</strong>
+        <span v-if="template.pack_id !== 'desktiny.core'" class="tag">{{ template.pack_name }}</span>
         <small>{{ template.description }}</small>
       </button>
     </div>

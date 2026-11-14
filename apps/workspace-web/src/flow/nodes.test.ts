@@ -2,7 +2,16 @@
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { reactive } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { KINDS, PROCESS_TEMPLATES, TEMPLATES, branchLabel, outputs, paintRun, paletteKinds, summary, toApi, toCanvas, tone, waitLabel, plainCopy, nodeOutputs } from './nodes'
+import { KINDS, TEMPLATES, branchLabel, outputs, paintRun, paletteKinds, summary, toApi, toCanvas, tone, waitLabel, plainCopy, nodeOutputs } from './nodes'
+import type { ApiGraph } from './nodes'
+import core from '../../../../packs/desktiny.core/desktiny-pack.json'
+
+// The ready-made processes ship as data in the core sector pack; test exactly those files.
+const files = import.meta.glob<{ key: string; title: string; description: string; graph: ApiGraph }>(
+  '../../../../packs/desktiny.core/templates/*.json',
+  { eager: true, import: 'default' },
+)
+const PROCESS_TEMPLATES = core.templates.map((path) => files[`../../../../packs/desktiny.core/${path}`]!)
 import type { FlowNodeData } from './nodes'
 
 describe('flow graph conversion', () => {

@@ -1,0 +1,75 @@
+{
+  "key": "process-escalate",
+  "title": "Quá hạn duyệt thì chuyển cấp trên",
+  "description": "Lãnh đạo đơn vị có 2 ngày để duyệt; quá hạn chưa ai xử lý thì hồ sơ tự chuyển lên ban giám đốc.",
+  "graph": {
+    "nodes": [
+      {
+        "id": "trigger",
+        "type": "trigger",
+        "label": "",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "data": {
+          "event": "case.submitted",
+          "form_id": null
+        }
+      },
+      {
+        "id": "leader",
+        "type": "approval",
+        "label": "Lãnh đạo đơn vị duyệt",
+        "position": {
+          "x": 320,
+          "y": 0
+        },
+        "data": {
+          "resolver": "department_manager",
+          "user_id": null,
+          "allow_return": true,
+          "allow_reject": true,
+          "due_in_days": 2,
+          "instructions": "",
+          "overdue": {
+            "action": "branch"
+          }
+        }
+      },
+      {
+        "id": "board",
+        "type": "approval",
+        "label": "Ban giám đốc duyệt thay",
+        "position": {
+          "x": 720,
+          "y": 120
+        },
+        "data": {
+          "resolver": "role",
+          "user_id": null,
+          "allow_return": true,
+          "allow_reject": true,
+          "due_in_days": 3,
+          "instructions": "",
+          "role": "director",
+          "role_scope": "organization"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger->leader",
+        "source": "trigger",
+        "target": "leader",
+        "branch": null
+      },
+      {
+        "id": "leader:overdue->board",
+        "source": "leader",
+        "target": "board",
+        "branch": "overdue"
+      }
+    ]
+  }
+}

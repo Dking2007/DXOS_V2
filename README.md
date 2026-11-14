@@ -307,6 +307,7 @@ audit không thay chữ ký số. Không cam kết hiệu năng/RPO/RTO khi chư
 - [Inventory bên thứ ba](docs/third-party-inventory.md)
 - [Kịch bản demo](docs/demo.md)
 - [Quy trình nghiệp vụ, chạy thử và truy vết](docs/process-packages.md)
+- [Gói ngành: giao diện và nghiệp vụ đóng gói, cài/gỡ được](docs/packs.md)
 
 Code tự viết: [Apache-2.0](LICENSE), xem [NOTICE](NOTICE). ONLYOFFICE, RustFS và các
 service/dependency giữ giấy phép của họ. Cần rà soát artifact, notice, source offer

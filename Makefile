@@ -54,6 +54,8 @@ install: build
 	cp -r apps/workspace-web/dist/. "$(DESTDIR)$(PREFIX)/share/desktiny/workspace-web/"
 	cp -r apps/core-admin/dist/. "$(DESTDIR)$(PREFIX)/share/desktiny/core-admin/"
 	install -m 0644 .env.example "$(DESTDIR)$(PREFIX)/share/desktiny/config/env.example"
+	install -d "$(DESTDIR)$(PREFIX)/share/desktiny/packs"
+	cp -r packs/. "$(DESTDIR)$(PREFIX)/share/desktiny/packs/"
 	for svc in core-api workspace-api; do \
 	  install -d "$(DESTDIR)$(PREFIX)/share/desktiny/$$svc" && \
 	  cp services/$$svc/alembic.ini "$(DESTDIR)$(PREFIX)/share/desktiny/$$svc/" && \

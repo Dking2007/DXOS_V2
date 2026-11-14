@@ -1,0 +1,141 @@
+{
+  "key": "process-payment",
+  "title": "Thanh toán theo chứng từ",
+  "description": "Kế toán kiểm tra chứng từ, ban giám đốc duyệt chi, kế toán chi trả và nộp ủy nhiệm chi, người đề nghị được báo. Chọn kế toán ở bước đầu và bước chi trả.",
+  "graph": {
+    "nodes": [
+      {
+        "id": "trigger",
+        "type": "trigger",
+        "label": "",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "data": {
+          "event": "case.submitted",
+          "form_id": null,
+          "required_documents": [
+            "Giấy đề nghị thanh toán",
+            "Hóa đơn",
+            "Biên bản nghiệm thu"
+          ]
+        }
+      },
+      {
+        "id": "check",
+        "type": "approval",
+        "label": "Kế toán kiểm tra chứng từ",
+        "position": {
+          "x": 320,
+          "y": 0
+        },
+        "data": {
+          "resolver": "user",
+          "user_id": null,
+          "allow_return": true,
+          "allow_reject": true,
+          "due_in_days": 2,
+          "instructions": ""
+        }
+      },
+      {
+        "id": "board",
+        "type": "approval",
+        "label": "Ban giám đốc duyệt chi",
+        "position": {
+          "x": 680,
+          "y": 0
+        },
+        "data": {
+          "resolver": "role",
+          "user_id": null,
+          "allow_return": true,
+          "allow_reject": true,
+          "due_in_days": 3,
+          "instructions": "",
+          "role": "director",
+          "role_scope": "organization"
+        }
+      },
+      {
+        "id": "pay",
+        "type": "assign_task",
+        "label": "Kế toán chi trả",
+        "position": {
+          "x": 1040,
+          "y": 0
+        },
+        "data": {
+          "title": "Chi trả: {title}",
+          "priority": "normal",
+          "due_in_days": 2,
+          "require_files": 1,
+          "required_documents": [
+            "Ủy nhiệm chi"
+          ]
+        }
+      },
+      {
+        "id": "tell_owner",
+        "type": "notify",
+        "label": "",
+        "position": {
+          "x": 1400,
+          "y": -60
+        },
+        "data": {
+          "recipients": [
+            "owner"
+          ],
+          "title": "Đã chi trả: {title}"
+        }
+      },
+      {
+        "id": "paid",
+        "type": "finish",
+        "label": "Hoàn tất",
+        "position": {
+          "x": 1760,
+          "y": -60
+        },
+        "data": {
+          "result": "approved",
+          "message": "Đã duyệt chi và chi trả."
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger->check",
+        "source": "trigger",
+        "target": "check",
+        "branch": null
+      },
+      {
+        "id": "check:approve->board",
+        "source": "check",
+        "target": "board",
+        "branch": "approve"
+      },
+      {
+        "id": "board:approve->pay",
+        "source": "board",
+        "target": "pay",
+        "branch": "approve"
+      },
+      {
+        "id": "pay:completed->tell_owner",
+        "source": "pay",
+        "target": "tell_owner",
+        "branch": "completed"
+      },
+      {
+        "id": "tell_owner->paid",
+        "source": "tell_owner",
+        "target": "paid",
+        "branch": null
+      }
+    ]
+  }
+}
