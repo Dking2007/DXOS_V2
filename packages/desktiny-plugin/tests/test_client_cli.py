@@ -102,3 +102,17 @@ def test_dev_plays_desktiny_and_signs_what_it_sends(server):
     assert seen[-1]["path"] == "/nodes/tra-cuu" and call["config"] == {"ma_so": "0101"}
     assert main(["dev", "event", "case.submitted", "--secret", SECRET, "--url", url, "--subject", "case:c1"]) == 0
     assert read_delivery(SECRET, seen[-1]["headers"], seen[-1]["body"])["subject"] == {"type": "case", "id": "c1"}
+
+
+def test_check_reads_a_packaged_plugin_folder(tmp_path, capsys):
+    example = Path(__file__).resolve().parents[3] / "examples" / "plugins" / "mot-cua-mau"
+    assert main(["check", str(example)]) == 0
+    folder = tmp_path / "dong-goi"
+    (folder / "ui").mkdir(parents=True)
+    manifest = {"schema": "desktiny-plugin/2", "id": "vn.vi-du.dong-goi", "name": "Đóng gói", "version": "1.0.0",
+                "license": "Apache-2.0", "pack": "pack/", "events": ["case.submitted"],
+                "ui": [{"slot": "page", "title": "Trang", "url": "/ui/trang.html"}]}  # fmt: skip
+    (folder / "desktiny-plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
+    assert main(["check", str(folder)]) == 1
+    out = capsys.readouterr().out
+    assert "events" in out and "ui/trang.html" in out and "desktiny-pack.json" in out

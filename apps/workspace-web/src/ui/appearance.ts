@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
-// The look of the installed sector pack (gói ngành): name, logo, colours, font, login page,
+// The look of the installed sector pack (gói giao diện): name, logo, colours, font, login page,
 // terminology, menu and home blocks. Loaded before the app mounts, from a public endpoint so the
 // login page has it too. No pack in force means stock Desktiny, untouched.
 import { computed, ref } from 'vue'

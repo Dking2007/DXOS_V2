@@ -4,6 +4,7 @@
 // No dependencies; load it as a module or a plain script (it also sets `window.DesktinyPlugin`).
 //
 //   const desktiny = DesktinyPlugin.connect({ desktinyOrigin: 'https://desktiny.example.org' })
+//   // A packaged plugin (pages inside its .zip, served by Desktiny) can leave `desktinyOrigin` out.
 //   const context = await desktiny.context   // place, record ids, viewer, theme, colours, app name
 //   const dossier = await desktiny.api(`/cases/${context.record.case_id}`)
 //   desktiny.toast('Đã ký số')            // also: navigate('/cases/…'), refresh(), close(result)
@@ -16,7 +17,7 @@ const PROTOCOL = 1
 
 function connect(options = {}) {
   const parent = window.parent
-  const expected = options.desktinyOrigin || null
+  const expected = options.desktinyOrigin || servedOrigin()
   const waiting = new Map()
   let session = null
   let resolveContext
@@ -121,6 +122,16 @@ function connect(options = {}) {
     close,
     confirm,
     refreshContext: () => post({ type: 'context' }),
+  }
+}
+
+/** A packaged plugin's page is served by Desktiny itself, so Desktiny's origin is the page address's own. */
+function servedOrigin() {
+  try {
+    const url = new URL(window.location.href)
+    return url.pathname.startsWith('/workspace/v1/plugin-files/') ? url.origin : null
+  } catch {
+    return null
   }
 }
 

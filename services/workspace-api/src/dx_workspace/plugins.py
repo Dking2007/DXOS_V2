@@ -15,6 +15,11 @@ through a manifest and talks to it over four channels, each limited to what an a
 
 Nothing a plugin sends is executed. Its server must be on PLUGIN_ALLOWED_HOSTS; switching a plugin off
 stops deliveries and makes its tokens useless at once.
+
+A *packaged* plugin (`desktiny-plugin/2` without `base_url`) is a .zip that carries its pages, scripts and
+styles, and may bring a sector pack (`pack`). Desktiny keeps the files and serves them itself under
+`/workspace/v1/plugin-files/...`, always with a CSP `sandbox`, so a page runs with an opaque origin even
+when opened directly; the pack is installed with the plugin and removed with it.
 """
 
 from __future__ import annotations
@@ -27,7 +32,9 @@ import re
 import secrets
 import time
 import zipfile
+from dataclasses import dataclass, field
 from datetime import timedelta
+from pathlib import PurePosixPath
 from typing import Any, Literal
 from urllib.parse import urljoin, urlsplit
 
@@ -35,15 +42,16 @@ import httpx
 from dx_platform.auth import Actor
 from dx_platform.errors import AppError
 from dx_platform.security import SecretBox
-from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from . import models as m
 from . import schemas as s
 from .automations import TRIGGERS
 from .flow_values import render
+from .packs import clean_path
 from .plugin_steps import allowed_hosts, check_step, host_allowed, node_of
 from .policies import current_user, get_case, permissions
 from .processes import active, advance, lock_run
@@ -51,6 +59,39 @@ from .services import audit, enqueue, notify
 from .tasks import visible as task_visible
 
 SCHEMA = "desktiny-plugin/1"
+# /2 adds packaged plugins: no `base_url`, files served by Desktiny, an optional sector pack.
+PACKAGED_SCHEMA = "desktiny-plugin/2"
+FILES_PREFIX = "/workspace/v1/plugin-files"
+MAX_PACKAGE_BYTES = 10 * 1024 * 1024
+MAX_PACKAGE_FILES = 300
+MAX_UNPACKED_BYTES = 25 * 1024 * 1024
+# What a packaged plugin's frames may load from the package; anything else in the .zip is not served.
+SERVED_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".htm": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".json": "application/json",
+    ".map": "application/json",
+    ".txt": "text/plain; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".ico": "image/x-icon",
+    ".woff2": "font/woff2",
+    ".woff": "font/woff",
+}
+# `sandbox` keeps a page off Desktiny's origin even when someone opens its address directly; scripts and
+# styles inline in the plugin's own page are its business, network reads go only to this server.
+FILE_CSP = (
+    "sandbox allow-scripts allow-forms allow-popups; default-src 'self'; script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; "
+    "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
+)
 # Raised whenever the plugin API grows; a manifest needing more says so in `requires.desktiny`.
 API_VERSION = 2
 MANAGE = "organization.manage"
@@ -217,14 +258,17 @@ class ListScope(s.Input):
 
 class PluginManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
-    schema_: Literal["desktiny-plugin/1"] = Field(alias="schema")
+    schema_: Literal["desktiny-plugin/1", "desktiny-plugin/2"] = Field(alias="schema")
     id: str = Field(pattern=r"^[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$", max_length=80)
     name: str = Field(min_length=1, max_length=120)
     version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
     license: str = Field(min_length=1, max_length=60)
     authors: list[str] = Field(default_factory=list, max_length=20)
     description: str = Field(default="", max_length=1000)
-    base_url: str = Field(min_length=8, max_length=300)
+    # Absent (desktiny-plugin/2 only): a packaged plugin, its pages served by Desktiny from the .zip.
+    base_url: str | None = Field(default=None, min_length=8, max_length=300)
+    # A folder of the .zip holding a sector pack (desktiny-pack.json …) installed with the plugin.
+    pack: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{1,40}/?$")
     permissions: list[str] = Field(default_factory=list, max_length=len(SCOPES))
     events: list[str] = Field(default_factory=list, max_length=len(TRIGGERS))
     events_endpoint: str = Field(default="/events", pattern=PATH)
@@ -247,9 +291,27 @@ class PluginManifest(BaseModel):
     def known(self):
         if int(self.requires.desktiny.removeprefix(">=")) > API_VERSION:
             raise ValueError(f"Plugin cần API plugin bản {self.requires.desktiny}; Desktiny này có bản {API_VERSION}.")
-        parts = urlsplit(self.base_url)
-        if parts.scheme not in {"http", "https"} or not parts.hostname or parts.query or parts.fragment:
-            raise ValueError("`base_url` phải là địa chỉ http(s) không có tham số.")
+        if self.pack and self.schema_ != PACKAGED_SCHEMA:
+            raise ValueError(f"`pack` cần `schema` là {PACKAGED_SCHEMA}.")
+        if self.base_url is None:
+            if self.schema_ != PACKAGED_SCHEMA:
+                raise ValueError(f"Thiếu `base_url`; plugin đóng gói (không có máy chủ) dùng `schema` {PACKAGED_SCHEMA}.")
+            server = [name for name, value in (("nodes", self.nodes), ("events", self.events), ("emits", self.emits),
+                                               ("assistant_tools", self.assistant_tools),
+                                               ("settings_schema", self.settings_schema.properties),
+                                               ("health_endpoint", self.health_endpoint)) if value]  # fmt: skip
+            if server:
+                raise ValueError(
+                    "Plugin đóng gói chưa có máy chủ nên chưa dùng được: "
+                    + ", ".join(server)
+                    + "; khai `base_url` nếu plugin có máy chủ riêng."
+                )
+            if not self.ui and not self.pack:
+                raise ValueError("Plugin đóng gói cần ít nhất một khung (`ui`) hoặc một gói giao diện (`pack`).")
+        else:
+            parts = urlsplit(self.base_url)
+            if parts.scheme not in {"http", "https"} or not parts.hostname or parts.query or parts.fragment:
+                raise ValueError("`base_url` phải là địa chỉ http(s) không có tham số.")
         if set(self.permissions) - set(SCOPES):
             raise ValueError("Quyền chỉ gồm: " + ", ".join(SCOPES) + ".")
         if set(self.events) - set(TRIGGERS):
@@ -289,15 +351,81 @@ def first_error(exc: ValidationError) -> str:
 
 def read_manifest(data: bytes) -> PluginManifest:
     """A manifest from a .json file, or from `desktiny-plugin.json` inside a .zip."""
-    if data[:2] == b"PK":
-        try:
-            archive = zipfile.ZipFile(io.BytesIO(data))
-            names = [n for n in archive.namelist() if n.rsplit("/", 1)[-1] == "desktiny-plugin.json"]
-            data = archive.read(min(names, key=len)) if names else b""
-        except zipfile.BadZipFile as exc:
-            raise AppError(422, "plugin_not_zip", "Tệp tải lên không phải .zip hợp lệ.") from exc
-        if not data:
-            raise AppError(422, "plugin_manifest_missing", "Gói plugin thiếu desktiny-plugin.json.")
+    return read_package(data).manifest
+
+
+@dataclass
+class Package:
+    manifest: PluginManifest
+    files: dict[str, bytes] = field(default_factory=dict)
+    sha256: str | None = None
+
+    @property
+    def packaged(self) -> bool:
+        return self.manifest.base_url is None
+
+    def pack_files(self) -> dict[str, bytes] | None:
+        """The sector pack's files, by their path inside the pack folder; None when there is no pack."""
+        if not self.manifest.pack:
+            return None
+        prefix = self.manifest.pack.rstrip("/") + "/"
+        files = {name[len(prefix) :]: data for name, data in self.files.items() if name.startswith(prefix)}
+        if "desktiny-pack.json" not in files:
+            raise AppError(
+                422, "plugin_pack_missing", f"Gói plugin khai `pack` “{prefix}” nhưng thư mục đó thiếu desktiny-pack.json."
+            )
+        return files
+
+    def served(self) -> dict[str, tuple[str, bytes]]:
+        """Files Desktiny serves for a packaged plugin's frames (not the pack, not unknown types)."""
+        if not self.packaged:
+            return {}
+        skip = self.manifest.pack.rstrip("/") + "/" if self.manifest.pack else None
+        served = {}
+        for name, data in self.files.items():
+            kind = SERVED_TYPES.get(PurePosixPath(name).suffix.lower())
+            if kind and not (skip and name.startswith(skip)):
+                served[name] = (kind, data)
+        for ui in self.manifest.ui:
+            path = ui.url.lstrip("/")
+            if path not in served or not path.lower().endswith((".html", ".htm")):
+                raise AppError(
+                    422, "plugin_file_missing", f"Khung “{ui.title}” trỏ tới “{path}” nhưng gói không có trang HTML đó."
+                )
+        return served
+
+
+def read_package(data: bytes) -> Package:
+    """A plugin from its manifest (.json), or a .zip holding the manifest and, when packaged, its files."""
+    if data[:2] != b"PK":
+        package = Package(parse_manifest(data))
+        if package.packaged:
+            raise AppError(
+                422, "plugin_package_required", "Plugin đóng gói phải tải lên dạng .zip, gồm cả các trang của nó."
+            )
+        return package
+    if len(data) > MAX_PACKAGE_BYTES:
+        raise AppError(413, "plugin_too_large", "Gói plugin tối đa 10 MB.")
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(data))
+        entries = [info for info in archive.infolist() if not info.is_dir()]
+        if len(entries) > MAX_PACKAGE_FILES or sum(info.file_size for info in entries) > MAX_UNPACKED_BYTES:
+            raise AppError(413, "plugin_too_large", "Gói plugin có quá nhiều tệp hoặc quá lớn khi giải nén.")
+        files = {clean_path(info.filename): archive.read(info) for info in entries}
+    except zipfile.BadZipFile as exc:
+        raise AppError(422, "plugin_not_zip", "Tệp tải lên không phải .zip hợp lệ.") from exc
+    # A plugin zipped together with its folder: drop that one top folder.
+    if "desktiny-plugin.json" not in files:
+        tops = {name.split("/", 1)[0] for name in files}
+        if len(tops) == 1 and all("/" in name for name in files):
+            files = {name.split("/", 1)[1]: content for name, content in files.items()}
+    if "desktiny-plugin.json" not in files:
+        raise AppError(422, "plugin_manifest_missing", "Gói plugin thiếu desktiny-plugin.json ở thư mục gốc.")
+    manifest = parse_manifest(files.pop("desktiny-plugin.json"))
+    return Package(manifest, files, hashlib.sha256(data).hexdigest())
+
+
+def parse_manifest(data: bytes) -> PluginManifest:
     if len(data) > 200_000:
         raise AppError(413, "plugin_manifest_too_large", "Manifest plugin tối đa 200 KB.")
     try:
@@ -319,6 +447,11 @@ def check_host(settings, url: str):
 
 def target(plugin: m.Plugin, path: str) -> str:
     return urljoin(plugin.base_url.rstrip("/") + "/", path.lstrip("/"))
+
+
+def file_url(plugin: m.Plugin, path: str) -> str:
+    """Where Desktiny serves a packaged plugin's file; the digest in the path changes with each package."""
+    return f"{FILES_PREFIX}/{plugin.plugin_id}/{(plugin.package_sha256 or '')[:16]}/{path.lstrip('/')}"
 
 
 # ---- Secrets, signatures, tokens --------------------------------------------------------------
@@ -788,13 +921,15 @@ def build_router(app):
     def summary(manifest: PluginManifest | dict) -> dict:
         data = manifest.model_dump(by_alias=True) if isinstance(manifest, PluginManifest) else manifest
         return {
+            "schema": data.get("schema", SCHEMA),
+            "packaged": not data.get("base_url"),
             "id": data["id"],
             "name": data["name"],
             "version": data["version"],
             "license": data["license"],
             "authors": data.get("authors", []),
             "description": data.get("description", ""),
-            "base_url": data["base_url"],
+            "base_url": data.get("base_url") or "",
             "permissions": [{"key": key, "label": SCOPES[key]} for key in data.get("permissions", [])],
             "events": [{"key": key, "label": TRIGGERS[key]} for key in data.get("events", [])],
             "nodes": [{"kind": n["kind"], "title": n["title"], "description": n.get("description", "")}
@@ -835,6 +970,7 @@ def build_router(app):
             .limit(1)
         )
         setting = db.get(m.PluginSetting, row.plugin_id)
+        pack = db.scalar(select(m.InstalledPack).where(m.InstalledPack.pack_id == row.pack_id)) if row.pack_id else None
         secret_keys = (
             sorted(SecretBox(settings.credential_encryption_key).decrypt(setting.secrets))
             if setting and setting.secrets
@@ -849,7 +985,9 @@ def build_router(app):
                 for form_id in (row.granted or {}).get("list_forms", [])
                 if (form := db.get(m.Form, form_id))
             },
-            "host_allowed": host_allowed(settings, row.base_url),
+            "host_allowed": not row.base_url or host_allowed(settings, row.base_url),
+            "pack": {"id": pack.pack_id, "name": pack.name, "version": pack.version} if pack else None,
+            "files": db.scalar(select(func.count(m.PluginFile.id)).where(m.PluginFile.plugin_id == row.plugin_id)),
             "revision": row.revision,
             "approved_at": row.approved_at,
             "updated_at": row.updated_at,
@@ -871,11 +1009,22 @@ def build_router(app):
             },
         }
 
-    async def manifest_from(file: UploadFile) -> PluginManifest:
-        data = await file.read(2_000_001)
-        if len(data) > 2_000_000:
-            raise AppError(413, "plugin_too_large", "Tệp plugin tối đa 2 MB.")
-        return read_manifest(data)
+    async def package_from(file: UploadFile) -> Package:
+        data = await file.read(MAX_PACKAGE_BYTES + 1)
+        if len(data) > MAX_PACKAGE_BYTES:
+            raise AppError(413, "plugin_too_large", "Gói plugin tối đa 10 MB.")
+        return read_package(data)
+
+    def pack_of(package: Package):
+        files = package.pack_files()
+        return app.state.packs.load(files) if files is not None else None
+
+    def check_pack_owner(db, plugin_id: str, pack) -> None:
+        if not pack:
+            return
+        other = db.scalar(select(m.Plugin).where(m.Plugin.pack_id == pack.manifest.id, m.Plugin.plugin_id != plugin_id))
+        if other:
+            raise AppError(409, "pack_owned_by_plugin", f"Gói giao diện {pack.manifest.id} đang đi kèm plugin “{other.name}”.")
 
     @router.get("/plugins")
     def plugins(db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
@@ -891,20 +1040,31 @@ def build_router(app):
     @router.post("/plugins/preview")
     async def preview(file: UploadFile = File(...), db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
         manager(db, actor)
-        manifest = await manifest_from(file)
+        package = await package_from(file)
+        manifest = package.manifest
+        served = package.served()
+        pack = pack_of(package)
+        check_pack_owner(db, manifest.id, pack)
         existing = db.scalar(select(m.Plugin).where(m.Plugin.plugin_id == manifest.id))
         return {
             **summary(manifest),
-            "host_allowed": host_allowed(settings, manifest.base_url),
+            "host_allowed": package.packaged or host_allowed(settings, manifest.base_url),
             "upgrade_from": existing.version if existing else None,
+            "files": len(served),
+            "pack_preview": app.state.packs.preview(db, pack) if pack else None,
         }
 
     @router.post("/plugins", status_code=201)
     async def install(file: UploadFile = File(...), db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
         """Install (or upgrade) a plugin; it stays pending until its permissions are approved."""
         user = manager(db, actor)
-        manifest = await manifest_from(file)
-        check_host(settings, manifest.base_url)
+        package = await package_from(file)
+        manifest = package.manifest
+        served = package.served()
+        pack = pack_of(package)
+        if not package.packaged:
+            check_host(settings, manifest.base_url)
+        check_pack_owner(db, manifest.id, pack)
         row = db.scalar(select(m.Plugin).where(m.Plugin.plugin_id == manifest.id).with_for_update())
         upgrade_from = row.version if row else None
         data = manifest.model_dump(by_alias=True)
@@ -923,13 +1083,27 @@ def build_router(app):
         else:
             row = m.Plugin(plugin_id=manifest.id, installed_by=user.id, granted={key: [] for key in asked({})})
             db.add(row)
-        row.name, row.version, row.manifest, row.base_url = manifest.name, manifest.version, data, manifest.base_url
+        row.name, row.version, row.manifest = manifest.name, manifest.version, data
+        row.base_url = manifest.base_url or ""
+        row.package_sha256 = package.sha256 if package.packaged else None
         row.updated_at = m.utcnow()
+        db.execute(delete(m.PluginFile).where(m.PluginFile.plugin_id == manifest.id))
+        for path, (mime, content) in served.items():
+            db.add(m.PluginFile(plugin_id=manifest.id, path=path, mime=mime, data=content))
+        notes = []
+        old_pack = db.scalar(select(m.InstalledPack).where(m.InstalledPack.pack_id == row.pack_id)) if row.pack_id else None
+        if old_pack and (not pack or old_pack.pack_id != pack.manifest.id):
+            notes += app.state.packs.remove(db, actor, user, old_pack)
+            row.pack_id = None
+        if pack:
+            pack_row, more = app.state.packs.install(db, actor, user, pack, "plugin")
+            row.pack_id = pack_row.pack_id
+            notes += more
         db.flush()
         audit(db, user, "plugin.upgraded" if upgrade_from else "plugin.installed", row.id,
-              {"plugin_id": manifest.id, "version": manifest.version})  # fmt: skip
+              {"plugin_id": manifest.id, "version": manifest.version, "pack_id": row.pack_id})  # fmt: skip
         db.commit()
-        return plugin_data(db, row)
+        return {**plugin_data(db, row), "notes": notes}
 
     @router.post("/plugins/{plugin_id}/approve")
     def approve(plugin_id: str, body: Approval, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
@@ -950,21 +1124,25 @@ def build_router(app):
         for form_id in body.list_forms:
             if not db.get(m.Form, form_id):
                 raise AppError(422, "plugin_grant_invalid", "Quy trình được chọn để liệt kê không tồn tại.")
-        check_host(settings, row.base_url)
+        if row.base_url:
+            check_host(settings, row.base_url)
         row.granted = {**(row.granted or {}), **{key: sorted(set(values)) for key, values in chosen.items()},
                        "list_forms": sorted(set(body.list_forms))}  # fmt: skip
         row.state, row.approved_by, row.approved_at = "enabled", user.id, m.utcnow()
-        secret = None
-        if not row.secret:
-            secret = secrets.token_urlsafe(32)
-            row.secret = SecretBox(settings.credential_encryption_key).encrypt({"value": secret})
-        revoke(db, row.plugin_id, "install")
-        token, _ = issue(db, row, "install", row.granted["permissions"])
+        issued = None
+        if row.base_url:  # a packaged plugin has no server to give a secret or an installation token to
+            secret = None
+            if not row.secret:
+                secret = secrets.token_urlsafe(32)
+                row.secret = SecretBox(settings.credential_encryption_key).encrypt({"value": secret})
+            revoke(db, row.plugin_id, "install")
+            token, _ = issue(db, row, "install", row.granted["permissions"])
+            issued = {"token": token, "secret": secret}
         row.revision += 1
         row.updated_at = m.utcnow()
         audit(db, user, "plugin.approved", row.id, {"plugin_id": plugin_id, **row.granted})
         db.commit()
-        return {**plugin_data(db, row), "issued": {"token": token, "secret": secret}}
+        return {**plugin_data(db, row), "issued": issued}
 
     @router.post("/plugins/{plugin_id}/rotate")
     def rotate(plugin_id: str, body: s.Revision, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
@@ -975,6 +1153,8 @@ def build_router(app):
             raise AppError(409, "revision_conflict", "Plugin vừa được người khác thay đổi. Tải lại để xem.")
         if row.state == "pending":
             raise AppError(409, "plugin_not_approved", "Duyệt plugin trước khi cấp khoá.")
+        if not row.base_url:
+            raise AppError(409, "plugin_packaged", "Plugin đóng gói không có máy chủ nên không có khoá để đổi.")
         secret = secrets.token_urlsafe(32)
         row.secret = SecretBox(settings.credential_encryption_key).encrypt({"value": secret})
         revoke(db, row.plugin_id)
@@ -992,7 +1172,7 @@ def build_router(app):
             raise AppError(409, "revision_conflict", "Plugin vừa được người khác thay đổi. Tải lại để xem.")
         if body.enabled and row.state == "pending":
             raise AppError(409, "plugin_not_approved", "Duyệt quyền của plugin trước khi bật.")
-        if body.enabled:
+        if body.enabled and row.base_url:
             check_host(settings, row.base_url)
         row.state = "enabled" if body.enabled else "disabled"
         if not body.enabled:
@@ -1017,10 +1197,15 @@ def build_router(app):
         setting = db.get(m.PluginSetting, row.plugin_id)
         if setting:
             db.delete(setting)  # an agency's keys for a plugin it removed are not kept
-        audit(db, user, "plugin.removed", row.id, {"plugin_id": plugin_id, "version": row.version})
+        db.execute(delete(m.PluginFile).where(m.PluginFile.plugin_id == plugin_id))
+        notes = []
+        pack = db.scalar(select(m.InstalledPack).where(m.InstalledPack.pack_id == row.pack_id)) if row.pack_id else None
+        if pack:
+            notes = app.state.packs.remove(db, actor, user, pack)
+        audit(db, user, "plugin.removed", row.id, {"plugin_id": plugin_id, "version": row.version, "pack_id": row.pack_id})
         db.delete(row)
         db.commit()
-        return {"removed": plugin_id}
+        return {"removed": plugin_id, "notes": notes}
 
     @router.put("/plugins/{plugin_id}/settings")
     def save_settings(
@@ -1139,25 +1324,50 @@ def build_router(app):
             return {"items": []}
         items = []
         for row in db.scalars(select(m.Plugin).where(m.Plugin.state == "enabled").order_by(m.Plugin.name)):
-            if not host_allowed(settings, row.base_url):
+            if row.base_url and not host_allowed(settings, row.base_url):
                 continue
             for index, ui in enumerate((row.manifest or {}).get("ui", [])):
                 if ui["slot"] == slot:
-                    parts = urlsplit(row.base_url)
+                    parts = urlsplit(row.base_url) if row.base_url else None
                     items.append(
                         {
                             "plugin_id": row.plugin_id,
                             "plugin_name": row.name,
                             "index": index,
                             "title": ui["title"],
-                            "url": target(row, ui["url"]),
-                            "origin": f"{parts.scheme}://{parts.netloc}",
+                            "url": target(row, ui["url"]) if parts else file_url(row, ui["url"]),
+                            "origin": f"{parts.scheme}://{parts.netloc}" if parts else "Desktiny",
                             "height": ui["height"],
                             # Only what was approved: the frame cannot ask the browser for more.
                             "allow": "; ".join((row.granted or {}).get("frame_permissions", [])),
                         }
                     )
         return {"items": items}
+
+    @router.get(FILES_PREFIX.removeprefix("/workspace/v1") + "/{plugin_id}/{build}/{path:path}", include_in_schema=False)
+    def plugin_file(plugin_id: str, build: str, path: str, db: Session = Depends(db_dep)):
+        """A file of a switched-on packaged plugin, for its frames. Public like any page script; always
+        sandboxed by CSP, so it never runs with Desktiny's origin, and no cookie-bearing request can use it."""
+        row = db.scalar(select(m.Plugin).where(m.Plugin.plugin_id == plugin_id))
+        if not row or row.state != "enabled" or not row.package_sha256 or row.package_sha256[:16] != build:
+            raise AppError(404, "plugin_file_not_found", "Không tìm thấy tệp của plugin.")
+        found = db.scalar(select(m.PluginFile).where(m.PluginFile.plugin_id == plugin_id, m.PluginFile.path == path))
+        if not found:
+            raise AppError(404, "plugin_file_not_found", "Không tìm thấy tệp của plugin.")
+        return Response(
+            found.data,
+            media_type=found.mime,
+            headers={
+                "Content-Security-Policy": FILE_CSP,
+                "X-Content-Type-Options": "nosniff",
+                # The page has an opaque origin, so its own scripts (CORS) and styles (no-cors) are cross-origin
+                # loads to the browser; nothing here is private.
+                "Access-Control-Allow-Origin": "*",
+                "Cross-Origin-Resource-Policy": "cross-origin",
+                # The path names the package's digest, so a new version is a new address.
+                "Cache-Control": "private, max-age=86400",
+            },
+        )
 
     @router.post("/plugin-sessions", status_code=201)
     def session(body: SessionInput, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):

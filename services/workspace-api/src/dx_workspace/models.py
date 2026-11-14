@@ -798,7 +798,7 @@ class AiEmbedding(Base):
 
 
 class InstalledPack(Base):
-    """A sector pack (gói ngành) in force: its checked manifest and what installing it created.
+    """A sector pack (gói giao diện) in force: its checked manifest and what installing it created.
 
     `source` is "file" (uploaded .zip), "builtin" (shipped in `packs/`) or "local" (made on the
     pack builder by this organisation; such a pack points at things that already existed and
@@ -887,8 +887,27 @@ class Plugin(Base):
     approved_by: Mapped[str | None] = mapped_column(String(36))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revision: Mapped[int] = mapped_column(Integer, default=1)
+    # Packaged plugins (desktiny-plugin/2 without `base_url`): the .zip's SHA-256, which also names the
+    # path its files are served under, and the sector pack it brought (installed with source "plugin").
+    package_sha256: Mapped[str | None] = mapped_column(String(64))
+    pack_id: Mapped[str | None] = mapped_column(String(80))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PluginFile(Base):
+    """A file of a packaged plugin (its pages, scripts, styles, images), served from Desktiny itself.
+
+    Served sandboxed (CSP `sandbox`), so even opened directly a page runs with an opaque origin.
+    """
+
+    __tablename__ = "plugin_files"
+    __table_args__ = (UniqueConstraint("plugin_id", "path"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    plugin_id: Mapped[str] = mapped_column(String(80), index=True)
+    path: Mapped[str] = mapped_column(String(200))
+    mime: Mapped[str] = mapped_column(String(60))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
 
 
 class PluginToken(Base):

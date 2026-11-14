@@ -21,7 +21,7 @@ const SUBJECTS: Record<string, { label: string; route?: string }> = {
   assistant: { label: 'Trợ lý AI' },
   field_evidence: { label: 'Căn cứ trường' },
   office: { label: 'Soạn thảo trực tuyến' },
-  pack: { label: 'Gói ngành' },
+  pack: { label: 'Gói giao diện' },
   plugin: { label: 'Plugin' },
   appearance: { label: 'Giao diện' },
 }

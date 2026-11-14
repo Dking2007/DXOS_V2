@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
-<!-- Sector packs (gói ngành): what is installed, which look is in force, packs shipped with the
+<!-- Sector packs (gói giao diện): what is installed, which look is in force, packs shipped with the
      release, uploading a .zip with a preview before anything changes, and the pack builder. -->
 <script setup lang="ts">
 import { computed, ref } from 'vue'
@@ -38,7 +38,7 @@ interface InstalledPack {
   pack_id: string
   name: string
   version: string
-  source: 'file' | 'builtin' | 'local'
+  source: 'file' | 'builtin' | 'local' | 'plugin'
   description: string
   license: string
   has_appearance: boolean
@@ -89,6 +89,7 @@ const SOURCE: Record<InstalledPack['source'], string> = {
   builtin: 'Có sẵn',
   file: 'Tải lên',
   local: 'Của cơ quan',
+  plugin: 'Đi kèm plugin',
 }
 const KIND_LABEL: Record<keyof Counts, string> = {
   processes: 'quy trình',
@@ -228,7 +229,7 @@ function swatches(look: AppearanceLook | null) {
 </script>
 <template>
   <header class="page-head compact">
-    <h1 class="sr-only">Gói ngành</h1>
+    <h1 class="sr-only">Gói giao diện</h1>
     <div class="page-actions">
       <label class="button secondary"
         ><Upload :size="17" />Tải gói lên (.zip)<input
@@ -343,7 +344,7 @@ function swatches(look: AppearanceLook | null) {
         </div>
       </section>
       <p class="muted pack-foot">
-        Gói ngành không chứa mã. Gỡ gói thì về đúng giao diện và nghiệp vụ mặc định; quy trình đã có hồ sơ chỉ ngừng
+        Gói giao diện không chứa mã. Gỡ gói thì về đúng giao diện và nghiệp vụ mặc định; quy trình đã có hồ sơ chỉ ngừng
         phát hành, không bị xoá. Cách viết gói: <code>docs/packs.md</code>.
       </p>
     </template>
@@ -351,7 +352,7 @@ function swatches(look: AppearanceLook | null) {
 
   <ModalDialog
     v-if="pending"
-    :title="preview?.upgrade_from ? 'Nâng cấp gói ngành' : 'Cài gói ngành'"
+    :title="preview?.upgrade_from ? 'Nâng cấp gói giao diện' : 'Cài gói giao diện'"
     wide
     @close="
       () => {
@@ -424,7 +425,7 @@ function swatches(look: AppearanceLook | null) {
     </div>
   </ModalDialog>
 
-  <ModalDialog v-if="removing" title="Gỡ gói ngành" @close="removing = null">
+  <ModalDialog v-if="removing" title="Gỡ gói giao diện" @close="removing = null">
     <div class="stack">
       <p>
         Gỡ <strong>{{ removing.name }}</strong>?

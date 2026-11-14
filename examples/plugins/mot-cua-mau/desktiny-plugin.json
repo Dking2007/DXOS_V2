@@ -1,0 +1,15 @@
+{
+  "schema": "desktiny-plugin/2",
+  "id": "vn.vi-du.mot-cua-mau",
+  "name": "Một cửa (mẫu)",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "authors": ["Desktiny contributors"],
+  "description": "Plugin đóng gói mẫu: không có máy chủ riêng. Thêm trang tính hạn xử lý theo ngày làm việc, phiếu tiếp nhận ở cột phải hồ sơ, và mang theo gói giao diện có quy trình tiếp nhận hồ sơ một cửa. Dữ liệu và tên cơ quan là giả.",
+  "permissions": ["cases.read"],
+  "pack": "pack/",
+  "ui": [
+    { "slot": "page", "title": "Tính hạn xử lý", "url": "/ui/tinh-han.html" },
+    { "slot": "case.side", "title": "Phiếu tiếp nhận", "url": "/ui/phieu-tiep-nhan.html", "height": 220 }
+  ]
+}

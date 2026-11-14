@@ -3,11 +3,11 @@ SPDX-License-Identifier: Apache-2.0
 SPDX-FileCopyrightText: 2026 Desktiny contributors
 -->
 
-# Gói ngành (`desktiny-pack/1`)
+# Gói giao diện (`desktiny-pack/1`)
 
-Gói ngành đóng gói **nghiệp vụ** (quy trình, biểu mẫu, mẫu quy trình, luồng tự động, bài kiến thức cho trợ lý
+Gói giao diện đóng gói **nghiệp vụ** (quy trình, biểu mẫu, mẫu quy trình, luồng tự động, bài kiến thức cho trợ lý
 AI) và **giao diện** (tên, logo, màu, phông, trang đăng nhập, từ ngữ, menu, trang chủ) của một ngành hay một cơ
-quan. Gói **không chứa mã**. Cài, nâng cấp, gỡ ở **Quản trị › Gói ngành** (quyền `organization.manage`); gỡ gói thì
+quan. Gói **không chứa mã**. Cài, nâng cấp, gỡ ở **Quản trị › Gói giao diện** (quyền `organization.manage`); gỡ gói thì
 Desktiny về đúng giao diện và nghiệp vụ mặc định. Đây là tầng 1 của hướng mở rộng; plugin có mã chạy ở máy chủ
 riêng (tầng 2) xem [`plugins.md`](plugins.md).
 
@@ -141,7 +141,7 @@ Thư mục gói được tìm ở `PACKS_DIR` (biến môi trường), thư mụ
 
 1. Chép `packs/truong-hoc` thành thư mục mới, đổi `id`, `name`, `version`.
 2. Vẽ quy trình trên canvas, rồi dùng trình tạo gói chọn nó và **Xuất** để có tệp `processes/*.json` đúng định dạng.
-3. Nén thư mục thành `.zip`, tải lên ở **Gói ngành**, đọc kỹ phần xem trước rồi cài.
+3. Nén thư mục thành `.zip`, tải lên ở **Gói giao diện**, đọc kỹ phần xem trước rồi cài.
 4. Gói trong repo phải qua `reuse lint` (thư mục `packs/` được khai trong `REUSE.toml`), không dùng tên, logo, con dấu
    của cơ quan thật, không chứa phông hay ảnh tải từ ngoài.
 

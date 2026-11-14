@@ -1,0 +1,60 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tính hạn xử lý</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <h1>Tính hạn xử lý theo ngày làm việc</h1>
+    <p class="muted">Bỏ thứ Bảy, Chủ nhật và các ngày nghỉ lễ nhập bên dưới. Tính ngay trên trang, không gửi dữ liệu đi đâu.</p>
+    <div class="grid">
+      <label>Ngày tiếp nhận <input id="from" type="date" /></label>
+      <label>Số ngày làm việc <input id="days" type="number" min="1" max="365" value="5" /></label>
+    </div>
+    <label>Ngày nghỉ lễ (mỗi dòng một ngày, dạng 2026-01-01)
+      <textarea id="holidays" rows="4">2026-01-01
+2026-04-30
+2026-05-01
+2026-09-02</textarea>
+    </label>
+    <p id="out" class="result" aria-live="polite"></p>
+    <script type="module">
+      import { connect } from './desktiny-plugin-sdk.js'
+      connect() // colours, font and height from Desktiny
+
+      const $ = (id) => document.getElementById(id)
+      const iso = (date) => date.toISOString().slice(0, 10)
+      $('from').value = iso(new Date())
+
+      function deadline(from, days, holidays) {
+        const date = new Date(`${from}T00:00:00Z`)
+        let left = days
+        while (left > 0) {
+          date.setUTCDate(date.getUTCDate() + 1)
+          const weekday = date.getUTCDay()
+          if (weekday !== 0 && weekday !== 6 && !holidays.has(iso(date))) left -= 1
+        }
+        return date
+      }
+      function update() {
+        const days = Number($('days').value)
+        const holidays = new Set($('holidays').value.split(/\s+/).filter((line) => /^\d{4}-\d{2}-\d{2}$/.test(line)))
+        if (!$('from').value || !(days >= 1 && days <= 365)) {
+          $('out').textContent = 'Nhập ngày tiếp nhận và số ngày từ 1 đến 365.'
+          return
+        }
+        const due = deadline($('from').value, days, holidays)
+        $('out').innerHTML = ''
+        const strong = document.createElement('strong')
+        strong.textContent = due.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })
+        $('out').append('Hạn trả kết quả: ', strong)
+      }
+      for (const id of ['from', 'days', 'holidays']) $(id).addEventListener('input', update)
+      update()
+    </script>
+  </body>
+</html>

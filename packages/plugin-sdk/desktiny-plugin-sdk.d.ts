@@ -34,6 +34,7 @@ export interface DesktinyConnection {
   refreshContext(): void
 }
 export function connect(options?: {
+  /** Desktiny's origin; may be left out on a packaged plugin's page (served by Desktiny itself). */
   desktinyOrigin?: string
   autoResize?: boolean
   onContext?: (context: DesktinyContext) => void

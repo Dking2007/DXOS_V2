@@ -123,7 +123,7 @@ export const router = createRouter({
     {
       path: '/packs',
       component: () => import('./views/PacksView.vue'),
-      meta: { title: 'Gói ngành', capability: 'organization.manage' },
+      meta: { title: 'Gói giao diện', capability: 'organization.manage' },
     },
     {
       path: '/:pathMatch(.*)*',

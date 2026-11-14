@@ -1,0 +1,29 @@
+{
+  "name": "Tiếp nhận hồ sơ một cửa",
+  "description": "Bộ phận một cửa kiểm tra thành phần hồ sơ, chuyên viên xử lý, lãnh đạo ký duyệt rồi trả kết quả.",
+  "form": {
+    "name": "Phiếu tiếp nhận hồ sơ một cửa",
+    "description": "Thông tin người nộp và thủ tục yêu cầu.",
+    "fields": [
+      { "key": "nguoi_nop", "label": "Họ tên người nộp", "type": "text", "required": true },
+      { "key": "so_dien_thoai", "label": "Số điện thoại", "type": "text", "required": true },
+      { "key": "thu_tuc", "label": "Thủ tục", "type": "select", "required": true, "options": ["Chứng thực bản sao", "Đăng ký khai sinh", "Xác nhận cư trú"] },
+      { "key": "ghi_chu", "label": "Ghi chú của bộ phận một cửa", "type": "textarea" }
+    ]
+  },
+  "graph": {
+    "nodes": [
+      { "id": "trigger", "type": "trigger", "label": "", "position": { "x": 0, "y": 0 }, "data": { "event": "case.submitted", "form_id": null, "required_documents": ["Đơn đề nghị", "Giấy tờ tuỳ thân (bản sao)"] } },
+      { "id": "kiem_tra", "type": "approval", "label": "Một cửa kiểm tra thành phần", "position": { "x": 320, "y": 0 }, "data": { "resolver": "department_manager", "user_id": null, "allow_return": true, "allow_reject": true, "due_in_days": 1, "instructions": "Đối chiếu thành phần hồ sơ; thiếu thì trả để bổ sung." } },
+      { "id": "lanh_dao", "type": "approval", "label": "Lãnh đạo ký duyệt", "position": { "x": 680, "y": 0 }, "data": { "resolver": "role", "user_id": null, "allow_return": true, "allow_reject": true, "due_in_days": 2, "instructions": "", "role": "director", "role_scope": "organization" } },
+      { "id": "tra_ket_qua", "type": "finish", "label": "Trả kết quả", "position": { "x": 1040, "y": 0 }, "data": { "result": "approved", "message": "Hồ sơ đã có kết quả, hẹn người nộp đến nhận." } }
+    ],
+    "edges": [
+      { "id": "trigger->kiem_tra", "source": "trigger", "target": "kiem_tra", "branch": null },
+      { "id": "kiem_tra:approve->lanh_dao", "source": "kiem_tra", "target": "lanh_dao", "branch": "approve" },
+      { "id": "lanh_dao:approve->tra_ket_qua", "source": "lanh_dao", "target": "tra_ket_qua", "branch": "approve" }
+    ]
+  },
+  "allowed_roles": [],
+  "required_file_count": 0
+}

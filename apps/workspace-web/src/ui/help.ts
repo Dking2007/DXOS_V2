@@ -215,7 +215,7 @@ export const HELP: Record<string, HelpTopic> = {
     tips: ['Nội dung trang do plugin cung cấp; liên hệ quản trị nếu trang không tải được.'],
   },
   '/packs': {
-    purpose: 'Gói ngành: giao diện (tên, logo, màu, trang đăng nhập, từ ngữ, menu) và quy trình mẫu theo ngành, cài và gỡ được.',
+    purpose: 'Gói giao diện: giao diện (tên, logo, màu, trang đăng nhập, từ ngữ, menu) và quy trình mẫu theo ngành, cài và gỡ được.',
     steps: [
       'Gói có sẵn: bấm "Xem và cài", đọc phần xem trước (sẽ thêm gì, đổi gì) rồi "Cài gói".',
       'Gói từ cơ quan khác: "Tải gói lên (.zip)", xem trước rồi cài.',

@@ -99,7 +99,7 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         key: 'packs',
         to: '/packs',
-        label: 'Gói ngành',
+        label: 'Gói giao diện',
         icon: Package,
         hint: 'Giao diện, từ ngữ và quy trình theo ngành',
         capability: 'organization.manage',

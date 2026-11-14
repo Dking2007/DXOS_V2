@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 Desktiny contributors
-"""Sector packs (gói ngành): business content and appearance, installed and removed as one unit.
+"""Sector packs (gói giao diện): business content and appearance, installed and removed as one unit.
 
 A pack is a folder (or a .zip of one) with a `desktiny-pack.json` manifest, contract
 `desktiny-pack/1`. It carries no code. Its two halves can be used alone or together:
@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
 from pathlib import Path, PurePosixPath
+from types import SimpleNamespace
 from typing import Literal
 from xml.etree import ElementTree as ET
 
@@ -912,7 +913,7 @@ def build_router(app):
             raise AppError(403, "workspace_user_required", "Cần phiên người dùng Workspace.")
         user = current_user(db, actor)
         if MANAGE not in permissions(db, user):
-            raise AppError(403, "permission_denied", "Chỉ người quản lý tổ chức được quản lý gói ngành.")
+            raise AppError(403, "permission_denied", "Chỉ người quản lý tổ chức được quản lý gói giao diện.")
         return user
 
     def needs(db, user, pack: Pack):
@@ -978,7 +979,7 @@ def build_router(app):
             },
             "created": {kind: len(ids) for kind, ids in made.items()},
             "includes": includes,
-            "removable": row.pack_id != CORE_PACK,
+            "removable": row.pack_id != CORE_PACK and row.source != "plugin",
             "revision": row.revision,
             "installed_at": row.installed_at,
             "updated_at": row.updated_at,
@@ -1161,23 +1162,26 @@ def build_router(app):
         pack, _ = await incoming(file, builtin)
         return preview_of(db, pack)
 
-    @router.post("/packs", status_code=201)
-    async def install(
-        file: UploadFile | None = File(None),
-        builtin: str | None = Form(None),
-        activate: bool = Form(False),
-        db: Session = Depends(db_dep),
-        actor: Actor = Depends(actor_dep),
-    ):
-        """Install a pack, or upgrade it when the same id is installed; one transaction."""
-        user = manager(db, actor)
-        pack, source = await incoming(file, builtin)
+    def install_pack(db, actor, user, pack: Pack, source: str, activate: bool = False):
+        """Install or upgrade `pack` (no commit); returns the row and notes for the person installing.
+
+        Also used by packaged plugins that bring a pack (`source` "plugin"): such a pack is then
+        upgraded and removed only with its plugin.
+        """
         needs(db, user, pack)
         manifest = pack.manifest
         if manifest.id == CORE_PACK:
             raise AppError(409, "core_pack_managed", "Gói mặc định được cài sẵn cùng hệ thống.")
         preview_of(db, pack)  # refuses ids the organisation's own pack uses
         row = db.scalar(select(m.InstalledPack).where(m.InstalledPack.pack_id == manifest.id).with_for_update())
+        if row and (row.source == "plugin") != (source == "plugin"):
+            raise AppError(
+                409,
+                "pack_owned_by_plugin" if row.source == "plugin" else "pack_id_taken",
+                "Gói này đi kèm một plugin; cài, nâng cấp hay gỡ plugin đó để thay đổi gói."
+                if row.source == "plugin"
+                else f"Đã có gói giao diện “{row.name}” cùng mã {manifest.id}; gỡ gói đó trước khi cài plugin.",
+            )
         upgrade_from = row.version if row else None
         if not row:
             row = m.InstalledPack(
@@ -1205,8 +1209,40 @@ def build_router(app):
             look.revision += 1  # the new version's appearance takes effect
         audit(db, user, "pack.upgraded" if upgrade_from else "pack.installed", row.id,
               {"pack_id": manifest.id, "version": manifest.version, "from": upgrade_from})  # fmt: skip
+        return row, installer.notes + pack.warnings
+
+    def remove_pack(db, actor, user, row: m.InstalledPack) -> list[str]:
+        """Take back what the pack made (no commit); a local pack only loses its assets."""
+        installer = Installer(app, db, actor, user, row)
+        if row.source != "local":  # a local pack only points at things the organisation made itself
+            installer.remove_all()
+        else:
+            db.execute(delete(m.PackAsset).where(m.PackAsset.pack_id == row.pack_id))
+        look = active(db)
+        if look.pack_id == row.pack_id:
+            look.pack_id, look.revision = None, look.revision + 1
+        audit(db, user, "pack.removed", row.id, {"pack_id": row.pack_id, "version": row.version})
+        db.delete(row)
+        return installer.notes
+
+    app.state.packs = SimpleNamespace(read=read_zip, load=load_pack, preview=preview_of, install=install_pack,
+                                      remove=remove_pack)  # fmt: skip
+
+    @router.post("/packs", status_code=201)
+    async def install(
+        file: UploadFile | None = File(None),
+        builtin: str | None = Form(None),
+        activate: bool = Form(False),
+        db: Session = Depends(db_dep),
+        actor: Actor = Depends(actor_dep),
+    ):
+        """Install a pack, or upgrade it when the same id is installed; one transaction."""
+        user = manager(db, actor)
+        pack, source = await incoming(file, builtin)
+        row, notes = install_pack(db, actor, user, pack, source, activate)
+        look = active(db)
         db.commit()
-        return {"pack": pack_data(db, row, look.pack_id), "notes": installer.notes + pack.warnings}
+        return {"pack": pack_data(db, row, look.pack_id), "notes": notes}
 
     @router.delete("/packs/{pack_id}")
     def uninstall(pack_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
@@ -1216,18 +1252,11 @@ def build_router(app):
         row = db.scalar(select(m.InstalledPack).where(m.InstalledPack.pack_id == pack_id).with_for_update())
         if not row:
             raise AppError(404, "pack_not_found", "Gói chưa được cài.")
-        installer = Installer(app, db, actor, user, row)
-        if row.source != "local":  # a local pack only points at things the organisation made itself
-            installer.remove_all()
-        else:
-            db.execute(delete(m.PackAsset).where(m.PackAsset.pack_id == pack_id))
-        look = active(db)
-        if look.pack_id == pack_id:
-            look.pack_id, look.revision = None, look.revision + 1
-        audit(db, user, "pack.removed", row.id, {"pack_id": pack_id, "version": row.version})
-        db.delete(row)
+        if row.source == "plugin":
+            raise AppError(409, "pack_owned_by_plugin", "Gói này đi kèm một plugin; gỡ plugin đó để gỡ gói.")
+        notes = remove_pack(db, actor, user, row)
         db.commit()
-        return {"notes": installer.notes}
+        return {"notes": notes}
 
     @router.get("/packs/{pack_id}/export")
     def export(pack_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):

@@ -5,4 +5,4 @@
 - Nghỉ trên 3 ngày cần Ban giám hiệu duyệt thêm.
 - Nghỉ ốm từ 2 ngày trở lên đính kèm giấy của cơ sở y tế.
 
-Đây là nội dung mẫu đi kèm gói ngành Trường học; nhà trường chỉnh lại theo quy chế của mình.
+Đây là nội dung mẫu đi kèm gói giao diện Trường học; nhà trường chỉnh lại theo quy chế của mình.

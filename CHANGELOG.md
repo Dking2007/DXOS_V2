@@ -7,6 +7,8 @@
 ## [Unreleased]
 
 ### Changed
+- Đổi tên **Gói ngành** thành **Gói giao diện** trên menu, tiêu đề trang, hướng dẫn, thông báo và tài liệu (mã,
+  đường dẫn `/packs`, API và định dạng `desktiny-pack/1` giữ nguyên).
 - **Trang đăng nhập** làm lại: thẻ tiêu đề có khung viền trang trí trên nền xanh đậm, luôn vừa một màn hình, hiệu
   ứng xuất hiện, vệt sáng, hạt sáng, vòng biểu tượng xoay, ánh kim trên tiêu đề và nút; tắt khi máy đặt giảm chuyển
   động. Một nút "Đăng nhập bằng SSO".
@@ -32,6 +34,16 @@
   - Trình thiết kế quy trình: ô tìm bước, nhóm bước thu gọn được; nút Lưu chuyển “Đã lưu” khi không có thay đổi.
 
 ### Added
+- **Plugin đóng gói** (`desktiny-plugin/2`, migration `workspace_0028`, [docs/plugins.md](docs/plugins.md)): cài một
+  tệp `.zip` là có tính năng mới, không cần máy chủ riêng.
+  - Desktiny lưu và tự phục vụ trang, script, CSS, ảnh của plugin ở `/workspace/v1/plugin-files/…` khi plugin đang
+    bật, luôn kèm CSP `sandbox` (mở thẳng địa chỉ cũng không chạy với origin của Desktiny); địa chỉ theo SHA-256 của
+    gói.
+  - Plugin mang theo **gói giao diện** (`pack`): xem trước cùng plugin, cài/nâng cấp/gỡ cùng plugin, không gỡ riêng được.
+  - Quản trị › Plugin: nhãn “Đóng gói”, số tệp giao diện, gói giao diện đi kèm; duyệt plugin đóng gói không cấp khoá.
+  - SDK khung tự nhận địa chỉ Desktiny với trang đóng gói; `desktiny-plugin check` kiểm trang và gói giao diện trong thư
+    mục. Plugin mẫu `examples/plugins/mot-cua-mau` (trang tính hạn theo ngày làm việc, phiếu tiếp nhận, quy trình một
+    cửa).
 - **Mở rộng plugin kết nối** (API bản 2, migration `workspace_0024`–`workspace_0027`, [docs/plugins.md](docs/plugins.md)):
   - API ghi có phạm vi: `cases.comment`, `cases.fields.write` (chỉ trường khai trong `writes.fields` và được duyệt,
     cần token phiên), `tasks.write` (cần token phiên), `notifications.send`; `Idempotency-Key` bắt buộc; lịch sử hồ sơ
@@ -61,8 +73,8 @@
   `PLUGIN_FRAME_SOURCES` (gateway dùng template của nginx). Bộ công cụ: `packages/desktiny-plugin` (Python),
   `packages/plugin-sdk` (JavaScript), plugin mẫu `examples/plugins/tra-cuu-mst`. 5 test backend, 2 test SDK, 3 test
   plugin mẫu, 1 test frontend.
-- **Gói ngành (`desktiny-pack/1`), tầng 1 của hướng phát triển plugin/giao diện** (migration `workspace_0022`,
-  [docs/packs.md](docs/packs.md)). Màn **Quản trị › Gói ngành** (`organization.manage`): cài gói `.zip` hoặc gói có
+- **Gói giao diện (`desktiny-pack/1`), tầng 1 của hướng phát triển plugin/giao diện** (migration `workspace_0022`,
+  [docs/packs.md](docs/packs.md)). Màn **Quản trị › Gói giao diện** (`organization.manage`): cài gói `.zip` hoặc gói có
   sẵn trong `packs/` sau khi **xem trước**, nâng cấp cùng `id`, gỡ (quy trình đã có hồ sơ chỉ ngừng phát hành), xuất
   `.zip`. Phần giao diện: tên ứng dụng và cơ quan, logo, favicon, màu sáng/tối (kiểm tương phản WCAG AA cả hai
   giao diện), phông, mật độ, bo góc, trang đăng nhập (khung/phẳng/ảnh nền), từ ngữ, ẩn/sắp menu, khối trang chủ;

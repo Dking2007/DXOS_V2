@@ -1,7 +1,8 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
-<!-- Connected plugins: install from a manifest, approve what each asks for, switch on and off, rotate
-     keys, read what was exchanged. Secrets and tokens are shown once, when issued. -->
+<!-- Plugins: install a .zip (or a connected plugin's manifest), approve what each asks for, switch on and
+     off, rotate keys, read what was exchanged. A packaged plugin's pages are served by Desktiny and it may
+     bring a sector pack, removed with it. Secrets and tokens are shown once, when issued. -->
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
@@ -36,6 +37,8 @@ interface PluginSummary {
   license: string
   description: string
   base_url: string
+  /** A .zip whose pages Desktiny serves itself (no server of its own). */
+  packaged: boolean
   permissions: Labelled[]
   events: Labelled[]
   nodes: { kind: string; title: string; description: string }[]
@@ -45,6 +48,14 @@ interface PluginSummary {
   frame_permissions: Labelled[]
   assistant_tools: { name: string; description: string }[]
   host_allowed: boolean
+}
+interface PackPreview {
+  pack: { id: string; name: string; version: string }
+  upgrade_from: string | null
+  adds: Record<'processes' | 'forms' | 'templates' | 'automations' | 'knowledge', string[]>
+  conflicts: string[]
+  warnings: string[]
+  appearance: unknown
 }
 interface PluginRow extends PluginSummary {
   state: 'pending' | 'enabled' | 'disabled'
@@ -57,6 +68,8 @@ interface PluginRow extends PluginSummary {
     assistant_tools?: string[]
   }
   list_form_names: Record<string, string>
+  pack: { id: string; name: string; version: string } | null
+  files: number
   revision: number
   approved_at: string | null
   updated_at: string
@@ -98,7 +111,16 @@ const listing = useQuery({
   queryFn: () => api.request<{ items: PluginRow[]; allowed_hosts: string[] }>('/plugins'),
 })
 const busy = ref(false)
-const preview = ref<(PluginSummary & { upgrade_from: string | null }) | null>(null)
+const preview = ref<
+  (PluginSummary & { upgrade_from: string | null; files: number; pack_preview: PackPreview | null }) | null
+>(null)
+const PACK_ADDS = {
+  processes: 'Quy trình',
+  forms: 'Biểu mẫu',
+  templates: 'Mẫu quy trình',
+  automations: 'Luồng tự động',
+  knowledge: 'Bài kiến thức cho trợ lý AI',
+} as const
 const previewFile = ref<File | null>(null)
 const previewError = ref<unknown>(null)
 const approving = ref<PluginRow | null>(null)
@@ -220,8 +242,13 @@ async function install() {
   if (!previewFile.value) return
   busy.value = true
   try {
-    const row = await api.request<PluginRow>('/plugins', { method: 'POST', body: form(previewFile.value) })
+    const row = await api.request<PluginRow & { notes?: string[] }>('/plugins', {
+      method: 'POST',
+      body: form(previewFile.value),
+    })
     toast.success(row.state === 'pending' ? 'Đã cài. Duyệt quyền để bật plugin.' : 'Đã nâng cấp plugin.')
+    for (const note of row.notes ?? []) toast.success(note)
+    await queryClient.invalidateQueries({ queryKey: ['packs'] })
     previewFile.value = null
     await refresh()
     if (row.state === 'pending') openApprove(row)
@@ -251,7 +278,7 @@ async function approve() {
   if (!approving.value) return
   busy.value = true
   try {
-    const result = await api.request<PluginRow & { issued: Issued }>(
+    const result = await api.request<PluginRow & { issued: Issued | null }>(
       `/plugins/${encodeURIComponent(approving.value.id)}/approve`,
       {
         method: 'POST',
@@ -264,7 +291,9 @@ async function approve() {
         }),
       },
     )
-    issued.value = { name: result.name, values: result.issued }
+    // A packaged plugin has no server, so nothing is issued to keep.
+    if (result.issued) issued.value = { name: result.name, values: result.issued }
+    else toast.success('Đã duyệt và bật plugin.')
     approving.value = null
     await refresh()
   } catch (cause) {
@@ -296,7 +325,7 @@ async function remove() {
     await api.request(`/plugins/${encodeURIComponent(removing.value.id)}`, { method: 'DELETE' })
     toast.success(`Đã gỡ “${removing.value.name}”.`)
     removing.value = null
-    await refresh()
+    await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: ['packs'] })])
   } catch (cause) {
     toast.error(cause)
   } finally {
@@ -328,7 +357,7 @@ async function copy(text: string) {
     <h1 class="sr-only">Plugin</h1>
     <div class="page-actions">
       <label class="button"
-        ><Upload :size="17" />Cài plugin (manifest)<input
+        ><Upload :size="17" />Cài plugin (.zip)<input
           type="file"
           accept=".json,.zip,application/json,application/zip"
           class="sr-only"
@@ -366,9 +395,12 @@ async function copy(text: string) {
           <div class="plugin-title">
             <strong>{{ row.name }}</strong>
             <span class="tag" :class="`state-${row.state}`">{{ STATE[row.state] }}</span>
+            <span v-if="row.packaged" class="tag">Đóng gói</span>
             <span v-if="!row.host_allowed" class="tag state-bad">Máy chủ chưa được phép</span>
           </div>
-          <small class="muted mono">{{ row.id }} · {{ row.version }} · {{ row.base_url }}</small>
+          <small class="muted mono"
+            >{{ row.id }} · {{ row.version }} · {{ row.packaged ? `${row.files} tệp giao diện` : row.base_url }}</small
+          >
           <p v-if="row.description">{{ row.description }}</p>
           <ul class="plugin-facts">
             <li v-if="row.permissions.length">
@@ -404,6 +436,9 @@ async function copy(text: string) {
             </li>
             <li v-if="Object.keys(row.list_form_names ?? {}).length">
               <strong>Được liệt kê hồ sơ của:</strong> {{ Object.values(row.list_form_names).join(', ') }}
+            </li>
+            <li v-if="row.pack">
+              <strong>Gói giao diện đi kèm:</strong> {{ row.pack.name }} ({{ row.pack.version }})
             </li>
             <li v-if="row.nodes.length">
               <strong>Bước quy trình:</strong> {{ row.nodes.map((n) => n.title).join(', ') }}
@@ -463,7 +498,12 @@ async function copy(text: string) {
           <button v-if="row.state !== 'pending'" class="button ghost small" :disabled="busy" @click="openApprove(row)">
             <ShieldCheck :size="15" />Quyền
           </button>
-          <button v-if="row.state !== 'pending'" class="button ghost small" :disabled="busy" @click="act(row, 'rotate')">
+          <button
+            v-if="row.state !== 'pending' && !row.packaged"
+            class="button ghost small"
+            :disabled="busy"
+            @click="act(row, 'rotate')"
+          >
             <KeyRound :size="15" />Đổi khoá
           </button>
           <RouterLink
@@ -491,8 +531,9 @@ async function copy(text: string) {
       </article>
     </section>
     <p class="muted" style="margin-top: 16px; font-size: 13.5px">
-      Mã của plugin không chạy trong Desktiny. Sự kiện và lời gọi bước quy trình được ký HMAC; plugin chỉ đọc được hồ
-      sơ nó đã được báo, hoặc theo quyền của người đang xem khung. Cách viết plugin: <code>docs/plugins.md</code>.
+      Trang của plugin chạy trong khung cách ly, không đọc được phiên hay dữ liệu của Desktiny. Sự kiện và lời gọi bước
+      quy trình được ký HMAC; plugin chỉ đọc được hồ sơ nó đã được báo, hoặc theo quyền của người đang xem khung. Cách
+      viết plugin: <code>docs/plugins.md</code>.
     </p>
   </template>
 
@@ -507,7 +548,10 @@ async function copy(text: string) {
           >{{ preview.version }} · {{ preview.license }}</small
         >
         <p v-if="preview.description">{{ preview.description }}</p>
-        <small class="mono">{{ preview.base_url }}</small>
+        <small v-if="preview.packaged" class="muted"
+          >Plugin đóng gói: Desktiny tự phục vụ {{ preview.files }} tệp giao diện của nó, không cần máy chủ riêng.</small
+        >
+        <small v-else class="mono">{{ preview.base_url }}</small>
       </div>
       <div v-if="!preview.host_allowed" class="notice error">
         <AlertTriangle :size="18" /><span
@@ -541,6 +585,26 @@ async function copy(text: string) {
             <li v-for="tool in preview.assistant_tools" :key="tool.name">Công cụ trợ lý: {{ tool.description }}</li>
           </ul>
         </div>
+      </div>
+      <div v-if="preview.pack_preview" class="plugin-pack">
+        <span class="section-label"
+          >Gói giao diện đi kèm: {{ preview.pack_preview.pack.name }}
+          <template v-if="preview.pack_preview.upgrade_from">{{ preview.pack_preview.upgrade_from }} → </template
+          >{{ preview.pack_preview.pack.version }}</span
+        >
+        <ul>
+          <template v-for="(label, key) in PACK_ADDS" :key="key">
+            <li v-if="preview.pack_preview.adds[key]?.length">
+              {{ label }}: {{ preview.pack_preview.adds[key].join(', ') }}
+            </li>
+          </template>
+          <li v-if="preview.pack_preview.appearance">Giao diện riêng (chọn dùng ở Quản trị › Gói giao diện)</li>
+        </ul>
+        <div v-for="item in preview.pack_preview.conflicts" :key="item" class="notice warning">
+          <AlertTriangle :size="16" /><span>{{ item }}</span>
+        </div>
+        <small v-for="item in preview.pack_preview.warnings" :key="item" class="muted">{{ item }}</small>
+        <small class="muted">Gói được cài cùng plugin và gỡ cùng plugin.</small>
       </div>
       <small class="muted">Plugin được cài ở trạng thái chờ duyệt; nó chưa nhận gì cho tới khi bạn duyệt quyền.</small>
       <div class="form-actions">
@@ -707,6 +771,10 @@ async function copy(text: string) {
         Gỡ <strong>{{ removing.name }}</strong>? Mọi token của plugin hết hiệu lực ngay; khung giao diện biến mất; bước
         quy trình của plugin sẽ báo lỗi và dừng có lý do cho tới khi được thay.
       </p>
+      <p v-if="removing.pack">
+        Gói giao diện đi kèm <strong>{{ removing.pack.name }}</strong> cũng được gỡ: quy trình chưa có hồ sơ bị xoá, quy trình
+        đã có hồ sơ chỉ ngừng sử dụng.
+      </p>
       <div class="form-actions">
         <button type="button" class="button secondary" @click="removing = null">Huỷ</button
         ><button type="button" class="button danger" :disabled="busy" @click="remove">Gỡ plugin</button>
@@ -843,6 +911,17 @@ async function copy(text: string) {
 }
 .plugin-asks ul {
   margin: 4px 0 0;
+  padding-left: 18px;
+}
+.plugin-pack {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.plugin-pack ul {
+  margin: 0;
   padding-left: 18px;
 }
 .plugin-secret {

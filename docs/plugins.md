@@ -3,11 +3,18 @@ SPDX-License-Identifier: Apache-2.0
 SPDX-FileCopyrightText: 2026 Desktiny contributors
 -->
 
-# Plugin kết nối (`desktiny-plugin/1`)
+# Plugin (`desktiny-plugin/1`, `desktiny-plugin/2`)
 
-Plugin kết nối là một **ứng dụng web riêng**, do người viết plugin hoặc cơ quan tự chạy (thường trong mạng nội bộ).
-Mã của plugin **không bao giờ chạy trong Desktiny**: Desktiny chỉ gọi HTTP tới plugin và nhận `postMessage` từ khung
-giao diện cách ly. Đây là tầng 2 của hướng mở rộng, sau [gói ngành](packs.md) (tầng 1, không chứa mã).
+Plugin thêm tính năng mới cho Desktiny và được cài, gỡ ở **Quản trị › Plugin** như gói giao diện. Có hai dạng:
+
+- **Plugin đóng gói** (`desktiny-plugin/2`, không có `base_url`): một tệp `.zip` chứa các trang giao diện và có thể
+  mang theo một gói giao diện. Desktiny **tự phục vụ** các trang đó, không cần máy chủ riêng. Xem
+  [Plugin đóng gói](#plugin-đóng-gói-desktiny-plugin2).
+- **Plugin kết nối** (có `base_url`): một **ứng dụng web riêng**, do người viết plugin hoặc cơ quan tự chạy (thường
+  trong mạng nội bộ), nói chuyện với Desktiny qua sự kiện, API có phạm vi, bước quy trình và khung giao diện.
+
+Mã của plugin **không bao giờ chạy trong tiến trình Desktiny**: trang của plugin chạy trong khung cách ly, máy chủ
+của plugin kết nối chạy ở nơi khác. Đây là tầng 2 của hướng mở rộng, sau [gói giao diện](packs.md) (tầng 1, không chứa mã).
 
 ```
                 ┌──────────────────── Desktiny ────────────────────┐
@@ -106,7 +113,7 @@ chối cài thay vì hiểu sai. `GET /plugin/v1/me` trả `api_version` hiện 
 - `nodes[].config_schema`: tối đa 20 ô, kiểu `string` / `number` / `boolean`, có thể kèm `enum`, `default`,
   `description`; trình thiết kế quy trình tự dựng ô cấu hình từ đây. `outputs`: các giá trị đơn plugin trả về.
   `mode: "async"` kèm `timeout_days` (1–90, bắt buộc) cho bước chạy lâu.
-- `ui[].slot`: `case.side`, `case.tab`, `case.action`, `task.side`, `task.action`, `home.widget` (gói ngành bật/tắt
+- `ui[].slot`: `case.side`, `case.tab`, `case.action`, `task.side`, `task.action`, `home.widget` (gói giao diện bật/tắt
   bằng khối `plugins.widgets`), `page` (mục trong nhóm **Ứng dụng** của thanh bên), `admin.page`. `height` 80–1200.
 - `frame_permissions`: `geolocation`, `camera`, `clipboard-write` (duyệt từng quyền).
 - `emits`: sự kiện của chính plugin (mục “Kênh 5”). `assistant_tools`: công cụ cho trợ lý AI (mục “Trợ lý AI”).
@@ -322,6 +329,57 @@ chỉ mục tri thức chung.
 | Trợ lý lộ dữ liệu qua công cụ | Gọi bằng token phiên của người hỏi, chỉ phạm vi đọc; duyệt từng công cụ; tính năng mặc định tắt. |
 | Tải lên làm đầy kho | 25 MB/tệp, 200 MB/24 giờ mỗi plugin. |
 
+## Plugin đóng gói (`desktiny-plugin/2`)
+
+```
+mot-cua-mau.zip
+├── desktiny-plugin.json      # schema desktiny-plugin/2, không có base_url
+├── ui/                       # trang, script, CSS, ảnh, phông — Desktiny phục vụ
+│   ├── tinh-han.html
+│   ├── phieu-tiep-nhan.html
+│   └── desktiny-plugin-sdk.js
+└── pack/                     # tuỳ chọn: một gói giao diện (desktiny-pack.json …) cài cùng plugin
+```
+
+```json
+{
+  "schema": "desktiny-plugin/2",
+  "id": "vn.vi-du.mot-cua-mau",
+  "name": "Một cửa (mẫu)",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "permissions": ["cases.read"],
+  "pack": "pack/",
+  "ui": [
+    { "slot": "page", "title": "Tính hạn xử lý", "url": "/ui/tinh-han.html" },
+    { "slot": "case.side", "title": "Phiếu tiếp nhận", "url": "/ui/phieu-tiep-nhan.html", "height": 220 }
+  ]
+}
+```
+
+- `ui[].url` là đường dẫn **trong gói** và phải là trang `.html` có trong `.zip`. `page` thêm một mục vào nhóm
+  **Ứng dụng** của thanh bên.
+- Desktiny chỉ phục vụ tệp `.html`, `.js`, `.mjs`, `.css`, `.json`, `.map`, `.txt`, `.svg`, `.png`, `.jpg`,
+  `.webp`, `.gif`, `.ico`, `.woff`, `.woff2`; tệp khác (README, mã nguồn) và thư mục `pack/` không được phục vụ.
+- Chưa có máy chủ (sẽ có ở bước sau với Deno), nên plugin đóng gói **không** khai `nodes`, `events`, `emits`,
+  `assistant_tools`, `settings_schema`, `health_endpoint`. Trang của nó đọc/ghi dữ liệu bằng **token phiên** (theo
+  quyền người đang xem), như khung của plugin kết nối. Khi duyệt, Desktiny không cấp khoá ký hay token cài đặt.
+- Giới hạn: `.zip` 10 MB, 25 MB khi giải nén, 300 tệp; đường dẫn tuyệt đối hoặc có `..` bị từ chối.
+
+**Phục vụ an toàn.** Tệp ở `/workspace/v1/plugin-files/<id>/<16 ký tự đầu SHA-256 của gói>/<đường dẫn>`, chỉ khi
+plugin **đang bật**. Mọi tệp kèm `Content-Security-Policy: sandbox allow-scripts allow-forms allow-popups; …`, nên
+kể cả khi mở thẳng địa chỉ, trang vẫn chạy với origin ẩn danh, không đọc được cookie hay phiên của Desktiny; chỉ gọi
+mạng tới chính Desktiny (`connect-src 'self'`). Mỗi gói mới là một địa chỉ mới, không lẫn bộ nhớ đệm.
+
+**Gói giao diện đi kèm** (`pack`): thư mục trong `.zip` có `desktiny-pack.json`, đúng định dạng [gói giao diện](packs.md).
+Xem trước plugin cho thấy cả những gì gói thêm vào. Gói được cài khi cài plugin (nguồn **Đi kèm plugin**), nâng cấp
+khi nâng cấp plugin, **gỡ khi gỡ plugin**; không gỡ hay cài đè riêng được ở **Gói giao diện**. Plugin không chiếm được mã
+của một gói giao diện đã cài riêng, hay của gói đi kèm plugin khác.
+
+**SDK.** Trang chép `packages/plugin-sdk/desktiny-plugin-sdk.js` vào gói và gọi `connect()` không cần
+`desktinyOrigin` (SDK tự nhận ra trang do Desktiny phục vụ). `desktiny-plugin check <thư-mục>` kiểm cả trang và gói
+ngành có trong thư mục; `desktiny-plugin pack` đóng `.zip`. Ví dụ đầy đủ: `examples/plugins/mot-cua-mau`.
+
 ## Giới hạn hiện tại
 
 - Ô biểu mẫu do plugin vẽ (`form.field`), kho khoá–giá trị gắn hồ sơ cho plugin, chế độ “thử” chỉ chạy với hồ sơ
@@ -330,4 +388,6 @@ chỉ mục tri thức chung.
 - Gateway chưa đặt `Permissions-Policy`; quyền thiết bị của khung dựa vào thuộc tính `allow` (mặc định trình duyệt
   chỉ cho trang chính và khung được trao quyền). Khung sandbox có origin ẩn danh: hãy thử `geolocation`/`camera` trên
   trình duyệt đích trước khi dựa vào.
+- Plugin đóng gói chưa có máy chủ: mã máy chủ chạy trên Deno trong dịch vụ `plugin-host`, kho dữ liệu riêng và việc
+  định kỳ là các bước tiếp theo ([thiết kế](design/Plugin_dong_goi_tu_chay.md)).
 - Plugin trong tiến trình (tầng 3) chưa làm.

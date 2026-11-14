@@ -1,0 +1,12 @@
+{
+  "schema": "desktiny-pack/1",
+  "id": "vn.vi-du.mot-cua-mau",
+  "name": "Một cửa (mẫu)",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "authors": ["Desktiny contributors"],
+  "description": "Đi kèm plugin Một cửa (mẫu): quy trình tiếp nhận và trả kết quả hồ sơ, hướng dẫn cho trợ lý AI. Tên cơ quan là tên giả.",
+  "requires": { "desktiny": ">=0.2.0" },
+  "processes": ["processes/tiep-nhan-mot-cua.json"],
+  "knowledge": ["knowledge/huong-dan-mot-cua.md"]
+}

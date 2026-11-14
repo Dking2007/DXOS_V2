@@ -9,6 +9,7 @@
     desktiny-plugin dev step tra_cuu_mst --config ma_so=0101 --secret <khoá> --manifest thu-nghiem/desktiny-plugin.json
 
 `check` repeats the rules Desktiny applies when the manifest is uploaded (the server stays the judge);
+given the plugin's folder it also checks a packaged plugin's pages and its sector pack are there.
 `dev` plays Desktiny's side: it signs and sends an event, a step call or an assistant tool call.
 """
 
@@ -44,21 +45,33 @@ PATH = re.compile(r"^/([A-Za-z0-9._~!$&'()*+,;=:@%-][A-Za-z0-9._~!$&'()*+,;=:@%/
 KEY = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
 
 
-def problems(manifest: dict) -> list[str]:
-    """What Desktiny would refuse in this manifest; empty when it looks acceptable."""
+PACKAGED = "desktiny-plugin/2"
+
+
+def problems(manifest: dict, folder: Path | None = None) -> list[str]:
+    """What Desktiny would refuse in this manifest (and, given the folder, in the package); empty if none."""
     found: list[str] = []
 
     def need(ok: bool, message: str):
         if not ok:
             found.append(message)
 
-    need(manifest.get("schema") == "desktiny-plugin/1", "`schema` phải là desktiny-plugin/1.")
+    schema = manifest.get("schema")
+    need(schema in {"desktiny-plugin/1", PACKAGED}, f"`schema` phải là desktiny-plugin/1 hoặc {PACKAGED}.")
+    packaged = schema == PACKAGED and not manifest.get("base_url")
     need(bool(re.fullmatch(r"[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+", str(manifest.get("id", "")))),
          "`id` dạng tên miền đảo ngược, ví dụ vn.co-quan.ten-plugin.")  # fmt: skip
     need(bool(re.fullmatch(r"\d+\.\d+\.\d+", str(manifest.get("version", "")))), "`version` dạng 1.0.0.")
-    for key in ("name", "license", "base_url"):
+    for key in ("name", "license") if packaged else ("name", "license", "base_url"):
         need(bool(manifest.get(key)), f"Thiếu `{key}`.")
-    need(str(manifest.get("base_url", "")).startswith(("http://", "https://")), "`base_url` phải là http(s).")
+    if packaged:
+        server = [key for key in ("nodes", "events", "emits", "assistant_tools", "health_endpoint") if manifest.get(key)]
+        server += ["settings_schema"] if (manifest.get("settings_schema") or {}).get("properties") else []
+        need(not server, "Plugin đóng gói chưa có máy chủ nên chưa dùng được: " + ", ".join(server) + ".")
+        need(bool(manifest.get("ui") or manifest.get("pack")), "Plugin đóng gói cần `ui` hoặc `pack`.")
+    else:
+        need(str(manifest.get("base_url", "")).startswith(("http://", "https://")), "`base_url` phải là http(s).")
+    need(not manifest.get("pack") or schema == PACKAGED, f"`pack` cần `schema` là {PACKAGED}.")
     required = str((manifest.get("requires") or {}).get("desktiny", ">=1"))
     need(bool(re.fullmatch(r">=\d{1,3}", required)) and int(required[2:]) <= API_VERSION,
          f"`requires.desktiny` không hợp lệ hoặc cần API mới hơn bản {API_VERSION}.")  # fmt: skip
@@ -84,6 +97,13 @@ def problems(manifest: dict) -> list[str]:
     for ui in manifest.get("ui", []):
         need(ui.get("slot") in SLOTS, f"Khung `{ui.get('title')}`: vị trí chỉ gồm {', '.join(sorted(SLOTS))}.")
         need(PATH.match(str(ui.get("url", ""))) is not None, f"Khung `{ui.get('title')}`: url phải là /… trên base_url.")
+        if packaged and folder is not None:
+            page = folder / str(ui.get("url", "")).lstrip("/")
+            need(page.is_file() and page.suffix.lower() in {".html", ".htm"},
+                 f"Khung `{ui.get('title')}`: gói không có trang HTML {page.relative_to(folder).as_posix()}.")  # fmt: skip
+    if manifest.get("pack") and folder is not None:
+        need((folder / str(manifest["pack"]) / "desktiny-pack.json").is_file(),
+             f"Thư mục `pack` ({manifest['pack']}) thiếu desktiny-pack.json.")  # fmt: skip
     need(not set(manifest.get("frame_permissions", [])) - FRAME_PERMISSIONS, "frame_permissions chỉ gồm "
          + ", ".join(sorted(FRAME_PERMISSIONS)) + ".")  # fmt: skip
     types = [event.get("type") for event in manifest.get("emits", [])]
@@ -105,7 +125,8 @@ def read(path: Path) -> dict:
 
 
 def cmd_check(args) -> int:
-    issues = problems(read(Path(args.path)))
+    path = Path(args.path)
+    issues = problems(read(path), path if path.is_dir() else None)
     for issue in issues:
         print("✗", issue)
     if not issues:
