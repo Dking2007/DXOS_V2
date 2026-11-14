@@ -1061,10 +1061,14 @@ def build_router(app):
         )
         if submission_id and not submission:
             raise AppError(404, "submission_not_found", "Không tìm thấy lần trình của hồ sơ.")
-        if submission:
-            snapshot = next((item for item in submission.files_snapshot if item["file_id"] == file_id), None)
-            if not snapshot:
-                raise AppError(404, "attachment_not_found", "Không tìm thấy tài liệu trong lần trình.")
+        snapshot = (
+            next((item for item in submission.files_snapshot if item["file_id"] == file_id), None)
+            if submission
+            else None
+        )
+        if submission and not snapshot and (submission_id or file_id not in value.file_ids):
+            raise AppError(404, "attachment_not_found", "Không tìm thấy tài liệu trong lần trình.")
+        if snapshot:
             version_id = snapshot["version_id"]
         else:
             if file_id not in value.file_ids:

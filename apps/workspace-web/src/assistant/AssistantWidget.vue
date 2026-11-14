@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   BookOpen,
   Bot,
+  BriefcaseBusiness,
   Check,
   ClipboardCheck,
   Copy,
@@ -41,7 +42,8 @@ const ITEM_KIND: Record<AssistantItem['kind'], string> = {
   file: 'Tài liệu',
   folder: 'Thư mục',
 }
-import { assistantOpen, historyFor, type ChatTurn } from './state'
+import CaseChat from './CaseChat.vue'
+import { assistantOpen, assistantTab, caseContext, historyFor, type ChatTurn } from './state'
 
 const session = useSession()
 const route = useRoute()
@@ -53,7 +55,19 @@ const status = useQuery({
   staleTime: 60_000,
 })
 const ready = computed(() => !!status.data.value?.ready)
-const visible = computed(() => ready.value || !!status.data.value?.can_manage)
+// On a dossier page the work tab is there even when the general assistant is off.
+const visible = computed(() => ready.value || !!status.data.value?.can_manage || !!caseContext.value)
+const onCase = computed(() => assistantTab.value === 'case' && !!caseContext.value)
+const caseChat = ref<InstanceType<typeof CaseChat> | null>(null)
+// Opening a dossier brings its tab forward; leaving it goes back to the general assistant.
+watch(
+  () => caseContext.value?.id,
+  (id, before) => {
+    if (id && id !== before) assistantTab.value = 'case'
+    if (!id) assistantTab.value = 'general'
+  },
+  { immediate: true },
+)
 // The chat page and the flow canvas keep their bottom corner; the palette still opens it.
 const showButton = computed(() => visible.value && !route.meta.bleed && !route.meta.wide)
 
@@ -132,6 +146,7 @@ async function send(text = draft.value) {
   }
 }
 function reset() {
+  if (onCase.value) return caseChat.value?.clear()
   turns.value = []
   error.value = ''
   save()
@@ -195,15 +210,16 @@ watch(
       <header class="assistant-head">
         <span class="assistant-avatar" aria-hidden="true"><Bot :size="20" /></span>
         <div class="grow">
-          <strong>Trợ lý Desktiny</strong>
-          <small>{{ !ready
+          <strong>{{ onCase ? 'Trợ lý công việc' : 'Trợ lý Desktiny' }}</strong>
+          <small v-if="onCase" :title="caseContext?.title">{{ caseContext?.title }}</small>
+          <small v-else>{{ !ready
               ? 'Chưa sẵn sàng'
               : status.data.value?.my_data
                 ? 'Quy trình, việc & tài liệu của bạn'
                 : 'Quy trình & cách dùng phần mềm' }}</small>
         </div>
         <button
-          v-if="turns.length"
+          v-if="onCase ? caseChat?.turns.length : turns.length"
           class="icon-button"
           type="button"
           aria-label="Bắt đầu cuộc trò chuyện mới"
@@ -225,7 +241,34 @@ watch(
           <X :size="19" />
         </button>
       </header>
-      <div ref="scroller" class="assistant-body" aria-live="polite">
+      <div v-if="caseContext" class="assistant-tabs" role="tablist" aria-label="Chọn trợ lý">
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="!onCase"
+          :class="{ active: !onCase }"
+          @click="assistantTab = 'general'"
+        >
+          <Bot :size="15" />Trợ lý chung
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="onCase"
+          :class="{ active: onCase }"
+          @click="assistantTab = 'case'"
+        >
+          <BriefcaseBusiness :size="15" />Trợ lý công việc
+        </button>
+      </div>
+      <CaseChat
+        v-if="onCase && caseContext"
+        ref="caseChat"
+        :key="caseContext.id"
+        :case-id="caseContext.id"
+        :suggestions="caseContext.suggestions"
+      />
+      <div v-else ref="scroller" class="assistant-body" aria-live="polite">
         <div v-if="!ready" class="assistant-setup">
           <Settings2 :size="26" />
           <strong>Trợ lý chưa được bật</strong>
@@ -283,7 +326,7 @@ watch(
           <p v-if="error" class="assistant-error" role="alert">{{ error }}</p>
         </template>
       </div>
-      <form v-if="ready" class="assistant-input" @submit.prevent="send()">
+      <form v-if="ready && !onCase" class="assistant-input" @submit.prevent="send()">
         <textarea
           ref="input"
           v-model="draft"
@@ -297,7 +340,7 @@ watch(
           <SendHorizontal :size="18" />
         </button>
       </form>
-      <footer v-if="ready" class="assistant-foot">
+      <footer v-if="ready && !onCase" class="assistant-foot">
         <span>Có thể nhầm — đối chiếu văn bản chính thức.</span>
         <span v-if="remaining !== null" :title="`Còn ${remaining} câu hỏi hôm nay`">Còn {{ remaining }} câu</span>
       </footer>

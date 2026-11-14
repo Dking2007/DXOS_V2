@@ -2,6 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { computed } from 'vue'
+import DocumentListEditor from './DocumentListEditor.vue'
 import { Copy, Plus, Trash2 } from 'lucide-vue-next'
 import { KINDS, OPERATORS, RECIPIENTS, nodeReference, waitLabel } from './nodes'
 import StepOptions from './StepOptions.vue'
@@ -151,6 +152,13 @@ const waitUnit = computed(() => {
           </select>
           <small>Chọn biểu mẫu thì hồ sơ của biểu mẫu đó đi theo luồng này thay cho bước duyệt khai trong biểu mẫu, và kết quả luồng là kết quả của hồ sơ.</small>
         </div>
+        <DocumentListEditor
+          v-if="c.form_id"
+          id="node-sdocs"
+          :value="c.required_documents as string[]"
+          hint="Những gì người lập phải đính kèm khi trình hồ sơ; hiện ở bước đầu trong tab Quy trình."
+          @update="set('required_documents', $event)"
+        />
         <div class="field-help">
           <span class="section-label">Dữ liệu dùng được trong điều kiện và nội dung</span>
           <code v-for="(label, key) in fields" :key="key" class="var-chip" :title="label">{{ key }}</code>
@@ -479,6 +487,11 @@ const waitUnit = computed(() => {
             <input id="node-treq" type="number" min="0" max="30" :value="c.require_files ?? 0" @change="set('require_files', Number(($event.target as HTMLInputElement).value))" />
             <small>Người làm chưa đính kèm đủ thì không nộp được. Đọc ở bước sau: <code>{{ `{${reference}.file_names}` }}</code></small>
           </div>
+          <DocumentListEditor
+            id="node-tdocs"
+            :value="c.required_documents as string[]"
+            @update="set('required_documents', $event)"
+          />
         </template>
         <div class="field">
           <label for="node-ttitle">Tên việc</label

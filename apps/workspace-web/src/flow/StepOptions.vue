@@ -2,6 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { computed } from 'vue'
+import DocumentListEditor from './DocumentListEditor.vue'
 import { roleLabel } from '../ui/labels'
 import FieldListEditor, { type StepField } from './FieldListEditor.vue'
 import { nodeReference } from './nodes'
@@ -205,6 +206,11 @@ function toggleEditable(key: string) {
     <input id="step-files" type="number" min="0" max="30" :value="c.require_files ?? 0" @change="set('require_files', Number(value($event)))" />
     <small>Trả lại hoặc từ chối thì không phải nộp.</small>
   </div>
+  <DocumentListEditor
+    id="step-docs"
+    :value="c.required_documents as string[]"
+    @update="set('required_documents', $event)"
+  />
 
   <div class="field">
     <label>Người ở bước này được xem</label>

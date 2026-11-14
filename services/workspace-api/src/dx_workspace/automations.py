@@ -193,6 +193,8 @@ class TriggerData(s.Input):
     event: str = ""
     # Process flows: the form whose dossiers follow this process.
     form_id: str | None = None
+    # Names of the documents this step expects ("Tờ trình", "Báo giá"), shown on the dossier's process.
+    required_documents: list[str] = Field(default_factory=list, max_length=20)
 
 
 class IfData(s.Input):
@@ -276,6 +278,8 @@ class StepData(s.Input):
     # What must be handed in with a positive answer, and what later steps read it by.
     result_fields: list[InputField] = Field(default_factory=list, max_length=30)
     require_files: int = Field(default=0, ge=0, le=30)
+    # Names of the documents this step expects ("Tờ trình", "Báo giá"), shown on the dossier's process.
+    required_documents: list[str] = Field(default_factory=list, max_length=20)
     output_name: str | None = OUTPUT_NAME
     hide_files: bool = False
     allow_delegation: bool = True
@@ -436,6 +440,8 @@ class AssignTaskData(CreateTaskData):
 
     # Result files the person must attach before handing the work in.
     require_files: int = Field(default=0, ge=0, le=30)
+    # Names of the documents this step expects ("Tờ trình", "Báo giá"), shown on the dossier's process.
+    required_documents: list[str] = Field(default_factory=list, max_length=20)
     output_name: str | None = OUTPUT_NAME
 
 

@@ -18,15 +18,19 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  Circle,
   Eye,
+  FileText,
   Hourglass,
+  Info,
   Maximize2,
   Minimize2,
   ScanSearch,
   XCircle,
 } from 'lucide-vue-next'
 import { api } from '../api'
-import { formatDate } from '@dx/web-shared/api.ts'
+import { formatDate, formatSize } from '@dx/web-shared/api.ts'
+import { isOfficeFile, previewKind } from '../ui/preview'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import FlowNode from './FlowNode.vue'
 import { FLOW_CONTEXT } from './context'
@@ -70,6 +74,24 @@ interface ProcessView {
   outcome: string | null
   state: string | null
   rule_name: string | null
+  /** Per step: the documents it asks for and the files handed in there. */
+  files?: Record<string, StepFiles>
+}
+export interface StepFile {
+  id: string
+  name: string
+  mime: string | null
+  size: number | null
+  by: string
+  at: string | null
+  source: 'dossier' | 'step' | 'task'
+  available: boolean
+}
+interface StepFiles {
+  required: number
+  documents: string[]
+  attached: StepFile[]
+  hidden: boolean
 }
 /** One stop on the dossier's journey, in the order it happened. */
 interface Stop {
@@ -81,6 +103,7 @@ interface Stop {
   step: Step
 }
 const props = defineProps<{ caseId: string; status: string; formId: string; formName: string }>()
+const emit = defineEmits<{ open: [file: StepFile, submissionId: string | null] }>()
 const submissionId = ref('')
 const view = useQuery({
   queryKey: computed(() => ['case-process', props.caseId, submissionId.value, props.status]),
@@ -200,6 +223,39 @@ const failed = computed(
 const selectedStops = computed(() => journey.value.filter((stop) => stop.nodeId === selectedId.value))
 const selectedStep = computed(() => selectedStops.value.at(-1)?.step)
 const selectedNode = computed(() => (selectedId.value ? graphNodes.value.get(selectedId.value) : undefined))
+const selectedFiles = computed(() => (selectedId.value ? view.data.value?.files?.[selectedId.value] : undefined))
+// Steps where documents come in: handing in the dossier, and the steps people answer or work on.
+const FILE_KINDS = new Set(['trigger', 'approval', 'consult', 'input', 'acknowledge', 'assign_task'])
+const showFiles = computed(() => {
+  const files = selectedFiles.value
+  if (!files) return false
+  const kind = selectedNode.value?.type ?? ''
+  return FILE_KINDS.has(kind) || files.required > 0 || files.documents.length > 0 || files.attached.length > 0
+})
+const asksNothing = computed(() => {
+  const files = selectedFiles.value
+  return !!files && !files.required && !files.documents.length
+})
+const FILE_SOURCE: Record<StepFile['source'], string> = {
+  dossier: 'Kèm khi trình',
+  step: 'Nộp ở bước này',
+  task: 'Kết quả công việc',
+}
+/** Whether a file can be read in the browser: office documents in the editor, others in the viewer. */
+function viewable(file: StepFile) {
+  return file.available && (isOfficeFile(file.name) || !!previewKind(file.name, file.mime))
+}
+const infoOpen = ref<string | null>(null)
+function openFile(file: StepFile) {
+  // Files handed in with the submission open at the version that was submitted.
+  emit('open', file, file.source === 'dossier' ? (view.data.value?.submission_id ?? null) : null)
+}
+/** Plain values a step's people filled in; the files they handed in are listed on their own. */
+function shownValues(values: Record<string, unknown> | null | undefined) {
+  return Object.entries(values ?? {})
+    .filter(([key]) => !key.startsWith('_'))
+    .map(([, value]) => String(value))
+}
 
 function focus(nodeId: string) {
   selectedId.value = nodeId
@@ -442,7 +498,7 @@ const modeText = computed(() => {
                       >
                     </p>
                     <small v-if="task.reason" class="pc-quote">“{{ task.reason }}”</small>
-                    <small v-if="task.values">{{ Object.values(task.values).join(' · ') }}</small>
+                    <small v-if="shownValues(task.values).length">{{ shownValues(task.values).join(' · ') }}</small>
                     <small v-if="task.decided_at" class="muted">{{ formatDate(task.decided_at, true) }}</small>
                     <small v-else-if="task.due_at && task.state === 'pending'" class="muted"
                       >Hạn {{ formatDate(task.due_at) }}</small
@@ -452,6 +508,59 @@ const modeText = computed(() => {
                     decisionText(task) || TASK_STATE[task.state] || task.state
                   }}</span>
                 </div>
+              </div>
+              <div v-if="showFiles && selectedFiles" class="pc-files">
+                <span class="section-label">Tài liệu</span>
+                <p v-if="selectedFiles.hidden" class="muted">Bước của bạn không được xem tài liệu của hồ sơ.</p>
+                <template v-else>
+                  <p v-if="selectedFiles.required" class="pc-files-need" :class="{ met: selectedFiles.attached.length >= selectedFiles.required }">
+                    Cần ít nhất <b>{{ selectedFiles.required }}</b> tệp · đã có
+                    <b>{{ selectedFiles.attached.length }}</b>
+                  </p>
+                  <ul v-if="selectedFiles.documents.length" class="pc-docs">
+                    <li v-for="name in selectedFiles.documents" :key="name">
+                      <Circle :size="12" aria-hidden="true" />{{ name }}
+                    </li>
+                  </ul>
+                  <ul v-if="selectedFiles.attached.length" class="pc-file-list">
+                    <li v-for="file in selectedFiles.attached" :key="`${file.source}-${file.id}`">
+                      <div class="pc-file">
+                        <button
+                          type="button"
+                          class="pc-file-open"
+                          :disabled="!viewable(file)"
+                          :title="viewable(file) ? (isOfficeFile(file.name) ? 'Mở bằng trình soạn thảo (chỉ xem)' : 'Xem tệp') : 'Không xem trước được tệp này'"
+                          @click="openFile(file)"
+                        >
+                          <FileText :size="16" aria-hidden="true" />
+                          <span class="grow">
+                            <strong>{{ file.name }}</strong>
+                            <small>{{ FILE_SOURCE[file.source] }}<template v-if="!file.available"> · đã xóa khỏi kho</template></small>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          class="icon-button"
+                          :aria-expanded="infoOpen === file.id"
+                          :aria-label="`Thông tin ${file.name}`"
+                          title="Thông tin tệp"
+                          @click="infoOpen = infoOpen === file.id ? null : file.id"
+                        >
+                          <Info :size="15" />
+                        </button>
+                      </div>
+                      <dl v-if="infoOpen === file.id" class="pc-file-info">
+                        <template v-if="file.by"><dt>Người nộp</dt><dd>{{ file.by }}</dd></template>
+                        <template v-if="file.at"><dt>Thời điểm</dt><dd>{{ formatDate(file.at, true) }}</dd></template>
+                        <template v-if="file.size != null"><dt>Dung lượng</dt><dd>{{ formatSize(file.size) }}</dd></template>
+                        <dt>Nguồn</dt><dd>{{ FILE_SOURCE[file.source] }}</dd>
+                      </dl>
+                    </li>
+                  </ul>
+                  <p v-else class="muted">
+                    {{ asksNothing ? 'Bước này không yêu cầu tài liệu.' : 'Chưa có tệp nào ở bước này.' }}
+                  </p>
+                </template>
               </div>
             </div>
           </template>

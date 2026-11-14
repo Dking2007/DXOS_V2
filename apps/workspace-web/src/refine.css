@@ -574,3 +574,181 @@ a.user-profile:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+/* Dossier progress: one line on where it stands, then the steps on a track that fills as it moves. */
+.case-progress {
+  padding: 20px 24px 22px;
+}
+.progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 18px;
+}
+.progress-head strong {
+  font-size: 15px;
+  color: var(--navy);
+}
+.progress-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+.progress-summary::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.progress-summary.wait {
+  background: var(--teal-soft);
+  color: var(--teal-ink);
+}
+.progress-summary.ok {
+  background: var(--green-soft);
+  color: var(--green-ink);
+}
+.progress-summary.warn {
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+.progress-summary.bad {
+  background: var(--red-soft);
+  color: var(--red-ink);
+}
+.case-progress .processing-rail {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+  background: none;
+  border: 0;
+}
+.case-progress .rail-step {
+  min-width: 170px;
+  flex-direction: column;
+  gap: 12px;
+}
+/* The track to the next step: solid once this step is passed, dashed while still ahead. */
+.case-progress .rail-step:not(:last-child)::after {
+  top: 17px;
+  left: 44px;
+  right: 8px;
+  height: 0;
+  background: none;
+  border-top: 2px dashed var(--border-strong);
+}
+.case-progress .rail-step.done:not(:last-child)::after {
+  border-top-style: solid;
+  border-color: var(--teal);
+}
+.case-progress .rail-step.returned:not(:last-child)::after {
+  border-top-style: solid;
+  border-color: #f59e0b;
+}
+.case-progress .rail-circle {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--muted);
+  transition: background 0.2s, border-color 0.2s;
+}
+.case-progress .rail-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+.case-progress .rail-step.done .rail-circle {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+  box-shadow: 0 4px 10px -4px var(--teal);
+}
+.case-progress .rail-step.current .rail-circle {
+  border-color: var(--teal);
+  color: var(--teal);
+  background: var(--surface);
+  box-shadow: 0 0 0 5px var(--teal-soft);
+  animation: rail-pulse 2s ease-in-out infinite;
+}
+.case-progress .rail-step.returned .rail-circle {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: #fff;
+}
+.case-progress .rail-step.rejected .rail-circle {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+.case-progress .rail-content {
+  margin: 0;
+  padding: 0 12px 0 0;
+  min-width: 0;
+  background: none;
+}
+.case-progress .rail-content strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.case-progress .rail-step.done .rail-content strong,
+.case-progress .rail-step.current .rail-content strong {
+  color: var(--navy);
+}
+.case-progress .rail-step:not(.done, .current, .returned, .rejected) .rail-content strong {
+  color: var(--muted);
+}
+.case-progress .rail-content small {
+  margin-top: 3px;
+  font-size: 13px;
+}
+.case-progress .rail-person {
+  color: var(--ink-2);
+}
+.case-progress .rail-time {
+  display: inline-block;
+  white-space: nowrap;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+.case-progress .rail-step.current .rail-time {
+  background: var(--teal-soft);
+  color: var(--teal-ink);
+  font-weight: 600;
+}
+@keyframes rail-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 5px var(--teal-soft);
+  }
+  50% {
+    box-shadow: 0 0 0 9px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .case-progress .rail-step.current .rail-circle {
+    animation: none;
+  }
+}
+@media (max-width: 640px) {
+  .case-progress {
+    padding: 16px;
+  }
+  .case-progress .rail-step {
+    min-width: 160px;
+  }
+}

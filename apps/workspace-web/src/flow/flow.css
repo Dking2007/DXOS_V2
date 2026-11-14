@@ -1034,3 +1034,110 @@ kbd {
 .palette-group-head svg.folded {
   transform: rotate(-90deg);
 }
+
+/* Dossier process: what a step asks for and the files handed in there. */
+.pc-files {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.pc-files-need {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+  font-size: 13px;
+}
+.pc-files-need.met {
+  background: var(--green-soft);
+  color: var(--green-ink);
+}
+.pc-docs {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+.pc-docs li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-2);
+}
+.pc-docs svg {
+  color: var(--muted);
+  flex: none;
+}
+.pc-file-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pc-file {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.pc-file-open {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pc-file-open:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.pc-file-open:disabled {
+  cursor: default;
+}
+.pc-file-open svg {
+  flex: none;
+  color: var(--teal-ink, var(--navy));
+}
+.pc-file-open strong {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+}
+.pc-file-open small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.pc-file-info {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 6px 0 2px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 13px;
+}
+.pc-file-info dt {
+  color: var(--muted);
+}
+.pc-file-info dd {
+  margin: 0;
+}

@@ -44,6 +44,8 @@ async function loadScript(url: string) {
     document.head.append(script)
   })
 }
+// Opened from a dossier: read through the dossier's rights, read-only.
+const fromCase = typeof route.query.case === 'string' ? route.query.case : ''
 async function open() {
   loading.value = true
   error.value = null
@@ -52,7 +54,10 @@ async function open() {
       config: Record<string, unknown>
       document_server_url: string
       session_id: string
-    }>(`/drive/files/${route.params.id}/office-sessions`, { method: 'POST' })
+    }>(
+      `/drive/files/${route.params.id}/office-sessions${fromCase ? `?case_id=${encodeURIComponent(fromCase)}` : ''}`,
+      { method: 'POST' },
+    )
     sessionId.value = result.session_id
     await loadScript(result.document_server_url)
     if (disposed) return
@@ -99,8 +104,8 @@ onBeforeUnmount(() => {
 <template>
   <section class="office-page">
     <header class="office-toolbar">
-      <RouterLink to="/drive" class="button ghost small"
-        ><ArrowLeft :size="16" />Về kho tài liệu</RouterLink
+      <RouterLink :to="fromCase ? `/cases/${fromCase}` : '/drive'" class="button ghost small"
+        ><ArrowLeft :size="16" />{{ fromCase ? 'Về hồ sơ' : 'Về kho tài liệu' }}</RouterLink
       ><span class="date-line" role="status"
         ><ShieldCheck :size="16" />{{ editorState }}</span
       >

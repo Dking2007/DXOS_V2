@@ -728,3 +728,36 @@ body .toaster {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* On a dossier page: the general assistant, or one that answers about this dossier. */
+.assistant-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.assistant-tabs button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.assistant-tabs button:hover {
+  background: var(--surface-2);
+  color: var(--navy);
+}
+.assistant-tabs button.active {
+  background: var(--surface-3);
+  color: var(--navy);
+}

@@ -5927,7 +5927,9 @@ export interface operations {
     };
     open_office_workspace_v1_drive_files__file_id__office_sessions_post: {
         parameters: {
-            query?: never;
+            query?: {
+                case_id?: string | null;
+            };
             header?: never;
             path: {
                 file_id: string;

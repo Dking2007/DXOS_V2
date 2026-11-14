@@ -6,6 +6,24 @@ import type { AssistantItem } from '@dx/web-shared/types.ts'
 /** Whether the assistant panel is open; the command palette can open it from anywhere. */
 export const assistantOpen = ref(false)
 
+/** The dossier on screen, when its page lets people ask the AI about it ("Trợ lý công việc"). */
+export interface CaseContext {
+  id: string
+  title: string
+  suggestions: string[]
+}
+export const caseContext = ref<CaseContext | null>(null)
+export const assistantTab = ref<'general' | 'case'>('general')
+/** A question picked on the dossier page, asked as soon as the dossier tab shows. */
+export const pendingCaseQuestion = ref('')
+
+/** Open the assistant on the dossier tab, optionally asking a question straight away. */
+export function askAboutCase(question = '') {
+  assistantTab.value = 'case'
+  pendingCaseQuestion.value = question.trim()
+  assistantOpen.value = true
+}
+
 export interface ChatTurn {
   role: 'user' | 'assistant'
   content: string

@@ -1134,6 +1134,75 @@ def build_router(app):
                 form = db.get(m.Form, case.form_id)
                 result.update(mode="preview", graph=steps_graph(form.id, form.approval_steps))
         result.update(names(db, result["graph"]))
+        result["files"] = step_files(db, user, case, submission, run, result["graph"], tasks if submission else [])
+        return result
+
+    def step_files(db, user, case, submission, run, graph: dict, tasks: list) -> dict:
+        """For each step: the documents it asks for, and the files actually handed in there."""
+        hidden = step_limits(db, user, case)[1]
+
+        def about(file_id: str, by: str | None, at, source: str, name: str = "") -> dict | None:
+            file = db.get(m.DriveFile, file_id)
+            if not file and not name:
+                return None
+            person = db.get(m.User, by) if by else None
+            return {
+                "id": file_id,
+                "name": file.name if file else name,
+                "mime": file.mime if file else None,
+                "size": file.size if file else None,
+                "by": person.display_name if person else "",
+                "at": at.isoformat() if hasattr(at, "isoformat") else at,
+                "source": source,
+                "available": bool(file and not file.deleted_at),
+            }
+
+        version = db.get(m.ProcessVersion, case.process_version_id) if case.process_version_id else None
+        rule = db.get(m.AutomationRule, run.rule_id) if run else None
+        dossier_count = version.required_file_count if version else (rule.required_file_count if rule else 0)
+        result: dict[str, dict] = {}
+        for node in graph.get("nodes", []):
+            data = node.get("data") or {}
+            required = dossier_count if node.get("type") == "trigger" else int(data.get("require_files") or 0)
+            documents = [str(name) for name in data.get("required_documents") or [] if str(name).strip()]
+            result[node["id"]] = {"required": required, "documents": documents, "attached": [], "hidden": hidden}
+        if hidden:
+            return result
+        trigger = next((node["id"] for node in graph.get("nodes", []) if node.get("type") == "trigger"), None)
+        if trigger:
+            if submission:
+                attached = [
+                    about(item["file_id"], case.owner_id, submission.created_at, "dossier", item.get("name", ""))
+                    for item in submission.files_snapshot or []
+                ]
+            else:
+                attached = [about(file_id, case.owner_id, case.updated_at, "dossier") for file_id in case.file_ids or []]
+            result[trigger]["attached"] = [item for item in attached if item]
+        for task in tasks:
+            node_id = task.node_id or f"approval_{task.step_index + 1}"
+            handed = (task.submitted_values or {}).get("_files") or []
+            if node_id in result and handed:
+                result[node_id]["attached"] += [
+                    item
+                    for item in (
+                        about(f["id"], task.decided_by_id or task.assignee_id, task.decided_at, "step", f.get("name", ""))
+                        for f in handed
+                    )
+                    if item
+                ]
+        for step in (run.steps if run else []) or []:
+            output = step.get("output") or {}
+            if step.get("type") == "assign_task" and output.get("task_id") and step.get("node_id") in result:
+                work = db.get(m.Task, output["task_id"])
+                if work:
+                    result[step["node_id"]]["attached"] += [
+                        item
+                        for item in (
+                            about(file_id, work.assignee_id, work.submitted_at or work.updated_at, "task")
+                            for file_id in work.file_ids or []
+                        )
+                        if item
+                    ]
         return result
 
     @router.get("/automations/process-template", tags=["automations"])

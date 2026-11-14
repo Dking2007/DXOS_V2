@@ -29,6 +29,16 @@
   - Trình thiết kế quy trình: ô tìm bước, nhóm bước thu gọn được; nút Lưu chuyển “Đã lưu” khi không có thay đổi.
 
 ### Added
+- **Hồ sơ: tài liệu theo từng bước.** Bấm một bước trong tab Quy trình thấy mục Tài liệu: số tệp cần nộp, tên các
+  tài liệu cần có (`required_documents`, khai trong trình thiết kế ở bước đầu, các bước có người xử lý và Giao việc)
+  và các tệp thực nộp ở bước đó (kèm khi trình, nộp ở bước, kết quả công việc) với người nộp, thời điểm, dung lượng.
+  Tệp Word/Excel/PowerPoint mở bằng OnlyOffice chỉ xem (`POST /drive/files/{id}/office-sessions?case_id=`, ai xem
+  được hồ sơ thì đọc được), tệp khác mở trong khung xem. `GET /cases/{id}/process` có thêm `files`. Sửa lỗi tệp nộp ở
+  bước duyệt (sau khi trình) không tải về được. 2 test backend.
+- **Trợ lý công việc:** trên trang hồ sơ, trợ lý AI có thêm tab "Trợ lý công việc" hỏi đáp riêng về hồ sơ đó (thay
+  khung hỏi đáp hồ sơ cũ); nút "Hỏi AI về hồ sơ" và câu gợi ý mở thẳng tab này.
+- **Khung tiến trình hồ sơ** làm mới: nhãn tóm tắt hồ sơ đang ở đâu, đường nối tô theo đoạn đã đi, biểu tượng và màu
+  riêng cho bước đã duyệt, đang chờ, trả lại, từ chối.
 - **Hồ sơ cá nhân** (`/profile`, migration `workspace_0021`): mỗi người tự sửa họ tên, chức danh, số điện thoại,
   email liên hệ, giới thiệu ngắn (`PATCH /me/profile`) và ảnh đại diện PNG/JPEG/WebP tối đa 2 MB
   (`PUT`/`DELETE /me/avatar`, lưu ở Core, xem qua `GET /users/{id}/avatar`). Vai trò và phòng ban vẫn do quản
