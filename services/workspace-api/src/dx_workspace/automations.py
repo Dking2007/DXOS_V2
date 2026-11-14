@@ -23,10 +23,9 @@ import json
 import re
 from datetime import timedelta
 from typing import Any, Literal
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin
 
 import httpx
-from dx_flowkit import FlowError, compare
 from dx_platform.auth import Actor
 from dx_platform.errors import AppError
 from dx_platform.security import SecretBox
@@ -35,11 +34,12 @@ from pydantic import Field, ValidationError
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from . import ai_core
+from . import ai_core, flow_hooks
 from . import models as m
 from . import schemas as s
 from .feed import can_see as can_see_post
 from .feed import visibility_filter as post_visibility
+from .flow_values import allowed_hosts, check_url, condition_holds, render
 from .policies import case_filter, current_user, get_case, require
 from .services import audit, cas, case_event, enqueue, notify, page, serial
 from .tasks import TaskCreate, TaskSource, create_task, event_data, get_task, log, manages, visible
@@ -551,49 +551,6 @@ class ConnectionInput(s.Input):
     secret_header: str = Field(default="Authorization", pattern=r"^[A-Za-z0-9-]{1,60}$")
     headers: dict[str, str] = Field(default_factory=dict)
     timeout_seconds: int = Field(default=10, ge=1, le=60)
-
-
-def allowed_hosts(settings) -> set[str]:
-    return {h.strip().lower() for h in settings.automation_allowed_hosts.split(",") if h.strip()}
-
-
-def check_url(settings, url: str):
-    parts = urlsplit(url)
-    if parts.scheme not in {"https", "http"} or not parts.hostname:
-        raise AppError(422, "connection_url_invalid", "Địa chỉ kết nối phải là URL http(s) hợp lệ.")
-    if parts.hostname.lower() not in allowed_hosts(settings):
-        raise AppError(
-            422,
-            "connection_host_denied",
-            "Máy chủ đích chưa nằm trong AUTOMATION_ALLOWED_HOSTS của triển khai.",
-        )
-
-
-def value_of(data: dict, field: str):
-    """`key` or `form.key`: one level of nesting, nothing else is reachable."""
-    head, _, tail = field.partition(".")
-    value = data.get(head)
-    if not tail:
-        return value
-    return value.get(tail) if isinstance(value, dict) else None
-
-
-def condition_holds(condition: dict, data: dict) -> bool:
-    """One flow condition on event data; values of the wrong kind simply do not match."""
-    try:
-        return compare(condition["operator"], value_of(data, condition["field"]), condition.get("value"))
-    except FlowError:
-        return False
-
-
-def render(template: str, data: dict) -> str:
-    """Replace `{key}` / `{form.key}` with event values; no expressions are evaluated."""
-
-    def value(match):
-        found = value_of(data, match.group(1))
-        return "" if found is None else str(found)
-
-    return re.sub(r"\{([a-z_][a-z0-9_]{0,39}(?:\.[A-Za-z][A-Za-z0-9_]{0,63})?)\}", value, template)
 
 
 def recipients(db: Session, names: list[str], data: dict) -> list[str]:
@@ -1615,9 +1572,7 @@ class Execution:
         if kind in PLAIN_ACTIONS | ENGINE_ACTIONS and self.dry_run:
             return {"output": {key.partition(".")[2]: "" for key in output_fields(node)}}
         if kind in PLAIN_ACTIONS:
-            from . import flow_actions
-
-            return {"output": flow_actions.PLAIN_ACTIONS[kind](self, data)}
+            return {"output": flow_hooks.ACTION_HANDLERS[kind](self, data)}
         if kind == "notify":
             people = recipients(self.db, data.get("recipients", []), self.data)
             title = render(data.get("title", ""), self.data)
@@ -1736,9 +1691,7 @@ def run_rule(
         return run
     trigger = next(n["id"] for n in graph["nodes"] if n["type"] == "trigger")
     if needs_engine(graph):
-        from . import processes
-
-        processes.start_flow(db, run, data, chain, core)
+        flow_hooks.start_flow(db, run, data, chain, core)
         return run
     execution = Execution(
         db,

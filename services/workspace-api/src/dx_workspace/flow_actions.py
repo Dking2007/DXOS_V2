@@ -21,9 +21,10 @@ from dx_platform.errors import AppError
 from dx_platform.security import SecretBox
 from sqlalchemy import select
 
-from . import ai_core, ai_docx, ai_text
+from . import ai_core, ai_docx, ai_text, flow_hooks
 from . import models as m
 from . import schemas as s
+from .flow_values import check_url, render
 from .policies import permissions
 from .services import audit, enqueue, next_number, notify
 
@@ -39,8 +40,6 @@ def author(execution) -> m.User:
 
 
 def render_text(execution, template) -> str:
-    from .automations import render
-
     return render(str(template or ""), execution.data)
 
 
@@ -310,8 +309,6 @@ def deliver_email(settings, payload: dict):
 
 def call_connection(db, settings, payload: dict) -> dict:
     """One call to a configured connection, returning the status and body for later steps."""
-    from .automations import check_url
-
     connection = db.get(m.Connection, payload.get("connection_id"))
     if not connection:
         return {"ok": False, "status": 0, "error": "connection_missing"}
@@ -405,3 +402,6 @@ ENGINE_ACTIONS = {
     "ai_extract": ai_extract,
 }
 PLAIN_ACTIONS = {"send_message": send_message, "send_email": send_email}
+
+# The engine runs these through flow_hooks, so it does not have to import this module.
+flow_hooks.ACTION_HANDLERS.update(PLAIN_ACTIONS)

@@ -33,7 +33,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from . import flow_actions, process_versions
+from . import flow_actions, flow_hooks, process_versions
 from . import models as m
 from .automations import (
     MAX_VISITS,
@@ -41,15 +41,13 @@ from .automations import (
     SUB_END,
     TERMINAL,
     Execution,
-    condition_holds,
     current_data,
     offered,
     people_for,
-    render,
     unit_manager,
-    value_of,
 )
 from .core_client import CoreClient
+from .flow_values import condition_holds, render, value_of
 from .policies import active_delegators, approval_assignees, current_user, get_case, permissions, require
 from .services import case_event, emit, enqueue, notify
 
@@ -1220,6 +1218,10 @@ def build_router(app):
         return {"name": f"Quy trình {form.name}", "graph": steps_graph(form.id, form.approval_steps)}
 
     return router
+
+
+# The engine starts process flows through flow_hooks, so it does not have to import this module.
+flow_hooks.STARTERS["process"] = start_flow
 
 
 __all__ = [

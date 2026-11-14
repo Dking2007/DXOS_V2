@@ -18,6 +18,7 @@ path = [
   "SELF_REVIEW.md",
   "THIRD_PARTY.md",
   "docs/**",
+  "design-system/**",
   "infra/identity/README.md",
   "examples/**/*.md",
   "**/*.json",
