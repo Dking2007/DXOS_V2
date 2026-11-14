@@ -12,8 +12,6 @@ COPY packages/flowkit /app/packages/flowkit
 RUN pip install -c /app/requirements.lock /app/packages/platform-kit /app/packages/flowkit
 ARG SERVICE
 COPY services/${SERVICE} /app/services/${SERVICE}
-# Sector packs shipped with the release (read by the Workspace API, harmless for Core).
-COPY packs /app/packs
 RUN pip install -c /app/requirements.lock /app/services/${SERVICE} && useradd --create-home --uid 10001 dx
 WORKDIR /app/services/${SERVICE}
 USER dx

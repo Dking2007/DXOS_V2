@@ -21,20 +21,11 @@ const SUBJECTS: Record<string, { label: string; route?: string }> = {
   assistant: { label: 'Trợ lý AI' },
   field_evidence: { label: 'Căn cứ trường' },
   office: { label: 'Soạn thảo trực tuyến' },
-  pack: { label: 'Gói ngành' },
-  appearance: { label: 'Giao diện' },
 }
 
 const VERBS: Record<string, string> = {
   created: 'tạo mới',
   avatar_changed: 'đổi ảnh đại diện',
-  installed: 'cài đặt',
-  upgraded: 'nâng cấp',
-  removed: 'gỡ',
-  exported: 'xuất tệp',
-  saved: 'lưu',
-  asset_uploaded: 'tải ảnh giao diện lên',
-  changed: 'đổi',
   avatar_removed: 'gỡ ảnh đại diện',
   updated: 'cập nhật',
   deleted: 'xóa',

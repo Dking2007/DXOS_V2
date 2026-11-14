@@ -859,12 +859,7 @@ def build_router(app):
     ):
         user = context(db, actor)
         require(db, user, "forms.manage")
-        value = make_form(db, actor, user, body, idempotency_key or m.uid())
-        db.commit()
-        return serial(value)
-
-    def make_form(db, actor, user, body: s.FormCreate, key: str) -> m.Form:
-        """A published form with its Core schema; the caller commits. Shared with sector packs."""
+        key = idempotency_key or m.uid()
         for step in body.approval_steps:
             if step.resolver == "user":
                 target = db.get(m.User, step.user_id)
@@ -892,9 +887,8 @@ def build_router(app):
         db.add(value)
         db.flush()
         audit(db, user, "form.published", value.id)
-        return value
-
-    app.state.make_form = make_form
+        db.commit()
+        return serial(value)
 
     @router.get("/cases", tags=["cases"])
     def cases(

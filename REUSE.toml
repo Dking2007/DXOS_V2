@@ -24,7 +24,6 @@ path = [
   "**/*.json",
   "**/*.html",
   "plugins/**/*.png",
-  "packs/**",
   "package-lock.json",
   "requirements.lock",
   "requirements-dev.txt",
