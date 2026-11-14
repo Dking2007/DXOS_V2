@@ -31,6 +31,7 @@ import TaskCreateDialog from '../components/TaskCreateDialog.vue'
 import TaskBreakdown from '../ai/TaskBreakdown.vue'
 import { useAi } from '../ai/useAi'
 import TaskAutomations from '../components/TaskAutomations.vue'
+import PluginFrames from '../components/plugins/PluginFrames.vue'
 import TaskFiles from '../components/TaskFiles.vue'
 import { TASK_STAGES, dueText, nextStep, taskStage } from '../ui/taskGuide'
 const route = useRoute()
@@ -515,6 +516,7 @@ function localInput(value: string | null) {
           </dl>
         </section>
         <TaskAutomations :task-id="task.id" :closed="['completed', 'cancelled'].includes(task.status)" />
+        <PluginFrames place="task.side" :context="{ task_id: task.id }" />
         <section class="card">
           <header class="card-header"><h3>Hoạt động</h3></header>
           <div class="card-body">

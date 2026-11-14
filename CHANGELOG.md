@@ -32,6 +32,17 @@
   - Trình thiết kế quy trình: ô tìm bước, nhóm bước thu gọn được; nút Lưu chuyển “Đã lưu” khi không có thay đổi.
 
 ### Added
+- **Plugin kết nối (`desktiny-plugin/1`), tầng 2** (migration `workspace_0023`, [docs/plugins.md](docs/plugins.md)):
+  ứng dụng chạy ở máy chủ riêng (chỉ máy chủ trong `PLUGIN_ALLOWED_HOSTS`), mã không chạy trong Desktiny. Màn
+  **Quản trị › Plugin**: cài từ manifest (chờ duyệt), duyệt quyền và sự kiện, khoá ký và token chỉ hiện một lần, bật/tắt
+  (tắt là mọi token hết hiệu lực), đổi khoá, gỡ, nhật ký trao đổi và gửi lại sự kiện. Bốn kênh: sự kiện qua outbox ký
+  HMAC-SHA256 và thử lại; API `/workspace/v1/plugin/v1` với token cài đặt (chỉ đọc bản ghi đã được báo) hoặc token
+  phiên 10 phút (đọc theo quyền người xem); bước quy trình `plugin_action` với ô cấu hình tự dựng từ `config_schema`,
+  nhánh Thành công/Lỗi, giá trị trả về cho bước sau; khung giao diện iframe sandbox ở cột phải hồ sơ, công việc, trang
+  chủ và trang riêng (nhóm **Ứng dụng**), truyền ngữ cảnh và màu của gói qua `postMessage`. CSP `frame-src` lấy từ
+  `PLUGIN_FRAME_SOURCES` (gateway dùng template của nginx). Bộ công cụ: `packages/desktiny-plugin` (Python),
+  `packages/plugin-sdk` (JavaScript), plugin mẫu `examples/plugins/tra-cuu-mst`. 5 test backend, 2 test SDK, 3 test
+  plugin mẫu, 1 test frontend.
 - **Gói ngành (`desktiny-pack/1`), tầng 1 của hướng phát triển plugin/giao diện** (migration `workspace_0022`,
   [docs/packs.md](docs/packs.md)). Màn **Quản trị › Gói ngành** (`organization.manage`): cài gói `.zip` hoặc gói có
   sẵn trong `packs/` sau khi **xem trước**, nâng cấp cùng `id`, gỡ (quy trình đã có hồ sơ chỉ ngừng phát hành), xuất

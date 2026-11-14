@@ -12,6 +12,7 @@ import {
   MessagesSquare,
   Newspaper,
   Package,
+  Puzzle,
   Settings2,
   Workflow,
 } from 'lucide-vue-next'
@@ -86,6 +87,14 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Bot,
         hint: 'Kiến thức và dịch vụ AI của trợ lý',
         capability: 'assistant.manage',
+      },
+      {
+        key: 'plugins',
+        to: '/plugins',
+        label: 'Plugin',
+        icon: Puzzle,
+        hint: 'Ứng dụng kết nối: duyệt quyền, bật tắt, nhật ký',
+        capability: 'organization.manage',
       },
       {
         key: 'packs',

@@ -8,6 +8,7 @@ import type { Page } from '@dx/web-shared/api.ts'
 import { api } from '../api'
 import { OPERATORS, nodeReference } from './nodes'
 import type { FlowCondition, NodeKind } from './nodes'
+import { usePluginSteps } from './pluginNodes'
 
 /** Settings of the logic, data and message steps, whose results later steps can read. */
 const props = defineProps<{
@@ -33,6 +34,20 @@ function removeItem(key: string, index: number) {
 }
 const fieldEntries = computed(() => Object.entries(props.fields))
 const reference = computed(() => nodeReference(props.id, props.config))
+const pluginSteps = usePluginSteps()
+const pluginStep = computed(() =>
+  props.kind === 'plugin_action'
+    ? (pluginSteps.data.value ?? []).find((step) => step.plugin_id === c.value.plugin_id && step.kind === c.value.node)
+    : undefined,
+)
+const pluginConfig = computed(() => (c.value.config as Record<string, unknown>) ?? {})
+/** How later steps write a value this step returns, e.g. "{tra_cuu.ten_dn}". */
+function placeholder(key: string) {
+  return '{' + reference.value + '.' + key + '}'
+}
+function setPluginValue(key: string, value: unknown) {
+  set('config', { ...pluginConfig.value, [key]: value })
+}
 const conversations = useQuery({
   queryKey: ['conversations', 'flow-picker'],
   queryFn: () => api.request<Page<{ id: string; title: string; kind: string }>>('/conversations'),
@@ -318,6 +333,57 @@ function toggleUser(id: string) {
       <input id="http-path" :value="c.path ?? ''" placeholder="/ton-kho/{form.ma_hang}" @change="set('path', text($event))" />
       <small>Đọc giá trị trả về ở bước sau: <code>{{ `{${reference}.ten_truong}` }}</code>. Chỉ lấy giá trị đơn, không lấy dữ liệu lồng nhau.</small>
     </div>
+  </template>
+
+  <template v-else-if="kind === 'plugin_action'">
+    <p v-if="pluginSteps.isPending.value" class="muted">Đang tải bước của plugin…</p>
+    <div v-else-if="!pluginStep" class="notice warning">
+      Plugin của bước này đang tắt, chưa được duyệt hoặc đã bị gỡ. Luồng sẽ không chạy được bước này.
+    </div>
+    <template v-else>
+      <p class="muted">
+        <strong>{{ pluginStep.plugin_name }}</strong> · {{ pluginStep.description || pluginStep.title }}
+      </p>
+      <div v-for="(field, key) in pluginStep.config_schema.properties" :key="key" class="field">
+        <label v-if="field.type !== 'boolean'" :for="`plugin-${key}`"
+          >{{ field.title
+          }}<span v-if="pluginStep.config_schema.required.includes(String(key))" class="required"> *</span></label
+        >
+        <select
+          v-if="field.enum?.length"
+          :id="`plugin-${key}`"
+          :value="pluginConfig[key] ?? ''"
+          @change="setPluginValue(String(key), text($event))"
+        >
+          <option value="">Chọn…</option>
+          <option v-for="option in field.enum" :key="option" :value="option">{{ option }}</option>
+        </select>
+        <label v-else-if="field.type === 'boolean'" class="checkbox-label"
+          ><input
+            type="checkbox"
+            :checked="pluginConfig[key] === true"
+            @change="setPluginValue(String(key), checked($event))"
+          />{{ field.title }}</label
+        >
+        <input
+          v-else
+          :id="`plugin-${key}`"
+          :value="pluginConfig[key] ?? ''"
+          :placeholder="field.type === 'number' ? 'Số, hoặc {form.truong}' : 'Chữ, có thể chèn {form.truong}'"
+          @change="
+            setPluginValue(
+              String(key),
+              field.type === 'number' && /^-?\d+(\.\d+)?$/.test(text($event)) ? Number(text($event)) : text($event),
+            )
+          "
+        />
+        <small v-if="field.description">{{ field.description }}</small>
+      </div>
+      <small class="muted"
+        >Chỉ các ô trên (đã điền giá trị) được gửi cho plugin, có chữ ký. Bước sau đọc kết quả:
+        <code v-for="(label, key) in pluginStep.outputs" :key="key" :title="label">{{ placeholder(String(key)) }} </code></small
+      >
+    </template>
   </template>
 
   <template v-else-if="kind === 'ai_extract'">

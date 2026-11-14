@@ -23,6 +23,7 @@ x-api-env: &api-env
   ONLYOFFICE_JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:?Bootstrap required}
   ONLYOFFICE_ENABLED: ${ONLYOFFICE_ENABLED:-false}
   AUTOMATION_ALLOWED_HOSTS: ${AUTOMATION_ALLOWED_HOSTS:-}
+  PLUGIN_ALLOWED_HOSTS: ${PLUGIN_ALLOWED_HOSTS:-}
   SMTP_HOST: ${SMTP_HOST:-}
   SMTP_PORT: ${SMTP_PORT:-587}
   SMTP_USER: ${SMTP_USER:-}
@@ -333,7 +334,12 @@ services:
     ports:
       - "127.0.0.1:${GATEWAY_PORT:-8080}:80"
     volumes:
-      - ../gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      # A template: the image fills in ${PLUGIN_*} at start-up and writes /etc/nginx/nginx.conf.
+      - ../gateway/nginx.conf:/etc/nginx/templates/nginx.conf.template:ro
+    environment:
+      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx
+      NGINX_ENVSUBST_FILTER: ^PLUGIN_
+      PLUGIN_FRAME_SOURCES: ${PLUGIN_FRAME_SOURCES:-}
     depends_on:
       core-api:
         condition: service_healthy

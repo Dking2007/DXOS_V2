@@ -31,6 +31,8 @@ jobs:
       - run: pytest -q
       - name: Kiểm thử gói dx-flowkit độc lập (không nằm trong testpaths)
         run: pip install ./packages/flowkit && pytest -q packages/flowkit/tests
+      - name: Kiểm thử SDK plugin desktiny-plugin và plugin mẫu
+        run: pip install ./packages/desktiny-plugin && pytest -q packages/desktiny-plugin/tests examples/plugins/tra-cuu-mst
       - run: python scripts/export_contracts.py
       - name: Contract OpenAPI đã commit khớp với mã
         run: git diff --exit-code contracts

@@ -30,6 +30,7 @@ import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import DigestCard from '../ai/DigestCard.vue'
 import { useAi } from '../ai/useAi'
 import { appearance, term } from '../ui/appearance'
+import PluginFrames from '../components/plugins/PluginFrames.vue'
 const session = useSession()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -262,5 +263,8 @@ const summary = computed(() => {
         </div>
       </section>
     </aside>
+  </div>
+  <div v-if="shows('plugins.widgets')" class="home-widgets">
+    <PluginFrames place="home.widget" />
   </div>
 </template>

@@ -8,8 +8,8 @@ SPDX-FileCopyrightText: 2026 Desktiny contributors
 Gói ngành đóng gói **nghiệp vụ** (quy trình, biểu mẫu, mẫu quy trình, luồng tự động, bài kiến thức cho trợ lý
 AI) và **giao diện** (tên, logo, màu, phông, trang đăng nhập, từ ngữ, menu, trang chủ) của một ngành hay một cơ
 quan. Gói **không chứa mã**. Cài, nâng cấp, gỡ ở **Quản trị › Gói ngành** (quyền `organization.manage`); gỡ gói thì
-Desktiny về đúng giao diện và nghiệp vụ mặc định. Đây là tầng 1 của hướng mở rộng; plugin có mã (chạy ở máy chủ
-riêng, nói chuyện qua sự kiện, API có phạm vi và khung giao diện cách ly) là các tầng sau, chưa triển khai.
+Desktiny về đúng giao diện và nghiệp vụ mặc định. Đây là tầng 1 của hướng mở rộng; plugin có mã chạy ở máy chủ
+riêng (tầng 2) xem [`plugins.md`](plugins.md).
 
 ## Cấu trúc
 
@@ -67,8 +67,8 @@ mỗi tệp văn bản 2 MB. Đường dẫn tuyệt đối hoặc có `..` bị
 | `login` | `{ "style": "framed" \| "flat" \| "image", "title", "subtitle", "background" }` | `image` cần `background` (PNG/JPEG/WebP ≤ 2 MB). |
 | `terminology` | `{ "Hồ sơ": "Hồ sơ học vụ" }`, ≤ 60 cặp | Đổi chữ hiển thị ở menu, tiêu đề trang, trang chủ (cả dạng viết hoa đầu và thường). Không đổi dữ liệu, đường dẫn, API. |
 | `menu.hide` | `tasks`, `cases`, `chat`, `feed`, `drive`, `reports` | Không ẩn được trang chủ, phê duyệt, phần quản trị. |
-| `menu.order` | khoá trong `home, tasks, approvals, cases, chat, feed, drive, reports, processes, assistant, packs, settings` | Phân hệ không nêu giữ chỗ sau các phân hệ được nêu. |
-| `home` | `tasks.today`, `quick.start`, `cases.recent`, `ai.digest` | Khối không nêu thì ẩn; ở cột phải theo thứ tự nêu. |
+| `menu.order` | khoá trong `home, tasks, approvals, cases, chat, feed, drive, reports, processes, assistant, plugins, packs, settings` | Phân hệ không nêu giữ chỗ sau các phân hệ được nêu. |
+| `home` | `tasks.today`, `quick.start`, `cases.recent`, `ai.digest`, `plugins.widgets` (khối của plugin kết nối) | Khối không nêu thì ẩn; ở cột phải theo thứ tự nêu. |
 
 **Kiểm tương phản** (WCAG AA, 4,5:1) chạy cho cả giao diện sáng và tối, với màu của gói đè lên màu mặc định. Các
 cặp: chữ chính trên nền thẻ và nền trang, chữ phụ, liên kết, chữ trên nền nhấn nhạt, chữ trên nút chính, chữ báo

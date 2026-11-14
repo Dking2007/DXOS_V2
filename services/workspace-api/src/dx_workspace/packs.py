@@ -101,7 +101,7 @@ LOGIN_STYLES = {"framed": "Khung trang trí", "flat": "Phẳng, theo màu chính
 # approvals, the home page or the administration screens would lock people out.
 MENU_KEYS = (
     "home", "tasks", "approvals", "cases", "chat", "feed", "drive", "reports",
-    "processes", "assistant", "packs", "settings",
+    "processes", "assistant", "plugins", "packs", "settings",
 )  # fmt: skip
 HIDEABLE = ("tasks", "cases", "chat", "feed", "drive", "reports")
 HOME_BLOCKS = {
@@ -109,6 +109,7 @@ HOME_BLOCKS = {
     "quick.start": "Bắt đầu nhanh",
     "cases.recent": "Hồ sơ gần đây",
     "ai.digest": "Bản tin việc hôm nay (AI)",
+    "plugins.widgets": "Khối của plugin",
 }
 IMAGE_MAGIC = {b"\x89PNG\r\n\x1a\n": "image/png", b"RIFF": "image/webp", b"\xff\xd8\xff": "image/jpeg"}
 SVG_NS = "http://www.w3.org/2000/svg"

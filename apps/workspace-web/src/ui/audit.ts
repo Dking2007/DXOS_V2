@@ -22,6 +22,7 @@ const SUBJECTS: Record<string, { label: string; route?: string }> = {
   field_evidence: { label: 'Căn cứ trường' },
   office: { label: 'Soạn thảo trực tuyến' },
   pack: { label: 'Gói ngành' },
+  plugin: { label: 'Plugin' },
   appearance: { label: 'Giao diện' },
 }
 
@@ -29,6 +30,9 @@ const VERBS: Record<string, string> = {
   created: 'tạo mới',
   avatar_changed: 'đổi ảnh đại diện',
   installed: 'cài đặt',
+  approved: 'duyệt quyền',
+  rotated: 'đổi khoá',
+  retried: 'gửi lại sự kiện',
   upgraded: 'nâng cấp',
   removed: 'gỡ',
   exported: 'xuất tệp',

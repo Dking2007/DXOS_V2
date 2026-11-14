@@ -29,6 +29,8 @@ class Settings(PlatformSettings):
     # Folder of the sector packs shipped with the release (`packs/` in the repository). Empty
     # means: look next to the source tree, then in /app/packs (the API image).
     packs_dir: str = ""
+    # Comma-separated hostnames connected plugins may run on. Empty means no plugin can be installed.
+    plugin_allowed_hosts: str = ""
 
 
 @lru_cache

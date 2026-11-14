@@ -207,6 +207,11 @@ class ProcessExecution(Execution):
             return []
         if node["type"] == "wait_until":
             return self.wait_until(node, node.get("data") or {})
+        if node["type"] == "plugin_action":
+            # The plugin is called from the worker; the answer picks the exit (see plugins.on_node).
+            enqueue(self.db, "plugin.node", self.run.id, {"run_id": self.run.id, "node_id": node["id"]})
+            self.record(node, "waiting")
+            return []
         if node["type"] == "http_request":
             enqueue(self.db, "automation.http", self.run.id, {"run_id": self.run.id, "node_id": node["id"]})
             self.record(node, "waiting")

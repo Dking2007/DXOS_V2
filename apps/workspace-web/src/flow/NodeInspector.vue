@@ -70,6 +70,7 @@ const SETTINGS_KINDS: NodeKind[] = [
   'send_message',
   'send_email',
   'http_request',
+  'plugin_action',
   'ai_extract',
 ]
 /** A form belongs to dossiers being submitted, so another event drops it. */

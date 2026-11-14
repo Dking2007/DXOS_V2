@@ -3,8 +3,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, RouterLink, RouterView } from 'vue-router'
-import { useQueryClient } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { api } from './api'
+import type { PluginSlotItem } from './components/plugins/PluginFrames.vue'
 import {
+  AppWindow,
   LogOut,
   Menu,
   Moon,
@@ -17,6 +20,7 @@ import {
 import { errorText } from '@dx/web-shared/api.ts'
 import { useSession } from './stores/session'
 import { badgeText, visibleGroups } from './ui/nav'
+import type { NavGroup } from './ui/nav'
 import { useOverview } from './ui/overview'
 import { paletteRequest } from './ui/palette'
 import { brand, term } from './ui/appearance'
@@ -39,7 +43,29 @@ const sidebarCollapsed = ref(readCollapsed())
 const sessionError = ref('')
 const palette = ref<InstanceType<typeof CommandPalette>>()
 watch(paletteRequest, (request) => request && palette.value?.show(request.text))
-const groups = computed(() => visibleGroups(session.can))
+// Pages of connected plugins get their own group in the sidebar.
+const pluginPages = useQuery({
+  queryKey: ['plugin-slots', 'page'],
+  queryFn: () => api.request<{ items: PluginSlotItem[] }>('/plugin-slots?slot=page').then((result) => result.items),
+  enabled: computed(() => !!session.user),
+  staleTime: 60_000,
+})
+const groups = computed(() => {
+  const base = visibleGroups(session.can)
+  const pages = pluginPages.data.value ?? []
+  if (!pages.length) return base
+  const apps: NavGroup = {
+    label: 'Ứng dụng',
+    links: pages.map((page) => ({
+      key: `app:${page.plugin_id}:${page.index}`,
+      to: `/apps/${page.plugin_id}/${page.index}`,
+      label: page.title,
+      icon: AppWindow,
+      hint: page.plugin_name,
+    })),
+  }
+  return [...base.slice(0, 1), apps, ...base.slice(1)]
+})
 const overview = useOverview()
 const counts = computed(() => overview.data.value?.counts)
 const queryClient = useQueryClient()

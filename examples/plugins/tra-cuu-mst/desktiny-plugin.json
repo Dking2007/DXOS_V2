@@ -1,0 +1,32 @@
+{
+  "schema": "desktiny-plugin/1",
+  "id": "vn.vi-du.tra-cuu-mst",
+  "name": "Tra cứu mã số thuế (giả lập)",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "authors": ["Desktiny contributors"],
+  "description": "Plugin mẫu: nhận sự kiện hồ sơ được trình, thêm bước quy trình tra cứu mã số thuế và một khung thông tin doanh nghiệp trên trang hồ sơ. Dữ liệu doanh nghiệp là giả lập.",
+  "base_url": "http://localhost:9100",
+  "permissions": ["cases.read"],
+  "events": ["case.submitted"],
+  "events_endpoint": "/events",
+  "nodes": [
+    {
+      "kind": "tra_cuu_mst",
+      "title": "Tra cứu mã số thuế",
+      "description": "Tra tên và tình trạng doanh nghiệp theo mã số thuế (giả lập).",
+      "endpoint": "/nodes/tra-cuu",
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "ma_so": { "type": "string", "title": "Mã số thuế", "description": "Ví dụ {form.ma_so_thue}", "default": "{form.ma_so_thue}" }
+        },
+        "required": ["ma_so"]
+      },
+      "outputs": { "ten_dn": "Tên doanh nghiệp", "trang_thai": "Trạng thái hoạt động" }
+    }
+  ],
+  "ui": [
+    { "slot": "case.side", "title": "Thông tin doanh nghiệp", "url": "/ui/case-card.html", "height": 220 }
+  ]
+}

@@ -1557,3 +1557,14 @@ body:has(.assistant-fab) .app-footer {
 .home-columns.home-single {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* Blocks of connected plugins under the home page's own blocks. */
+.home-widgets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+.home-widgets:empty {
+  display: none;
+}

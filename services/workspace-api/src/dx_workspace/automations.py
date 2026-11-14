@@ -40,6 +40,7 @@ from . import schemas as s
 from .feed import can_see as can_see_post
 from .feed import visibility_filter as post_visibility
 from .flow_values import allowed_hosts, check_url, condition_holds, render
+from .plugin_steps import check_step as check_plugin_step
 from .policies import case_filter, current_user, get_case, require
 from .services import audit, cas, case_event, enqueue, notify, page, serial
 from .tasks import TaskCreate, TaskSource, create_task, event_data, get_task, log, manages, visible
@@ -121,12 +122,12 @@ LOGIC_NODES = {"switch", "parallel", "join", "wait_until", "set_value"}
 PLAIN_ACTIONS = {"send_message", "send_email"}
 ENGINE_ACTIONS = {"update_record", "create_case", "create_document", "file_share", "ai_extract"}
 # A flow containing any of these runs on the engine that can wait for people and reach Core.
-NEEDS_ENGINE = PROCESS_NODES | ENGINE_ACTIONS | {"join", "wait_until", "http_request"}
+NEEDS_ENGINE = PROCESS_NODES | ENGINE_ACTIONS | {"join", "wait_until", "http_request", "plugin_action"}
 # Put in place of a sub-process's endings when it is expanded; never drawn by anyone.
 SUB_END = "sub_end"
 NODE_TYPES = {
     "trigger", "if", "notify", "create_task", "webhook", "wait", "ai",
-    *PROCESS_NODES, *LOGIC_NODES, *PLAIN_ACTIONS, *ENGINE_ACTIONS, "http_request",
+    *PROCESS_NODES, *LOGIC_NODES, *PLAIN_ACTIONS, *ENGINE_ACTIONS, "http_request", "plugin_action",
 }
 # Nodes that leave through named branches, and the branches each one has.
 BRANCHES = {
@@ -139,6 +140,7 @@ BRANCHES = {
     "subprocess": {"approve", "return", "reject"},
     "wait_until": {"done", "timeout"},
     "http_request": {"success", "error"},
+    "plugin_action": {"success", "error"},
 }
 # A switch's exits are named by its own cases, so they are worked out from its configuration.
 SWITCH = "switch"
@@ -417,6 +419,18 @@ class HttpRequestData(s.Input):
     output_name: str | None = OUTPUT_NAME
 
 
+class PluginActionData(s.Input):
+    """A step a connected plugin offers; `config` follows the plugin's own `config_schema`."""
+
+    plugin_id: str = Field(default="", max_length=80)
+    node: str = Field(default="", max_length=40)
+    title: str = Field(default="", max_length=80)
+    config: dict = Field(default_factory=dict)
+    # Labels of the values the plugin returns, copied from its manifest for later steps to offer.
+    outputs: dict[str, str] = Field(default_factory=dict, max_length=20)
+    output_name: str | None = OUTPUT_NAME
+
+
 class ExtractField(s.Input):
     key: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z][A-Za-z0-9_]*$")
     label: str = Field(default="", max_length=200)
@@ -475,6 +489,7 @@ DATA_MODELS = {
     "send_message": SendMessageData,
     "send_email": SendEmailData,
     "http_request": HttpRequestData,
+    "plugin_action": PluginActionData,
     "ai_extract": AiExtractData,
     "trigger": TriggerData,
     "if": IfData,
@@ -666,6 +681,7 @@ def output_fields(node: dict) -> dict[str, str]:
         "send_message": {"message_id": "Mã tin nhắn", "post_id": "Mã bài viết"},
         "send_email": {"to": "Người nhận", "queued": "Đã xếp hàng gửi"},
         "http_request": {"ok": "Thành công", "status": "Mã phản hồi", "body": "Nội dung trả về"},
+        "plugin_action": {"ok": "Thành công", **(data.get("outputs") or {})},
         "ai_extract": {"summary": "Tóm tắt"},
     }.get(node["type"])
     if base is None:
@@ -927,7 +943,7 @@ def validate_graph(db: Session, settings, graph: dict, kind: str | None = None) 
                 fail(node_id, "Chọn quy trình con.")
             elif not child.active_version_id:
                 fail(node_id, f"Quy trình con “{child.name}” chưa được phát hành.")
-        if kind in {"switch", "parallel", "join", "wait_until", "set_value", *PLAIN_ACTIONS, *ENGINE_ACTIONS, "http_request"}:
+        if kind in {"switch", "parallel", "join", "wait_until", "set_value", *PLAIN_ACTIONS, *ENGINE_ACTIONS, "http_request", "plugin_action"}:
             check_flow_node(db, settings, fail, node_id, kind, data, outgoing.get(node_id, []), incoming.get(node_id, 0))
         if kind in {"approval", "consult", "input", "acknowledge"}:
             check_step(db, fail, node_id, kind, data, own_fields)
@@ -1039,6 +1055,11 @@ def check_flow_node(db: Session, settings, fail, node_id, kind, data, out, incom
                 fail(node_id, exc.detail)
         if not out:
             fail(node_id, "Nối bước sẽ chạy sau khi gọi xong.")
+    elif kind == "plugin_action":
+        for problem in check_plugin_step(db, settings, data.model_dump()):
+            fail(node_id, problem)
+        if not out:
+            fail(node_id, "Nối bước sẽ chạy sau khi plugin làm xong (ít nhất nhánh Thành công).")
     elif kind == "ai_extract":
         if not data.fields and not data.text.strip() and not data.read_files:
             fail(node_id, "Chọn nội dung AI cần đọc.")
@@ -1484,7 +1505,7 @@ class Execution:
             self.data = {**self.data, data["name"]: value}
             self.record(node, self.done if self.dry_run else "succeeded", value=value)
             return self.successors(node["id"])
-        if kind in {"wait_until", "http_request"} and self.dry_run:
+        if kind in {"wait_until", "http_request", "plugin_action"} and self.dry_run:
             branch = "done" if kind == "wait_until" else "success"
             self.record(node, "would_run", branch=branch)
             return self.successors(node["id"], branch)

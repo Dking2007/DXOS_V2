@@ -12,7 +12,7 @@ from dx_platform.errors import AppError
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from . import ai_core, ai_index, flow_actions, processes
+from . import ai_core, ai_index, flow_actions, plugins, processes
 from .automations import deliver_webhook, dispatch, needs_engine, resume
 from .config import get_settings
 from .core_client import CoreClient
@@ -309,6 +309,7 @@ def process_once(engine, settings, core=None) -> bool:
             elif job.kind == "automation.dispatch":
                 dispatch(db, job.payload, core)
                 processes.on_task_event(db, core, job.payload)
+                plugins.fan_out(db, job.payload)
             elif job.kind == "automation.webhook":
                 deliver_webhook(db, settings, job.payload)
             elif job.kind == "automation.resume":
@@ -319,6 +320,10 @@ def process_once(engine, settings, core=None) -> bool:
                     resume(db, job.payload)
             elif job.kind == "automation.http":
                 processes.on_http(db, core, settings, job.payload)
+            elif job.kind == "plugin.node":
+                plugins.on_node(db, core, settings, job.payload)
+            elif job.kind == "plugin.deliver":
+                plugins.deliver(db, settings, job.payload["delivery_id"])
             elif job.kind == "automation.email":
                 flow_actions.deliver_email(settings, job.payload)
             elif job.kind == "process.overdue":

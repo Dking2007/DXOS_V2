@@ -64,6 +64,7 @@ import { askAboutCase, caseContext } from '../assistant/state'
 import { useAi } from '../ai/useAi'
 import { OPERATORS } from '../flow/nodes'
 import ProcessCanvas from '../flow/ProcessCanvas.vue'
+import PluginFrames from '../components/plugins/PluginFrames.vue'
 import StepAnswerDialog from '../components/StepAnswerDialog.vue'
 import { toast } from '../ui/toast'
 import { isOfficeFile, previewKind } from '../ui/preview'
@@ -1148,6 +1149,7 @@ function moveTab(step: number) {
         </section>
       </div>
       <aside v-if="tab !== 'process'" class="stack" style="align-content: start">
+        <PluginFrames place="case.side" :context="{ case_id: id }" />
         <section v-if="ai.on('case_qa')" class="card case-ask-card" aria-label="Hỏi đáp về hồ sơ">
           <header class="card-header">
             <h3><Sparkles :size="16" /> Hỏi đáp về hồ sơ</h3>

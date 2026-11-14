@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Thông tin doanh nghiệp</title>
+    <style>
+      body { margin: 0; padding: 12px 16px; font: 14px/1.5 var(--dk-font, sans-serif); color: var(--dk-navy, #0f172a); background: var(--dk-surface, #fff); }
+      .muted { color: var(--dk-muted, #475569); font-size: 13px; }
+      .name { font-weight: 700; color: var(--dk-teal-ink, #1e3a5f); }
+      .tag { display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px; background: var(--dk-teal-soft, #e9eef5); color: var(--dk-teal-ink, #1e3a5f); }
+      .error { color: var(--dk-red, #b91c1c); }
+    </style>
+  </head>
+  <body>
+    <div id="out" class="muted">Đang tải…</div>
+    <script type="module">
+      import { connect } from '../sdk/desktiny-plugin-sdk.js'
+      const out = document.getElementById('out')
+      const desktiny = connect()
+      try {
+        const context = await desktiny.context
+        const dossier = await desktiny.api(`/cases/${context.record.case_id}`)
+        const code = dossier.payload.ma_so_thue
+        if (!code) {
+          out.textContent = 'Hồ sơ không có trường “ma_so_thue”.'
+        } else {
+          const result = await (await fetch(`../api/lookup?ma_so=${encodeURIComponent(code)}`)).json()
+          out.innerHTML = ''
+          const lines = result.found
+            ? [['name', result.ten_dn], ['tag', result.trang_thai], ['muted', `MST ${result.ma_so} · dữ liệu giả lập`]]
+            : [['error', result.reason]]
+          for (const [kind, text] of lines) {
+            const line = document.createElement('div')
+            line.className = kind
+            line.textContent = text
+            out.append(line)
+          }
+        }
+      } catch (error) {
+        out.className = 'error'
+        out.textContent = error.message
+      }
+    </script>
+  </body>
+</html>

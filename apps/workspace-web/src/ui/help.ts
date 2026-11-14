@@ -189,6 +189,25 @@ export const HELP: Record<string, HelpTopic> = {
     ],
     tips: ['Mọi tính năng AI mặc định tắt; chỉ người có quyền quản lý trợ lý mới bật được.'],
   },
+  '/plugins': {
+    purpose: 'Plugin kết nối: ứng dụng chạy ở máy chủ riêng, nhận sự kiện, thêm bước quy trình và khung giao diện.',
+    steps: [
+      '"Cài plugin (manifest)": chọn tệp desktiny-plugin.json (hoặc .zip), xem plugin xin gì rồi "Cài plugin".',
+      '"Duyệt quyền": chỉ chọn quyền và sự kiện plugin thật sự cần, rồi "Duyệt và bật".',
+      'Sao chép khoá ký và token vừa cấp (chỉ hiện một lần) vào cấu hình máy chủ plugin.',
+      '"Nhật ký" xem sự kiện đã gửi, bước đã gọi, dữ liệu plugin đã đọc; gửi lại sự kiện bị lỗi.',
+    ],
+    tips: [
+      'Tắt plugin thì mọi token của nó hết hiệu lực ngay.',
+      'Máy chủ plugin phải có trong danh sách được phép của triển khai (PLUGIN_ALLOWED_HOSTS).',
+      'Mất khoá thì bấm "Đổi khoá"; khoá cũ hết hiệu lực.',
+    ],
+  },
+  '/apps/:pluginId/:index': {
+    purpose: 'Trang riêng của một plugin kết nối, hiện trong khung cách ly ngay trong phần mềm.',
+    steps: ['Dùng như một trang bình thường; plugin chỉ đọc được dữ liệu trong phạm vi quyền của bạn.'],
+    tips: ['Nội dung trang do plugin cung cấp; liên hệ quản trị nếu trang không tải được.'],
+  },
   '/packs': {
     purpose: 'Gói ngành: giao diện (tên, logo, màu, trang đăng nhập, từ ngữ, menu) và quy trình mẫu theo ngành, cài và gỡ được.',
     steps: [
