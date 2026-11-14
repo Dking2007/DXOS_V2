@@ -32,6 +32,24 @@
   - Trình thiết kế quy trình: ô tìm bước, nhóm bước thu gọn được; nút Lưu chuyển “Đã lưu” khi không có thay đổi.
 
 ### Added
+- **Mở rộng plugin kết nối** (API bản 2, migration `workspace_0024`–`workspace_0027`, [docs/plugins.md](docs/plugins.md)):
+  - API ghi có phạm vi: `cases.comment`, `cases.fields.write` (chỉ trường khai trong `writes.fields` và được duyệt,
+    cần token phiên), `tasks.write` (cần token phiên), `notifications.send`; `Idempotency-Key` bắt buộc; lịch sử hồ sơ
+    hiện “Plugin X” hoặc “A qua plugin X”; nhật ký hoạt động `plugin.write.*`.
+  - Tệp: `files.read` (danh sách, nội dung qua Core kèm SHA-256), `cases.attach` (25 MB/tệp, 200 MB/ngày, gắn với
+    bước); bước `plugin_action` có thể nhận danh sách tệp.
+  - `cases.list` theo quy trình chọn lúc duyệt (phân trang con trỏ, `updated_since`), `departments.read`, `people.list`.
+  - Bước chạy lâu `mode: "async"` với `timeout_days`, `calls/{id}/complete` (ký HMAC) và `/progress`, nhánh
+    `timeout`; huỷ thì plugin nhận `plugin.call.cancelled`.
+  - Sự kiện của plugin (`emits`, `POST /plugin/v1/events`) làm điểm bắt đầu quy trình; sự kiện lõi mới
+    `case.step_entered`, `case.file_added`, `case.closed`, `case.overdue`, `task.overdue`.
+  - Khung giao diện: vị trí `case.tab`, `case.action`, `task.action`, `admin.page`; lệnh `toast`, `navigate`,
+    `refresh`, `close`, `confirm`; `frame_permissions` duyệt từng quyền, đặt vào `allow` của iframe.
+  - Công cụ cho trợ lý AI (`assistant_tools`, tính năng `assistant_plugins`), gọi bằng token phiên chỉ đọc của người hỏi.
+  - Cấu hình theo cơ quan (`settings_schema`, ô bí mật mã hoá, `GET /plugin/v1/settings`); `health_endpoint`, tỉ lệ
+    lỗi và độ trễ 24 giờ, báo người duyệt khi lỗi liên tiếp; giới hạn tần suất theo plugin và kênh (429 +
+    `Retry-After`); contract riêng `contracts/plugin.openapi.json`.
+  - SDK: `desktiny-plugin` 0.2.0 (client mới, CLI `init`/`check`/`pack`/`dev`), SDK khung JS có lệnh mới.
 - **Plugin kết nối (`desktiny-plugin/1`), tầng 2** (migration `workspace_0023`, [docs/plugins.md](docs/plugins.md)):
   ứng dụng chạy ở máy chủ riêng (chỉ máy chủ trong `PLUGIN_ALLOWED_HOSTS`), mã không chạy trong Desktiny. Màn
   **Quản trị › Plugin**: cài từ manifest (chờ duyệt), duyệt quyền và sự kiện, khoá ký và token chỉ hiện một lần, bật/tắt
