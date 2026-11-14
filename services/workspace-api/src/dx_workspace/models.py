@@ -912,6 +912,18 @@ class PluginToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class PluginSetting(Base):
+    """An organisation's values for a plugin's `settings_schema`; secret values are kept encrypted."""
+
+    __tablename__ = "plugin_settings"
+    plugin_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    values: Mapped[dict] = mapped_column(JSON, default=dict)
+    secrets: Mapped[str] = mapped_column(Text, default="")
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    updated_by: Mapped[str | None] = mapped_column(String(36))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class PluginCall(Base):
     """A long-running plugin step (`mode: async`): the flow waits until the plugin reports back.
 

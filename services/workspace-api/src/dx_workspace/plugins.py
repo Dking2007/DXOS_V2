@@ -47,7 +47,7 @@ from .flow_values import render
 from .plugin_steps import allowed_hosts, check_step, host_allowed, node_of
 from .policies import current_user, get_case, permissions
 from .processes import active, advance, lock_run
-from .services import audit, enqueue
+from .services import audit, enqueue, notify
 from .tasks import visible as task_visible
 
 SCHEMA = "desktiny-plugin/1"
@@ -103,6 +103,8 @@ class ConfigField(s.Input):
     description: str = Field(default="", max_length=300)
     enum: list[str] | None = Field(default=None, max_length=30)
     default: Any = None
+    # Settings only: stored encrypted, never shown again, given to the plugin's own server alone.
+    secret: bool = False
 
 
 class ConfigSchema(s.Input):
@@ -211,6 +213,10 @@ class PluginManifest(BaseModel):
     list_scope: ListScope = Field(default_factory=ListScope)
     # Events of the plugin's own that flows may start on (sent in with POST /plugin/v1/events).
     emits: list[PluginEvent] = Field(default_factory=list, max_length=30)
+    # What each organisation fills in for the plugin (agency code, an outside system's API key…).
+    settings_schema: ConfigSchema = Field(default_factory=ConfigSchema)
+    # GET here answers 2xx when the plugin's server is well; the plugin page shows it.
+    health_endpoint: str | None = Field(default=None, pattern=PATH)
 
     @model_validator(mode="after")
     def known(self):
@@ -227,6 +233,8 @@ class PluginManifest(BaseModel):
             raise ValueError("`writes.fields` cần quyền cases.fields.write.")
         if "cases.fields.write" in self.permissions and not self.writes.fields:
             raise ValueError("Quyền cases.fields.write cần khai các trường sẽ ghi trong `writes.fields`.")
+        if any(field.secret for node in self.nodes for field in node.config_schema.properties.values()):
+            raise ValueError("Ô cấu hình của bước quy trình không được là `secret`; dùng `settings_schema`.")
         if len({event.type for event in self.emits}) != len(self.emits):
             raise ValueError("Mỗi sự kiện trong `emits` cần `type` khác nhau.")
         if len({node.kind for node in self.nodes}) != len(self.nodes):
@@ -406,6 +414,7 @@ def deliver(db: Session, settings, delivery_id: str):
         "Idempotency-Key": row.id,
     }
     row.attempts += 1
+    started = time.monotonic()
     try:
         with client(CALL_TIMEOUT) as http:
             response = http.post(url, content=body, headers=headers)
@@ -413,6 +422,7 @@ def deliver(db: Session, settings, delivery_id: str):
         row.error = "Không kết nối được máy chủ plugin."
         # The outbox retries with growing gaps; the delivery id lets the plugin drop repeats.
         raise AppError(503, "plugin_unreachable", row.error) from exc
+    row.duration_ms = int((time.monotonic() - started) * 1000)
     row.status_code = response.status_code
     if response.status_code >= 500 or response.status_code == 429:
         row.error = f"Plugin trả lỗi {response.status_code}."
@@ -420,6 +430,30 @@ def deliver(db: Session, settings, delivery_id: str):
     row.state = "sent" if response.status_code < 400 else "failed"
     row.error = None if row.state == "sent" else f"Plugin từ chối ({response.status_code})."
     row.delivered_at = m.utcnow()
+    if row.state == "failed":
+        alert_failing(db, plugin)
+
+
+def send_event(db: Session, plugin: m.Plugin, event_type: str, subject: dict | None = None):
+    """An event about the plugin itself (settings changed): sent whatever events it subscribed to."""
+    row = log(db, plugin.plugin_id, "event", event_type=event_type, subject=subject, state="pending")
+    enqueue(db, "plugin.deliver", row.id, {"delivery_id": row.id})
+
+
+def alert_failing(db: Session, plugin: m.Plugin, streak: int = 5):
+    """Tell whoever approved the plugin, once a day, when its last exchanges all failed. It stays on."""
+    recent = db.scalars(
+        select(m.PluginDelivery.state)
+        .where(m.PluginDelivery.plugin_id == plugin.plugin_id, m.PluginDelivery.kind.in_(["event", "node", "health"]))
+        .order_by(m.PluginDelivery.created_at.desc())
+        .limit(streak)
+    ).all()
+    if len(recent) < streak or any(state == "sent" for state in recent):
+        return
+    person = plugin.approved_by or plugin.installed_by
+    if person and db.get(m.User, person):
+        notify(db, person, f"plugin-failing:{plugin.plugin_id}:{m.utcnow().date().isoformat()}",
+               f"Plugin “{plugin.name}” lỗi {streak} lần liên tiếp. Xem nhật ký ở trang Plugin.", link="/plugins")  # fmt: skip
 
 
 # ---- Flow step (worker) ------------------------------------------------------------------
@@ -459,6 +493,7 @@ def call_node(db: Session, settings, run: m.AutomationRun, node: dict) -> tuple[
         "Idempotency-Key": f"{run.id}:{node['id']}",
     }
     row.attempts += 1
+    started = time.monotonic()
     try:
         with client(CALL_TIMEOUT) as http:
             response = http.post(target(plugin, spec["endpoint"]), content=body, headers=headers)
@@ -469,6 +504,7 @@ def call_node(db: Session, settings, run: m.AutomationRun, node: dict) -> tuple[
     except httpx.HTTPError as exc:
         row.error = "Không kết nối được máy chủ plugin."
         raise AppError(503, "plugin_unreachable", row.error) from exc
+    row.duration_ms = int((time.monotonic() - started) * 1000)
     row.status_code = response.status_code
     if response.status_code >= 500:
         row.error = f"Plugin trả lỗi {response.status_code}."
@@ -595,6 +631,42 @@ class Toggle(s.Revision):
     enabled: bool
 
 
+class SettingsInput(s.Input):
+    # 0 until the settings are first saved.
+    expected_revision: int = Field(ge=0)
+    # A secret left out (or null) keeps its value; "" clears it.
+    values: dict[str, Any] = Field(default_factory=dict, max_length=20)
+
+
+def clean_settings(schema: dict, values: dict, kept_secrets: dict, incoming: dict) -> tuple[dict, dict]:
+    """New (values, secrets) for a plugin's settings, checked against its `settings_schema`."""
+    fields = schema.get("properties") or {}
+    unknown = set(incoming) - set(fields)
+    if unknown:
+        raise AppError(422, "plugin_setting_unknown", "Plugin không có cấu hình: " + ", ".join(sorted(unknown)))
+    values, kept_secrets = dict(values), dict(kept_secrets)
+    for key, value in incoming.items():
+        field = fields[key]
+        kept = kept_secrets if field.get("secret") else values
+        if value is None and field.get("secret"):
+            continue
+        if value in (None, ""):
+            kept.pop(key, None)
+            continue
+        expected = {"string": str, "number": int | float, "boolean": bool}[field.get("type", "string")]
+        if not isinstance(value, expected) or field.get("type") == "number" and isinstance(value, bool):
+            raise AppError(422, "plugin_setting_invalid", f"“{field['title']}” không đúng kiểu.")
+        if isinstance(value, str) and len(value) > 4000:
+            raise AppError(422, "plugin_setting_invalid", f"“{field['title']}” quá dài.")
+        if field.get("enum") and value not in field["enum"]:
+            raise AppError(422, "plugin_setting_invalid", f"“{field['title']}” chỉ nhận: {', '.join(field['enum'])}.")
+        kept[key] = value
+    missing = [fields[k]["title"] for k in schema.get("required") or [] if k not in values and k not in kept_secrets]
+    if missing:
+        raise AppError(422, "plugin_setting_required", "Cần điền: " + ", ".join(missing))
+    return values, kept_secrets
+
+
 class SessionInput(s.Input):
     plugin_id: str = Field(min_length=1, max_length=80)
     slot: Literal["case.side", "task.side", "home.widget", "page"]
@@ -655,6 +727,30 @@ def build_router(app):
                 .group_by(m.PluginDelivery.state)
             ).all()
         )
+        # Calls Desktiny made to the plugin's server in the last day: failures and answer time.
+        calls = list(
+            db.scalars(
+                select(m.PluginDelivery).where(
+                    m.PluginDelivery.plugin_id == row.plugin_id,
+                    m.PluginDelivery.created_at >= since,
+                    m.PluginDelivery.kind.in_(["event", "node", "health", "tool"]),
+                    m.PluginDelivery.state != "pending",
+                )
+            )
+        )
+        timed = [c.duration_ms for c in calls if c.duration_ms is not None]
+        last_health = db.scalar(
+            select(m.PluginDelivery)
+            .where(m.PluginDelivery.plugin_id == row.plugin_id, m.PluginDelivery.kind == "health")
+            .order_by(m.PluginDelivery.created_at.desc())
+            .limit(1)
+        )
+        setting = db.get(m.PluginSetting, row.plugin_id)
+        secret_keys = (
+            sorted(SecretBox(settings.credential_encryption_key).decrypt(setting.secrets))
+            if setting and setting.secrets
+            else []
+        )
         return {
             **summary(row.manifest),
             "state": row.state,
@@ -669,6 +765,21 @@ def build_router(app):
             "approved_at": row.approved_at,
             "updated_at": row.updated_at,
             "last_day": counts,
+            "health": {
+                "endpoint": (row.manifest or {}).get("health_endpoint"),
+                "checked_at": last_health.created_at if last_health else None,
+                "ok": last_health.state == "sent" if last_health else None,
+                "status_code": last_health.status_code if last_health else None,
+                "latency_ms": last_health.duration_ms if last_health else None,
+                "error_rate": round(sum(c.state != "sent" for c in calls) / len(calls), 3) if calls else None,
+                "avg_latency_ms": int(sum(timed) / len(timed)) if timed else None,
+            },
+            "settings_schema": (row.manifest or {}).get("settings_schema") or {"properties": {}, "required": []},
+            "settings": {
+                "values": setting.values if setting else {},
+                "secrets_set": secret_keys,
+                "revision": setting.revision if setting else 0,
+            },
         }
 
     async def manifest_from(file: UploadFile) -> PluginManifest:
@@ -813,10 +924,66 @@ def build_router(app):
             call.state, call.finished_at = "cancelled", m.utcnow()
             call.result = {"branch": "error", "message": "Plugin đã bị gỡ."}
             enqueue(db, "plugin.call_done", call.run_id, {"call_id": call.id})
+        setting = db.get(m.PluginSetting, row.plugin_id)
+        if setting:
+            db.delete(setting)  # an agency's keys for a plugin it removed are not kept
         audit(db, user, "plugin.removed", row.id, {"plugin_id": plugin_id, "version": row.version})
         db.delete(row)
         db.commit()
         return {"removed": plugin_id}
+
+    @router.put("/plugins/{plugin_id}/settings")
+    def save_settings(
+        plugin_id: str, body: SettingsInput, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)
+    ):
+        """The organisation's settings for the plugin; the plugin is told they changed (not what they are)."""
+        user = manager(db, actor)
+        row = get_plugin(db, plugin_id)
+        setting = db.scalar(select(m.PluginSetting).where(m.PluginSetting.plugin_id == plugin_id).with_for_update())
+        if (setting.revision if setting else 0) != body.expected_revision:
+            raise AppError(409, "revision_conflict", "Cấu hình vừa được người khác thay đổi. Tải lại để xem.")
+        box = SecretBox(settings.credential_encryption_key)
+        kept = box.decrypt(setting.secrets) if setting and setting.secrets else {}
+        values, secret_values = clean_settings(
+            (row.manifest or {}).get("settings_schema") or {}, setting.values if setting else {}, kept, body.values
+        )
+        if not setting:
+            setting = m.PluginSetting(plugin_id=plugin_id, revision=0)
+            db.add(setting)
+        setting.values, setting.secrets = values, box.encrypt(secret_values) if secret_values else ""
+        setting.revision += 1
+        setting.updated_by, setting.updated_at = user.id, m.utcnow()
+        audit(db, user, "plugin.settings_changed", row.id, {"plugin_id": plugin_id, "keys": sorted(body.values)})
+        if row.state == "enabled" and row.secret:
+            send_event(db, row, "plugin.settings.changed")
+        db.commit()
+        return plugin_data(db, row)
+
+    @router.post("/plugins/{plugin_id}/health")
+    def check_health(plugin_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        """Ask the plugin's `health_endpoint` now; the answer and its time go to the plugin's log."""
+        manager(db, actor)
+        row = get_plugin(db, plugin_id)
+        path = (row.manifest or {}).get("health_endpoint")
+        if not path:
+            raise AppError(409, "plugin_health_missing", "Plugin không khai health_endpoint.")
+        check_host(settings, row.base_url)
+        entry = log(db, row.plugin_id, "health", event_type="GET health", state="pending")
+        started = time.monotonic()
+        try:
+            with client(5) as http:
+                response = http.get(target(row, path))
+            entry.status_code = response.status_code
+            entry.state = "sent" if response.status_code < 300 else "failed"
+            entry.error = None if entry.state == "sent" else f"Plugin trả {response.status_code}."
+        except httpx.HTTPError:
+            entry.state, entry.error = "failed", "Không kết nối được máy chủ plugin."
+        entry.duration_ms = int((time.monotonic() - started) * 1000)
+        entry.delivered_at = m.utcnow()
+        if entry.state == "failed":
+            alert_failing(db, row)
+        db.commit()
+        return plugin_data(db, row)
 
     @router.get("/plugins/{plugin_id}/deliveries")
     def deliveries(

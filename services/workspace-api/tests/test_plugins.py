@@ -697,3 +697,71 @@ def test_new_core_events_are_announced(world, plugin):  # noqa: F811
         assert sweep_overdue(db) == 0  # once per due date
         db.commit()
     assert "task.overdue" in dispatched(world)
+
+
+# ---- Settings and operations (5.8, 5.9) ------------------------------------------------------------
+
+CONFIGURED = {
+    **MANIFEST,
+    "id": "vn.vi-du.cau-hinh",
+    "permissions": [],
+    "events": [],
+    "ui": [],
+    "nodes": [],
+    "health_endpoint": "/health",
+    "settings_schema": {
+        "type": "object",
+        "properties": {
+            "ma_co_quan": {"type": "string", "title": "Mã cơ quan"},
+            "khoa_api": {"type": "string", "title": "Khoá API hệ thống ngoài", "secret": True},
+            "so_ngay": {"type": "number", "title": "Số ngày"},
+        },
+        "required": ["ma_co_quan", "khoa_api"],
+    },
+}
+
+
+def test_settings_keep_secrets_hidden_and_reach_only_the_plugin_server(world, plugin):  # noqa: F811
+    fake, _, _ = plugin
+    issued = approve(world, CONFIGURED)
+    token = issued["issued"]["token"]
+    fake.secret = issued["issued"]["secret"]
+    director = as_(world, "director")
+    path = f"{API}/plugins/{CONFIGURED['id']}/settings"
+    missing = director.put(path, json={"expected_revision": 0, "values": {"ma_co_quan": "H01"}})
+    assert missing.status_code == 422 and missing.json()["code"] == "plugin_setting_required"
+    wrong = director.put(path, json={"expected_revision": 0, "values": {"ma_co_quan": "H01", "khoa_api": "k",
+                                                                         "so_ngay": "ba"}})  # fmt: skip
+    assert wrong.status_code == 422
+    saved = director.put(path, json={"expected_revision": 0, "values": {"ma_co_quan": "H01", "khoa_api": "bi-mat"}})
+    assert saved.status_code == 200, saved.text
+    shown = saved.json()["settings"]
+    assert shown["values"] == {"ma_co_quan": "H01"} and shown["secrets_set"] == ["khoa_api"]
+    assert "bi-mat" not in saved.text
+    # Saving without the secret keeps it.
+    again = director.put(path, json={"expected_revision": shown["revision"], "values": {"so_ngay": 3}})
+    assert again.status_code == 200 and again.json()["settings"]["secrets_set"] == ["khoa_api"]
+    read = plugin_get(world, token, "/settings").json()
+    assert read["values"] == {"ma_co_quan": "H01", "khoa_api": "bi-mat", "so_ngay": 3}
+    assert as_(world, "staff").put(path, json={"expected_revision": 2, "values": {}}).status_code == 403
+    drain(world)
+    assert [e["type"] for e in fake.events].count("plugin.settings.changed") == 2
+    secret_step = {**CONFIGURED, "id": "vn.vi-du.sai", "nodes": [{**MANIFEST["nodes"][0], "config_schema": {
+        "type": "object", "properties": {"k": {"type": "string", "title": "K", "secret": True}}}}]}  # fmt: skip
+    assert upload(as_(world, "director"), "/plugins/preview", secret_step).status_code == 422
+
+
+def test_health_checks_and_a_failing_plugin_is_reported_without_switching_it_off(world, plugin):  # noqa: F811
+    approve(world, CONFIGURED)
+    director = as_(world, "director")
+    answers = iter([200] + [503] * 5)
+    plugins.use_transport(httpx.MockTransport(lambda request: httpx.Response(next(answers))))
+    path = f"{API}/plugins/{CONFIGURED['id']}/health"
+    first = director.post(path).json()["health"]
+    assert first["ok"] is True and first["status_code"] == 200 and first["latency_ms"] is not None
+    for _ in range(5):
+        last = director.post(path).json()
+    assert last["health"]["ok"] is False and last["health"]["error_rate"] > 0.5 and last["state"] == "enabled"
+    titles = [n["title"] for n in director.get(API + "/notifications").json()["items"]]
+    assert any("lỗi 5 lần liên tiếp" in title for title in titles)
+    assert director.post(f"{API}/plugins/{MANIFEST['id']}/health").status_code == 409  # no health_endpoint

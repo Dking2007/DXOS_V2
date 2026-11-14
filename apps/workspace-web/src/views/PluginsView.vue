@@ -9,8 +9,10 @@ import {
   AlertTriangle,
   Copy,
   KeyRound,
+  Activity,
   ListChecks,
   Power,
+  Settings2,
   Puzzle,
   RefreshCw,
   ShieldCheck,
@@ -50,10 +52,24 @@ interface PluginRow extends PluginSummary {
   approved_at: string | null
   updated_at: string
   last_day: Record<string, number>
+  health: {
+    endpoint: string | null
+    checked_at: string | null
+    ok: boolean | null
+    status_code: number | null
+    latency_ms: number | null
+    error_rate: number | null
+    avg_latency_ms: number | null
+  }
+  settings_schema: {
+    properties: Record<string, { type: 'string' | 'number' | 'boolean'; title: string; description?: string; enum?: string[] | null; secret?: boolean }>
+    required: string[]
+  }
+  settings: { values: Record<string, unknown>; secrets_set: string[]; revision: number }
 }
 interface Delivery {
   id: string
-  kind: 'event' | 'node' | 'api' | 'write'
+  kind: 'event' | 'node' | 'api' | 'write' | 'inbound' | 'health' | 'tool'
   event_type: string
   subject: { type: string; id: string } | null
   state: string
@@ -94,7 +110,59 @@ const removing = ref<PluginRow | null>(null)
 const logOf = ref<PluginRow | null>(null)
 
 const STATE = { pending: 'Chờ duyệt', enabled: 'Đang bật', disabled: 'Đang tắt' }
-const KIND = { event: 'Sự kiện', node: 'Bước quy trình', api: 'Đọc API', write: 'Ghi API' }
+const KIND = {
+  event: 'Sự kiện',
+  node: 'Bước quy trình',
+  api: 'Đọc API',
+  write: 'Ghi API',
+  inbound: 'Plugin gửi vào',
+  health: 'Kiểm tra sức khoẻ',
+  tool: 'Công cụ trợ lý',
+}
+// The organisation's settings for a plugin; secrets are never shown back, only whether they are set.
+const configuring = ref<PluginRow | null>(null)
+const draft = ref<Record<string, unknown>>({})
+function openSettings(row: PluginRow) {
+  configuring.value = row
+  draft.value = { ...row.settings.values }
+}
+async function saveSettings() {
+  const row = configuring.value
+  if (!row) return
+  busy.value = true
+  try {
+    // A secret left empty keeps its value; only what was typed is sent.
+    const values = Object.fromEntries(
+      Object.entries(row.settings_schema.properties)
+        .filter(([key, field]) => !field.secret || (draft.value[key] ?? '') !== '')
+        .map(([key]) => [key, draft.value[key] ?? null]),
+    )
+    await api.request(`/plugins/${encodeURIComponent(row.id)}/settings`, {
+      method: 'PUT',
+      body: JSON.stringify({ expected_revision: row.settings.revision, values }),
+    })
+    toast.success('Đã lưu cấu hình; plugin được báo có thay đổi.')
+    configuring.value = null
+    await refresh()
+  } catch (cause) {
+    toast.error(cause)
+  } finally {
+    busy.value = false
+  }
+}
+async function checkHealth(row: PluginRow) {
+  busy.value = true
+  try {
+    const result = await api.request<PluginRow>(`/plugins/${encodeURIComponent(row.id)}/health`, { method: 'POST' })
+    if (result.health.ok) toast.success(`Plugin trả lời sau ${result.health.latency_ms} ms.`)
+    else toast.error('Plugin không trả lời đúng; xem nhật ký.')
+    await refresh()
+  } catch (cause) {
+    toast.error(cause)
+  } finally {
+    busy.value = false
+  }
+}
 const DELIVERY = {
   pending: 'Đang gửi',
   sent: 'Thành công',
@@ -335,6 +403,15 @@ async function copy(text: string) {
                 · <span class="overdue-text">{{ row.last_day.failed }} bị từ chối</span></template
               ><template v-if="row.last_day.pending"> · {{ row.last_day.pending }} đang gửi</template>
             </li>
+            <li v-if="row.state !== 'pending' && (row.health.checked_at || row.health.error_rate !== null)" class="muted">
+              <template v-if="row.health.checked_at"
+                >Sức khoẻ:
+                <span :class="row.health.ok ? '' : 'overdue-text'">{{ row.health.ok ? 'tốt' : 'lỗi' }}</span>
+                ({{ formatDate(row.health.checked_at, true) }})</template
+              ><template v-if="row.health.error_rate !== null">
+                · tỉ lệ lỗi 24 giờ {{ Math.round(row.health.error_rate * 100) }}%</template
+              ><template v-if="row.health.avg_latency_ms !== null"> · trả lời trung bình {{ row.health.avg_latency_ms }} ms</template>
+            </li>
           </ul>
         </div>
         <div class="plugin-actions">
@@ -354,6 +431,17 @@ async function copy(text: string) {
           </button>
           <button v-if="row.state !== 'pending'" class="button ghost small" :disabled="busy" @click="act(row, 'rotate')">
             <KeyRound :size="15" />Đổi khoá
+          </button>
+          <button
+            v-if="Object.keys(row.settings_schema.properties).length"
+            class="button ghost small"
+            :disabled="busy"
+            @click="openSettings(row)"
+          >
+            <Settings2 :size="15" />Cấu hình
+          </button>
+          <button v-if="row.health.endpoint" class="button ghost small" :disabled="busy" @click="checkHealth(row)">
+            <Activity :size="15" />Kiểm tra
           </button>
           <button class="button ghost small" @click="logOf = row"><ListChecks :size="15" />Nhật ký</button>
           <button class="button ghost small" @click="removing = row"><Trash2 :size="15" />Gỡ</button>
@@ -474,6 +562,46 @@ async function copy(text: string) {
         </button>
       </div>
     </div>
+  </ModalDialog>
+
+  <ModalDialog v-if="configuring" :title="`Cấu hình: ${configuring.name}`" @close="configuring = null">
+    <form class="stack" @submit.prevent="saveSettings">
+      <p class="muted">Giá trị dành cho cơ quan này. Ô bí mật được mã hoá khi lưu và không hiện lại.</p>
+      <div v-for="(field, key) in configuring.settings_schema.properties" :key="key" class="field">
+        <label v-if="field.type !== 'boolean'" :for="`setting-${key}`"
+          >{{ field.title
+          }}<span v-if="configuring.settings_schema.required.includes(String(key))" class="required"> *</span></label
+        >
+        <select v-if="field.enum?.length" :id="`setting-${key}`" v-model="draft[key]">
+          <option :value="null">Chọn…</option>
+          <option v-for="option in field.enum" :key="option" :value="option">{{ option }}</option>
+        </select>
+        <label v-else-if="field.type === 'boolean'" class="checkbox-label"
+          ><input v-model="draft[key]" type="checkbox" />{{ field.title }}</label
+        >
+        <input
+          v-else-if="field.type === 'number'"
+          :id="`setting-${key}`"
+          v-model.number="draft[key]"
+          type="number"
+        />
+        <input
+          v-else
+          :id="`setting-${key}`"
+          v-model="draft[key]"
+          :type="field.secret ? 'password' : 'text'"
+          autocomplete="off"
+          :placeholder="
+            field.secret && configuring.settings.secrets_set.includes(String(key)) ? 'Đã đặt; để trống để giữ' : ''
+          "
+        />
+        <small v-if="field.description">{{ field.description }}</small>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="button secondary" @click="configuring = null">Huỷ</button
+        ><button type="submit" class="button" :disabled="busy">Lưu cấu hình</button>
+      </div>
+    </form>
   </ModalDialog>
 
   <ModalDialog v-if="issued" :title="`Khoá cho ${issued.name}`" @close="issued = null">

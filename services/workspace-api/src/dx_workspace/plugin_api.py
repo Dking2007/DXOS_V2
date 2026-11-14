@@ -27,6 +27,7 @@ from typing import Any, Literal
 from urllib.parse import quote
 
 from dx_platform.errors import AppError
+from dx_platform.security import SecretBox
 from fastapi import APIRouter, Depends, File, Header, Query, Request, Response, UploadFile
 from fastapi import Form as MultipartForm
 from fastapi.encoders import jsonable_encoder
@@ -130,6 +131,11 @@ class CompleteInput(s.Input):
 
 class ProgressInput(s.Input):
     message: str = Field(min_length=1, max_length=300)
+
+
+def signed_body(model) -> dict:
+    """The JSON body a signed endpoint reads itself (to check the signature over the raw bytes)."""
+    return {"requestBody": {"required": True, "content": {"application/json": {"schema": model.model_json_schema()}}}}
 
 
 def plugin_api(app) -> APIRouter:
@@ -499,6 +505,20 @@ def plugin_api(app) -> APIRouter:
         return once(db, who, f"case.attach:{case.id}", idempotency_key,
                     {"name": name, "sha256": digest_hex, "node_id": node_id, "role": role}, work)  # fmt: skip
 
+    # ---- Settings ---------------------------------------------------------------------------
+
+    @router.get("/settings")
+    def read_settings(db: Session = Depends(db_dep), who: Caller = Depends(reader)):
+        """The organisation's settings for this plugin, secrets included: for the plugin's server only."""
+        if who.user:
+            raise AppError(403, "plugin_install_token_required", "Cấu hình chỉ đọc bằng token cài đặt.")
+        setting = db.get(m.PluginSetting, who.plugin.plugin_id)
+        box = SecretBox(settings.credential_encryption_key)
+        secrets = box.decrypt(setting.secrets) if setting and setting.secrets else {}
+        record(db, who, "GET /settings", None)
+        db.commit()
+        return {"values": {**(setting.values if setting else {}), **secrets}, "revision": setting.revision if setting else 0}
+
     # ---- Events in --------------------------------------------------------------------------
 
     def event_value(db, kind: str, key: str, value):
@@ -587,7 +607,7 @@ def plugin_api(app) -> APIRouter:
         except ValidationError as exc:
             raise AppError(422, "validation_error", "Dữ liệu không hợp lệ: " + str(exc.errors()[0]["msg"])) from None
 
-    @router.post("/calls/{call_id}/complete")
+    @router.post("/calls/{call_id}/complete", openapi_extra=signed_body(CompleteInput))
     async def complete_call(call_id: str, request: Request, db: Session = Depends(db_dep), who: Caller = Depends(writer)):
         """The plugin finished a long-running step; only the first report counts."""
         body = parse(CompleteInput, await signed(request, who))
@@ -600,7 +620,7 @@ def plugin_api(app) -> APIRouter:
         db.commit()
         return {"accepted": True, "state": "completed"}
 
-    @router.post("/calls/{call_id}/progress")
+    @router.post("/calls/{call_id}/progress", openapi_extra=signed_body(ProgressInput))
     async def call_progress(call_id: str, request: Request, db: Session = Depends(db_dep), who: Caller = Depends(writer)):
         """A line about where the step is ("Đang chờ ký"), shown on the dossier's process."""
         body = parse(ProgressInput, await signed(request, who))
