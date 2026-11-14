@@ -14,6 +14,8 @@ over answers 429 with `Retry-After`.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import time
 from collections import deque
@@ -23,7 +25,7 @@ from typing import Any, Literal
 from urllib.parse import quote
 
 from dx_platform.errors import AppError
-from fastapi import APIRouter, Depends, File, Header, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Header, Query, Response, UploadFile
 from fastapi import Form as MultipartForm
 from fastapi.encoders import jsonable_encoder
 from pydantic import Field
@@ -33,9 +35,9 @@ from sqlalchemy.orm import Session
 from . import models as m
 from . import schemas as s
 from .plugins import API_PREFIX, API_VERSION, SCOPES, SESSION_ONLY, digest, log
-from .policies import get_case
+from .policies import case_filter, get_case
 from .processes import step_limits
-from .services import audit, idem_begin, notify
+from .services import audit, idem_begin, notify, page
 from .tasks import TaskCreate, TaskSource, TaskTransition, add_comment, apply_transition, create_task
 from .tasks import visible as task_visible
 
@@ -164,11 +166,22 @@ def plugin_api(app) -> APIRouter:
             case = get_case(db, who.user, case_id)
             fields, hide_files = step_limits(db, who.user, case)
             return case, fields, hide_files
-        told_about(db, who, "case", case_id)
         case = db.get(m.Case, case_id)
+        if not (case and listable(who, case)):
+            told_about(db, who, "case", case_id)
         if not case or case.deleted_at:
             raise AppError(404, "case_not_found", "Không tìm thấy hồ sơ.")
         return case, None, False
+
+    def list_forms(who: Caller) -> set[str]:
+        granted = who.plugin.granted or {}
+        if "cases.list" not in granted.get("permissions", []) or "cases.list" not in who.token.scopes:
+            return set()
+        return set(granted.get("list_forms", []))
+
+    def listable(who: Caller, case: m.Case) -> bool:
+        """A dossier of a form the plugin may list counts as told about."""
+        return case.form_id in list_forms(who)
 
     def task_for(db, who: Caller, task_id: str) -> m.Task:
         task = db.get(m.Task, task_id)
@@ -273,6 +286,89 @@ def plugin_api(app) -> APIRouter:
             "job_title": person.job_title,
             "department": department.name if department else None,
         }
+
+    # ---- Lists and reference data -------------------------------------------------------------
+
+    @router.get("/cases")
+    def list_cases(
+        form_id: str | None = None,
+        status: str | None = None,
+        updated_since: datetime | None = None,
+        cursor: str | None = None,
+        limit: int = Query(100, ge=1, le=200),
+        db: Session = Depends(db_dep),
+        who: Caller = Depends(reader),
+    ):
+        """Dossiers of the forms chosen at approval, oldest change first; no form content."""
+        need(who, "cases.list")
+        forms = list_forms(who)
+        if form_id:
+            if form_id not in forms:
+                raise AppError(403, "plugin_form_denied", "Plugin không được liệt kê hồ sơ của quy trình này.")
+            forms = {form_id}
+        statement = select(m.Case).where(m.Case.form_id.in_(forms), m.Case.deleted_at.is_(None))
+        if who.user:
+            statement = statement.where(case_filter(db, who.user))
+        if status:
+            statement = statement.where(m.Case.status.in_(status.split(",")))
+        if updated_since:
+            statement = statement.where(m.Case.updated_at >= updated_since)
+        if cursor:
+            try:
+                moment, last_id = base64.urlsafe_b64decode(cursor.encode()).decode().split("|", 1)
+                after = datetime.fromisoformat(moment)
+            except (ValueError, UnicodeDecodeError, binascii.Error) as exc:
+                raise AppError(422, "invalid_cursor", "Con trỏ trang không hợp lệ.") from exc
+            statement = statement.where(
+                (m.Case.updated_at > after) | ((m.Case.updated_at == after) & (m.Case.id > last_id))
+            )
+        rows = list(db.scalars(statement.order_by(m.Case.updated_at, m.Case.id).limit(limit + 1)))
+        more, rows = len(rows) > limit, rows[:limit]
+        record(db, who, "GET /cases", None)
+        db.commit()
+        last = rows[-1] if rows else None
+        return {
+            "items": [
+                {"id": c.id, "code": f"HS-{c.number:06d}", "title": c.title, "form_id": c.form_id, "status": c.status,
+                 "priority": c.priority, "due_at": c.due_at, "updated_at": c.updated_at}
+                for c in rows
+            ],
+            "next_cursor": base64.urlsafe_b64encode(f"{last.updated_at.isoformat()}|{last.id}".encode()).decode()
+            if more and last else None,
+            "has_more": more,
+        }  # fmt: skip
+
+    @router.get("/departments")
+    def departments(db: Session = Depends(db_dep), who: Caller = Depends(reader)):
+        need(who, "departments.read")
+        rows = db.scalars(select(m.Department).order_by(m.Department.name))
+        record(db, who, "GET /departments", None)
+        db.commit()
+        return {
+            "items": [
+                {"id": d.id, "name": d.name, "code": d.code, "parent_id": d.parent_id, "manager_id": d.manager_id}
+                for d in rows
+            ]
+        }
+
+    @router.get("/people")
+    def people(
+        department_id: str | None = None,
+        cursor: str | None = None,
+        limit: int = Query(100, ge=1, le=200),
+        db: Session = Depends(db_dep),
+        who: Caller = Depends(reader),
+    ):
+        need(who, "people.list")
+        statement = select(m.User).where(m.User.active.is_(True))
+        if department_id:
+            statement = statement.where(m.User.department_id == department_id)
+        rows = list(db.scalars(statement.order_by(m.User.display_name, m.User.id)))
+        record(db, who, "GET /people", None)
+        db.commit()
+        return page(rows, limit, cursor, transform=lambda u: {"id": u.id, "display_name": u.display_name,
+                                                               "job_title": u.job_title,
+                                                               "department_id": u.department_id})  # fmt: skip
 
     # ---- Files ------------------------------------------------------------------------------
 

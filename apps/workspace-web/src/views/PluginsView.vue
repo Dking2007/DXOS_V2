@@ -44,7 +44,8 @@ interface PluginSummary {
 }
 interface PluginRow extends PluginSummary {
   state: 'pending' | 'enabled' | 'disabled'
-  granted: { permissions: string[]; events: string[]; fields: string[] }
+  granted: { permissions: string[]; events: string[]; fields: string[]; list_forms: string[] }
+  list_form_names: Record<string, string>
   revision: number
   approved_at: string | null
   updated_at: string
@@ -76,10 +77,17 @@ const preview = ref<(PluginSummary & { upgrade_from: string | null }) | null>(nu
 const previewFile = ref<File | null>(null)
 const previewError = ref<unknown>(null)
 const approving = ref<PluginRow | null>(null)
-const chosen = ref<{ permissions: string[]; events: string[]; fields: string[] }>({
+const chosen = ref<{ permissions: string[]; events: string[]; fields: string[]; list_forms: string[] }>({
   permissions: [],
   events: [],
   fields: [],
+  list_forms: [],
+})
+// Forms whose dossiers a plugin with cases.list may list: chosen here, at approval.
+const forms = useQuery({
+  queryKey: ['forms', 'published'],
+  queryFn: () => api.request<{ items: { id: string; name: string }[] }>('/forms?limit=200'),
+  enabled: computed(() => !!approving.value?.permissions.some((item) => item.key === 'cases.list')),
 })
 const issued = ref<{ name: string; values: Issued } | null>(null)
 const removing = ref<PluginRow | null>(null)
@@ -150,6 +158,7 @@ function openApprove(row: PluginRow) {
     permissions: row.permissions.map((item) => item.key),
     events: row.events.map((item) => item.key),
     fields: [...row.fields],
+    list_forms: [...(row.granted.list_forms ?? [])],
   }
 }
 function toggleIn(list: string[], key: string) {
@@ -170,6 +179,7 @@ async function approve() {
           ...chosen.value,
           // Fields go with the write permission; without it they are not granted.
           fields: chosen.value.permissions.includes('cases.fields.write') ? chosen.value.fields : [],
+          list_forms: chosen.value.permissions.includes('cases.list') ? chosen.value.list_forms : [],
         }),
       },
     )
@@ -311,6 +321,9 @@ async function copy(text: string) {
                 >{{ key }}</span
               >
             </li>
+            <li v-if="Object.keys(row.list_form_names ?? {}).length">
+              <strong>Được liệt kê hồ sơ của:</strong> {{ Object.values(row.list_form_names).join(', ') }}
+            </li>
             <li v-if="row.nodes.length">
               <strong>Bước quy trình:</strong> {{ row.nodes.map((n) => n.title).join(', ') }}
             </li>
@@ -428,6 +441,21 @@ async function copy(text: string) {
             >{{ key }}</span
           ></label
         >
+      </div>
+      <div v-if="chosen.permissions.includes('cases.list')">
+        <span class="section-label">Quy trình plugin được liệt kê hồ sơ</span>
+        <p v-if="forms.isPending.value" class="muted">Đang tải quy trình…</p>
+        <label
+          v-for="item in forms.data.value?.items ?? []"
+          :key="item.id"
+          class="checkbox-label"
+          ><input
+            type="checkbox"
+            :checked="chosen.list_forms.includes(item.id)"
+            @change="toggleIn(chosen.list_forms, item.id)"
+          />{{ item.name }}</label
+        >
+        <small class="muted">Plugin chỉ liệt kê (và đọc) hồ sơ của các quy trình được chọn; không chọn thì không thấy hồ sơ nào.</small>
       </div>
       <div v-if="approving.events.length">
         <span class="section-label">Sự kiện được gửi</span>

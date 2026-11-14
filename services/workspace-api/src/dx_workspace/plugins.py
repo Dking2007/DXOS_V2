@@ -68,6 +68,9 @@ SCOPES = {
     "notifications.send": "Gửi thông báo trong ứng dụng",
     "files.read": "Đọc tài liệu của hồ sơ (danh sách và nội dung)",
     "cases.attach": "Gắn tài liệu vào hồ sơ",
+    "cases.list": "Liệt kê hồ sơ của các quy trình được chọn khi duyệt",
+    "departments.read": "Đọc cây phòng ban",
+    "people.list": "Liệt kê danh bạ",
 }
 # Writes that need a person behind them: the frame's viewer, never the installation alone.
 SESSION_ONLY = {"cases.fields.write", "tasks.write"}
@@ -158,6 +161,11 @@ class Writes(s.Input):
         return list(dict.fromkeys(value))
 
 
+class ListScope(s.Input):
+    # The administrator picks the forms (processes) at approval; nothing else is possible yet.
+    forms: Literal["ask"] = "ask"
+
+
 class PluginManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
     schema_: Literal["desktiny-plugin/1"] = Field(alias="schema")
@@ -175,6 +183,7 @@ class PluginManifest(BaseModel):
     ui: list[PluginUi] = Field(default_factory=list, max_length=10)
     requires: Requires = Field(default_factory=Requires)
     writes: Writes = Field(default_factory=Writes)
+    list_scope: ListScope = Field(default_factory=ListScope)
 
     @model_validator(mode="after")
     def known(self):
@@ -500,6 +509,8 @@ class Approval(s.Revision):
     permissions: list[str] = Field(default_factory=list)
     events: list[str] = Field(default_factory=list)
     fields: list[str] = Field(default_factory=list)
+    # Forms whose dossiers `cases.list` may list (and so read).
+    list_forms: list[str] = Field(default_factory=list, max_length=100)
 
 
 class Toggle(s.Revision):
@@ -568,7 +579,12 @@ def build_router(app):
         return {
             **summary(row.manifest),
             "state": row.state,
-            "granted": {key: [] for key in asked({})} | (row.granted or {}),
+            "granted": {key: [] for key in asked({})} | {"list_forms": []} | (row.granted or {}),
+            "list_form_names": {
+                form_id: form.name
+                for form_id in (row.granted or {}).get("list_forms", [])
+                if (form := db.get(m.Form, form_id))
+            },
             "host_allowed": host_allowed(settings, row.base_url),
             "revision": row.revision,
             "approved_at": row.approved_at,
@@ -649,8 +665,14 @@ def build_router(app):
             raise AppError(422, "plugin_grant_invalid", "Chỉ duyệt được những gì plugin đã xin.")
         if body.fields and "cases.fields.write" not in body.permissions:
             raise AppError(422, "plugin_grant_invalid", "Duyệt trường để ghi cần duyệt cả quyền cases.fields.write.")
+        if body.list_forms and "cases.list" not in body.permissions:
+            raise AppError(422, "plugin_grant_invalid", "Chọn quy trình để liệt kê cần duyệt cả quyền cases.list.")
+        for form_id in body.list_forms:
+            if not db.get(m.Form, form_id):
+                raise AppError(422, "plugin_grant_invalid", "Quy trình được chọn để liệt kê không tồn tại.")
         check_host(settings, row.base_url)
-        row.granted = {**(row.granted or {}), **{key: sorted(set(values)) for key, values in chosen.items()}}
+        row.granted = {**(row.granted or {}), **{key: sorted(set(values)) for key, values in chosen.items()},
+                       "list_forms": sorted(set(body.list_forms))}  # fmt: skip
         row.state, row.approved_by, row.approved_at = "enabled", user.id, m.utcnow()
         secret = None
         if not row.secret:

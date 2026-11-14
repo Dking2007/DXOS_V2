@@ -446,3 +446,38 @@ def test_the_plugin_step_can_be_handed_the_file_list(world, plugin):  # noqa: F8
     case = make_case(world, make_form(world), key="sf-case", files=[uploaded["id"]])
     submit(world, case, "sf-submit")
     assert fake.calls[0]["files"] == [{"id": uploaded["id"], "name": "a.txt", "type": "text/plain"}]
+
+
+# ---- Lists (5.3) ---------------------------------------------------------------------------
+
+LISTER = {**MANIFEST, "id": "vn.vi-du.nhac-han", "events": [],
+          "permissions": ["cases.read", "cases.list", "departments.read", "people.list"]}  # fmt: skip
+
+
+def test_listing_is_bound_to_the_forms_chosen_at_approval(world, plugin):  # noqa: F811
+    chosen, other = make_form(world), make_form(world)
+    director = as_(world, "director")
+    pending = upload(director, "/plugins", LISTER).json()
+    no_list = director.post(f"{API}/plugins/{LISTER['id']}/approve", json={
+        "expected_revision": pending["revision"], "permissions": ["cases.read"], "list_forms": [chosen["id"]]})  # fmt: skip
+    assert no_list.status_code == 422
+    approved = director.post(f"{API}/plugins/{LISTER['id']}/approve", json={
+        "expected_revision": pending["revision"], "permissions": LISTER["permissions"], "list_forms": [chosen["id"]]})  # fmt: skip
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["list_form_names"] == {chosen["id"]: chosen["name"]}
+    token = approved.json()["issued"]["token"]
+    mine = [make_case(world, chosen, key=f"l-{i}") for i in range(3)]
+    hidden = make_case(world, other, key="l-other")
+    first = plugin_get(world, token, "/cases?limit=2").json()
+    assert first["has_more"] and len(first["items"]) == 2 and "payload" not in first["items"][0]
+    rest = plugin_get(world, token, f"/cases?limit=2&cursor={first['next_cursor']}").json()
+    assert {c["id"] for c in first["items"] + rest["items"]} == {c["id"] for c in mine}
+    assert plugin_get(world, token, f"/cases?form_id={other['id']}").status_code == 403
+    # Listed dossiers read like dossiers it was told about; the others stay out of reach.
+    assert plugin_get(world, token, f"/cases/{mine[0]['id']}").status_code == 200
+    assert plugin_get(world, token, f"/cases/{hidden['id']}").status_code == 404
+    assert plugin_get(world, token, "/cases?status=approved").json()["items"] == []
+    departments = plugin_get(world, token, "/departments").json()["items"]
+    assert departments and {"id", "name", "parent_id"} <= set(departments[0])
+    people = plugin_get(world, token, "/people?limit=2").json()
+    assert len(people["items"]) == 2 and people["has_more"] and "display_name" in people["items"][0]
