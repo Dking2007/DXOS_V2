@@ -293,7 +293,7 @@ export interface TaskDetail extends Task {
     detail: Record<string, unknown>
     created_at: string
   }[]
-  comments: { id: string; author_name: string; body: string; created_at: string }[]
+  comments: { id: string; author_name: string; body: string; created_at: string; via?: string | null }[]
   subtasks: { id: string; title: string; status: TaskStatus; assignee_name: string }[]
   parent: { id: string; title: string } | null
   case: { id: string; title: string; code: string } | null

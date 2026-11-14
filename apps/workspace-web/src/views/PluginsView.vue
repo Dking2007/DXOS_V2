@@ -38,11 +38,13 @@ interface PluginSummary {
   events: Labelled[]
   nodes: { kind: string; title: string; description: string }[]
   ui: { slot: string; slot_label: string; title: string }[]
+  fields: string[]
+  requires: string
   host_allowed: boolean
 }
 interface PluginRow extends PluginSummary {
   state: 'pending' | 'enabled' | 'disabled'
-  granted: { permissions: string[]; events: string[] }
+  granted: { permissions: string[]; events: string[]; fields: string[] }
   revision: number
   approved_at: string | null
   updated_at: string
@@ -50,7 +52,7 @@ interface PluginRow extends PluginSummary {
 }
 interface Delivery {
   id: string
-  kind: 'event' | 'node' | 'api'
+  kind: 'event' | 'node' | 'api' | 'write'
   event_type: string
   subject: { type: string; id: string } | null
   state: string
@@ -74,13 +76,17 @@ const preview = ref<(PluginSummary & { upgrade_from: string | null }) | null>(nu
 const previewFile = ref<File | null>(null)
 const previewError = ref<unknown>(null)
 const approving = ref<PluginRow | null>(null)
-const chosen = ref<{ permissions: string[]; events: string[] }>({ permissions: [], events: [] })
+const chosen = ref<{ permissions: string[]; events: string[]; fields: string[] }>({
+  permissions: [],
+  events: [],
+  fields: [],
+})
 const issued = ref<{ name: string; values: Issued } | null>(null)
 const removing = ref<PluginRow | null>(null)
 const logOf = ref<PluginRow | null>(null)
 
 const STATE = { pending: 'Chờ duyệt', enabled: 'Đang bật', disabled: 'Đang tắt' }
-const KIND = { event: 'Sự kiện', node: 'Bước quy trình', api: 'Đọc API' }
+const KIND = { event: 'Sự kiện', node: 'Bước quy trình', api: 'Đọc API', write: 'Ghi API' }
 const DELIVERY = {
   pending: 'Đang gửi',
   sent: 'Thành công',
@@ -143,6 +149,7 @@ function openApprove(row: PluginRow) {
   chosen.value = {
     permissions: row.permissions.map((item) => item.key),
     events: row.events.map((item) => item.key),
+    fields: [...row.fields],
   }
 }
 function toggleIn(list: string[], key: string) {
@@ -156,7 +163,15 @@ async function approve() {
   try {
     const result = await api.request<PluginRow & { issued: Issued }>(
       `/plugins/${encodeURIComponent(approving.value.id)}/approve`,
-      { method: 'POST', body: JSON.stringify({ expected_revision: approving.value.revision, ...chosen.value }) },
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          expected_revision: approving.value.revision,
+          ...chosen.value,
+          // Fields go with the write permission; without it they are not granted.
+          fields: chosen.value.permissions.includes('cases.fields.write') ? chosen.value.fields : [],
+        }),
+      },
     )
     issued.value = { name: result.name, values: result.issued }
     approving.value = null
@@ -286,6 +301,16 @@ async function copy(text: string) {
                 >{{ item.label }}</span
               >
             </li>
+            <li v-if="row.fields.length">
+              <strong>Trường được ghi:</strong>
+              <span
+                v-for="key in row.fields"
+                :key="key"
+                class="chip mono"
+                :class="{ off: !row.granted.fields.includes(key) }"
+                >{{ key }}</span
+              >
+            </li>
             <li v-if="row.nodes.length">
               <strong>Bước quy trình:</strong> {{ row.nodes.map((n) => n.title).join(', ') }}
             </li>
@@ -349,9 +374,12 @@ async function copy(text: string) {
       <div class="plugin-asks">
         <div>
           <span class="section-label">Xin quyền</span>
-          <p v-if="!preview.permissions.length" class="muted">Không xin đọc dữ liệu.</p>
+          <p v-if="!preview.permissions.length" class="muted">Không xin quyền dữ liệu.</p>
           <ul>
             <li v-for="item in preview.permissions" :key="item.key">{{ item.label }}</li>
+            <li v-if="preview.fields.length">
+              Ghi các trường: <span class="mono">{{ preview.fields.join(', ') }}</span>
+            </li>
           </ul>
         </div>
         <div>
@@ -383,13 +411,22 @@ async function copy(text: string) {
     <div class="stack">
       <p class="muted">Chỉ cấp những gì plugin thật sự cần. Bỏ chọn mục nào thì plugin không có mục đó.</p>
       <div v-if="approving.permissions.length">
-        <span class="section-label">Quyền đọc</span>
+        <span class="section-label">Quyền dữ liệu</span>
         <label v-for="item in approving.permissions" :key="item.key" class="checkbox-label"
           ><input
             type="checkbox"
             :checked="chosen.permissions.includes(item.key)"
             @change="toggleIn(chosen.permissions, item.key)"
           />{{ item.label }}</label
+        >
+      </div>
+      <div v-if="approving.fields.length && chosen.permissions.includes('cases.fields.write')">
+        <span class="section-label">Trường biểu mẫu plugin được ghi</span>
+        <label v-for="key in approving.fields" :key="key" class="checkbox-label"
+          ><input type="checkbox" :checked="chosen.fields.includes(key)" @change="toggleIn(chosen.fields, key)" /><span
+            class="mono"
+            >{{ key }}</span
+          ></label
         >
       </div>
       <div v-if="approving.events.length">

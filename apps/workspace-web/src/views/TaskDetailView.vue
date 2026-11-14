@@ -468,7 +468,10 @@ function localInput(value: string | null) {
               <span class="avatar">{{ item.author_name.split(' ').slice(-1)[0]?.[0] }}</span>
               <div>
                 <strong>{{ item.author_name }}</strong>
-                <small class="muted"> · {{ formatDate(item.created_at, true) }}</small>
+                <small class="muted"
+                  ><template v-if="item.via"> qua plugin {{ item.via }}</template> ·
+                  {{ formatDate(item.created_at, true) }}</small
+                >
                 <p class="prewrap">{{ item.body }}</p>
               </div>
             </div>

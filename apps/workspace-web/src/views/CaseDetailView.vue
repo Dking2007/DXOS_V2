@@ -612,8 +612,26 @@ function eventLabel(event: HistoryEvent) {
     'case.rejected': 'Hồ sơ bị từ chối',
     'approval.decided': 'Đã ghi nhận quyết định',
     'case.workflow_started': 'Đã bắt đầu quy trình xử lý',
+    'plugin.write.comment': 'Ý kiến',
+    'plugin.write.fields': 'Cập nhật trường của hồ sơ',
+    'plugin.write.attach': 'Gắn tài liệu vào hồ sơ',
   }
   return actions[event.action] || event.action
+}
+// A plugin writes as itself ("plugin:<id>"), or as the viewer of its frame; history says which.
+function eventActor(event: HistoryEvent) {
+  const detail = typeof event.detail === 'object' && event.detail ? event.detail : {}
+  const plugin = typeof detail.plugin_name === 'string' ? detail.plugin_name : ''
+  if (event.actor_id?.startsWith('plugin:')) return `Plugin ${plugin || event.actor_id.slice(7)}`
+  return plugin ? `${userName(event.actor_id)} qua plugin ${plugin}` : userName(event.actor_id)
+}
+function eventNote(event: HistoryEvent) {
+  if (typeof event.detail === 'string') return event.detail
+  const detail = event.detail || {}
+  if (typeof detail.body === 'string') return detail.body
+  if (Array.isArray(detail.fields)) return 'Trường: ' + detail.fields.join(', ')
+  if (typeof detail.name === 'string') return detail.name
+  return typeof detail.reason === 'string' ? detail.reason : ''
 }
 function taskState(task: ApprovalTask) {
   return task.state || task.status || 'pending'
@@ -1084,22 +1102,11 @@ function moveTab(step: number) {
                 >
                   <p>{{ eventLabel(event) }}</p>
                   <small
-                    >{{ userName(event.actor_id) }} ·
+                    >{{ eventActor(event) }} ·
                     {{ formatDate(event.created_at, true) }}</small
                   >
-                  <p
-                    v-if="typeof event.detail === 'string'"
-                    class="muted"
-                    style="font-size: 14px; margin-top: 5px"
-                  >
-                    {{ event.detail }}
-                  </p>
-                  <p
-                    v-else-if="event.detail?.reason"
-                    class="muted"
-                    style="font-size: 14px; margin-top: 5px"
-                  >
-                    {{ event.detail.reason }}
+                  <p v-if="eventNote(event)" class="muted prewrap" style="font-size: 14px; margin-top: 5px">
+                    {{ eventNote(event) }}
                   </p>
                 </li>
               </ul>

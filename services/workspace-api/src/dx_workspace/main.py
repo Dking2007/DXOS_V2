@@ -48,8 +48,9 @@ def create_app(settings=None, engine=None):
     from .messaging import build_router as messaging_router
     from .office import office_router
     from .packs import build_router as packs_router
+    from .plugin_api import plugin_api
     from .plugins import build_router as plugins_router
-    from .plugins import plugin_api, plugin_cors
+    from .plugins import plugin_cors
     from .process_versions import build_router as process_versions_router
     from .processes import build_router as processes_router
     from .profile import build_router as profile_router

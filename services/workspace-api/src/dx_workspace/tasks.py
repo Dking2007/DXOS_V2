@@ -317,6 +317,86 @@ def event_data(task: m.Task) -> dict:
     }
 
 
+def apply_transition(db: Session, user: m.User, task: m.Task, body: TaskTransition, via: dict | None = None) -> m.Task:
+    """Move a task by one of TRANSITIONS as `user`; `via` names a plugin acting for them."""
+    if body.action not in allowed_actions(db, user, task):
+        raise AppError(
+            409, "transition_not_allowed", "Không thể thực hiện thao tác này ở trạng thái hiện tại."
+        )
+    if body.action in REASON_REQUIRED and not body.reason.strip():
+        raise AppError(422, "reason_required", "Cần nêu lý do cho thao tác này.")
+    target = TRANSITIONS[body.action][1]
+    values: dict = {"status": target, "updated_at": m.utcnow()}
+    if body.action == "accept":
+        values["accepted_at"] = m.utcnow()
+    if body.action == "submit" and len(task.file_ids or []) < (task.required_file_count or 0):
+        raise AppError(
+            422,
+            "task_result_required",
+            f"Cần đính kèm ít nhất {task.required_file_count} tệp kết quả trước khi nộp.",
+        )
+    if body.action == "submit":
+        if any(not item.get("done") for item in task.checklist or []):
+            raise AppError(422, "checklist_incomplete", "Hoàn thành checklist trước khi nộp kết quả.")
+        if body.result is not None:
+            values["result"] = body.result
+        values["submitted_at"] = m.utcnow()
+    if body.action == "complete":
+        open_children = db.scalar(
+            select(m.Task.id).where(m.Task.parent_id == task.id, m.Task.status.not_in(FINAL))
+        )
+        if open_children:
+            raise AppError(409, "subtasks_open", "Còn việc con chưa hoàn tất hoặc hủy.")
+        values["completed_at"] = m.utcnow()
+    cas(db, m.Task, task.id, body.expected_revision, values)
+    task = db.get(m.Task, task.id)
+    log(db, task, user.id, body.action, {**({"reason": body.reason} if body.reason else {}), **(via or {})})
+    recipients = set()
+    if body.action == "submit":
+        recipients.add(task.creator_id)
+    elif body.action in {"complete", "return", "cancel"} and task.assignee_id:
+        recipients.add(task.assignee_id)
+    elif body.action == "block":
+        recipients.add(task.creator_id)
+    labels = {
+        "submit": "Đã nộp kết quả",
+        "complete": "Đã nghiệm thu",
+        "return": "Bị trả lại",
+        "cancel": "Đã hủy",
+        "block": "Đang vướng mắc",
+    }
+    for recipient in recipients - {user.id}:
+        notify(
+            db,
+            recipient,
+            f"task-{body.action}:{task.id}:{task.revision}",
+            f"{labels.get(body.action, 'Cập nhật')}: {task.title}",
+            link=f"/tasks/{task.id}",
+        )
+    audit(db, user, "task." + body.action, task.id, via or None)
+    emit(db, "task." + target, task.id, event_data(task))
+    return task
+
+
+def add_comment(db: Session, user: m.User, task: m.Task, text: str, via: str | None = None) -> m.TaskComment:
+    """A comment by `user`; `via` is the name of the plugin that wrote it for them."""
+    value = m.TaskComment(task_id=task.id, author_id=user.id, body=text.strip(), via=via)
+    db.add(value)
+    db.flush()
+    participants = {task.creator_id, task.assignee_id, *(task.watcher_ids or [])} - {None, user.id}
+    if not task.assignee_id:
+        participants.update(recipients_for_assignment(db, task))
+    for recipient in participants - {user.id}:
+        notify(
+            db,
+            recipient,
+            f"task-comment:{value.id}",
+            f"{user.display_name} bình luận: {task.title}",
+            link=f"/tasks/{task.id}",
+        )
+    return value
+
+
 def build_router(app):
     router = APIRouter(prefix="/workspace/v1", tags=["tasks"])
     db_dep = app.state.db_dependency
@@ -644,63 +724,7 @@ def build_router(app):
         task_id: str, body: TaskTransition, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)
     ):
         user = user_for(db, actor)
-        task = get_task(db, user, task_id)
-        if body.action not in allowed_actions(db, user, task):
-            raise AppError(
-                409, "transition_not_allowed", "Không thể thực hiện thao tác này ở trạng thái hiện tại."
-            )
-        if body.action in REASON_REQUIRED and not body.reason.strip():
-            raise AppError(422, "reason_required", "Cần nêu lý do cho thao tác này.")
-        target = TRANSITIONS[body.action][1]
-        values: dict = {"status": target, "updated_at": m.utcnow()}
-        if body.action == "accept":
-            values["accepted_at"] = m.utcnow()
-        if body.action == "submit" and len(task.file_ids or []) < (task.required_file_count or 0):
-            raise AppError(
-                422,
-                "task_result_required",
-                f"Cần đính kèm ít nhất {task.required_file_count} tệp kết quả trước khi nộp.",
-            )
-        if body.action == "submit":
-            if any(not item.get("done") for item in task.checklist or []):
-                raise AppError(422, "checklist_incomplete", "Hoàn thành checklist trước khi nộp kết quả.")
-            if body.result is not None:
-                values["result"] = body.result
-            values["submitted_at"] = m.utcnow()
-        if body.action == "complete":
-            open_children = db.scalar(
-                select(m.Task.id).where(m.Task.parent_id == task.id, m.Task.status.not_in(FINAL))
-            )
-            if open_children:
-                raise AppError(409, "subtasks_open", "Còn việc con chưa hoàn tất hoặc hủy.")
-            values["completed_at"] = m.utcnow()
-        cas(db, m.Task, task_id, body.expected_revision, values)
-        task = db.get(m.Task, task_id)
-        log(db, task, user.id, body.action, {"reason": body.reason} if body.reason else {})
-        recipients = set()
-        if body.action == "submit":
-            recipients.add(task.creator_id)
-        elif body.action in {"complete", "return", "cancel"} and task.assignee_id:
-            recipients.add(task.assignee_id)
-        elif body.action == "block":
-            recipients.add(task.creator_id)
-        labels = {
-            "submit": "Đã nộp kết quả",
-            "complete": "Đã nghiệm thu",
-            "return": "Bị trả lại",
-            "cancel": "Đã hủy",
-            "block": "Đang vướng mắc",
-        }
-        for recipient in recipients - {user.id}:
-            notify(
-                db,
-                recipient,
-                f"task-{body.action}:{task.id}:{task.revision}",
-                f"{labels.get(body.action, 'Cập nhật')}: {task.title}",
-                link=f"/tasks/{task.id}",
-            )
-        audit(db, user, "task." + body.action, task.id)
-        emit(db, "task." + target, task.id, event_data(task))
+        task = apply_transition(db, user, get_task(db, user, task_id), body)
         db.commit()
         return task_data(db, user, task, True)
 
@@ -709,21 +733,7 @@ def build_router(app):
         task_id: str, body: CommentInput, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)
     ):
         user = user_for(db, actor)
-        task = get_task(db, user, task_id)
-        value = m.TaskComment(task_id=task.id, author_id=user.id, body=body.body.strip())
-        db.add(value)
-        db.flush()
-        participants = {task.creator_id, task.assignee_id, *(task.watcher_ids or [])} - {None, user.id}
-        if not task.assignee_id:
-            participants.update(recipients_for_assignment(db, task))
-        for recipient in participants - {user.id}:
-            notify(
-                db,
-                recipient,
-                f"task-comment:{value.id}",
-                f"{user.display_name} bình luận: {task.title}",
-                link=f"/tasks/{task.id}",
-            )
+        value = add_comment(db, user, get_task(db, user, task_id), body.body)
         db.commit()
         return dict(serial(value), author_name=user.display_name)
 

@@ -12,8 +12,10 @@ logger = logging.getLogger("dx.errors")
 
 
 class AppError(Exception):
-    def __init__(self, status: int, code: str, detail: str):
+    def __init__(self, status: int, code: str, detail: str, headers: dict[str, str] | None = None):
         self.status, self.code, self.detail = status, code, detail
+        # Extra response headers, e.g. Retry-After on 429.
+        self.headers = headers or {}
         super().__init__(detail)
 
 
@@ -33,8 +35,9 @@ def install_handlers(app: FastAPI):
         response.headers["Cache-Control"] = "no-store"
         return response
 
-    def response(request, status, code, detail):
+    def response(request, status, code, detail, headers=None):
         return JSONResponse(
+            headers=headers,
             status_code=status,
             content={
                 "status": status,
@@ -46,7 +49,7 @@ def install_handlers(app: FastAPI):
 
     @app.exception_handler(AppError)
     async def app_error(request: Request, exc: AppError):
-        return response(request, exc.status, exc.code, exc.detail)
+        return response(request, exc.status, exc.code, exc.detail, exc.headers or None)
 
     @app.exception_handler(RequestValidationError)
     async def validation(request: Request, exc):

@@ -31,6 +31,10 @@ class Settings(PlatformSettings):
     packs_dir: str = ""
     # Comma-separated hostnames connected plugins may run on. Empty means no plugin can be installed.
     plugin_allowed_hosts: str = ""
+    # Calls each plugin may make per minute and channel; going over answers 429 with Retry-After.
+    plugin_reads_per_minute: int = 600
+    plugin_writes_per_minute: int = 120
+    plugin_notifications_per_minute: int = 30
 
 
 @lru_cache

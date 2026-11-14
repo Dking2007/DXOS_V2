@@ -6,8 +6,9 @@ A plugin is a web application its author or the organisation runs on its own ser
 through a manifest and talks to it over four channels, each limited to what an administrator approved:
 
 * events: the worker posts `{event, subject}` (ids only) to the plugin, signed with HMAC-SHA256;
-* API: the plugin calls `/workspace/v1/plugin/v1/...` with a bearer token. The installation token reads
-  only records the plugin was told about; a frame's session token reads with the viewer's own rights;
+* API (`plugin_api`): the plugin calls `/workspace/v1/plugin/v1/...` with a bearer token. The installation
+  token reads (and, for a few scopes, writes) only records the plugin was told about; a frame's session
+  token acts with the viewer's own rights;
 * flow step: `plugin_action` posts the step's configuration (rendered) to the plugin and takes its
   `success`/`error` exit with the values it returns;
 * frames: pages of the plugin shown in sandboxed iframes on given slots, fed context over postMessage.
@@ -26,7 +27,6 @@ import re
 import secrets
 import time
 import zipfile
-from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Literal
 from urllib.parse import urljoin, urlsplit
@@ -35,7 +35,7 @@ import httpx
 from dx_platform.auth import Actor
 from dx_platform.errors import AppError
 from dx_platform.security import SecretBox
-from fastapi import APIRouter, Depends, File, Header, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -46,11 +46,13 @@ from .automations import TRIGGERS
 from .flow_values import render
 from .plugin_steps import allowed_hosts, check_step, host_allowed, node_of
 from .policies import current_user, get_case, permissions
-from .processes import active, advance, lock_run, step_limits
+from .processes import active, advance, lock_run
 from .services import audit, enqueue
 from .tasks import visible as task_visible
 
 SCHEMA = "desktiny-plugin/1"
+# Raised whenever the plugin API grows; a manifest needing more says so in `requires.desktiny`.
+API_VERSION = 2
 MANAGE = "organization.manage"
 API_PREFIX = "/workspace/v1/plugin/v1"
 SESSION_MINUTES = 10
@@ -60,7 +62,13 @@ SCOPES = {
     "cases.read": "Đọc hồ sơ: thông tin chung, nội dung biểu mẫu, trạng thái",
     "tasks.read": "Đọc công việc: tiêu đề, trạng thái, hạn, người làm",
     "people.read": "Đọc danh bạ: họ tên, phòng ban, chức danh",
+    "cases.comment": "Ghi ý kiến vào hồ sơ",
+    "cases.fields.write": "Ghi các trường biểu mẫu đã khai (writes.fields) của hồ sơ",
+    "tasks.write": "Tạo công việc, bình luận và chuyển trạng thái công việc thay người dùng",
+    "notifications.send": "Gửi thông báo trong ứng dụng",
 }
+# Writes that need a person behind them: the frame's viewer, never the installation alone.
+SESSION_ONLY = {"cases.fields.write", "tasks.write"}
 SLOTS = {
     "case.side": "Cột phải trang hồ sơ",
     "task.side": "Cột phải trang công việc",
@@ -132,6 +140,22 @@ class PluginUi(s.Input):
     height: int = Field(default=240, ge=80, le=1200)
 
 
+class Requires(s.Input):
+    desktiny: str = Field(default=">=1", pattern=r"^>=\d{1,3}$")
+
+
+class Writes(s.Input):
+    fields: list[str] = Field(default_factory=list, max_length=50)
+
+    @field_validator("fields")
+    @classmethod
+    def keys(cls, value):
+        for key in value:
+            if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,79}", key):
+                raise ValueError(f"Tên trường “{key}” không hợp lệ.")
+        return list(dict.fromkeys(value))
+
+
 class PluginManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
     schema_: Literal["desktiny-plugin/1"] = Field(alias="schema")
@@ -147,9 +171,13 @@ class PluginManifest(BaseModel):
     events_endpoint: str = Field(default="/events", pattern=PATH)
     nodes: list[PluginNode] = Field(default_factory=list, max_length=20)
     ui: list[PluginUi] = Field(default_factory=list, max_length=10)
+    requires: Requires = Field(default_factory=Requires)
+    writes: Writes = Field(default_factory=Writes)
 
     @model_validator(mode="after")
     def known(self):
+        if int(self.requires.desktiny.removeprefix(">=")) > API_VERSION:
+            raise ValueError(f"Plugin cần API plugin bản {self.requires.desktiny}; Desktiny này có bản {API_VERSION}.")
         parts = urlsplit(self.base_url)
         if parts.scheme not in {"http", "https"} or not parts.hostname or parts.query or parts.fragment:
             raise ValueError("`base_url` phải là địa chỉ http(s) không có tham số.")
@@ -157,9 +185,22 @@ class PluginManifest(BaseModel):
             raise ValueError("Quyền chỉ gồm: " + ", ".join(SCOPES) + ".")
         if set(self.events) - set(TRIGGERS):
             raise ValueError("Sự kiện không có trong danh sách sự kiện của Desktiny.")
+        if self.writes.fields and "cases.fields.write" not in self.permissions:
+            raise ValueError("`writes.fields` cần quyền cases.fields.write.")
+        if "cases.fields.write" in self.permissions and not self.writes.fields:
+            raise ValueError("Quyền cases.fields.write cần khai các trường sẽ ghi trong `writes.fields`.")
         if len({node.kind for node in self.nodes}) != len(self.nodes):
             raise ValueError("Mỗi bước quy trình của plugin cần `kind` khác nhau.")
         return self
+
+
+def asked(manifest: dict) -> dict[str, list[str]]:
+    """What a manifest asks an administrator to approve, by the key it is granted under."""
+    return {
+        "permissions": list(manifest.get("permissions", [])),
+        "events": list(manifest.get("events", [])),
+        "fields": list((manifest.get("writes") or {}).get("fields", [])),
+    }
 
 
 def first_error(exc: ValidationError) -> str:
@@ -423,144 +464,6 @@ def on_node(db: Session, core, settings, payload: dict):
     advance(db, core, run, node_id, branch, output=values, **({"message": message} if message else {}))
 
 
-# ---- API for plugins ----------------------------------------------------------------------
-
-
-@dataclass
-class Caller:
-    plugin: m.Plugin
-    token: m.PluginToken
-    user: m.User | None
-
-
-def plugin_api(app) -> APIRouter:
-    router = APIRouter(prefix=API_PREFIX, tags=["plugin-api"])
-    db_dep = app.state.db_dependency
-
-    def caller(authorization: str = Header(""), db: Session = Depends(db_dep)) -> Caller:
-        token = authorization.removeprefix("Bearer ").strip()
-        row = db.scalar(select(m.PluginToken).where(m.PluginToken.token_hash == digest(token))) if token else None
-        plugin = db.scalar(select(m.Plugin).where(m.Plugin.plugin_id == row.plugin_id)) if row else None
-        expires = row.expires_at if row else None
-        if expires and expires.tzinfo is None:  # SQLite drops the zone; stored values are UTC
-            expires = expires.replace(tzinfo=m.utcnow().tzinfo)
-        if not row or row.revoked_at or (expires and expires < m.utcnow()) or not plugin or plugin.state != "enabled":
-            raise AppError(401, "plugin_token_invalid", "Token plugin không hợp lệ, đã hết hạn hoặc plugin đang tắt.")
-        user = db.get(m.User, row.user_id) if row.user_id else None
-        if row.user_id and (not user or not user.active):
-            raise AppError(401, "plugin_token_invalid", "Người dùng của phiên này không còn hoạt động.")
-        return Caller(plugin, row, user)
-
-    def need(who: Caller, scope: str):
-        """Approved for the plugin *and* carried by this token; a frame's reads are then checked as its viewer."""
-        granted = set((who.plugin.granted or {}).get("permissions", []))
-        if scope not in granted or scope not in who.token.scopes:
-            raise AppError(403, "plugin_scope_missing", f"Plugin chưa được cấp quyền “{scope}”.")
-
-    def told_about(db, who: Caller, kind: str, object_id: str):
-        """Without a person, a plugin reads only records it was sent an event or a step call about."""
-        if not db.scalar(
-            select(m.PluginDelivery.id).where(
-                m.PluginDelivery.plugin_id == who.plugin.plugin_id,
-                m.PluginDelivery.subject_type == kind,
-                m.PluginDelivery.subject_id == object_id,
-                m.PluginDelivery.kind.in_(["event", "node"]),
-            )
-        ):
-            raise AppError(404, f"{kind}_not_found", "Không tìm thấy, hoặc plugin chưa được báo về bản ghi này.")
-
-    def record(db, who: Caller, path: str, subject: dict | None):
-        log(db, who.plugin.plugin_id, "api", event_type=path, subject=subject,
-            event_id=who.user.id if who.user else None)  # fmt: skip
-        db.commit()
-
-    @router.get("/me")
-    def me(who: Caller = Depends(caller)):
-        return {
-            "plugin_id": who.plugin.plugin_id,
-            "scopes": who.token.scopes,
-            "kind": who.token.kind,
-            "user": {"id": who.user.id, "display_name": who.user.display_name} if who.user else None,
-            "context": who.token.context or {},
-        }
-
-    @router.get("/cases/{case_id}")
-    def read_case(case_id: str, db: Session = Depends(db_dep), who: Caller = Depends(caller)):
-        need(who, "cases.read")
-        if who.user:
-            case = get_case(db, who.user, case_id)
-            fields, _ = step_limits(db, who.user, case)
-        else:
-            told_about(db, who, "case", case_id)
-            case, fields = db.get(m.Case, case_id), None
-            if not case or case.deleted_at:
-                raise AppError(404, "case_not_found", "Không tìm thấy hồ sơ.")
-        form = db.get(m.Form, case.form_id)
-        payload = app.state.core_service.get(f"/records/{case.payload_record_id}")["payload"]
-        if fields is not None:  # a step limited to part of the dossier sees only that part
-            payload = {key: value for key, value in payload.items() if key in fields}
-        owner = db.get(m.User, case.owner_id)
-        department = db.get(m.Department, case.department_id) if case.department_id else None
-        record(db, who, "GET /cases", {"type": "case", "id": case.id})
-        return {
-            "id": case.id,
-            "code": f"HS-{case.number:06d}",
-            "title": case.title,
-            "status": case.status,
-            "priority": case.priority,
-            "due_at": case.due_at,
-            "form": {"id": form.id, "name": form.name, "fields": [
-                {"key": f["key"], "label": f["label"], "type": f["type"]} for f in form.fields
-                if fields is None or f["key"] in fields
-            ]},  # fmt: skip
-            "payload": payload,
-            "owner": {"id": owner.id, "display_name": owner.display_name} if owner else None,
-            "department": {"id": department.id, "name": department.name} if department else None,
-            "created_at": case.created_at,
-            "updated_at": case.updated_at,
-        }
-
-    @router.get("/tasks/{task_id}")
-    def read_task(task_id: str, db: Session = Depends(db_dep), who: Caller = Depends(caller)):
-        need(who, "tasks.read")
-        task = db.get(m.Task, task_id)
-        if who.user:
-            if not task or not task_visible(db, who.user, task):
-                raise AppError(404, "task_not_found", "Không tìm thấy công việc.")
-        else:
-            told_about(db, who, "task", task_id)
-            if not task:
-                raise AppError(404, "task_not_found", "Không tìm thấy công việc.")
-        assignee = db.get(m.User, task.assignee_id) if task.assignee_id else None
-        record(db, who, "GET /tasks", {"type": "task", "id": task.id})
-        return {
-            "id": task.id,
-            "title": task.title,
-            "status": task.status,
-            "priority": task.priority,
-            "due_at": task.due_at,
-            "case_id": task.case_id,
-            "assignee": {"id": assignee.id, "display_name": assignee.display_name} if assignee else None,
-        }
-
-    @router.get("/people/{user_id}")
-    def read_person(user_id: str, db: Session = Depends(db_dep), who: Caller = Depends(caller)):
-        need(who, "people.read")
-        person = db.get(m.User, user_id)
-        if not person or not person.active:
-            raise AppError(404, "person_not_found", "Không tìm thấy người này.")
-        department = db.get(m.Department, person.department_id) if person.department_id else None
-        record(db, who, "GET /people", None)
-        return {
-            "id": person.id,
-            "display_name": person.display_name,
-            "job_title": person.job_title,
-            "department": department.name if department else None,
-        }
-
-    return router
-
-
 def plugin_cors(app):
     """Plugin frames are sandboxed (origin "null") and call with a bearer token, never cookies."""
 
@@ -570,8 +473,9 @@ def plugin_cors(app):
             return await call_next(request)
         headers = {
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "Authorization, Content-Type",
+            "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, Idempotency-Key",
+            "Access-Control-Expose-Headers": "Retry-After, X-Content-SHA256",
             "Access-Control-Max-Age": "600",
         }
         if request.method == "OPTIONS":
@@ -590,6 +494,7 @@ def plugin_cors(app):
 class Approval(s.Revision):
     permissions: list[str] = Field(default_factory=list)
     events: list[str] = Field(default_factory=list)
+    fields: list[str] = Field(default_factory=list)
 
 
 class Toggle(s.Revision):
@@ -642,6 +547,8 @@ def build_router(app):
             "nodes": [{"kind": n["kind"], "title": n["title"], "description": n.get("description", "")}
                       for n in data.get("nodes", [])],  # fmt: skip
             "ui": [{"slot": u["slot"], "slot_label": SLOTS[u["slot"]], "title": u["title"]} for u in data.get("ui", [])],
+            "fields": asked(data)["fields"],
+            "requires": (data.get("requires") or {}).get("desktiny", ">=1"),
         }
 
     def plugin_data(db, row: m.Plugin) -> dict:
@@ -656,7 +563,7 @@ def build_router(app):
         return {
             **summary(row.manifest),
             "state": row.state,
-            "granted": row.granted or {"permissions": [], "events": []},
+            "granted": {key: [] for key in asked({})} | (row.granted or {}),
             "host_allowed": host_allowed(settings, row.base_url),
             "revision": row.revision,
             "approved_at": row.approved_at,
@@ -702,21 +609,19 @@ def build_router(app):
         upgrade_from = row.version if row else None
         data = manifest.model_dump(by_alias=True)
         if row:
-            granted = row.granted or {}
+            granted, wanted = row.granted or {}, asked(data)
             # Asking for more than was approved sends it back for approval; asking for less keeps it running.
-            more = set(manifest.permissions) - set(granted.get("permissions", [])) or set(manifest.events) - set(
-                granted.get("events", [])
-            )
+            more = any(set(values) - set(granted.get(key, [])) for key, values in wanted.items())
             row.granted = {
-                "permissions": [p for p in granted.get("permissions", []) if p in manifest.permissions],
-                "events": [e for e in granted.get("events", []) if e in manifest.events],
+                **granted,
+                **{key: [v for v in granted.get(key, []) if v in values] for key, values in wanted.items()},
             }
             if more and row.state == "enabled":
                 row.state = "pending"
                 revoke(db, row.plugin_id)
             row.revision += 1
         else:
-            row = m.Plugin(plugin_id=manifest.id, installed_by=user.id, granted={"permissions": [], "events": []})
+            row = m.Plugin(plugin_id=manifest.id, installed_by=user.id, granted={key: [] for key in asked({})})
             db.add(row)
         row.name, row.version, row.manifest, row.base_url = manifest.name, manifest.version, data, manifest.base_url
         row.updated_at = m.utcnow()
@@ -733,13 +638,14 @@ def build_router(app):
         row = get_plugin(db, plugin_id, lock=True)
         if row.revision != body.expected_revision:
             raise AppError(409, "revision_conflict", "Plugin vừa được người khác thay đổi. Tải lại để xem.")
-        manifest = row.manifest or {}
-        if set(body.permissions) - set(manifest.get("permissions", [])) or set(body.events) - set(
-            manifest.get("events", [])
-        ):
+        wanted = asked(row.manifest or {})
+        chosen = {"permissions": body.permissions, "events": body.events, "fields": body.fields}
+        if any(set(values) - set(wanted[key]) for key, values in chosen.items()):
             raise AppError(422, "plugin_grant_invalid", "Chỉ duyệt được những gì plugin đã xin.")
+        if body.fields and "cases.fields.write" not in body.permissions:
+            raise AppError(422, "plugin_grant_invalid", "Duyệt trường để ghi cần duyệt cả quyền cases.fields.write.")
         check_host(settings, row.base_url)
-        row.granted = {"permissions": sorted(set(body.permissions)), "events": sorted(set(body.events))}
+        row.granted = {**(row.granted or {}), **{key: sorted(set(values)) for key, values in chosen.items()}}
         row.state, row.approved_by, row.approved_at = "enabled", user.id, m.utcnow()
         secret = None
         if not row.secret:

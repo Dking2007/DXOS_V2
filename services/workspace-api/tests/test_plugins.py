@@ -244,3 +244,129 @@ def test_the_example_plugin_manifest_is_accepted():
     example = Path(__file__).resolve().parents[3] / "examples/plugins/tra-cuu-mst/desktiny-plugin.json"
     manifest = plugins.read_manifest(example.read_bytes())
     assert manifest.nodes[0].kind == "tra_cuu_mst" and manifest.ui[0].slot == "case.side"
+
+
+# ---- Writes (5.1) --------------------------------------------------------------------------
+
+WRITER = {
+    **MANIFEST,
+    "id": "vn.vi-du.ghi-ket-qua",
+    "permissions": ["cases.read", "tasks.read", "cases.comment", "cases.fields.write", "tasks.write",
+                    "notifications.send"],  # fmt: skip
+    "writes": {"fields": ["amount"]},
+    "requires": {"desktiny": ">=2"},
+}
+
+
+def approve(env, manifest, **grants):
+    director = as_(env, "director")
+    installed = upload(director, "/plugins", manifest)
+    assert installed.status_code == 201, installed.text
+    body = {"expected_revision": installed.json()["revision"], "permissions": manifest["permissions"],
+            "events": manifest.get("events", []), **grants}  # fmt: skip
+    approved = director.post(f"{API}/plugins/{manifest['id']}/approve", json=body)
+    assert approved.status_code == 200, approved.text
+    return approved.json()
+
+
+def plugin_call(env, token, method, path, key=None, **kwargs):
+    headers = {"Authorization": f"Bearer {token}", **({"Idempotency-Key": key} if key else {})}
+    return env[0].request(method, API + "/plugin/v1" + path, headers=headers, **kwargs)
+
+
+def frame_token(env, who, plugin_id, **context):
+    response = as_(env, who).post(API + "/plugin-sessions", json={"plugin_id": plugin_id, "slot": "case.side",
+                                                                   **context})  # fmt: skip
+    assert response.status_code == 201, response.text
+    return response.json()["token"]
+
+
+def test_manifests_declare_what_they_write_and_the_api_they_need(world):  # noqa: F811
+    world[8].plugin_allowed_hosts = HOST
+    director = as_(world, "director")
+    for bad in (
+        {**WRITER, "writes": {"fields": []}},
+        {**WRITER, "permissions": ["cases.read"], "writes": {"fields": ["amount"]}},
+        {**WRITER, "requires": {"desktiny": ">=99"}},
+    ):
+        response = upload(director, "/plugins/preview", bad)
+        assert response.status_code == 422 and response.json()["code"] == "plugin_manifest_invalid", bad
+    preview = upload(director, "/plugins/preview", WRITER).json()
+    assert preview["fields"] == ["amount"] and preview["requires"] == ">=2"
+    pending = upload(director, "/plugins", WRITER).json()
+    wrong = director.post(f"{API}/plugins/{WRITER['id']}/approve",
+                          json={"expected_revision": pending["revision"], "permissions": WRITER["permissions"],
+                                "fields": ["reason"]})  # fmt: skip
+    assert wrong.status_code == 422
+
+
+def test_plugin_writes_are_scoped_repeatable_and_say_who_wrote(world, plugin):  # noqa: F811
+    fake, _, _ = plugin
+    issued = approve(world, WRITER, fields=["amount"], events=["case.submitted"])
+    token = issued["issued"]["token"]
+    form = make_form(world)
+    told = make_case(world, form, key="w-told")
+    untold = make_case(world, form, key="w-untold")
+    submit(world, told, "w-submit")
+    # The installation comments on a dossier it was told about, once per key.
+    path = f"/cases/{told['id']}/comments"
+    assert plugin_call(world, token, "POST", path, json={"body": "Đã tra cứu"}).status_code == 422
+    first = plugin_call(world, token, "POST", path, "k1", json={"body": "Đã tra cứu"})
+    again = plugin_call(world, token, "POST", path, "k1", json={"body": "Đã tra cứu"})
+    assert first.status_code == 201 and again.json()["id"] == first.json()["id"]
+    assert plugin_call(world, token, "POST", path, "k1", json={"body": "Khác"}).status_code == 409
+    assert plugin_call(world, token, "POST", f"/cases/{untold['id']}/comments", "k2",
+                       json={"body": "x"}).status_code == 404  # fmt: skip
+    # Fields and tasks need a person behind the call.
+    fields = f"/cases/{told['id']}/plugin-fields"
+    refused = plugin_call(world, token, "PATCH", fields, "k3", json={"values": {"amount": 250}})
+    assert refused.status_code == 403 and refused.json()["code"] == "plugin_session_required"
+    frame = frame_token(world, "staff", WRITER["id"], case_id=told["id"])
+    wrote = plugin_call(world, frame, "PATCH", fields, "k4", json={"values": {"amount": 250}})
+    assert wrote.status_code == 200, wrote.text
+    other = plugin_call(world, frame, "PATCH", fields, "k5", json={"values": {"reason": "Sửa"}})
+    assert other.status_code == 403 and other.json()["code"] == "plugin_field_denied"
+    detail = as_(world, "staff").get(f"{API}/cases/{told['id']}").json()
+    assert detail["payload"]["amount"] == 250 and detail["status"] != "draft"
+    history = {(h["action"], h["actor_id"]) for h in detail["history"]}
+    assert ("plugin.write.comment", f"plugin:{WRITER['id']}") in history
+    assert ("plugin.write.fields", world[7]["staff"]) in history
+    # A task given by the viewer through the plugin moves by the usual rules.
+    made = plugin_call(world, frame, "POST", "/tasks", "k6", json={"title": "Đối chiếu MST", "assignee_id": world[7]["staff"]})
+    assert made.status_code == 201, made.text
+    task = made.json()
+    started = plugin_call(world, frame, "POST", f"/tasks/{task['id']}/status", "k7",
+                          json={"action": "start", "expected_revision": task["revision"]})  # fmt: skip
+    assert started.status_code == 200 and started.json()["status"] == "in_progress", started.text
+    bad_move = plugin_call(world, frame, "POST", f"/tasks/{task['id']}/status", "k8",
+                           json={"action": "complete", "expected_revision": started.json()["revision"]})  # fmt: skip
+    assert bad_move.status_code == 409
+    said = plugin_call(world, frame, "POST", f"/tasks/{task['id']}/comments", "k9", json={"body": "Khớp"})
+    assert said.status_code == 201
+    comments = as_(world, "staff").get(f"{API}/tasks/{task['id']}").json()["comments"]
+    assert comments[0]["via"] == WRITER["name"]
+    # Notices go out under the plugin's name, at a limited rate, and link only inside the app.
+    bad_link = plugin_call(world, frame, "POST", "/notifications", "n10",
+                           json={"title": "x", "user_ids": [world[7]["staff"]], "link": "//evil.example"})  # fmt: skip
+    assert bad_link.status_code == 422
+    world[8].plugin_notifications_per_minute = 3
+    for index in range(2):
+        sent = plugin_call(world, token, "POST", "/notifications", f"n{index}",
+                           json={"title": f"Nhắc {index}", "user_ids": [world[7]["staff"]]})  # fmt: skip
+        assert sent.status_code == 201 and sent.json()["sent"] == 1, sent.text
+    limited = plugin_call(world, token, "POST", "/notifications", "n9", json={"title": "x", "user_ids": [world[7]["staff"]]})
+    assert limited.status_code == 429 and int(limited.headers["retry-after"]) > 0
+    titles = [n["title"] for n in as_(world, "staff").get(API + "/notifications").json()["items"]]
+    assert f"{WRITER['name']}: Nhắc 0" in titles
+    me = plugin_get(world, token, "/me").json()
+    assert me["api_version"] == 2 and "cases.comment" in me["supported_scopes"] and me["fields"] == ["amount"]
+    with Session(world[2]) as db:
+        assert db.scalar(select(PluginDelivery.id).where(PluginDelivery.kind == "write"))
+
+
+def test_asking_for_more_fields_on_upgrade_goes_back_to_approval(world, plugin):  # noqa: F811
+    approved = approve(world, WRITER, fields=["amount"])
+    assert approved["state"] == "enabled" and approved["granted"]["fields"] == ["amount"]
+    director = as_(world, "director")
+    upgraded = upload(director, "/plugins", {**WRITER, "version": "1.1.0", "writes": {"fields": ["amount", "reason"]}})
+    assert upgraded.json()["state"] == "pending" and upgraded.json()["granted"]["fields"] == ["amount"]

@@ -416,6 +416,8 @@ class TaskComment(Base):
     task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), index=True)
     author_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     body: Mapped[str] = mapped_column(Text)
+    # The plugin that wrote the comment for its author, shown as "A qua plugin X".
+    via: Mapped[str | None] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -910,7 +912,8 @@ class PluginToken(Base):
 
 
 class PluginDelivery(Base):
-    """One exchange with a plugin, for its log: an event sent, a flow step called, or an API read.
+    """One exchange with a plugin, for its log: an event sent, a flow step called, an API read or write,
+    an event the plugin sent in, an assistant tool call or a health check (`kind`).
 
     An event or a step call about a record is also what lets the installation token read that record.
     """
@@ -927,6 +930,9 @@ class PluginDelivery(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     status_code: Mapped[int | None] = mapped_column(Integer)
     error: Mapped[str | None] = mapped_column(String(300))
+    # Bytes a plugin uploaded (daily quota) and how long the plugin took to answer (health).
+    size: Mapped[int | None] = mapped_column(Integer)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
