@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
 import type { Component } from 'vue'
+import { roleLabel } from '../ui/labels'
 import type { Edge, Node } from '@vue-flow/core'
 import {
   Bell,
@@ -566,7 +567,8 @@ function peopleText(c: Record<string, unknown>, names: (id: string) => string, f
     case 'users':
       return `${((c.user_ids as string[]) ?? []).length} người`
     case 'role':
-      return c.role ? `Vai trò ${String(c.role)}` : 'Chọn vai trò'
+      if (!c.role) return 'Chọn vai trò'
+      return c.role_scope === 'organization' ? roleLabel(String(c.role)) : `${roleLabel(String(c.role))} của đơn vị`
     case 'department':
       return c.department_id ? 'Thành viên phòng ban' : 'Thành viên đơn vị'
     case 'form_field':
@@ -825,6 +827,16 @@ function step(id: string, type: NodeKind, x: number, y: number, label: string, d
   return { ...n(id, type, x, y, { ...KINDS[type].defaults(), ...data }), label }
 }
 
+/** Someone on the board of directors decides; works as is, without picking a person. */
+const BOARD = { resolver: 'role', role: 'director', role_scope: 'organization' }
+/** The dossier's starting point, naming the documents it should come with. */
+function startWith(documents: string[]) {
+  return n('trigger', 'trigger', 0, 0, { event: 'case.submitted', form_id: null, required_documents: documents })
+}
+function done(id: string, x: number, y: number, message: string) {
+  return step(id, 'finish', x, y, 'Hoàn tất', { result: 'approved', message })
+}
+
 /** Ready-made processes people start from, then adjust to their form. */
 export const PROCESS_TEMPLATES: { key: string; title: string; description: string; graph: ApiGraph }[] = [
   {
@@ -839,12 +851,12 @@ export const PROCESS_TEMPLATES: { key: string; title: string; description: strin
   {
     key: 'process-two-levels',
     title: 'Hai cấp: đơn vị rồi ban giám đốc',
-    description: 'Lãnh đạo đơn vị duyệt trước; được duyệt thì chuyển một người ở ban giám đốc duyệt tiếp.',
+    description: 'Lãnh đạo đơn vị duyệt trước; được duyệt thì chuyển ban giám đốc duyệt tiếp.',
     graph: {
       nodes: [
         start(),
         step('leader', 'approval', 320, 0, 'Lãnh đạo đơn vị duyệt'),
-        step('board', 'approval', 680, -40, 'Ban giám đốc duyệt', { resolver: 'user' }),
+        step('board', 'approval', 680, -40, 'Ban giám đốc duyệt', BOARD),
       ],
       edges: [e('trigger', 'leader'), e('leader', 'board', 'approve')],
     },
@@ -906,6 +918,299 @@ export const PROCESS_TEMPLATES: { key: string; title: string; description: strin
         e('appraise', 'tell_owner', 'completed'),
         e('appraise', 'stop', 'cancelled'),
       ],
+    },
+  },
+  {
+    key: 'process-urgent-track',
+    title: 'Hồ sơ khẩn trình thẳng ban giám đốc',
+    description:
+      'Hồ sơ có mức ưu tiên Khẩn đi thẳng tới ban giám đốc; hồ sơ thường qua lãnh đạo đơn vị trước rồi mới tới ban giám đốc.',
+    graph: {
+      nodes: [
+        start(),
+        n('is_urgent', 'if', 320, 0, { mode: 'all', conditions: [{ field: 'priority', operator: 'eq', value: 'urgent' }] }),
+        step('leader', 'approval', 680, 140, 'Lãnh đạo đơn vị duyệt'),
+        step('board', 'approval', 1040, -60, 'Ban giám đốc duyệt', BOARD),
+      ],
+      edges: [
+        e('trigger', 'is_urgent'),
+        e('is_urgent', 'board', 'true'),
+        e('is_urgent', 'leader', 'false'),
+        e('leader', 'board', 'approve'),
+      ],
+    },
+  },
+  {
+    key: 'process-leave',
+    title: 'Nghỉ phép: trên 3 ngày cần ban giám đốc',
+    description:
+      'Lãnh đạo đơn vị duyệt mọi đơn; đơn nghỉ trên 3 ngày chuyển tiếp ban giám đốc. Đổi trường “so_ngay” thành trường số ngày nghỉ của biểu mẫu.',
+    graph: {
+      nodes: [
+        startWith(['Đơn xin nghỉ phép']),
+        step('leader', 'approval', 320, 0, 'Lãnh đạo đơn vị duyệt', { due_in_days: 1 }),
+        n('long_leave', 'if', 680, 0, { mode: 'all', conditions: [{ field: 'form.so_ngay', operator: 'gt', value: 3 }] }),
+        step('board', 'approval', 1040, -80, 'Ban giám đốc duyệt', { ...BOARD, due_in_days: 1 }),
+        done('short_ok', 1040, 120, 'Đơn nghỉ từ 3 ngày trở xuống, lãnh đạo đơn vị duyệt là đủ.'),
+      ],
+      edges: [
+        e('trigger', 'leader'),
+        e('leader', 'long_leave', 'approve'),
+        e('long_leave', 'board', 'true'),
+        e('long_leave', 'short_ok', 'false'),
+      ],
+    },
+  },
+  {
+    key: 'process-procurement-value',
+    title: 'Mua sắm theo giá trị',
+    description:
+      'Lãnh đạo đơn vị duyệt; từ 50 triệu trở lên thì xin ý kiến kế toán, hành chính rồi ban giám đốc quyết. Đổi trường “so_tien” theo biểu mẫu và chọn người cho ý kiến.',
+    graph: {
+      nodes: [
+        startWith(['Tờ trình mua sắm', 'Báo giá của nhà cung cấp']),
+        step('leader', 'approval', 320, 0, 'Lãnh đạo đơn vị duyệt'),
+        n('big', 'if', 680, 0, { mode: 'all', conditions: [{ field: 'form.so_tien', operator: 'gte', value: 50000000 }] }),
+        step('opinions', 'consult', 1040, -100, 'Kế toán, hành chính cho ý kiến'),
+        step('board', 'approval', 1400, -100, 'Ban giám đốc quyết định', BOARD),
+        done('small_ok', 1040, 140, 'Dưới 50 triệu: lãnh đạo đơn vị duyệt là đủ.'),
+      ],
+      edges: [
+        e('trigger', 'leader'),
+        e('leader', 'big', 'approve'),
+        e('big', 'opinions', 'true'),
+        e('big', 'small_ok', 'false'),
+        e('opinions', 'board', 'approve'),
+        e('opinions', 'board', 'reject'),
+      ],
+    },
+  },
+  {
+    key: 'process-business-trip',
+    title: 'Đi công tác và tạm ứng',
+    description:
+      'Lãnh đạo đơn vị rồi ban giám đốc duyệt; xong thì giao kế toán chuyển tạm ứng, nộp phiếu chi mới hoàn tất. Chọn người nhận việc kế toán.',
+    graph: {
+      nodes: [
+        startWith(['Kế hoạch công tác', 'Dự toán chi phí']),
+        step('leader', 'approval', 320, 0, 'Lãnh đạo đơn vị duyệt'),
+        step('board', 'approval', 680, 0, 'Ban giám đốc duyệt', BOARD),
+        step('advance', 'assign_task', 1040, 0, 'Kế toán chuyển tạm ứng', {
+          title: 'Chuyển tạm ứng công tác: {title}',
+          due_in_days: 2,
+          require_files: 1,
+          required_documents: ['Phiếu chi'],
+        }),
+        done('paid', 1400, -60, 'Đã duyệt và chuyển tạm ứng.'),
+      ],
+      edges: [
+        e('trigger', 'leader'),
+        e('leader', 'board', 'approve'),
+        e('board', 'advance', 'approve'),
+        e('advance', 'paid', 'completed'),
+      ],
+    },
+  },
+  {
+    key: 'process-incoming-doc',
+    title: 'Xử lý công văn đến',
+    description:
+      'Văn thư vào sổ (số đến, ngày đến), ban giám đốc ghi ý kiến chỉ đạo, rồi giao đơn vị xử lý. Chọn người hoặc phòng xử lý ở bước giao việc.',
+    graph: {
+      nodes: [
+        startWith(['Bản chụp công văn đến']),
+        step('register', 'input', 320, 0, 'Văn thư vào sổ', {
+          resolver: 'owner',
+          due_in_days: 1,
+          fields: [
+            { key: 'so_den', label: 'Số đến', type: 'text', required: true, options: [] },
+            { key: 'ngay_den', label: 'Ngày đến', type: 'date', required: true, options: [] },
+          ],
+        }),
+        step('direct', 'approval', 680, 0, 'Ban giám đốc cho ý kiến chỉ đạo', {
+          ...BOARD,
+          due_in_days: 1,
+          allow_reject: false,
+          instructions: 'Ghi ý kiến chỉ đạo vào ô lý do; đơn vị xử lý sẽ đọc được.',
+        }),
+        step('handle', 'assign_task', 1040, 0, 'Đơn vị xử lý công văn', {
+          title: 'Xử lý công văn: {title}',
+          due_in_days: 5,
+        }),
+        done('closed', 1400, -60, 'Công văn đã được xử lý.'),
+      ],
+      edges: [
+        e('trigger', 'register'),
+        e('register', 'direct', 'submitted'),
+        e('direct', 'handle', 'approve'),
+        e('handle', 'closed', 'completed'),
+      ],
+    },
+  },
+  {
+    key: 'process-outgoing-doc',
+    title: 'Trình ký văn bản đi',
+    description:
+      'Lãnh đạo đơn vị kiểm tra nội dung, ban giám đốc ký duyệt, văn thư vào số, đóng dấu và phát hành rồi báo người soạn.',
+    graph: {
+      nodes: [
+        startWith(['Dự thảo văn bản']),
+        step('review', 'approval', 320, 0, 'Lãnh đạo đơn vị kiểm tra nội dung'),
+        step('sign', 'approval', 680, 0, 'Ban giám đốc ký duyệt', BOARD),
+        step('issue', 'assign_task', 1040, 0, 'Văn thư phát hành', {
+          title: 'Vào số, đóng dấu, phát hành: {title}',
+          due_in_days: 1,
+          require_files: 1,
+          required_documents: ['Bản đã ký, đóng dấu'],
+        }),
+        n('tell_owner', 'notify', 1400, -60, { recipients: ['owner'], title: 'Văn bản đã được phát hành: {title}' }),
+        done('issued', 1760, -60, 'Văn bản đã ký và phát hành.'),
+      ],
+      edges: [
+        e('trigger', 'review'),
+        e('review', 'sign', 'approve'),
+        e('sign', 'issue', 'approve'),
+        e('issue', 'tell_owner', 'completed'),
+        e('tell_owner', 'issued'),
+      ],
+    },
+  },
+  {
+    key: 'process-contract',
+    title: 'Rà soát hợp đồng song song rồi ký',
+    description:
+      'Pháp chế và kế toán rà soát cùng lúc; cả hai đồng ý thì ban giám đốc ký. Một bên trả lại hay từ chối thì hồ sơ dừng ở đó. Chọn người rà soát ở hai bước.',
+    graph: {
+      nodes: [
+        startWith(['Dự thảo hợp đồng', 'Hồ sơ năng lực đối tác']),
+        n('split', 'parallel', 320, 0, {}),
+        step('legal', 'approval', 640, -120, 'Pháp chế rà soát', { resolver: 'user' }),
+        step('finance', 'approval', 640, 120, 'Kế toán rà soát', { resolver: 'user' }),
+        n('both', 'join', 1000, 0, { mode: 'all' }),
+        step('sign', 'approval', 1320, 0, 'Ban giám đốc ký hợp đồng', BOARD),
+      ],
+      edges: [
+        e('trigger', 'split'),
+        e('split', 'legal'),
+        e('split', 'finance'),
+        e('legal', 'both', 'approve'),
+        e('finance', 'both', 'approve'),
+        e('both', 'sign'),
+      ],
+    },
+  },
+  {
+    key: 'process-payment',
+    title: 'Thanh toán theo chứng từ',
+    description:
+      'Kế toán kiểm tra chứng từ, ban giám đốc duyệt chi, kế toán chi trả và nộp ủy nhiệm chi, người đề nghị được báo. Chọn kế toán ở bước đầu và bước chi trả.',
+    graph: {
+      nodes: [
+        startWith(['Giấy đề nghị thanh toán', 'Hóa đơn', 'Biên bản nghiệm thu']),
+        step('check', 'approval', 320, 0, 'Kế toán kiểm tra chứng từ', { resolver: 'user', due_in_days: 2 }),
+        step('board', 'approval', 680, 0, 'Ban giám đốc duyệt chi', BOARD),
+        step('pay', 'assign_task', 1040, 0, 'Kế toán chi trả', {
+          title: 'Chi trả: {title}',
+          due_in_days: 2,
+          require_files: 1,
+          required_documents: ['Ủy nhiệm chi'],
+        }),
+        n('tell_owner', 'notify', 1400, -60, { recipients: ['owner'], title: 'Đã chi trả: {title}' }),
+        done('paid', 1760, -60, 'Đã duyệt chi và chi trả.'),
+      ],
+      edges: [
+        e('trigger', 'check'),
+        e('check', 'board', 'approve'),
+        e('board', 'pay', 'approve'),
+        e('pay', 'tell_owner', 'completed'),
+        e('tell_owner', 'paid'),
+      ],
+    },
+  },
+  {
+    key: 'process-repair',
+    title: 'Sửa chữa tài sản, thiết bị',
+    description:
+      'Lãnh đạo đơn vị xác nhận, giao kiểm tra hiện trạng kèm biên bản, ban giám đốc duyệt kinh phí, rồi giao sửa chữa và nghiệm thu.',
+    graph: {
+      nodes: [
+        startWith(['Ảnh hiện trạng tài sản']),
+        step('leader', 'approval', 320, 0, 'Lãnh đạo đơn vị xác nhận'),
+        step('inspect', 'assign_task', 680, 0, 'Kiểm tra hiện trạng', {
+          title: 'Kiểm tra hiện trạng: {title}',
+          due_in_days: 2,
+          require_files: 1,
+          required_documents: ['Biên bản kiểm tra hiện trạng'],
+        }),
+        step('budget', 'approval', 1040, 0, 'Ban giám đốc duyệt kinh phí', BOARD),
+        step('repair', 'assign_task', 1400, 0, 'Sửa chữa và nghiệm thu', {
+          title: 'Sửa chữa: {title}',
+          due_in_days: 7,
+          require_files: 1,
+          required_documents: ['Biên bản nghiệm thu'],
+        }),
+        done('fixed', 1760, -60, 'Đã sửa chữa và nghiệm thu.'),
+      ],
+      edges: [
+        e('trigger', 'leader'),
+        e('leader', 'inspect', 'approve'),
+        e('inspect', 'budget', 'completed'),
+        e('budget', 'repair', 'approve'),
+        e('repair', 'fixed', 'completed'),
+      ],
+    },
+  },
+  {
+    key: 'process-recruitment',
+    title: 'Đề xuất tuyển dụng',
+    description:
+      'Lãnh đạo đơn vị đề xuất, phòng tổ chức – hành chính cho ý kiến về biên chế và kinh phí, ban giám đốc quyết định. Chọn người cho ý kiến.',
+    graph: {
+      nodes: [
+        startWith(['Bản mô tả vị trí việc làm']),
+        step('leader', 'approval', 320, 0, 'Lãnh đạo đơn vị đề xuất'),
+        step('hr', 'consult', 680, 0, 'Tổ chức – hành chính cho ý kiến'),
+        step('board', 'approval', 1040, 0, 'Ban giám đốc quyết định', BOARD),
+      ],
+      edges: [
+        e('trigger', 'leader'),
+        e('leader', 'hr', 'approve'),
+        e('hr', 'board', 'approve'),
+        e('hr', 'board', 'reject'),
+      ],
+    },
+  },
+  {
+    key: 'process-announce',
+    title: 'Ban hành quy định, cả đơn vị xác nhận đã đọc',
+    description:
+      'Ban giám đốc duyệt ban hành; sau đó mọi người trong đơn vị của hồ sơ xác nhận đã đọc, đủ người thì hoàn tất.',
+    graph: {
+      nodes: [
+        startWith(['Dự thảo quy định']),
+        step('board', 'approval', 320, 0, 'Ban giám đốc duyệt ban hành', BOARD),
+        step('read', 'acknowledge', 680, 0, 'Cả đơn vị xác nhận đã đọc', {
+          resolver: 'department',
+          department_id: null,
+          due_in_days: 5,
+        }),
+        done('published', 1040, 0, 'Đã ban hành và phổ biến.'),
+      ],
+      edges: [e('trigger', 'board'), e('board', 'read', 'approve'), e('read', 'published', 'submitted')],
+    },
+  },
+  {
+    key: 'process-escalate',
+    title: 'Quá hạn duyệt thì chuyển cấp trên',
+    description:
+      'Lãnh đạo đơn vị có 2 ngày để duyệt; quá hạn chưa ai xử lý thì hồ sơ tự chuyển lên ban giám đốc.',
+    graph: {
+      nodes: [
+        start(),
+        step('leader', 'approval', 320, 0, 'Lãnh đạo đơn vị duyệt', { due_in_days: 2, overdue: { action: 'branch' } }),
+        step('board', 'approval', 720, 120, 'Ban giám đốc duyệt thay', BOARD),
+      ],
+      edges: [e('trigger', 'leader'), e('leader', 'board', 'overdue')],
     },
   },
 ]

@@ -29,6 +29,11 @@
   - Trình thiết kế quy trình: ô tìm bước, nhóm bước thu gọn được; nút Lưu chuyển “Đã lưu” khi không có thay đổi.
 
 ### Added
+- **12 quy trình mẫu mới** trong Tạo luồng: hồ sơ khẩn trình thẳng ban giám đốc, nghỉ phép theo số ngày, mua sắm theo
+  giá trị, công tác và tạm ứng, công văn đến, trình ký văn bản đi, rà soát hợp đồng song song, thanh toán theo chứng từ,
+  sửa chữa tài sản, đề xuất tuyển dụng, ban hành quy định có xác nhận đã đọc, quá hạn thì chuyển cấp trên. Bước ban
+  giám đốc chọn theo vai trò nên chạy được ngay; các mẫu khai sẵn tài liệu cần có và hạn từng bước. Bước giao cho vai
+  trò hiện tên vai trò thay cho mã.
 - **Hồ sơ: tài liệu theo từng bước.** Bấm một bước trong tab Quy trình thấy mục Tài liệu: số tệp cần nộp, tên các
   tài liệu cần có (`required_documents`, khai trong trình thiết kế ở bước đầu, các bước có người xử lý và Giao việc)
   và các tệp thực nộp ở bước đó (kèm khi trình, nộp ở bước, kết quả công việc) với người nộp, thời điểm, dung lượng.
