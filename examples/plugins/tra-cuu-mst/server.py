@@ -99,7 +99,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):  # noqa: N802
         parts = urlsplit(self.path)
-        if parts.path == "/api/lookup":
+        if parts.path == "/health":
+            self.reply(200, b'{"ok": true}')
+        elif parts.path == "/api/lookup":
             code = parse_qs(parts.query).get("ma_so", [""])[0]
             self.reply(200, json.dumps(lookup(code), ensure_ascii=False).encode(), cors=True)
         elif parts.path == "/ui/case-card.html":

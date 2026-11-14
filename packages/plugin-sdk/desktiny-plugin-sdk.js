@@ -6,6 +6,8 @@
 //   const desktiny = DesktinyPlugin.connect({ desktinyOrigin: 'https://desktiny.example.org' })
 //   const context = await desktiny.context   // place, record ids, viewer, theme, colours, app name
 //   const dossier = await desktiny.api(`/cases/${context.record.case_id}`)
+//   desktiny.toast('Đã ký số')            // also: navigate('/cases/…'), refresh(), close(result)
+//   if (await desktiny.confirm('Ký văn bản này?')) { … }   // asked in Desktiny's own dialog
 //
 // The page runs in a sandboxed frame with an opaque origin: it cannot read Desktiny's cookies or DOM.
 // Data comes only through `api()`, with a short-lived token scoped to the viewer and this place.
@@ -34,6 +36,11 @@ function connect(options = {}) {
       applyTheme(data.context)
       resolveContext(data.context)
       if (options.onContext) options.onContext(data.context)
+    } else if (data.type === 'confirm_result') {
+      const pending = waiting.get(data.id)
+      if (!pending) return
+      waiting.delete(data.id)
+      pending.resolve(data.ok === true)
     } else if (data.type === 'token' || data.type === 'error') {
       const pending = waiting.get(data.id)
       if (!pending) return
@@ -45,7 +52,7 @@ function connect(options = {}) {
   window.addEventListener('message', onMessage)
 
   function requestToken() {
-    const id = Math.random().toString(36).slice(2)
+    const id = newId()
     return new Promise((resolve, reject) => {
       waiting.set(id, { resolve, reject })
       post({ type: 'token', id })
@@ -63,10 +70,14 @@ function connect(options = {}) {
 
   async function api(path, init = {}) {
     const current = await token()
-    const response = await fetch(current.api_base + path, {
-      ...init,
-      headers: { ...(init.headers || {}), Authorization: `Bearer ${current.token}`, Accept: 'application/json' },
-    })
+    const headers = { ...(init.headers || {}), Authorization: `Bearer ${current.token}`, Accept: 'application/json' }
+    // Writes need an Idempotency-Key; one per call unless the page passes its own to retry safely.
+    if (init.method && init.method !== 'GET' && !headers['Idempotency-Key']) headers['Idempotency-Key'] = newId()
+    if (init.body && typeof init.body !== 'string' && !(init.body instanceof FormData)) {
+      init = { ...init, body: JSON.stringify(init.body) }
+      headers['Content-Type'] = 'application/json'
+    }
+    const response = await fetch(current.api_base + path, { ...init, headers })
     if (response.status === 401) session = null
     const body = await response.json().catch(() => ({}))
     if (!response.ok) {
@@ -82,11 +93,39 @@ function connect(options = {}) {
     post({ type: 'resize', height: Math.ceil(height ?? document.documentElement.scrollHeight) })
   }
 
+  /** Commands Desktiny carries out for the frame. */
+  const toast = (text, tone = 'success') => post({ type: 'toast', text: String(text), tone })
+  const navigate = (path) => post({ type: 'navigate', path })
+  const refresh = () => post({ type: 'refresh' })
+  const close = (result = null) => post({ type: 'close', result })
+  function confirm(text) {
+    const id = newId()
+    return new Promise((resolve) => {
+      waiting.set(id, { resolve, reject: () => resolve(false) })
+      post({ type: 'confirm', id, text: String(text) })
+    })
+  }
+
   if (options.autoResize !== false && 'ResizeObserver' in window) {
     new ResizeObserver(() => resize()).observe(document.documentElement)
   }
   post({ type: 'ready' })
-  return { context, api, token, resize, refreshContext: () => post({ type: 'context' }) }
+  return {
+    context,
+    api,
+    token,
+    resize,
+    toast,
+    navigate,
+    refresh,
+    close,
+    confirm,
+    refreshContext: () => post({ type: 'context' }),
+  }
+}
+
+function newId() {
+  return (globalThis.crypto && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2))
 }
 
 /** Paint the page with Desktiny's theme: `--dk-<name>` variables and `data-theme` on <html>. */

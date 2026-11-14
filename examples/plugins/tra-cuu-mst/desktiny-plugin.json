@@ -7,6 +7,8 @@
   "authors": ["Desktiny contributors"],
   "description": "Plugin mẫu: nhận sự kiện hồ sơ được trình, thêm bước quy trình tra cứu mã số thuế và một khung thông tin doanh nghiệp trên trang hồ sơ. Dữ liệu doanh nghiệp là giả lập.",
   "base_url": "http://localhost:9100",
+  "requires": { "desktiny": ">=2" },
+  "health_endpoint": "/health",
   "permissions": ["cases.read"],
   "events": ["case.submitted"],
   "events_endpoint": "/events",

@@ -6,13 +6,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "desktiny-plugin"
-version = "0.1.0"
-description = "Helpers for writing connected Desktiny plugins: verify signed deliveries, call the plugin API."
+version = "0.2.0"
+description = "Helpers for writing connected Desktiny plugins: verify signed deliveries, call the plugin API, CLI."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 dependencies = []
+
+[project.scripts]
+desktiny-plugin = "desktiny_plugin.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
