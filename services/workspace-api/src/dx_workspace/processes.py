@@ -48,6 +48,7 @@ from .automations import (
 )
 from .core_client import CoreClient
 from .flow_values import condition_holds, render, value_of
+from .plugin_steps import cancel_call
 from .policies import active_delegators, approval_assignees, current_user, get_case, permissions, require
 from .services import case_event, emit, enqueue, notify
 
@@ -185,6 +186,7 @@ class ProcessExecution(Execution):
             self.steps[index] = dict(step, superseded=True)
 
     def withdraw(self, step: dict):
+        cancel_call(self.db, step.get("plugin_call_id"))
         for task_id, core_run in (step.get("core_runs") or {}).items():
             task = self.db.get(m.ApprovalTask, task_id)
             if task and task.state == "pending":
@@ -383,6 +385,7 @@ def close_waiting(execution: ProcessExecution, state: str = "cancelled"):
         if step["state"] != "waiting":
             continue
         execution.steps[index] = dict(step, state=state)
+        cancel_call(db, step.get("plugin_call_id"))
         for task_id, core_run in (step.get("core_runs") or {}).items():
             task = db.get(m.ApprovalTask, task_id)
             if task and task.state == "pending":
@@ -834,6 +837,7 @@ def cancel(db: Session, core: CoreClient, submission: m.Submission):
     steps = []
     for step in run.steps or []:
         if step["state"] == "waiting":
+            cancel_call(db, step.get("plugin_call_id"))
             for core_run in (step.get("core_runs") or {}).values():
                 cancel_core_run(core, core_run)
             step = dict(step, state="cancelled")

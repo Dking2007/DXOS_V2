@@ -20,6 +20,8 @@ export interface PluginStep {
   description: string
   config_schema: { properties: Record<string, PluginField>; required: string[] }
   outputs: Record<string, string>
+  mode?: 'sync' | 'async'
+  timeout_days?: number | null
 }
 
 export function usePluginSteps() {
@@ -43,5 +45,7 @@ export function pluginStepConfig(step: PluginStep): Record<string, unknown> {
     title: step.title,
     config,
     outputs: { ...step.outputs },
+    // A long-running step may also end on "timeout"; the canvas offers that exit.
+    ...(step.mode === 'async' ? { mode: 'async' } : {}),
   }
 }

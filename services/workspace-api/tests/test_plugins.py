@@ -3,6 +3,7 @@
 """Connected plugins: approval, signed events, scoped API tokens, the plugin flow step, frames."""
 
 import json
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -481,3 +482,134 @@ def test_listing_is_bound_to_the_forms_chosen_at_approval(world, plugin):  # noq
     assert departments and {"id", "name", "parent_id"} <= set(departments[0])
     people = plugin_get(world, token, "/people?limit=2").json()
     assert len(people["items"]) == 2 and people["has_more"] and "display_name" in people["items"][0]
+
+
+# ---- Long-running steps (5.4) ------------------------------------------------------------------
+
+SIGNER = {
+    **MANIFEST,
+    "id": "vn.vi-du.ky-so-lau",
+    "permissions": [],
+    "events": [],
+    "ui": [],
+    "nodes": [{"kind": "ky_so", "title": "Ký số", "endpoint": "/nodes/ky-so", "mode": "async", "timeout_days": 3,
+               "outputs": {"so_van_ban": "Số văn bản"}}],  # fmt: skip
+}
+
+
+def signed_post(env, token, secret, path, body: dict):
+    import time
+
+    from desktiny_plugin import sign
+
+    raw = json.dumps(body).encode()
+    stamp = str(int(time.time()))
+    return env[0].post(API + "/plugin/v1" + path, content=raw, headers={
+        "Authorization": f"Bearer {token}", "Content-Type": "application/json",
+        "X-Desktiny-Timestamp": stamp, "X-Desktiny-Signature": sign(secret, stamp, raw)})  # fmt: skip
+
+
+def async_flow(env):
+    director = as_(env, "director")
+
+    def node(node_id, kind, **data):
+        return {"id": node_id, "type": kind, "position": {"x": 0, "y": 0}, "data": data}
+
+    graph = {
+        "nodes": [
+            node("start", "trigger", event="case.submitted"),
+            node("ky", "plugin_action", plugin_id=SIGNER["id"], node="ky_so", mode="async",
+                 outputs={"so_van_ban": "Số văn bản"}),  # fmt: skip
+            node("xong", "notify", recipients=["owner"], title="Đã ký: {ky.so_van_ban}"),
+            node("tre", "notify", recipients=["owner"], title="Quá hạn ký"),
+            node("loi", "notify", recipients=["owner"], title="Ký lỗi"),
+        ],
+        "edges": [
+            {"id": "a", "source": "start", "target": "ky"},
+            {"id": "b", "source": "ky", "target": "xong", "branch": "success"},
+            {"id": "c", "source": "ky", "target": "tre", "branch": "timeout"},
+            {"id": "d", "source": "ky", "target": "loi", "branch": "error"},
+        ],
+    }
+    rule = director.post(API + "/automations", json={"name": "Ký số", "graph": graph})
+    assert rule.status_code == 201, rule.text
+    enabled = director.post(f"{API}/automations/{rule.json()['id']}/enabled",
+                            json={"expected_revision": rule.json()["revision"], "enabled": True})  # fmt: skip
+    assert enabled.status_code == 200, enabled.text
+
+
+def titles_of(env):
+    return [n["title"] for n in as_(env, "staff").get(API + "/notifications").json()["items"]]
+
+
+def test_a_long_running_step_waits_for_the_plugin_to_report_back(world, plugin):  # noqa: F811
+    fake, _, _ = plugin
+    no_deadline = {**SIGNER, "nodes": [{**SIGNER["nodes"][0], "timeout_days": None}]}
+    assert upload(as_(world, "director"), "/plugins/preview", no_deadline).status_code == 422
+    issued = approve(world, SIGNER)["issued"]
+    original = fake.__call__
+
+    def answer(request):
+        if request.url.path == "/nodes/ky-so":
+            fake.calls.append(read_delivery(issued["secret"], request.headers, request.content))
+            return httpx.Response(202, json={"accepted": True})
+        return original(request)
+
+    plugins.use_transport(httpx.MockTransport(answer))
+    async_flow(world)
+    form = make_form(world)
+    case = make_case(world, form, key="as-1")
+    submit(world, case, "as-submit")
+    call_id = fake.calls[-1]["call_id"]
+    with Session(world[2]) as db:
+        from dx_workspace.models import AutomationRun, PluginCall
+
+        assert db.get(PluginCall, call_id).state == "waiting"
+        run = db.scalar(select(AutomationRun).where(AutomationRun.case_id == case["id"]))
+        waiting = next(s for s in run.steps if s.get("node_id") == "ky")
+        assert waiting["state"] == "waiting" and "Đang chờ plugin" in waiting["message"]
+    token, secret = issued["token"], issued["secret"]
+    progress = signed_post(world, token, secret, f"/calls/{call_id}/progress", {"message": "Đang chờ ký"})
+    assert progress.status_code == 200, progress.text
+    unsigned = world[0].post(API + f"/plugin/v1/calls/{call_id}/complete", json={"branch": "success"},
+                             headers={"Authorization": f"Bearer {token}"})  # fmt: skip
+    assert unsigned.status_code == 401
+    done = signed_post(world, token, secret, f"/calls/{call_id}/complete",
+                       {"branch": "success", "output": {"so_van_ban": "12/QĐ", "la": "bỏ"}})  # fmt: skip
+    assert done.json() == {"accepted": True, "state": "completed"}
+    again = signed_post(world, token, secret, f"/calls/{call_id}/complete", {"branch": "error"})
+    assert again.json()["accepted"] is False
+    drain(world)
+    assert "Đã ký: 12/QĐ" in titles_of(world)
+    # No report before the deadline: the timeout exit.
+    late = make_case(world, form, key="as-2")
+    submit(world, late, "as-submit-2")
+    with Session(world[2]) as db:
+        from dx_workspace.models import Outbox
+
+        for job in db.scalars(select(Outbox).where(Outbox.kind == "plugin.call_timeout", Outbox.state == "pending")):
+            job.available_at = job.created_at
+        db.commit()
+    drain(world)
+    assert "Quá hạn ký" in titles_of(world)
+    # Removing the plugin sends a flow still waiting on it down its error exit.
+    third = make_case(world, form, key="as-3")
+    submit(world, third, "as-submit-3")
+    as_(world, "director").delete(f"{API}/plugins/{SIGNER['id']}")
+    drain(world)
+    assert "Ký lỗi" in titles_of(world)
+
+
+def test_a_cancelled_call_is_announced_to_the_plugin(world, plugin):  # noqa: F811
+    from dx_workspace.models import PluginCall
+    from dx_workspace.plugin_steps import cancel_call
+
+    fake, _, _ = plugin
+    with Session(world[2]) as db:
+        db.add(PluginCall(id="call-1", plugin_id=MANIFEST["id"], run_id="run-1", node_id="n", deadline=datetime.now(UTC)))
+        db.commit()
+        cancel_call(db, "call-1")
+        db.commit()
+        assert db.get(PluginCall, "call-1").state == "cancelled"
+    drain(world)
+    assert [(e["type"], e["subject"]) for e in fake.events] == [("plugin.call.cancelled", {"type": "call", "id": "call-1"})]

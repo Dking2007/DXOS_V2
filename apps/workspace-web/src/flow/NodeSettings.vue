@@ -379,6 +379,10 @@ function toggleUser(id: string) {
         />
         <small v-if="field.description">{{ field.description }}</small>
       </div>
+      <p v-if="pluginStep.mode === 'async'" class="notice">
+        Bước chạy lâu: luồng chờ plugin báo kết quả, tối đa {{ pluginStep.timeout_days }} ngày rồi đi nhánh “Hết thời
+        gian chờ”.
+      </p>
       <label class="checkbox-label"
         ><input type="checkbox" :checked="c.send_files === true" @change="set('send_files', checked($event))" /> Gửi
         danh sách tài liệu của hồ sơ (chỉ mã và tên, không gửi nội dung)</label

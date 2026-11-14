@@ -26,4 +26,10 @@ describe('plugin flow steps', () => {
     ])
     expect(summary({ kind: 'plugin_action', label: '', config }, [], () => '')).toBe('Tra cứu mã số thuế')
   })
+
+  it('offer the timeout exit only on a long-running step', () => {
+    const config = pluginStepConfig({ ...step, mode: 'async', timeout_days: 3 })
+    expect(config.mode).toBe('async')
+    expect(outputs('plugin_action', config)).toEqual(['success', 'error', 'timeout'])
+  })
 })

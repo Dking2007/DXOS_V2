@@ -322,6 +322,10 @@ def process_once(engine, settings, core=None) -> bool:
                 processes.on_http(db, core, settings, job.payload)
             elif job.kind == "plugin.node":
                 plugins.on_node(db, core, settings, job.payload)
+            elif job.kind == "plugin.call_done":
+                plugins.on_call_done(db, core, job.payload)
+            elif job.kind == "plugin.call_timeout":
+                plugins.on_call_timeout(db, core, job.payload)
             elif job.kind == "plugin.deliver":
                 plugins.deliver(db, settings, job.payload["delivery_id"])
             elif job.kind == "automation.email":

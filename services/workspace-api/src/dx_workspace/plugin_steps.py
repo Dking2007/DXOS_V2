@@ -29,6 +29,21 @@ def node_of(plugin: m.Plugin | None, kind: str) -> dict | None:
     return next((node for node in (plugin.manifest or {}).get("nodes", []) if node["kind"] == kind), None) if plugin else None
 
 
+def cancel_call(db: Session, call_id: str | None, notify_plugin: bool = True):
+    """Stop waiting on a long-running plugin step and tell the plugin (`plugin.call.cancelled`)."""
+    call = db.get(m.PluginCall, call_id) if call_id else None
+    if not call or call.state != "waiting":
+        return
+    call.state, call.finished_at = "cancelled", m.utcnow()
+    if not notify_plugin:
+        return
+    row = m.PluginDelivery(plugin_id=call.plugin_id, kind="event", event_type="plugin.call.cancelled",
+                           event_id=call.id, subject_type="call", subject_id=call.id, state="pending")  # fmt: skip
+    db.add(row)
+    db.flush()
+    db.add(m.Outbox(kind="plugin.deliver", aggregate_id=row.id, payload={"delivery_id": row.id}))
+
+
 def check_step(db: Session, settings, data: dict) -> list[str]:
     """Problems with a `plugin_action` step as configured; empty when it can run."""
     plugin = db.scalar(select(m.Plugin).where(m.Plugin.plugin_id == data.get("plugin_id", "")))

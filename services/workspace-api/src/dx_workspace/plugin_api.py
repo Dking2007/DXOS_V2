@@ -17,6 +17,8 @@ from __future__ import annotations
 import base64
 import binascii
 import hashlib
+import hmac
+import json
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -25,19 +27,29 @@ from typing import Any, Literal
 from urllib.parse import quote
 
 from dx_platform.errors import AppError
-from fastapi import APIRouter, Depends, File, Header, Query, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Header, Query, Request, Response, UploadFile
 from fastapi import Form as MultipartForm
 from fastapi.encoders import jsonable_encoder
-from pydantic import Field
+from pydantic import Field, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import models as m
 from . import schemas as s
-from .plugins import API_PREFIX, API_VERSION, SCOPES, SESSION_ONLY, digest, log
+from .plugins import (
+    API_PREFIX,
+    API_VERSION,
+    MAX_RESPONSE_BYTES,
+    SCOPES,
+    SESSION_ONLY,
+    digest,
+    log,
+    secret_of,
+    sign,
+)
 from .policies import case_filter, get_case
-from .processes import step_limits
-from .services import audit, idem_begin, notify, page
+from .processes import lock_run, step_limits
+from .services import audit, enqueue, idem_begin, notify, page
 from .tasks import TaskCreate, TaskSource, TaskTransition, add_comment, apply_transition, create_task
 from .tasks import visible as task_visible
 
@@ -103,6 +115,16 @@ class NotificationInput(s.Input):
     department_id: str | None = Field(default=None, max_length=36)
     case_id: str | None = Field(default=None, max_length=36)
     link: str | None = Field(default=None, pattern=INTERNAL_LINK)
+
+
+class CompleteInput(s.Input):
+    branch: Literal["success", "error"] = "success"
+    output: dict[str, Any] = Field(default_factory=dict, max_length=20)
+    message: str = Field(default="", max_length=300)
+
+
+class ProgressInput(s.Input):
+    message: str = Field(min_length=1, max_length=300)
 
 
 def plugin_api(app) -> APIRouter:
@@ -469,6 +491,74 @@ def plugin_api(app) -> APIRouter:
 
         return once(db, who, f"case.attach:{case.id}", idempotency_key,
                     {"name": name, "sha256": digest_hex, "node_id": node_id, "role": role}, work)  # fmt: skip
+
+    # ---- Long-running steps -------------------------------------------------------------------
+
+    async def signed(request: Request, who: Caller) -> dict:
+        """The JSON body, signed by the plugin with its secret exactly as Desktiny signs what it sends."""
+        if who.user:
+            raise AppError(403, "plugin_install_token_required", "Chỉ máy chủ plugin (token cài đặt) được báo kết quả.")
+        body = await request.body()
+        stamp = request.headers.get("X-Desktiny-Timestamp", "")
+        signature = request.headers.get("X-Desktiny-Signature", "")
+        try:
+            fresh = abs(time.time() - int(stamp)) <= 300
+        except ValueError:
+            fresh = False
+        expected = sign(secret_of(settings, who.plugin), stamp, body)
+        if not fresh or not hmac.compare_digest(expected, signature):
+            raise AppError(401, "plugin_signature_invalid", "Chữ ký của plugin không khớp hoặc đã quá 5 phút.")
+        if len(body) > MAX_RESPONSE_BYTES:
+            raise AppError(413, "plugin_body_too_large", "Nội dung tối đa 20 KB.")
+        try:
+            data = json.loads(body or b"{}")
+        except ValueError:
+            raise AppError(422, "validation_error", "Nội dung không phải JSON.") from None
+        return data if isinstance(data, dict) else {}
+
+    def waiting_call(db, who: Caller, call_id: str) -> m.PluginCall:
+        call = db.scalar(select(m.PluginCall).where(m.PluginCall.id == call_id).with_for_update())
+        if not call or call.plugin_id != who.plugin.plugin_id:
+            raise AppError(404, "plugin_call_not_found", "Không tìm thấy lần gọi bước của plugin này.")
+        return call
+
+    def parse(model, data: dict):
+        try:
+            return model.model_validate(data)
+        except ValidationError as exc:
+            raise AppError(422, "validation_error", "Dữ liệu không hợp lệ: " + str(exc.errors()[0]["msg"])) from None
+
+    @router.post("/calls/{call_id}/complete")
+    async def complete_call(call_id: str, request: Request, db: Session = Depends(db_dep), who: Caller = Depends(writer)):
+        """The plugin finished a long-running step; only the first report counts."""
+        body = parse(CompleteInput, await signed(request, who))
+        call = waiting_call(db, who, call_id)
+        if call.state != "waiting":
+            return {"accepted": False, "state": call.state}
+        call.state, call.result, call.finished_at = "completed", body.model_dump(), m.utcnow()
+        enqueue(db, "plugin.call_done", call.run_id, {"call_id": call.id})
+        record(db, who, "POST /calls/complete", None, "inbound")
+        db.commit()
+        return {"accepted": True, "state": "completed"}
+
+    @router.post("/calls/{call_id}/progress")
+    async def call_progress(call_id: str, request: Request, db: Session = Depends(db_dep), who: Caller = Depends(writer)):
+        """A line about where the step is ("Đang chờ ký"), shown on the dossier's process."""
+        body = parse(ProgressInput, await signed(request, who))
+        call = waiting_call(db, who, call_id)
+        if call.state != "waiting":
+            raise AppError(409, "plugin_call_closed", "Bước này đã kết thúc.")
+        call.message = body.message
+        run = lock_run(db, call.run_id)
+        if run:
+            run.steps = [
+                dict(step, message=body.message)
+                if step.get("node_id") == call.node_id and step["state"] == "waiting" else step
+                for step in run.steps or []
+            ]  # fmt: skip
+        record(db, who, "POST /calls/progress", None, "inbound")
+        db.commit()
+        return {"state": call.state, "message": call.message}
 
     # ---- Writing ----------------------------------------------------------------------------
 

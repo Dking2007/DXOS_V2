@@ -911,6 +911,26 @@ class PluginToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class PluginCall(Base):
+    """A long-running plugin step (`mode: async`): the flow waits until the plugin reports back.
+
+    `id` is the call id the plugin was given (also the id of the `node` exchange in its log).
+    """
+
+    __tablename__ = "plugin_calls"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    plugin_id: Mapped[str] = mapped_column(String(80), index=True)
+    run_id: Mapped[str] = mapped_column(String(36), index=True)
+    node_id: Mapped[str] = mapped_column(String(80))
+    # waiting, completed, timed_out, cancelled
+    state: Mapped[str] = mapped_column(String(20), default="waiting", index=True)
+    deadline: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    message: Mapped[str | None] = mapped_column(String(300))
+    result: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class PluginDelivery(Base):
     """One exchange with a plugin, for its log: an event sent, a flow step called, an API read or write,
     an event the plugin sent in, an assistant tool call or a health check (`kind`).

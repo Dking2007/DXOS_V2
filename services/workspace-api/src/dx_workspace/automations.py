@@ -140,7 +140,7 @@ BRANCHES = {
     "subprocess": {"approve", "return", "reject"},
     "wait_until": {"done", "timeout"},
     "http_request": {"success", "error"},
-    "plugin_action": {"success", "error"},
+    "plugin_action": {"success", "error", "timeout"},
 }
 # A switch's exits are named by its own cases, so they are worked out from its configuration.
 SWITCH = "switch"
@@ -430,6 +430,8 @@ class PluginActionData(s.Input):
     outputs: dict[str, str] = Field(default_factory=dict, max_length=20)
     # Hand the plugin the dossier's file list (ids, names, types; never the content).
     send_files: bool = False
+    # Copied from the manifest: an "async" step answers later and may end on "timeout".
+    mode: Literal["sync", "async"] = "sync"
     output_name: str | None = OUTPUT_NAME
 
 
@@ -779,6 +781,8 @@ def offered(kind: str, data: dict) -> set[str]:
         return {f"case_{index}" for index in range(1, len(data.get("cases") or []) + 1)} | {"default"}
     branches = set(BRANCHES.get(kind, set()))
     if kind == "wait_until" and not data.get("timeout_days"):
+        branches.discard("timeout")
+    if kind == "plugin_action" and data.get("mode") != "async":
         branches.discard("timeout")
     if (data.get("overdue") or {}).get("action") != "branch":
         branches.discard("overdue")

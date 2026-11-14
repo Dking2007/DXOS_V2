@@ -479,8 +479,9 @@ export function outputs(kind: NodeKind, config: Record<string, unknown>): Branch
     case 'wait_until':
       return ['done', ...(config.timeout_days ? (['timeout'] as Branch[]) : [])]
     case 'http_request':
-    case 'plugin_action':
       return ['success', 'error']
+    case 'plugin_action':
+      return ['success', 'error', ...(config.mode === 'async' ? (['timeout'] as Branch[]) : [])]
     case 'subprocess':
       return ['approve', 'return', 'reject']
     case 'assign_task':

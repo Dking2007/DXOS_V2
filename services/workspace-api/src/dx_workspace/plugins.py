@@ -128,6 +128,16 @@ class PluginNode(s.Input):
     config_schema: ConfigSchema = Field(default_factory=ConfigSchema)
     outputs: dict[str, str] = Field(default_factory=dict, max_length=20)
     branches: list[Literal["success", "error"]] = Field(default_factory=lambda: ["success", "error"])
+    # "async": the plugin answers 202 at once and reports back later (calls/{id}/complete);
+    # the flow then waits up to `timeout_days` before taking the "timeout" exit.
+    mode: Literal["sync", "async"] = "sync"
+    timeout_days: int | None = Field(default=None, ge=1, le=90)
+
+    @model_validator(mode="after")
+    def waits(self):
+        if self.mode == "async" and not self.timeout_days:
+            raise ValueError(f"Bước chạy lâu “{self.kind}” cần `timeout_days`.")
+        return self
 
     @field_validator("outputs")
     @classmethod
@@ -449,9 +459,25 @@ def call_node(db: Session, settings, run: m.AutomationRun, node: dict) -> tuple[
     except ValueError:
         answer = {}
     answer = answer if isinstance(answer, dict) else {}
-    branch = answer.get("branch") if answer.get("branch") in {"success", "error"} else (
-        "success" if response.status_code < 400 else "error"
-    )
+    if spec.get("mode") == "async" and response.status_code == 202:
+        # Accepted: the flow waits for calls/{call_id}/complete, or the deadline.
+        row.state, row.delivered_at = "sent", m.utcnow()
+        deadline = m.utcnow() + timedelta(days=spec.get("timeout_days") or 7)
+        db.add(m.PluginCall(id=row.id, plugin_id=plugin.plugin_id, run_id=run.id, node_id=node["id"],
+                            deadline=deadline))  # fmt: skip
+        db.add(m.Outbox(kind="plugin.call_timeout", aggregate_id=run.id, available_at=deadline,
+                        payload={"call_id": row.id}))  # fmt: skip
+        return "waiting", {"call_id": row.id}, f"Đang chờ plugin {plugin.name}"
+    branch, values = settle_answer(spec, answer, response.status_code < 400)
+    row.state = "sent" if response.status_code < 400 else "failed"
+    row.delivered_at = m.utcnow()
+    message = str(answer.get("message") or "")[:300]
+    return branch, values, message
+
+
+def settle_answer(spec: dict, answer: dict, ok: bool) -> tuple[str, dict]:
+    """The exit and the plain, declared values from a plugin's answer (now or reported later)."""
+    branch = answer.get("branch") if answer.get("branch") in {"success", "error"} else ("success" if ok else "error")
     # Later steps read plain values only, and only those the plugin declared.
     declared = set((spec.get("outputs") or {}))
     values = {
@@ -460,10 +486,7 @@ def call_node(db: Session, settings, run: m.AutomationRun, node: dict) -> tuple[
         if key in declared and isinstance(value, str | int | float | bool)
     }
     values["ok"] = branch == "success"
-    row.state = "sent" if response.status_code < 400 else "failed"
-    row.delivered_at = m.utcnow()
-    message = str(answer.get("message") or "")[:300]
-    return branch, values, message
+    return branch, values
 
 
 def on_node(db: Session, core, settings, payload: dict):
@@ -475,7 +498,43 @@ def on_node(db: Session, core, settings, payload: dict):
         return
     node = next(node for node in run.graph["nodes"] if node["id"] == node_id)
     branch, values, message = call_node(db, settings, run, node)
+    if branch == "waiting":
+        # The step keeps waiting, now on the plugin; the canvas says so.
+        run.steps = [
+            dict(step, message=message, plugin_call_id=values["call_id"])
+            if step.get("node_id") == node_id and step["state"] == "waiting" else step
+            for step in run.steps
+        ]  # fmt: skip
+        return
     advance(db, core, run, node_id, branch, output=values, **({"message": message} if message else {}))
+
+
+def on_call_done(db: Session, core, payload: dict):
+    """The plugin reported a long-running step finished (or it was removed): carry the flow on."""
+    call = db.get(m.PluginCall, payload["call_id"])
+    run = lock_run(db, call.run_id) if call else None
+    if not active(run) or not any(
+        s.get("node_id") == call.node_id and s["state"] == "waiting" for s in run.steps or []
+    ):
+        return
+    plugin = db.scalar(select(m.Plugin).where(m.Plugin.plugin_id == call.plugin_id))
+    node = next(node for node in run.graph["nodes"] if node["id"] == call.node_id)
+    spec = node_of(plugin, (node.get("data") or {}).get("node", "")) or {}
+    result = call.result or {}
+    branch, values = settle_answer(spec, result, result.get("branch") != "error")
+    message = str(result.get("message") or "")[:300]
+    advance(db, core, run, call.node_id, branch, output=values, **({"message": message} if message else {}))
+
+
+def on_call_timeout(db: Session, core, payload: dict):
+    call = db.get(m.PluginCall, payload["call_id"])
+    if not call or call.state != "waiting":
+        return
+    call.state, call.finished_at = "timed_out", m.utcnow()
+    run = lock_run(db, call.run_id)
+    if active(run):
+        advance(db, core, run, call.node_id, "timeout", output={"ok": False, "error": "timeout"},
+                message="Plugin không báo kết quả trước hạn.")  # fmt: skip
 
 
 def plugin_cors(app):
@@ -728,6 +787,12 @@ def build_router(app):
         user = manager(db, actor)
         row = get_plugin(db, plugin_id, lock=True)
         revoke(db, row.plugin_id)
+        # Flows waiting on this plugin take their error exit rather than wait for the deadline.
+        for call in db.scalars(select(m.PluginCall).where(m.PluginCall.plugin_id == plugin_id,
+                                                          m.PluginCall.state == "waiting")):  # fmt: skip
+            call.state, call.finished_at = "cancelled", m.utcnow()
+            call.result = {"branch": "error", "message": "Plugin đã bị gỡ."}
+            enqueue(db, "plugin.call_done", call.run_id, {"call_id": call.id})
         audit(db, user, "plugin.removed", row.id, {"plugin_id": plugin_id, "version": row.version})
         db.delete(row)
         db.commit()
