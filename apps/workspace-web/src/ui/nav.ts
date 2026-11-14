@@ -11,7 +11,6 @@ import {
   ListChecks,
   MessagesSquare,
   Newspaper,
-  PackageOpen,
   Settings2,
   Workflow,
 } from 'lucide-vue-next'
@@ -50,11 +49,6 @@ export const NAV_GROUPS: NavGroup[] = [
         badge: (counts) => counts.approvals,
       },
       { to: '/cases', label: 'Hồ sơ', icon: Files, hint: 'Lập và theo dõi hồ sơ trình duyệt' },
-    ],
-  },
-  {
-    label: 'Trao đổi',
-    links: [
       {
         to: '/chat',
         label: 'Nhắn tin',
@@ -63,11 +57,6 @@ export const NAV_GROUPS: NavGroup[] = [
         badge: (counts) => counts.chat,
       },
       { to: '/feed', label: 'Bảng tin', icon: Newspaper, hint: 'Thông báo và bài viết nội bộ' },
-    ],
-  },
-  {
-    label: 'Tài liệu & báo cáo',
-    links: [
       { to: '/drive', label: 'Kho tài liệu', icon: FolderClosed, hint: 'Tài liệu của bạn và được chia sẻ' },
       { to: '/reports', label: 'Báo cáo', icon: BarChart3, hint: 'Số liệu công việc và hồ sơ' },
     ],
@@ -76,18 +65,11 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Quản trị',
     links: [
       {
-        to: '/automations',
-        label: 'Tự động hóa',
+        to: '/processes',
+        label: 'Quy trình nghiệp vụ',
         icon: Workflow,
-        hint: 'Luồng tự động khi có sự kiện',
+        hint: 'Quy trình hồ sơ và luồng tự động',
         capability: 'automations.manage',
-      },
-      {
-        to: '/packages',
-        label: 'Gói nghiệp vụ',
-        icon: PackageOpen,
-        hint: 'Quy trình duyệt cho từng loại hồ sơ',
-        capability: 'forms.manage',
       },
       {
         to: '/assistant',
@@ -96,7 +78,7 @@ export const NAV_GROUPS: NavGroup[] = [
         hint: 'Kiến thức và dịch vụ AI của trợ lý',
         capability: 'assistant.manage',
       },
-      { to: '/settings', label: 'Thiết lập', icon: Settings2, hint: 'Mẫu biểu, tổ chức, vai trò, giao diện' },
+      { to: '/settings', label: 'Thiết lập', icon: Settings2, hint: 'Tổ chức, vai trò, nhật ký, giao diện' },
     ],
   },
 ]

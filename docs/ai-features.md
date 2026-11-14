@@ -5,7 +5,7 @@ SPDX-FileCopyrightText: 2026 Desktiny contributors
 
 # Tính năng AI
 
-17 tính năng AI rải trong các màn hình. Ban giám đốc và Quản trị kỹ thuật (quyền `assistant.manage`, cùng
+18 tính năng AI rải trong các màn hình. Ban giám đốc và Quản trị kỹ thuật (quyền `assistant.manage`, cùng
 quyền với trợ lý AI) bật từng tính năng ở **Trợ lý AI › Tính năng AI**, chọn dịch vụ AI riêng cho từng tính
 năng nếu muốn. Tính năng chưa bật thì không có nút nào hiện ra. Mặc định mọi tính năng đều tắt.
 
@@ -32,6 +32,7 @@ model trò chuyện với model tạo vector (theo tên model; Gemini theo khả
 |---|---|---|---|
 | Hồ sơ | 1. Đọc tài liệu, tự điền biểu mẫu | Hồ sơ nháp › Thông tin | Tạo "căn cứ trường" nguồn AI, mỗi giá trị kèm trang và câu trích. Câu trích không có thật trong tài liệu, hoặc giá trị sai kiểu, bị bỏ. Người lập xác nhận rồi bấm "Điền … giá trị đã xác nhận vào biểu mẫu". |
 | | 2. Tóm tắt hồ sơ cho người duyệt | Đầu trang hồ sơ | Tóm tắt lại khi nội dung, tài liệu hoặc quyết định thay đổi. |
+| | 2b. Hỏi đáp về hồ sơ | Nút “Hỏi AI về hồ sơ” ở đầu trang hồ sơ | Ngăn kéo hỏi đáp dùng ở mọi tab. AI đọc biểu mẫu, quy trình (từng bước, ai quyết định gì, lý do, đang chờ ai), công việc gắn hồ sơ mà người hỏi được xem và tối đa 5 tài liệu kèm; trả lời kèm nguồn (chỉ giữ nguồn có thật trong hồ sơ). Người chỉ được xem một phần hồ sơ không dùng được. Hội thoại chỉ giữ trong tab trình duyệt; mỗi câu hỏi tính một lượt. |
 | | 3. Soát hồ sơ trước khi trình | Hồ sơ nháp | Quy tắc cứng (trường bắt buộc, số tài liệu của gói) cộng điểm AI thấy lệch giữa biểu mẫu và tài liệu. |
 | | 4. Gợi ý ý kiến duyệt, lý do trả lại | Hộp xác nhận Phê duyệt/Trả lại/Từ chối | Chỉ người có bước duyệt đang chờ. |
 | Văn bản | 5. Soạn văn bản hành chính | Kho tài liệu › Mới | Tờ trình, công văn, thông báo, kế hoạch, báo cáo, giấy mời. Trình bày cố định theo NĐ 30/2020 (A4, lề 20/20/30/15 mm, Times New Roman, quốc hiệu 13, tiêu ngữ 14, nội dung 14), mở bằng ONLYOFFICE để plugin `vn-document-format` kiểm tra. |
@@ -46,7 +47,7 @@ model trò chuyện với model tạo vector (theo tên model; Gemini theo khả
 | | 14. Hỗ trợ viết bài bảng tin | Khung soạn bài | Viết gọn, sửa chính tả, gợi ý tiêu đề, mô tả ảnh cho trình đọc màn hình (lưu ở `post_attachments.alt`). |
 | Mở rộng | 15. Bước "Hỏi AI" trong luồng | Trình thiết kế luồng | AI chọn một đáp án; node Điều kiện rẽ nhánh theo trường kết quả (mặc định `ai_label`). |
 | | 16. Trợ lý trả lời về dữ liệu của người hỏi | Trợ lý AI | Thêm vào lời dặn: hồ sơ, việc, việc chờ duyệt của chính người hỏi. Không bao giờ của người khác. |
-| | 17. Sinh kịch bản thử cho Gói nghiệp vụ | Gói nghiệp vụ › Chạy thử | Kết quả mong đợi lấy từ lần chạy thử thật của gói, người dùng kiểm tra lại trước khi lưu. |
+| | 17. Sinh kịch bản thử cho Quy trình nghiệp vụ | Quy trình nghiệp vụ › Phát hành › Kịch bản thử | Kết quả mong đợi lấy từ lần chạy thử thật của quy trình, người dùng kiểm tra lại trước khi lưu. |
 
 ## Đọc tài liệu
 

@@ -19,6 +19,8 @@ export interface ApprovalStep {
   resolver: 'user' | 'department_manager'
   user_id?: string
   condition?: Condition
+  /** How long the approver has once the dossier reaches this step; empty means no deadline. */
+  due_hours?: number | null
 }
 export interface FormTemplate {
   id: string
@@ -40,6 +42,12 @@ export interface User {
   roles?: string[]
   csrf_token?: string
   capabilities?: string[]
+  job_title?: string | null
+  phone?: string | null
+  contact_email?: string | null
+  about?: string | null
+  /** Address of the profile photo; null when the person has none. */
+  avatar_url?: string | null
 }
 export interface Department {
   id: string
@@ -108,6 +116,10 @@ export interface CaseItem {
   /** How many times it was submitted; 0 means a draft nobody has seen, which may be deleted. */
   submission_no?: number
   archived_at?: string | null
+  due_at?: string | null
+  overdue?: boolean
+  /** In the list only: who the dossier waits for now (step, person, deadline). */
+  waiting_on?: { label: string; name: string; due_at: string | null }[]
 }
 export interface Submission {
   id: string
@@ -129,6 +141,8 @@ export interface Submission {
 export interface ApprovalTask {
   id: string
   case_id: string
+  /** From the step's deadline, set when the step reached its approver. */
+  due_at?: string | null
   case_title?: string
   case_code?: string
   case_number?: string
@@ -149,12 +163,22 @@ export interface ApprovalTask {
   decided_by_id?: string | null
   decided_by_name?: string
   /** Process flows: "opinion" asks for advice (agree / disagree) rather than a decision. */
-  kind?: 'approval' | 'opinion' | null
+  kind?: 'approval' | 'opinion' | 'input' | 'acknowledge' | null
   /** Decisions this step offers; absent means approve, return and reject. */
-  options?: ('approve' | 'return' | 'reject')[] | null
+  options?: ('approve' | 'return' | 'reject' | 'submit')[] | null
   node_id?: string | null
-  due_at?: string | null
   instructions?: string
+  /** What the process step offers on this request. */
+  step?: {
+    fields: { key: string; label: string; type: string; required?: boolean; options?: string[] }[]
+    allow_files: boolean
+    editable_fields: string[]
+    allow_forward: boolean
+    result_fields?: { key: string; label: string; type: string; required?: boolean; options?: string[] }[]
+    require_files?: number
+  }
+  /** What a request is about when no dossier stands behind it. */
+  subject?: { type: 'task' | 'case' | 'post'; id: string; title: string; link: string | null } | null
 }
 export interface HistoryEvent {
   id?: string
@@ -321,6 +345,8 @@ export interface Conversation {
   member_count: number
   updated_at: string
   last_message: ChatMessage | null
+  /** In a direct conversation, the other person. */
+  peer_id?: string | null
   members?: { user_id: string; display_name: string; role: string; last_read_seq: number }[]
 }
 export interface Post {
@@ -354,6 +380,7 @@ export interface PostMedia {
 }
 export interface PostComment {
   id: string
+  author_id?: string
   author_name: string
   body: string
   created_at: string
@@ -364,6 +391,8 @@ export interface AssistantStatus {
   ready: boolean
   welcome: string
   suggestions: string[]
+  /** Whether the assistant may answer about the asker's own tasks, dossiers and files. */
+  my_data?: boolean
   provider: string | null
   remaining: number | null
   daily_limit: number
@@ -375,10 +404,18 @@ export interface AssistantSource {
   title: string
   category: string
 }
+/** Something of the asker's that an answer pointed at with @n. */
+export interface AssistantItem {
+  ref: number
+  kind: 'task' | 'case' | 'file' | 'folder' | 'approval'
+  title: string
+  link: string
+}
 export interface AssistantReply {
   answer: string
   truncated: boolean
   sources: AssistantSource[]
+  items?: AssistantItem[]
   remaining: number | null
 }
 export interface AssistantProvider {

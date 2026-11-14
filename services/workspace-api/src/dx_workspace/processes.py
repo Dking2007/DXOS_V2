@@ -7,10 +7,14 @@ that form is submitted, the flow (pinned as it is at that moment) runs instead o
 form's linear approval steps. The Workspace worker walks it with the automation engine;
 steps that need people wait:
 
-* ``approval`` asks one person, through a Core human task, to approve, return or reject;
+* ``approval`` asks people, through Core human tasks, to approve, return or reject;
 * ``consult`` asks several people at once for their opinion (agree / disagree);
+* ``input`` asks someone to fill in more of the dossier;
 * ``assign_task`` hands work to someone and waits until it is accepted as done;
 * ``finish`` and ``request_info`` settle the dossier.
+
+A "return" exit may lead back to an earlier step. The steps from there on are marked superseded,
+stay in the record, and may run again up to a limit.
 
 Decisions are still recorded in Workspace before the Core task is completed, exactly as
 for linear steps; Core keeps the generic human task and its audit. Every run is replayed
@@ -20,27 +24,32 @@ on the canvas of the dossier, so people see which step it has reached.
 from __future__ import annotations
 
 import copy
-from datetime import timedelta
+import math
+from datetime import UTC, datetime, timedelta
 
 from dx_platform.auth import Actor
 from dx_platform.errors import AppError
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from . import flow_actions, flow_hooks, process_versions
 from . import models as m
 from .automations import (
+    MAX_VISITS,
     OUTCOMES,
+    SUB_END,
     TERMINAL,
     Execution,
-    approver,
-    consultees,
-    graph_of,
+    current_data,
     offered,
+    people_for,
+    unit_manager,
 )
 from .core_client import CoreClient
-from .policies import active_delegators, current_user, get_case, require
-from .services import case_event, emit, notify
+from .flow_values import condition_holds, render, value_of
+from .policies import active_delegators, approval_assignees, current_user, get_case, permissions, require
+from .services import case_event, emit, enqueue, notify
 
 # One generic Core workflow per submission: a single human task whose assignee and business
 # reference come from the run input. Each approval or opinion is one run of it.
@@ -64,17 +73,6 @@ OWNER_MESSAGES = {
 }
 
 
-def rule_for_form(db: Session, form_id: str) -> m.AutomationRule | None:
-    """The switched-on process of a form; at most one exists (enforced when switching on)."""
-    return db.scalar(
-        select(m.AutomationRule).where(
-            m.AutomationRule.kind == "process",
-            m.AutomationRule.form_id == form_id,
-            m.AutomationRule.enabled.is_(True),
-        )
-    )
-
-
 def process_data(submission: m.Submission, case: m.Case) -> dict:
     """What conditions and messages can use: the dossier, its form answers and its files."""
     return {
@@ -87,15 +85,15 @@ def process_data(submission: m.Submission, case: m.Case) -> dict:
     }
 
 
-def begin(db: Session, rule: m.AutomationRule, submission: m.Submission, case: m.Case) -> m.AutomationRun:
-    """Pin the flow to the submission now; the worker starts it. Called when the dossier is submitted."""
+def begin(db: Session, version: m.ProcessVersion, submission: m.Submission, case: m.Case) -> m.AutomationRun:
+    """Pin the published flow to the submission now; the worker starts it."""
     run = m.AutomationRun(
-        rule_id=rule.id,
-        rule_revision=rule.revision,
+        rule_id=version.rule_id,
+        rule_revision=version.version_no,
         event_id=submission.id,
         event_type="case.submitted",
         state="queued",
-        graph=copy.deepcopy(graph_of(rule)),
+        graph=copy.deepcopy(version.graph),
         data=process_data(submission, case),
         steps=[],
         case_id=case.id,
@@ -103,7 +101,8 @@ def begin(db: Session, rule: m.AutomationRule, submission: m.Submission, case: m
     )
     db.add(run)
     db.flush()
-    submission.process_rule_id = rule.id
+    submission.process_rule_id = version.rule_id
+    submission.process_version_id = version.id
     submission.process_run_id = run.id
     return run
 
@@ -114,11 +113,14 @@ def cancel_core_run(core: CoreClient, run_id: str):
         core.post(f"/workflow-runs/{run_id}/cancel", {"expected_revision": run["revision"]})
 
 
-def announce(db: Session, task: m.ApprovalTask, case: m.Case):
+def announce(db: Session, task: m.ApprovalTask, case: m.Case | None, title: str):
     """Tell the person asked, and whoever acts for them under a delegation."""
-    verb = "cho ý kiến" if task.kind == "opinion" else "duyệt"
-    notify(db, task.assignee_id, "approval:" + task.id, f"Hồ sơ cần {verb}: {case.title}", case.id)
+    verb = {"opinion": "cho ý kiến", "input": "bổ sung thông tin", "acknowledge": "xác nhận đã đọc"}.get(task.kind, "duyệt")
+    noun, case_id, link = ("Hồ sơ", case.id, None) if case else ("Việc", None, "/approvals")
+    notify(db, task.assignee_id, "approval:" + task.id, f"{noun} cần {verb}: {title}", case_id, link)
     assignee = db.get(m.User, task.assignee_id)
+    if not node_config(db, task).get("allow_delegation", True):
+        return
     for delegate in db.scalars(
         select(m.Delegation.delegate_id).where(
             m.Delegation.delegator_id == task.assignee_id, m.Delegation.revoked_at.is_(None)
@@ -130,20 +132,23 @@ def announce(db: Session, task: m.ApprovalTask, case: m.Case):
                 db,
                 delegate,
                 "approval:" + task.id,
-                f"Hồ sơ cần {verb} thay {assignee.display_name}: {case.title}",
-                case.id,
+                f"{noun} cần {verb} thay {assignee.display_name}: {title}",
+                case_id,
+                link,
             )
 
 
 class ProcessExecution(Execution):
     """The automation engine, with the steps that wait for people and settle the dossier."""
 
-    def __init__(self, db: Session, core: CoreClient, run: m.AutomationRun, submission: m.Submission):
-        self.core, self.submission = core, submission
-        self.case = db.get(m.Case, submission.case_id)
+    def __init__(self, db: Session, core: CoreClient, run: m.AutomationRun, submission: m.Submission | None = None):
+        self.submission = submission
+        known = run.data or {}
+        case_id = submission.case_id if submission else (run.case_id or known.get("case_id"))
+        self.case = db.get(m.Case, case_id) if case_id else None
         rule = db.get(m.AutomationRule, run.rule_id)
         # Facts refreshed from the dossier, answers of AI steps and the like kept from before.
-        data = {**(run.data or {}), **case_event(self.case)}
+        data = {**known, **(case_event(self.case) if self.case else {})}
         super().__init__(
             db,
             run.graph,
@@ -151,20 +156,94 @@ class ProcessExecution(Execution):
             dry_run=False,
             run=run,
             rule=rule,
-            event={"event_type": "case.submitted", "event_id": submission.id},
+            chain=known.get("_chain") or [],
+            event={"event_type": run.event_type, "event_id": run.event_id},
         )
+        self.core = core
+        self.title = self.case.title if self.case else str(known.get("title") or (rule.name if rule else ""))
         self.steps = list(run.steps or [])
-        # A node runs once per dossier, even when two branches lead to it.
-        self.ran = {step["node_id"] for step in self.steps if step.get("node_id")}
+        # A node runs once per pass, even when two branches lead to it.
+        self.ran = {step["node_id"] for step in self.steps if step.get("node_id") and not step.get("superseded")}
+
+    def attempt(self, node_id: str) -> int:
+        return sum(1 for step in self.steps if step.get("node_id") == node_id) + 1
+
+    def has_run(self, node_id: str) -> bool:
+        return node_id in self.ran
+
+    def rewind(self, node_id: str):
+        """Back to a step already passed: earlier answers stay on record, marked as superseded."""
+        super().rewind(node_id)
+        again = self.after(node_id)
+        self.ran -= again
+        for index, step in enumerate(self.steps):
+            if step.get("node_id") not in again or step.get("superseded"):
+                continue
+            if step["state"] == "waiting":
+                self.withdraw(step)
+                step = dict(step, state="cancelled")
+            self.steps[index] = dict(step, superseded=True)
+
+    def withdraw(self, step: dict):
+        for task_id, core_run in (step.get("core_runs") or {}).items():
+            task = self.db.get(m.ApprovalTask, task_id)
+            if task and task.state == "pending":
+                task.state, task.revision = "cancelled", task.revision + 1
+                cancel_core_run(self.core, core_run)
+
+    def record(self, node, state, **extra):
+        attempt = self.attempt(node["id"])
+        # When the dossier reached the step, so its journey can be told in order.
+        extra.setdefault("at", m.utcnow().isoformat())
+        super().record(node, state, **({"attempt": attempt} if attempt > 1 else {}), **extra)
 
     def step(self, node) -> list[str]:
         if node["id"] in self.ran:
             return []
         self.ran.add(node["id"])
+        self.current_node = node["id"]
+        if self.attempt(node["id"]) > MAX_VISITS:
+            self.record(node, "failed", error="loop_limit", message="Quy trình quay lại bước này quá nhiều lần.")
+            return []
+        if node["type"] == "wait_until":
+            return self.wait_until(node, node.get("data") or {})
+        if node["type"] == "http_request":
+            enqueue(self.db, "automation.http", self.run.id, {"run_id": self.run.id, "node_id": node["id"]})
+            self.record(node, "waiting")
+            return []
         return super().step(node)
 
+    def act(self, node, kind, data) -> dict:
+        if kind in flow_actions.ENGINE_ACTIONS:
+            return {"output": flow_actions.ENGINE_ACTIONS[kind](self, data)}
+        return super().act(node, kind, data)
+
+    def wait_until(self, node, data: dict) -> list[str]:
+        following = self.successors(node["id"], "done")
+        due, poll = None, False
+        if data.get("mode", "date") == "date":
+            due = parse_moment(value_of(self.data, data.get("date_field", "")))
+            if not due:
+                self.record(node, "failed", error="date_invalid", message="Trường được chọn chưa có ngày hợp lệ.")
+                return []
+        elif not all(condition_holds(c, self.data) for c in data.get("conditions", [])):
+            poll = True
+            due = m.utcnow() + timedelta(minutes=data.get("check_every_minutes", 60))
+        if not poll and (due is None or due <= m.utcnow()):
+            self.set_output(node, {"resumed_at": m.utcnow().isoformat()})
+            self.record(node, "succeeded", branch="done")
+            return following
+        payload = {"run_id": self.run.id, "wait_node": node["id"], "nodes": following, "branch": "done"}
+        if poll:
+            payload["poll"] = True
+            if data.get("timeout_days"):
+                payload["deadline"] = (m.utcnow() + timedelta(days=data["timeout_days"])).isoformat()
+        self.db.add(m.Outbox(kind="automation.resume", aggregate_id=self.run.id, available_at=due, payload=payload))
+        self.record(node, "waiting", resume_at=due.isoformat())
+        return []
+
     def process_step(self, node, kind, data) -> list[str]:
-        if kind in TERMINAL:
+        if kind in TERMINAL or kind == SUB_END:
             return super().process_step(node, kind, data)
         if kind == "assign_task":
             try:
@@ -172,25 +251,31 @@ class ProcessExecution(Execution):
             except AppError as exc:
                 self.record(node, "failed", error=exc.code, message=exc.detail)
                 return []
+            task.required_file_count = data.get("require_files") or 0
             self.record(node, "waiting", task_id=task.id, title=task.title)
             return []
+        people, problem = people_for(self.db, self.data, data, kind)
+        if not people:
+            code = {"approval": "approver_unresolved", "consult": "consultees_missing"}.get(kind, "assignee_unresolved")
+            self.record(node, "failed", error=code, message=problem)
+            return []
+        needed = data.get("quorum") if data.get("mode") == "quorum" else None
+        if needed and needed > len(people):
+            self.record(node, "failed", error="quorum_impossible",
+                        message=f"Cần {needed} người đồng ý nhưng chỉ hỏi được {len(people)} người.")
+            return []
         if kind == "approval":
-            person, problem = approver(self.db, self.data, data)
-            if not person:
-                self.record(node, "failed", error="approver_unresolved", message=problem)
-                return []
-            options = ["approve", *sorted(offered(kind, data) - {"approve"})]
-            people = [person]
+            options = ["approve", *sorted(offered(kind, data) - {"approve", "overdue"})]
+        elif kind in {"input", "acknowledge"}:
+            options = ["submit"]
         else:
-            people = consultees(self.db, self.data, data)
-            if not people:
-                self.record(node, "failed", error="consultees_missing", message="Không có ai để xin ý kiến.")
-                return []
             options = ["approve", "reject"]
+        task_kind = {"approval": "approval", "consult": "opinion", "input": "input", "acknowledge": "acknowledge"}[kind]
         core_runs = {}
         for person in people:
-            task, core_run = self.ask(node, person, "approval" if kind == "approval" else "opinion", options, data)
+            task, core_run = self.ask(node, person, task_kind, options, data)
             core_runs[task.id] = core_run
+        self.schedule_overdue(node, data)
         self.record(
             node,
             "waiting",
@@ -202,43 +287,68 @@ class ProcessExecution(Execution):
         )
         return []
 
+    def schedule_overdue(self, node, data: dict):
+        due, action = data.get("due_in_days"), (data.get("overdue") or {}).get("action", "none")
+        if due is None or action == "none":
+            return
+        self.db.add(
+            m.Outbox(
+                kind="process.overdue",
+                aggregate_id=self.run.id,
+                available_at=m.utcnow() + timedelta(days=due),
+                payload={"run_id": self.run.id, "node_id": node["id"], "attempt": self.attempt(node["id"])},
+            )
+        )
+
     def workflow(self) -> str:
-        if not self.submission.core_workflow_id:
+        # A dossier's submission holds the workflow; a flow on anything else keeps its own.
+        holder = self.submission or self.run
+        if not holder.core_workflow_id:
             workflow = self.core.post(
                 "/workflows",
-                {"name": "Process " + self.submission.id, "graph": APPROVAL_GRAPH},
-                key=self.submission.id + ":process-workflow",
+                {"name": "Process " + holder.id, "graph": APPROVAL_GRAPH},
+                key=holder.id + ":process-workflow",
             )
             if workflow.get("state") != "published":
                 self.core.post(
                     f"/workflows/{workflow['id']}/publish", {"expected_revision": workflow.get("revision", 1)}
                 )
-            self.submission.core_workflow_id = workflow["id"]
+            holder.core_workflow_id = workflow["id"]
             self.db.flush()
-        return self.submission.core_workflow_id
+        return holder.core_workflow_id
 
     def ask(self, node, person: m.User, kind: str, options: list[str], data: dict):
-        key = f"{self.run.id}:{node['id']}:{person.id}"
+        # Going back to a step, or passing it to someone again, asks anew.
+        asked = sum(1 for step in self.steps if step.get("node_id") == node["id"])
+        forwarded = self.db.scalar(
+            select(func.count(m.ApprovalTask.id)).where(
+                m.ApprovalTask.run_id == self.run.id,
+                m.ApprovalTask.node_id == node["id"],
+                m.ApprovalTask.assignee_id == person.id,
+            )
+        )
+        key = f"{self.run.id}:{node['id']}:{person.id}" + (f":{asked}:{forwarded}" if asked or forwarded else "")
         core_run = self.core.post(
             f"/workflows/{self.workflow()}/runs",
-            {"input": {"subject": person.subject, "ref": self.submission.id}, "external_key": key},
+            {"input": {"subject": person.subject, "ref": (self.submission or self.run).id}, "external_key": key},
             key=key,
         )
         human = core_run["human_tasks"][0]
         index = len(
             list(
                 self.db.scalars(
-                    select(m.ApprovalTask.id).where(m.ApprovalTask.submission_id == self.submission.id)
+                    select(m.ApprovalTask.id).where(m.ApprovalTask.run_id == self.run.id)
                 )
             )
         )
         due = data.get("due_in_days")
         task = m.ApprovalTask(
-            submission_id=self.submission.id,
-            case_id=self.case.id,
+            submission_id=self.submission.id if self.submission else None,
+            case_id=self.case.id if self.case else None,
+            run_id=self.run.id,
             assignee_id=person.id,
             step_index=index,
-            label=node.get("label") or ("Cho ý kiến" if kind == "opinion" else "Duyệt hồ sơ"),
+            label=node.get("label") or {"opinion": "Cho ý kiến", "input": "Bổ sung thông tin"}.get(kind, "Duyệt hồ sơ"),
             core_task_id=human["id"],
             core_revision=human.get("revision", 1),
             node_id=node["id"],
@@ -248,11 +358,12 @@ class ProcessExecution(Execution):
         )
         self.db.add(task)
         self.db.flush()
-        announce(self.db, task, self.case)
+        announce(self.db, task, self.case, self.title)
         return task, core_run["id"]
 
     def conclude(self, outcome: str, node, message: str = ""):
         super().conclude(outcome, node, message)
+        self.steps[-1] = dict(self.steps[-1], at=m.utcnow().isoformat())
         settle_dossier(self, outcome, message)
 
 
@@ -278,6 +389,9 @@ def settle_dossier(execution: ProcessExecution, outcome: str, message: str):
     db, case, submission, run = execution.db, execution.case, execution.submission, execution.run
     close_waiting(execution)
     run.outcome, run.state = outcome, "succeeded"
+    # Without a submission there is no dossier to settle: the flow simply ends with this result.
+    if not submission:
+        return
     case.status = submission.state = outcome
     case.revision += 1
     case.updated_at = m.utcnow()
@@ -296,18 +410,37 @@ def settle(execution: ProcessExecution):
     if states & {"waiting", "queued"}:
         run.state = "waiting"
         return
+    # A flow on anything but a dossier has no result it must reach: running out of steps is finishing.
+    if not execution.submission and "failed" not in states:
+        run.state = "succeeded"
+        return
     run.state = "failed"
-    execution.submission.state = "configuration_error"
+    if execution.submission:
+        execution.submission.state = "configuration_error"
     problem = next((step.get("message") for step in run.steps if step["state"] == "failed"), None)
-    text = "Quy trình hồ sơ dừng lại, chưa có kết quả: " + execution.case.title
-    for user_id in {execution.case.owner_id, execution.rule.created_by}:
+    text = "Luồng dừng lại, chưa có kết quả: " + execution.title
+    people = {execution.rule.created_by}
+    if execution.case:
+        people.add(execution.case.owner_id)
+    for user_id in people:
         notify(
             execution.db,
             user_id,
             f"process-stuck:{run.id}:{user_id}",
             (text + (f". {problem}" if problem else ""))[:250],
-            execution.case.id,
+            execution.case.id if execution.case else None,
         )
+
+
+def parse_moment(value) -> datetime | None:
+    """A date or time from a form or an earlier step; day-only values mean the start of that day."""
+    if not value:
+        return None
+    try:
+        moment = datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
 
 
 def lock_run(db: Session, run_id: str | None) -> m.AutomationRun | None:
@@ -338,22 +471,39 @@ def start(db: Session, core: CoreClient, submission: m.Submission):
     settle(execution)
 
 
+def start_flow(db: Session, run: m.AutomationRun, data: dict, chain: list, core: CoreClient):
+    """A flow on an event, on the engine that can wait for people and reach Core."""
+    run.data = {**data, "_chain": chain}
+    run.case_id = data.get("case_id")
+    run.state = "running"
+    execution = ProcessExecution(db, core, run)
+    trigger = next(node["id"] for node in run.graph["nodes"] if node["type"] == "trigger")
+    execution.walk([trigger])
+    settle(execution)
+
+
+def execution_of(db: Session, core: CoreClient, run: m.AutomationRun) -> ProcessExecution:
+    submission = db.get(m.Submission, run.submission_id) if run.submission_id else None
+    return ProcessExecution(db, core, run, submission)
+
+
 def advance(db: Session, core: CoreClient, run: m.AutomationRun, node_id: str, branch: str | None,
-            following: list[str] | None = None, **detail):
+            following: list[str] | None = None, output: dict | None = None, **detail):
     """Mark the waiting step done and carry on from it."""
-    submission = db.get(m.Submission, run.submission_id)
-    execution = ProcessExecution(db, core, run, submission)
+    execution = execution_of(db, core, run)
     position = next(
         (i for i, step in enumerate(execution.steps) if step.get("node_id") == node_id and step["state"] == "waiting"),
         None,
     )
     if position is None:
         return
-    update = dict(execution.steps[position], state="succeeded", **detail)
+    update = dict(execution.steps[position], state="succeeded", done_at=m.utcnow().isoformat(), **detail)
     if branch:
         update["branch"] = branch
     execution.steps[position] = update
     node = next(node for node in run.graph["nodes"] if node["id"] == node_id)
+    if output is not None:
+        execution.set_output(node, output)
     if following is None:
         following = execution.follow(node, branch)
     execution.walk(following)
@@ -369,10 +519,85 @@ def active(run: m.AutomationRun | None) -> bool:
     return bool(run) and not run.outcome and run.state in {"running", "waiting"}
 
 
+def tally(kind: str, mode: str, quorum: int | None, tasks: list[m.ApprovalTask]) -> str | None:
+    """The branch a step takes given the answers so far, or None while it must still wait."""
+    answered = [t for t in tasks if t.state == "completed"]
+    agreed = sum(t.decision == "approve" for t in answered)
+    open_count = sum(t.state in {"pending", "syncing"} for t in tasks)
+    if kind == "input":
+        return "submitted" if answered else None
+    if kind == "acknowledge":
+        return "submitted" if answered and (mode == "any" or not open_count) else None
+    needed = quorum if mode == "quorum" else None
+    if kind == "opinion":
+        # Opinions only ever inform: without a quorum the step waits for what it asked for.
+        if mode == "any" and agreed:
+            return "approve"
+        if needed:
+            if agreed >= needed:
+                return "approve"
+            return "reject" if agreed + open_count < needed else None
+        if open_count:
+            return None
+        return "approve" if agreed and (mode == "any" or agreed == len(answered)) else "reject"
+    # A person with a decision: returning or rejecting stops the step for everybody.
+    if not answered:
+        return None
+    if mode == "any":
+        return answered[-1].decision
+    if any(t.decision == "return" for t in answered):
+        return "return"
+    if needed:
+        if agreed >= needed:
+            return "approve"
+        return "reject" if agreed + open_count < needed else None
+    if any(t.decision == "reject" for t in answered):
+        return "reject"
+    return "approve" if not open_count else None
+
+
+def absorb_values(db: Session, run: m.AutomationRun, case: m.Case | None, task: m.ApprovalTask, config: dict):
+    """What someone filled in or corrected joins the form data later steps and conditions read.
+
+    Results a step asked for stay under that step's name instead; see `step_output`.
+    """
+    given = {key: value for key, value in (task.submitted_values or {}).items() if key != "_files"}
+    if task.kind != "input":
+        editable = set(config.get("editable_fields") or [])
+        given = {key: value for key, value in given.items() if key in editable}
+    if given:
+        run.data = {**run.data, "form": {**(run.data.get("form") or {}), **given}}
+    if case:
+        run.data = {**run.data, "file_count": len(case.file_ids or [])}
+
+
+def step_output(db: Session, tasks: list[m.ApprovalTask], branch: str, task: m.ApprovalTask) -> dict:
+    """What later steps read from a step people answered."""
+    answered = [t for t in tasks if t.state == "completed"]
+    values, files = {}, []
+    for item in answered:
+        for key, value in (item.submitted_values or {}).items():
+            if key == "_files":
+                files.extend(value)
+            else:
+                values[key] = value
+    output = {
+        **values,
+        "decision": branch,
+        "agreed": sum(t.decision == "approve" for t in answered),
+        "count": len(answered),
+        "people": ", ".join(display_name(db, t.decided_by_id or t.assignee_id) for t in answered),
+        "file_count": len(files),
+        "file_names": ", ".join(item["name"] for item in files),
+    }
+    if task.kind == "approval":
+        output.update(decided_by=display_name(db, task.decided_by_id), reason=task.reason or "")
+    return output
+
+
 def on_decision(db: Session, core: CoreClient, task: m.ApprovalTask):
     """A decision or opinion reached Core: move the flow on if the step is now answered."""
-    submission = db.get(m.Submission, task.submission_id)
-    run = lock_run(db, submission.process_run_id)
+    run = lock_run(db, task_run_id(db, task))
     if not active(run):
         return
     step = next(
@@ -380,34 +605,16 @@ def on_decision(db: Session, core: CoreClient, task: m.ApprovalTask):
     )
     if not step:
         return
-    if task.kind != "opinion":
-        advance(
-            db,
-            core,
-            run,
-            task.node_id,
-            task.decision,
-            decision=task.decision,
-            reason=task.reason or "",
-            decided_by=display_name(db, task.decided_by_id),
-        )
-        return
     node = next(node for node in run.graph["nodes"] if node["id"] == task.node_id)
+    config = node.get("data") or {}
+    absorb_values(db, run, db.get(m.Case, task.case_id) if task.case_id else None, task, config)
     tasks = [db.get(m.ApprovalTask, task_id) for task_id in step.get("task_ids", [])]
     answered = [t for t in tasks if t.state == "completed"]
-    agreed = [t for t in answered if t.decision == "approve"]
-    open_requests = [t for t in tasks if t.state in {"pending", "syncing"}]
-    mode = (node.get("data") or {}).get("mode", "all")
-    if mode == "any" and agreed:
-        branch = "approve"
-    elif open_requests:
-        steps = [
-            dict(s, answered=len(answered)) if s is step else s for s in run.steps
-        ]
-        run.steps = steps
+    mode = config.get("mode", "all" if task.kind in {"opinion", "acknowledge"} else "any")
+    branch = tally(task.kind, mode, config.get("quorum"), tasks)
+    if branch is None:
+        run.steps = [dict(s, answered=len(answered)) if s is step else s for s in run.steps]
         return
-    else:
-        branch = "approve" if agreed and (mode == "any" or len(agreed) == len(answered)) else "reject"
     opinions = [
         {"by": display_name(db, t.decided_by_id or t.assignee_id), "decision": t.decision, "reason": t.reason or ""}
         for t in answered
@@ -417,18 +624,26 @@ def on_decision(db: Session, core: CoreClient, task: m.ApprovalTask):
         if other.state == "pending":
             other.state, other.revision = "cancelled", other.revision + 1
             cancel_core_run(core, step["core_runs"][other.id])
-    advance(db, core, run, task.node_id, branch, answered=len(answered), opinions=opinions)
+    extra = {}
+    if task.kind == "approval":
+        extra = {"decision": branch, "reason": task.reason or "", "decided_by": display_name(db, task.decided_by_id)}
+    output = step_output(db, tasks, branch, task)
+    advance(db, core, run, task.node_id, branch, output=output, answered=len(answered), opinions=opinions, **extra)
 
 
 def on_task_event(db: Session, core: CoreClient, payload: dict):
     """Work handed out by an "assign_task" step was accepted as done or cancelled."""
     event, data = payload["event_type"], payload.get("data") or {}
-    if event not in {"task.completed", "task.cancelled"} or not data.get("case_id"):
+    if event not in {"task.completed", "task.cancelled"} or not data.get("task_id"):
+        return
+    task = db.get(m.Task, data["task_id"])
+    source = (task.source or {}) if task else {}
+    if source.get("type") != "automation":
         return
     branch = "completed" if event == "task.completed" else "cancelled"
     for run_id in db.scalars(
         select(m.AutomationRun.id).where(
-            m.AutomationRun.case_id == data["case_id"], m.AutomationRun.state == "waiting"
+            m.AutomationRun.rule_id == source.get("id"), m.AutomationRun.state == "waiting"
         )
     ).all():
         run = lock_run(db, run_id)
@@ -436,8 +651,146 @@ def on_task_event(db: Session, core: CoreClient, payload: dict):
             continue
         for step in run.steps:
             if step["type"] == "assign_task" and step["state"] == "waiting" and step.get("task_id") == data["task_id"]:
-                advance(db, core, run, step["node_id"], branch)
+                names = [db.get(m.DriveFile, file_id) for file_id in task.file_ids or []]
+                output = {
+                    "task_id": task.id,
+                    "status": task.status,
+                    "file_count": len(task.file_ids or []),
+                    "file_names": ", ".join(file.name for file in names if file),
+                }
+                advance(db, core, run, step["node_id"], branch, output=output)
                 break
+
+
+def on_http(db: Session, core: CoreClient, settings, payload: dict):
+    """Call the outside system a step names; its answer picks the exit and is kept for later steps."""
+    run = lock_run(db, payload["run_id"])
+    if not active(run):
+        return
+    node_id = payload["node_id"]
+    if not any(s.get("node_id") == node_id and s["state"] == "waiting" for s in run.steps or []):
+        return
+    node = next(node for node in run.graph["nodes"] if node["id"] == node_id)
+    config = node.get("data") or {}
+    facts = {key: value for key, value in (run.data or {}).items() if not key.startswith("_")}
+    result = flow_actions.call_connection(
+        db,
+        settings,
+        {
+            "connection_id": config.get("connection_id"),
+            "path": render(config.get("path", ""), run.data or {}),
+            "method": config.get("method", "GET"),
+            "key": f"{run.id}:{node_id}",
+            "body": {"event_id": run.event_id, "rule_id": run.rule_id, "data": facts},
+        },
+    )
+    advance(db, core, run, node_id, "success" if result.get("ok") else "error", output=result)
+
+
+def on_overdue(db: Session, core: CoreClient, payload: dict):
+    """A step's deadline passed: do what its node says, if it is still waiting on that same pass."""
+    run = lock_run(db, payload["run_id"])
+    if not active(run):
+        return
+    execution = execution_of(db, core, run)
+    node = execution.nodes.get(payload["node_id"])
+    step = next(
+        (
+            s
+            for s in execution.steps
+            if s.get("node_id") == payload["node_id"] and s["state"] == "waiting" and not s.get("superseded")
+        ),
+        None,
+    )
+    # A job from an earlier pass must not act on the step asked again since.
+    if not node or not step or execution.attempt(node["id"]) - 1 != payload.get("attempt", 1):
+        return
+    config = node.get("data") or {}
+    rule = config.get("overdue") or {}
+    action = rule.get("action", "none")
+    waiting = [
+        task
+        for task in (db.get(m.ApprovalTask, task_id) for task_id in step.get("task_ids", []))
+        if task and task.state == "pending"
+    ]
+    if not waiting:
+        return
+    case_id = execution.case.id if execution.case else None
+    late = f"Quá hạn xử lý: {execution.title}"
+    if action == "remind":
+        for task in waiting:
+            notify(db, task.assignee_id, f"overdue:{task.id}", late, case_id)
+    elif action == "branch":
+        execution.withdraw(step)
+        advance(db, core, run, node["id"], "overdue", overdue=True)
+    elif action == "escalate":
+        target = rule.get("user_id") or unit_manager(db, execution.data.get("department_id"))
+        person = db.get(m.User, target) if target else None
+        current = {task.assignee_id for task in waiting}
+        if not person or not person.active or person.id == execution.owner_id() or person.id in current:
+            for task in waiting:
+                notify(db, task.assignee_id, f"overdue:{task.id}", late, case_id)
+            return
+        hand_over(execution, step, node, waiting, person, "overdue")
+
+
+def hand_over(execution: ProcessExecution, step: dict, node, tasks: list[m.ApprovalTask], person: m.User, why: str):
+    """Requests move to someone else; the step keeps waiting, with their answer in place of these."""
+    db, run = execution.db, execution.run
+    core_runs = dict(step.get("core_runs") or {})
+    for task in tasks:
+        task.state, task.revision = "cancelled", task.revision + 1
+        cancel_core_run(execution.core, core_runs.pop(task.id))
+    db.flush()
+    data = node.get("data") or {}
+    new_task, core_run = execution.ask(node, person, tasks[0].kind, tasks[0].options or ["approve"], data)
+    core_runs[new_task.id] = core_run
+    updated = dict(
+        step,
+        core_runs=core_runs,
+        task_ids=list(core_runs),
+        people=[display_name(db, db.get(m.ApprovalTask, task_id).assignee_id) for task_id in core_runs],
+        total=len(core_runs),
+        handed_over=why,
+    )
+    run.steps = [updated if s is step else s for s in execution.steps]
+    db.flush()
+
+
+def forward(db: Session, core: CoreClient, task: m.ApprovalTask, person: m.User, reason: str):
+    """The person asked passes the request on, where the step allows it."""
+    run = lock_run(db, task_run_id(db, task))
+    if not active(run):
+        raise AppError(409, "approval_closed", "Luồng đã kết thúc.")
+    execution = execution_of(db, core, run)
+    node = execution.nodes.get(task.node_id)
+    step = next(
+        (s for s in execution.steps if s.get("node_id") == task.node_id and s["state"] == "waiting"), None
+    )
+    if not node or not step or task.id not in (step.get("task_ids") or []):
+        raise AppError(409, "approval_closed", "Nhiệm vụ đã xử lý.")
+    if not (node.get("data") or {}).get("allow_forward"):
+        raise AppError(403, "forward_not_allowed", "Bước này không cho phép chuyển người xử lý.")
+    if person.id == execution.owner_id() and task.kind not in {"input", "acknowledge"}:
+        raise AppError(422, "self_approval_denied", "Không chuyển cho người tạo hồ sơ.")
+    if not person.active:
+        raise AppError(422, "assignee_inactive", "Người được chuyển đang bị khóa.")
+    open_people = {
+        db.get(m.ApprovalTask, task_id).assignee_id
+        for task_id in step.get("task_ids", [])
+        if db.get(m.ApprovalTask, task_id).state in {"pending", "syncing"}
+    }
+    if person.id in open_people:
+        raise AppError(422, "already_asked", "Người này đang được hỏi ở bước này.")
+    hand_over(execution, step, node, [task], person, "forward")
+    notify(
+        db,
+        person.id,
+        f"forward:{task.id}",
+        (f"Được chuyển để bạn xử lý: {execution.title}" + (f". {reason}" if reason else ""))[:250],
+        execution.case.id if execution.case else None,
+        None if execution.case else "/approvals",
+    )
 
 
 def resume(db: Session, core: CoreClient, payload: dict):
@@ -445,7 +798,27 @@ def resume(db: Session, core: CoreClient, payload: dict):
     run = lock_run(db, payload["run_id"])
     if not active(run):
         return
-    advance(db, core, run, payload["wait_node"], None, following=payload["nodes"])
+    if payload.get("poll"):
+        node = next(node for node in run.graph["nodes"] if node["id"] == payload["wait_node"])
+        config = node.get("data") or {}
+        fresh = current_data(db, {key: value for key, value in (run.data or {}).items()})
+        if not all(condition_holds(c, fresh) for c in config.get("conditions", [])):
+            deadline = parse_moment(payload.get("deadline"))
+            if deadline and deadline <= m.utcnow():
+                execution = execution_of(db, core, run)
+                advance(db, core, run, node["id"], "timeout", following=execution.successors(node["id"], "timeout"))
+                return
+            db.add(
+                m.Outbox(
+                    kind="automation.resume",
+                    aggregate_id=run.id,
+                    available_at=m.utcnow() + timedelta(minutes=config.get("check_every_minutes", 60)),
+                    payload=payload,
+                )
+            )
+            return
+    output = {"resumed_at": m.utcnow().isoformat()} if payload.get("branch") else None
+    advance(db, core, run, payload["wait_node"], payload.get("branch"), following=payload["nodes"], output=output)
 
 
 def cancel(db: Session, core: CoreClient, submission: m.Submission):
@@ -467,14 +840,106 @@ def cancel(db: Session, core: CoreClient, submission: m.Submission):
     run.state = "cancelled"
 
 
+def task_run_id(db: Session, task: m.ApprovalTask) -> str | None:
+    if task.run_id:
+        return task.run_id
+    submission = db.get(m.Submission, task.submission_id) if task.submission_id else None
+    return submission.process_run_id if submission else None
+
+
+def run_of(db: Session, task: m.ApprovalTask) -> m.AutomationRun | None:
+    run_id = task_run_id(db, task)
+    return db.get(m.AutomationRun, run_id) if run_id else None
+
+
+def node_config(db: Session, task: m.ApprovalTask) -> dict:
+    """The configuration of the step that asked, as pinned in the run."""
+    if not task.node_id:
+        return {}
+    run = run_of(db, task)
+    node = next((n for n in (run.graph if run else {}).get("nodes", []) if n["id"] == task.node_id), None)
+    return (node or {}).get("data") or {}
+
+
 def instructions_for(db: Session, task: m.ApprovalTask) -> str:
     """What the process asks the person to look at, as written on the step that asked them."""
-    if not task.node_id:
-        return ""
-    submission = db.get(m.Submission, task.submission_id)
-    run = db.get(m.AutomationRun, submission.process_run_id) if submission and submission.process_run_id else None
-    node = next((n for n in (run.graph if run else {}).get("nodes", []) if n["id"] == task.node_id), None)
-    return str(((node or {}).get("data") or {}).get("instructions") or "")
+    return str(node_config(db, task).get("instructions") or "")
+
+
+def step_values(db: Session, task: m.ApprovalTask, values: dict, decision: str) -> tuple[dict, dict]:
+    """Checks what someone sends with their answer. Returns (results handed in, corrected form fields).
+
+    A step's results are asked for with a positive answer: nobody has to write up a refusal.
+    """
+    config = node_config(db, task)
+    positive = decision in {"approve", "submit"}
+    fields = (config.get("fields") or []) + (config.get("result_fields") or []) if positive else []
+    editable = set(config.get("editable_fields") or [])
+    corrections = {key: value for key, value in values.items() if key in editable}
+    others = {key: value for key, value in values.items() if key not in editable}
+    known = {field["key"]: field for field in fields}
+    if task.kind != "input" and set(others) - set(known):
+        raise AppError(403, "field_not_editable", "Bước này không cho sửa trường đó.")
+    if fields or task.kind == "input":
+        answers = {}
+        problems = []
+        for field in fields:
+            value = values.get(field["key"])
+            if value in (None, ""):
+                if field.get("required"):
+                    problems.append(f"Cần nhập “{field['label']}”.")
+                continue
+            if field.get("type") == "number":
+                try:
+                    value = float(value)
+                except (TypeError, ValueError):
+                    problems.append(f"“{field['label']}” phải là số.")
+                    continue
+            elif field.get("type") == "select" and value not in (field.get("options") or []):
+                problems.append(f"“{field['label']}” chưa đúng lựa chọn.")
+                continue
+            answers[field["key"]] = value
+        extra = set(others) - set(known)
+        if extra:
+            problems.append("Có trường không thuộc bước này.")
+        if problems:
+            raise AppError(422, "form_validation_error", " ".join(problems))
+        return answers, corrections
+    return {}, corrections
+
+
+def takes_files(config: dict, task: m.ApprovalTask) -> bool:
+    return bool(config.get("require_files")) or (task.kind == "input" and bool(config.get("allow_files")))
+
+
+def step_limits(db: Session, user: m.User, case: m.Case) -> tuple[set[str] | None, bool]:
+    """What someone who is on a dossier only because a step asked them may see of it.
+
+    Returns (fields they may see or None for all, whether its files are hidden). Each step that
+    asked them adds what it shows, so being asked twice never shows less than being asked once.
+    The owner and those who may read dossiers anyway see everything.
+    """
+    perms = permissions(db, user)
+    unit_reader = "cases.read.department" in perms and case.department_id == user.department_id
+    if case.owner_id == user.id or "cases.read.organization" in perms or unit_reader:
+        return None, False
+    tasks = db.scalars(
+        select(m.ApprovalTask).where(
+            m.ApprovalTask.case_id == case.id, m.ApprovalTask.assignee_id.in_(approval_assignees(db, user))
+        )
+    ).all()
+    fields: set[str] | None = set()
+    hide_files = bool(tasks)
+    for task in tasks:
+        config = node_config(db, task)
+        if not config.get("hide_files"):
+            hide_files = False
+        visible = config.get("visible_fields")
+        if visible is None:
+            fields = None
+        elif fields is not None:
+            fields |= set(visible)
+    return (fields if tasks else None), hide_files
 
 
 def expected_approvers(db: Session, case: m.Case, graph: dict, payload: dict) -> list[dict]:
@@ -482,16 +947,10 @@ def expected_approvers(db: Session, case: m.Case, graph: dict, payload: dict) ->
     data = {**case_event(case), "form": payload}
     people = []
     for node in graph["nodes"]:
-        config = node.get("data") or {}
-        if node["type"] == "approval":
-            found = [approver(db, data, config)[0]]
-        elif node["type"] == "consult":
-            found = consultees(db, data, config)
-        else:
+        if node["type"] not in {"approval", "consult", "input"}:
             continue
-        for person in found:
-            if person:
-                people.append({"user": person, "label": node.get("label") or ""})
+        for person in people_for(db, data, node.get("data") or {}, node["type"])[0]:
+            people.append({"user": person, "label": node.get("label") or ""})
     return people
 
 
@@ -523,7 +982,7 @@ def steps_graph(form_id: str, steps: list[dict]) -> dict:
             "user_id": step.get("user_id"),
             "allow_return": True,
             "allow_reject": True,
-            "due_in_days": None,
+            "due_in_days": math.ceil(step["due_hours"] / 24) if step.get("due_hours") else None,
             "instructions": "",
         }
         condition = step.get("condition")
@@ -611,6 +1070,7 @@ def build_router(app):
             "decided_by_name": decider.display_name if decider else "",
             "decided_at": task.decided_at.isoformat() if task.decided_at else None,
             "due_at": task.due_at.isoformat() if task.due_at else None,
+            "values": task.submitted_values,
         }
 
     @router.get("/cases/{case_id}/process", tags=["cases"])
@@ -664,13 +1124,83 @@ def build_router(app):
             result.update(mode="steps", graph=graph, steps=legacy_steps(submission, tasks), state=submission.state,
                           outcome=submission.state if submission.state in OUTCOMES else None)
         else:
-            rule = rule_for_form(db, case.form_id)
-            if rule:
-                result.update(mode="preview", graph=graph_of(rule), rule_name=rule.name)
+            version = process_versions.pinned_or_live(db, case)
+            if version:
+                rule = db.get(m.AutomationRule, version.rule_id)
+                result.update(mode="preview", graph=version.graph, rule_name=rule.name if rule else None)
             else:
                 form = db.get(m.Form, case.form_id)
                 result.update(mode="preview", graph=steps_graph(form.id, form.approval_steps))
         result.update(names(db, result["graph"]))
+        result["files"] = step_files(db, user, case, submission, run, result["graph"], tasks if submission else [])
+        return result
+
+    def step_files(db, user, case, submission, run, graph: dict, tasks: list) -> dict:
+        """For each step: the documents it asks for, and the files actually handed in there."""
+        hidden = step_limits(db, user, case)[1]
+
+        def about(file_id: str, by: str | None, at, source: str, name: str = "") -> dict | None:
+            file = db.get(m.DriveFile, file_id)
+            if not file and not name:
+                return None
+            person = db.get(m.User, by) if by else None
+            return {
+                "id": file_id,
+                "name": file.name if file else name,
+                "mime": file.mime if file else None,
+                "size": file.size if file else None,
+                "by": person.display_name if person else "",
+                "at": at.isoformat() if hasattr(at, "isoformat") else at,
+                "source": source,
+                "available": bool(file and not file.deleted_at),
+            }
+
+        version = db.get(m.ProcessVersion, case.process_version_id) if case.process_version_id else None
+        rule = db.get(m.AutomationRule, run.rule_id) if run else None
+        dossier_count = version.required_file_count if version else (rule.required_file_count if rule else 0)
+        result: dict[str, dict] = {}
+        for node in graph.get("nodes", []):
+            data = node.get("data") or {}
+            required = dossier_count if node.get("type") == "trigger" else int(data.get("require_files") or 0)
+            documents = [str(name) for name in data.get("required_documents") or [] if str(name).strip()]
+            result[node["id"]] = {"required": required, "documents": documents, "attached": [], "hidden": hidden}
+        if hidden:
+            return result
+        trigger = next((node["id"] for node in graph.get("nodes", []) if node.get("type") == "trigger"), None)
+        if trigger:
+            if submission:
+                attached = [
+                    about(item["file_id"], case.owner_id, submission.created_at, "dossier", item.get("name", ""))
+                    for item in submission.files_snapshot or []
+                ]
+            else:
+                attached = [about(file_id, case.owner_id, case.updated_at, "dossier") for file_id in case.file_ids or []]
+            result[trigger]["attached"] = [item for item in attached if item]
+        for task in tasks:
+            node_id = task.node_id or f"approval_{task.step_index + 1}"
+            handed = (task.submitted_values or {}).get("_files") or []
+            if node_id in result and handed:
+                result[node_id]["attached"] += [
+                    item
+                    for item in (
+                        about(f["id"], task.decided_by_id or task.assignee_id, task.decided_at, "step", f.get("name", ""))
+                        for f in handed
+                    )
+                    if item
+                ]
+        for step in (run.steps if run else []) or []:
+            output = step.get("output") or {}
+            if step.get("type") == "assign_task" and output.get("task_id") and step.get("node_id") in result:
+                work = db.get(m.Task, output["task_id"])
+                if work:
+                    result[step["node_id"]]["attached"] += [
+                        item
+                        for item in (
+                            about(file_id, work.assignee_id, work.submitted_at or work.updated_at, "task")
+                            for file_id in work.file_ids or []
+                        )
+                        if item
+                    ]
         return result
 
     @router.get("/automations/process-template", tags=["automations"])
@@ -690,15 +1220,22 @@ def build_router(app):
     return router
 
 
+# The engine starts process flows through flow_hooks, so it does not have to import this module.
+flow_hooks.STARTERS["process"] = start_flow
+
+
 __all__ = [
     "begin",
     "build_router",
     "cancel",
     "expected_approvers",
     "instructions_for",
+    "forward",
     "on_decision",
+    "on_overdue",
     "on_task_event",
     "resume",
-    "rule_for_form",
     "start",
+    "step_limits",
+    "step_values",
 ]

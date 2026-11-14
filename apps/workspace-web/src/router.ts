@@ -20,7 +20,8 @@ export const router = createRouter({
     {
       path: '/drive',
       component: () => import('./views/DriveView.vue'),
-      meta: { title: 'Kho tài liệu' },
+      // Edge to edge under the top bar, like a file manager; the main navigation stays.
+      meta: { title: 'Kho tài liệu', bleed: true },
     },
     {
       path: '/drive/:id/edit',
@@ -41,6 +42,11 @@ export const router = createRouter({
       path: '/approvals',
       component: () => import('./views/ApprovalsView.vue'),
       meta: { title: 'Cần phê duyệt' },
+    },
+    {
+      path: '/profile',
+      component: () => import('./views/ProfileView.vue'),
+      meta: { title: 'Hồ sơ cá nhân' },
     },
     {
       path: '/settings',
@@ -79,24 +85,23 @@ export const router = createRouter({
       meta: { title: 'Tìm kiếm' },
     },
     {
-      path: '/automations',
+      path: '/processes',
       component: () => import('./views/AutomationsView.vue'),
-      meta: { title: 'Tự động hóa', capability: 'automations.manage' },
+      meta: { title: 'Quy trình nghiệp vụ', capability: 'automations.manage' },
     },
     {
-      path: '/automations/:id',
+      path: '/processes/:id',
       component: () => import('./views/AutomationEditorView.vue'),
-      meta: { title: 'Thiết kế luồng', capability: 'automations.manage', wide: true },
+      meta: { title: 'Thiết kế quy trình', capability: 'automations.manage', wide: true },
     },
+    // Links saved before Tự động hóa and Gói nghiệp vụ became one screen.
+    { path: '/automations', redirect: (to) => ({ path: '/processes', query: { tab: 'automation', ...to.query } }) },
+    { path: '/automations/:id', redirect: (to) => ({ path: `/processes/${String(to.params.id)}`, query: to.query }) },
+    { path: '/packages', redirect: '/processes' },
     {
       path: '/assistant',
       component: () => import('./views/AssistantAdminView.vue'),
       meta: { title: 'Trợ lý AI', capability: 'assistant.manage' },
-    },
-    {
-      path: '/packages',
-      component: () => import('./views/PackagesView.vue'),
-      meta: { title: 'Gói nghiệp vụ' },
     },
     {
       path: '/:pathMatch(.*)*',

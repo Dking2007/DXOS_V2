@@ -9,6 +9,7 @@ export type Inline =
   | { t: 'code'; v: string }
   | { t: 'link'; v: string; href: string }
   | { t: 'cite'; n: number }
+  | { t: 'ref'; n: number }
 
 export type Block =
   | { t: 'p'; inline: Inline[] }
@@ -16,7 +17,7 @@ export type Block =
   | { t: 'ul' | 'ol'; items: Inline[][] }
   | { t: 'code'; v: string }
 
-const INLINE = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\[\d{1,2}\])|(https?:\/\/[^\s<>()"']+)/g
+const INLINE = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\[\d{1,2}\])|(https?:\/\/[^\s<>()"']+)|((?<![\w@])@\d{1,3}(?!\d))/g
 
 export function parseInline(text: string): Inline[] {
   const out: Inline[] = []
@@ -29,6 +30,7 @@ export function parseInline(text: string): Inline[] {
     if (match[1]) out.push({ t: 'code', v: token.slice(1, -1) })
     else if (match[2]) out.push({ t: 'bold', v: token.slice(2, -2) })
     else if (match[3]) out.push({ t: 'cite', n: Number(token.slice(1, -1)) })
+    else if (match[5]) out.push({ t: 'ref', n: Number(token.slice(1)) })
     else out.push({ t: 'link', v: token, href: token })
     last = start + token.length
   }

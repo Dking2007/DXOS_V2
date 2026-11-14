@@ -502,6 +502,7 @@
           "drive"
         ],
         "summary": "Folders",
+        "description": "A folder's subfolders; at the root, one's own. `shared` lists what others opened to you.",
         "operationId": "folders_workspace_v1_drive_folders_get",
         "parameters": [
           {
@@ -518,6 +519,16 @@
                 }
               ],
               "title": "Parent Id"
+            }
+          },
+          {
+            "name": "shared",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Shared"
             }
           },
           {
@@ -788,6 +799,16 @@
               "type": "boolean",
               "default": false,
               "title": "Trash"
+            }
+          },
+          {
+            "name": "shared",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Shared"
             }
           },
           {
@@ -2245,6 +2266,57 @@
         }
       }
     },
+    "/workspace/v1/approval-tasks/{task_id}/forward": {
+      "post": {
+        "tags": [
+          "approvals"
+        ],
+        "summary": "Forward Task",
+        "description": "Pass a request to someone else, where the step allows it.",
+        "operationId": "forward_task_workspace_v1_approval_tasks__task_id__forward_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForwardInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/notifications": {
       "get": {
         "tags": [
@@ -2422,13 +2494,14 @@
         }
       }
     },
-    "/workspace/v1/business-packages": {
+    "/workspace/v1/processes/available": {
       "get": {
         "tags": [
-          "business-packages"
+          "processes"
         ],
-        "summary": "Packages",
-        "operationId": "packages_workspace_v1_business_packages_get",
+        "summary": "Available",
+        "description": "Processes this person may open a dossier under.",
+        "operationId": "available_workspace_v1_processes_available_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2439,28 +2512,23 @@
             }
           }
         }
-      },
-      "post": {
+      }
+    },
+    "/workspace/v1/processes/{rule_id}/settings": {
+      "put": {
         "tags": [
-          "business-packages"
+          "processes"
         ],
-        "summary": "Create Package",
-        "operationId": "create_package_workspace_v1_business_packages_post",
+        "summary": "Update Settings",
+        "operationId": "update_settings_workspace_v1_processes__rule_id__settings_put",
         "parameters": [
           {
-            "name": "idempotency-key",
-            "in": "header",
-            "required": false,
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Idempotency-Key"
+              "type": "string",
+              "title": "Rule Id"
             }
           }
         ],
@@ -2469,345 +2537,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PackageCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/workspace/v1/business-packages/active-versions": {
-      "get": {
-        "tags": [
-          "business-packages"
-        ],
-        "summary": "Active Versions",
-        "operationId": "active_versions_workspace_v1_business_packages_active_versions_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/workspace/v1/business-packages/from-template": {
-      "post": {
-        "tags": [
-          "business-packages"
-        ],
-        "summary": "Import Template",
-        "operationId": "import_template_workspace_v1_business_packages_from_template_post",
-        "parameters": [
-          {
-            "name": "idempotency-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Idempotency-Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TemplateImport"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/workspace/v1/business-packages/{package_id}/versions": {
-      "get": {
-        "tags": [
-          "business-packages"
-        ],
-        "summary": "Versions",
-        "operationId": "versions_workspace_v1_business_packages__package_id__versions_get",
-        "parameters": [
-          {
-            "name": "package_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Package Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "business-packages"
-        ],
-        "summary": "Create Version",
-        "operationId": "create_version_workspace_v1_business_packages__package_id__versions_post",
-        "parameters": [
-          {
-            "name": "package_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Package Id"
-            }
-          },
-          {
-            "name": "idempotency-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Idempotency-Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/workspace/v1/package-versions/{version_id}/diff": {
-      "get": {
-        "tags": [
-          "business-packages"
-        ],
-        "summary": "Version Diff",
-        "operationId": "version_diff_workspace_v1_package_versions__version_id__diff_get",
-        "parameters": [
-          {
-            "name": "version_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Version Id"
-            }
-          },
-          {
-            "name": "against_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Against Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/workspace/v1/package-versions/{version_id}/impact": {
-      "get": {
-        "tags": [
-          "business-packages"
-        ],
-        "summary": "Version Impact",
-        "description": "Run the same fixtures through two versions and say what changes, and why.\n\nRead-only rehearsal: nothing is created, sent or published. Both versions are evaluated\nagainst today's organisation, so a difference between them comes from the rules. Whether the\norganisation moved since the baseline was last rehearsed is reported separately as drift,\nby comparing the recipients stored in that report with the ones resolved now.",
-        "operationId": "version_impact_workspace_v1_package_versions__version_id__impact_get",
-        "parameters": [
-          {
-            "name": "version_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Version Id"
-            }
-          },
-          {
-            "name": "against_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Against Id"
-            }
-          },
-          {
-            "name": "suite_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Suite Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/workspace/v1/package-versions/{version_id}/validate": {
-      "post": {
-        "tags": [
-          "business-packages"
-        ],
-        "summary": "Validate Version",
-        "operationId": "validate_version_workspace_v1_package_versions__version_id__validate_post",
-        "parameters": [
-          {
-            "name": "version_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Version Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Revision"
+                "$ref": "#/components/schemas/ProcessSettings"
               }
             }
           }
@@ -2834,320 +2564,21 @@
         }
       }
     },
-    "/workspace/v1/package-versions/{version_id}/test-suites": {
+    "/workspace/v1/processes/{rule_id}/publish": {
       "post": {
         "tags": [
-          "business-packages"
-        ],
-        "summary": "Create Suite",
-        "operationId": "create_suite_workspace_v1_package_versions__version_id__test_suites_post",
-        "parameters": [
-          {
-            "name": "version_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Version Id"
-            }
-          },
-          {
-            "name": "idempotency-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Idempotency-Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SuiteCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "business-packages"
-        ],
-        "summary": "Suites",
-        "operationId": "suites_workspace_v1_package_versions__version_id__test_suites_get",
-        "parameters": [
-          {
-            "name": "version_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Version Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/workspace/v1/package-versions/{version_id}/simulation-reports": {
-      "get": {
-        "tags": [
-          "business-packages"
-        ],
-        "summary": "Reports",
-        "operationId": "reports_workspace_v1_package_versions__version_id__simulation_reports_get",
-        "parameters": [
-          {
-            "name": "version_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Version Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/workspace/v1/package-versions/{version_id}/preview": {
-      "post": {
-        "tags": [
-          "business-packages"
-        ],
-        "summary": "Preview",
-        "operationId": "preview_workspace_v1_package_versions__version_id__preview_post",
-        "parameters": [
-          {
-            "name": "version_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Version Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PreviewInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/workspace/v1/package-versions/{version_id}/simulate": {
-      "post": {
-        "tags": [
-          "business-packages"
-        ],
-        "summary": "Simulate",
-        "operationId": "simulate_workspace_v1_package_versions__version_id__simulate_post",
-        "parameters": [
-          {
-            "name": "version_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Version Id"
-            }
-          },
-          {
-            "name": "suite_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Suite Id"
-            }
-          },
-          {
-            "name": "idempotency-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Idempotency-Key"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/workspace/v1/simulation-reports/{report_id}": {
-      "get": {
-        "tags": [
-          "business-packages"
-        ],
-        "summary": "Report",
-        "operationId": "report_workspace_v1_simulation_reports__report_id__get",
-        "parameters": [
-          {
-            "name": "report_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Report Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/workspace/v1/package-versions/{version_id}/publish": {
-      "post": {
-        "tags": [
-          "business-packages"
+          "processes"
         ],
         "summary": "Publish",
-        "operationId": "publish_workspace_v1_package_versions__version_id__publish_post",
+        "operationId": "publish_workspace_v1_processes__rule_id__publish_post",
         "parameters": [
           {
-            "name": "version_id",
+            "name": "rule_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Version Id"
+              "title": "Rule Id"
             }
           }
         ],
@@ -3161,6 +2592,348 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/processes/{rule_id}/unpublish": {
+      "post": {
+        "tags": [
+          "processes"
+        ],
+        "summary": "Unpublish",
+        "operationId": "unpublish_workspace_v1_processes__rule_id__unpublish_post",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Revision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/processes/{rule_id}/versions": {
+      "get": {
+        "tags": [
+          "processes"
+        ],
+        "summary": "Versions",
+        "operationId": "versions_workspace_v1_processes__rule_id__versions_get",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/processes/{rule_id}/scenarios": {
+      "get": {
+        "tags": [
+          "processes"
+        ],
+        "summary": "List Scenarios",
+        "operationId": "list_scenarios_workspace_v1_processes__rule_id__scenarios_get",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "processes"
+        ],
+        "summary": "Add Scenario",
+        "operationId": "add_scenario_workspace_v1_processes__rule_id__scenarios_post",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/processes/{rule_id}/scenarios/{scenario_id}": {
+      "delete": {
+        "tags": [
+          "processes"
+        ],
+        "summary": "Remove Scenario",
+        "operationId": "remove_scenario_workspace_v1_processes__rule_id__scenarios__scenario_id__delete",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          },
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/processes/{rule_id}/scenario-reports": {
+      "post": {
+        "tags": [
+          "processes"
+        ],
+        "summary": "Run Scenarios",
+        "description": "Walk every scenario through the draft. Nothing is created, sent or published.",
+        "operationId": "run_scenarios_workspace_v1_processes__rule_id__scenario_reports_post",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "processes"
+        ],
+        "summary": "Reports",
+        "operationId": "reports_workspace_v1_processes__rule_id__scenario_reports_get",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/processes/{rule_id}/impact": {
+      "get": {
+        "tags": [
+          "processes"
+        ],
+        "summary": "Impact",
+        "description": "What the draft changes compared with the version in force: its steps and each scenario.\n\nRead-only rehearsal. Both sides are evaluated against today's organisation, so a difference\nbetween them comes from the process and not from people having moved.",
+        "operationId": "impact_workspace_v1_processes__rule_id__impact_get",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3186,9 +2959,11 @@
     "/workspace/v1/cases/{case_id}/explanation": {
       "get": {
         "tags": [
-          "business-packages"
+          "processes",
+          "cases"
         ],
         "summary": "Explanation",
+        "description": "Why a dossier went where it did: what was pinned at each submission, and Core's trace.",
         "operationId": "explanation_workspace_v1_cases__case_id__explanation_get",
         "parameters": [
           {
@@ -3542,6 +3317,23 @@
               "type": "string",
               "title": "File Id"
             }
+          },
+          {
+            "name": "case_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 36
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Case Id"
+            }
           }
         ],
         "responses": {
@@ -3670,6 +3462,7 @@
             "schema": {
               "enum": [
                 "mine",
+                "review",
                 "created",
                 "watching",
                 "managed",
@@ -5607,6 +5400,26 @@
         }
       }
     },
+    "/workspace/v1/reports/cases.csv": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Cases Csv",
+        "description": "Every dossier this person may see, with where it waits and whether it is late.",
+        "operationId": "cases_csv_workspace_v1_reports_cases_csv_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/delegations": {
       "get": {
         "tags": [
@@ -5678,6 +5491,159 @@
             "schema": {
               "type": "string",
               "title": "Delegation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/me/profile": {
+      "patch": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Patch Profile",
+        "operationId": "patch_profile_workspace_v1_me_profile_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfilePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/me/avatar": {
+      "put": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Put Avatar",
+        "operationId": "put_avatar_workspace_v1_me_avatar_put",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_put_avatar_workspace_v1_me_avatar_put"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Delete Avatar",
+        "operationId": "delete_avatar_workspace_v1_me_avatar_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/users/{user_id}/avatar": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Avatar",
+        "operationId": "avatar_workspace_v1_users__user_id__avatar_get",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
             }
           }
         ],
@@ -7592,6 +7558,57 @@
         }
       }
     },
+    "/workspace/v1/ai/cases/{case_id}/ask": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ask Case",
+        "description": "Questions about the dossier open on screen, answered from that dossier only.",
+        "operationId": "ask_case_workspace_v1_ai_cases__case_id__ask_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseQuestionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/ai/documents/draft": {
       "post": {
         "tags": [
@@ -8095,22 +8112,22 @@
         }
       }
     },
-    "/workspace/v1/ai/package-versions/{version_id}/scenarios": {
+    "/workspace/v1/ai/processes/{rule_id}/scenarios": {
       "post": {
         "tags": [
           "ai"
         ],
         "summary": "Scenarios",
-        "description": "17. Scenarios worth testing (amounts at the threshold, missing files) with their real path.",
-        "operationId": "scenarios_workspace_v1_ai_package_versions__version_id__scenarios_post",
+        "description": "17. Scenarios worth testing (amounts at the threshold, missing files) with their real result.",
+        "operationId": "scenarios_workspace_v1_ai_processes__rule_id__scenarios_post",
         "parameters": [
           {
-            "name": "version_id",
+            "name": "rule_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Version Id"
+              "title": "Rule Id"
             }
           }
         ],
@@ -8276,6 +8293,19 @@
                 "type": "null"
               }
             ]
+          },
+          "due_hours": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2160.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Hours"
           }
         },
         "additionalProperties": false,
@@ -8390,6 +8420,20 @@
         ],
         "title": "ArticlePatch"
       },
+      "Body_put_avatar_workspace_v1_me_avatar_put": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_put_avatar_workspace_v1_me_avatar_put"
+      },
       "Body_upload_attachment_workspace_v1_conversations__conversation_id__attachments_post": {
         "properties": {
           "file": {
@@ -8455,7 +8499,7 @@
             "type": "string",
             "title": "Form Id"
           },
-          "package_version_id": {
+          "process_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -8464,7 +8508,7 @@
                 "type": "null"
               }
             ],
-            "title": "Package Version Id"
+            "title": "Process Id"
           },
           "payload": {
             "additionalProperties": true,
@@ -8595,6 +8639,30 @@
           "expected_revision"
         ],
         "title": "CasePatch"
+      },
+      "CaseQuestionInput": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 2,
+            "title": "Question"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/Turn"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "History"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "CaseQuestionInput"
       },
       "ChatInput": {
         "properties": {
@@ -8899,7 +8967,8 @@
             "enum": [
               "approve",
               "reject",
-              "return"
+              "return",
+              "submit"
             ],
             "title": "Decision"
           },
@@ -8908,6 +8977,19 @@
             "maxLength": 3000,
             "title": "Reason",
             "default": ""
+          },
+          "values": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Values"
+          },
+          "file_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "File Ids"
           }
         },
         "additionalProperties": false,
@@ -9124,15 +9206,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": [
-                  "true",
-                  "false",
-                  "approve",
-                  "return",
-                  "reject",
-                  "completed",
-                  "cancelled"
-                ]
+                "maxLength": 30
               },
               {
                 "type": "null"
@@ -9394,74 +9468,6 @@
         ],
         "title": "FilePatch"
       },
-      "Fixture": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "payload": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Payload"
-          },
-          "decisions": {
-            "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "object",
-            "title": "Decisions"
-          },
-          "file_count": {
-            "type": "integer",
-            "maximum": 30.0,
-            "minimum": 0.0,
-            "title": "File Count",
-            "default": 0
-          },
-          "expected_path": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Expected Path"
-          },
-          "expected_assignees": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Expected Assignees"
-          },
-          "expected_error_code": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "required_documents_missing",
-                  "approval_configuration_error",
-                  "form_validation_error",
-                  "self_approval_denied"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expected Error Code"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "name",
-          "payload"
-        ],
-        "title": "Fixture"
-      },
       "FolderCreate": {
         "properties": {
           "name": {
@@ -9642,6 +9648,32 @@
         ],
         "title": "FormField"
       },
+      "ForwardInput": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "user_id"
+        ],
+        "title": "ForwardInput"
+      },
       "Graph": {
         "properties": {
           "nodes": {
@@ -9676,13 +9708,19 @@
             "title": "Data"
           },
           "kind": {
-            "type": "string",
-            "enum": [
-              "automation",
-              "process"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "automation",
+                  "process"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Kind",
-            "default": "automation"
+            "title": "Kind"
           }
         },
         "additionalProperties": false,
@@ -9964,53 +10002,6 @@
         ],
         "title": "Node"
       },
-      "PackageCreate": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 3000,
-            "title": "Description",
-            "default": ""
-          },
-          "form_id": {
-            "type": "string",
-            "title": "Form Id"
-          },
-          "required_file_count": {
-            "type": "integer",
-            "maximum": 30.0,
-            "minimum": 0.0,
-            "title": "Required File Count",
-            "default": 0
-          },
-          "allowed_roles": {
-            "items": {
-              "type": "string",
-              "enum": [
-                "staff",
-                "manager",
-                "director",
-                "technical_admin"
-              ]
-            },
-            "type": "array",
-            "title": "Allowed Roles"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "name",
-          "form_id"
-        ],
-        "title": "PackageCreate"
-      },
       "PackageImport": {
         "properties": {
           "package_id": {
@@ -10124,35 +10115,116 @@
         ],
         "title": "PostEdit"
       },
-      "PreviewInput": {
+      "ProcessSettings": {
         "properties": {
-          "payload": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Payload"
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
           },
-          "decisions": {
-            "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
+          "allowed_roles": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "staff",
+                "manager",
+                "director",
+                "technical_admin"
+              ]
             },
-            "type": "object",
-            "title": "Decisions"
+            "type": "array",
+            "title": "Allowed Roles"
           },
-          "file_count": {
+          "allowed_department_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Allowed Department Ids"
+          },
+          "required_file_count": {
             "type": "integer",
             "maximum": 30.0,
             "minimum": 0.0,
-            "title": "File Count",
+            "title": "Required File Count",
             "default": 0
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "payload"
+          "expected_revision"
         ],
-        "title": "PreviewInput"
+        "title": "ProcessSettings"
+      },
+      "ProfilePatch": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "job_title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Title"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "contact_email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Email"
+          },
+          "about": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "About"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ProfilePatch"
       },
       "ProviderInput": {
         "properties": {
@@ -10383,13 +10455,19 @@
             "default": "all"
           },
           "kind": {
-            "type": "string",
-            "enum": [
-              "automation",
-              "process"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "automation",
+                  "process"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Kind",
-            "default": "automation"
+            "title": "Kind"
           }
         },
         "additionalProperties": false,
@@ -10432,13 +10510,19 @@
             "default": "all"
           },
           "kind": {
-            "type": "string",
-            "enum": [
-              "automation",
-              "process"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "automation",
+                  "process"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Kind",
-            "default": "automation"
+            "title": "Kind"
           }
         },
         "additionalProperties": false,
@@ -10481,6 +10565,85 @@
           "enabled"
         ],
         "title": "RuleToggle"
+      },
+      "ScenarioInput": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "decisions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Decisions"
+          },
+          "file_count": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "File Count",
+            "default": 0
+          },
+          "expected_outcome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "approved",
+                  "rejected",
+                  "needs_revision"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Outcome"
+          },
+          "expected_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 80,
+            "title": "Expected Path"
+          },
+          "expected_error_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "required_documents_missing",
+                  "form_validation_error",
+                  "approver_unresolved",
+                  "consultees_missing",
+                  "assignee_unresolved",
+                  "quorum_impossible",
+                  "loop_limit"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Error Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ScenarioInput"
       },
       "SearchInput": {
         "properties": {
@@ -10576,25 +10739,6 @@
           "access"
         ],
         "title": "ShareInput"
-      },
-      "SuiteCreate": {
-        "properties": {
-          "cases": {
-            "items": {
-              "$ref": "#/components/schemas/Fixture"
-            },
-            "type": "array",
-            "maxItems": 20,
-            "minItems": 1,
-            "title": "Cases"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "cases"
-        ],
-        "title": "SuiteCreate"
       },
       "TaskAssign": {
         "properties": {
@@ -11014,27 +11158,6 @@
         ],
         "title": "TaskTransition"
       },
-      "TemplateImport": {
-        "properties": {
-          "version_id": {
-            "type": "string",
-            "title": "Version Id"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Name"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "version_id",
-          "name"
-        ],
-        "title": "TemplateImport"
-      },
       "Turn": {
         "properties": {
           "role": {
@@ -11186,27 +11309,6 @@
           "type"
         ],
         "title": "ValidationError"
-      },
-      "VersionCreate": {
-        "properties": {
-          "form_id": {
-            "type": "string",
-            "title": "Form Id"
-          },
-          "required_file_count": {
-            "type": "integer",
-            "maximum": 30.0,
-            "minimum": 0.0,
-            "title": "Required File Count",
-            "default": 0
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "form_id"
-        ],
-        "title": "VersionCreate"
       },
       "WithdrawInput": {
         "properties": {

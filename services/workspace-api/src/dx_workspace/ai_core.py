@@ -38,6 +38,7 @@ GROUPS = {
 FEATURES = {
     "case_extract": ("cases", "Đọc tài liệu, tự điền biểu mẫu", "Đọc báo giá, đơn, hợp đồng đính kèm hồ sơ và đề xuất giá trị cho từng trường, ghi rõ trang và câu trích để người lập xác nhận.", True),
     "case_summary": ("cases", "Tóm tắt hồ sơ cho người duyệt", "3–5 dòng ở đầu trang hồ sơ: nội dung xin duyệt, số tiền, tài liệu kèm, ý kiến các bước trước.", False),
+    "case_qa": ("cases", "Hỏi đáp về hồ sơ", "Hỏi AI về chính hồ sơ đang mở: nội dung xin duyệt, tài liệu kèm, đang chờ ai, các bước trước đã nói gì; câu trả lời nêu nguồn.", False),
     "case_check": ("cases", "Soát hồ sơ trước khi trình", "Chỉ ra chỗ có thể chưa ổn: số tiền khác báo giá, ngày không khớp, thiếu tài liệu.", False),
     "decision_draft": ("cases", "Gợi ý ý kiến duyệt, lý do trả lại", "Soạn sẵn ý kiến phê duyệt hoặc lý do trả lại lịch sự, dựa trên điểm còn thiếu.", False),
     "document_draft": ("documents", "Soạn văn bản hành chính", "Từ vài ý chính soạn tờ trình, công văn, thông báo theo thể thức Nghị định 30/2020, lưu thành tệp Word mở được trong ONLYOFFICE.", False),
@@ -51,8 +52,8 @@ FEATURES = {
     "chat_summary": ("talk", "Tóm tắt hội thoại dài", "Tóm tắt cuộc trò chuyện và các việc đã thống nhất; tạo việc từ tin nhắn.", False),
     "writing_help": ("talk", "Hỗ trợ viết bài bảng tin", "Viết lại cho gọn, sửa chính tả, gợi ý tiêu đề, tạo mô tả cho ảnh.", False),
     "automation_ai": ("extend", "Bước “Hỏi AI” trong luồng tự động", "Node mới trong trình thiết kế luồng: AI phân loại (ví dụ mức gấp) để rẽ nhánh.", False),
-    "assistant_my_data": ("extend", "Trợ lý trả lời về dữ liệu của người hỏi", "Trợ lý xem được hồ sơ, công việc, việc chờ duyệt của chính người hỏi (theo quyền xem) để trả lời “Hồ sơ của tôi đang chờ ai?”.", False),
-    "package_scenarios": ("extend", "Sinh kịch bản thử cho Gói nghiệp vụ", "Đề xuất kịch bản kiểm thử (số tiền sát ngưỡng, thiếu tài liệu…) để chạy thử trước khi phát hành.", False),
+    "assistant_my_data": ("extend", "Trợ lý trả lời về dữ liệu của người hỏi", "Trợ lý xem được công việc (được giao, đã giao, điều phối, theo dõi), bàn giao và ủy quyền, hồ sơ, việc chờ duyệt, tài liệu của mình và được chia sẻ của chính người hỏi (theo quyền xem) để trả lời “Việc nào của tôi sắp quá hạn?”, “Ai chia sẻ tài liệu cho tôi?”.", False),
+    "package_scenarios": ("extend", "Sinh kịch bản thử cho Quy trình nghiệp vụ", "Đề xuất kịch bản kiểm thử (số tiền sát ngưỡng, thiếu tài liệu…) để chạy thử trước khi phát hành.", False),
 }  # fmt: skip
 MAX_FILE_BYTES = 20 * 1024 * 1024
 # Flows run inside the API and the worker, deep below any request; each process records here

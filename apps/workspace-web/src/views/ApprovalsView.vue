@@ -1,12 +1,12 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
+import StepAnswerDialog from '../components/StepAnswerDialog.vue'
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   ArrowRight,
-  CheckCheck,
   ClipboardCheck,
   ChevronRight,
   UserRoundCheck,
@@ -26,6 +26,7 @@ interface Delegation {
   id: string
   delegator_id: string
   delegator_name: string
+  delegate_id: string
   delegate_name: string
   starts_at: string
   ends_at: string
@@ -37,6 +38,29 @@ const delegations = useQuery({
   queryFn: () => api.request<Page<Delegation>>('/delegations'),
 })
 const users = useQuery({ queryKey: ['users'], queryFn: () => api.request<Page<User>>('/users') })
+/** In force now or starting later: who acts for whom is what people need to see at a glance. */
+const LIVE = ['active', 'scheduled']
+const delegationGroups = computed(() => {
+  const items = delegations.data.value?.items ?? []
+  const me = session.user?.id
+  return [
+    {
+      key: 'given',
+      title: 'Bạn đang ủy quyền cho',
+      empty: 'Bạn chưa ủy quyền cho ai. Hồ sơ giao cho bạn chỉ bạn xử lý.',
+      items: items.filter((item) => item.delegator_id === me && LIVE.includes(item.state)),
+    },
+    {
+      key: 'received',
+      title: 'Bạn đang được ủy quyền',
+      empty: 'Không ai đang nhờ bạn duyệt thay.',
+      items: items.filter((item) => item.delegate_id === me && LIVE.includes(item.state)),
+    },
+  ]
+})
+const pastDelegations = computed(() =>
+  (delegations.data.value?.items ?? []).filter((item) => !LIVE.includes(item.state)),
+)
 const showDelegate = ref(false)
 const delegateId = ref('')
 const startsAt = ref('')
@@ -82,17 +106,20 @@ const tasks = useQuery({
     ),
   refetchInterval: 20_000,
 })
+/** The deadline the process set for this step has passed. */
+function stepLate(task: { due_at?: string | null; state?: string; status?: string }) {
+  return !!task.due_at && new Date(task.due_at).getTime() < Date.now() && (task.state || task.status) === 'pending'
+}
+const answering = ref<ApprovalTask | null>(null)
+async function answered() {
+  answering.value = null
+  await tasks.refetch()
+}
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <span class="eyebrow">HỘP VIỆC CỦA BẠN</span>
-      <h1>Cần phê duyệt</h1>
-      <p>Xem nội dung, đối chiếu tài liệu và ra quyết định có căn cứ.</p>
-    </div>
-    <div class="date-line">
-      <CheckCheck :size="16" />Danh sách tự cập nhật mỗi 20 giây
-    </div>
+  <StepAnswerDialog v-if="answering" :task="answering" mode="answer" @close="answering = null" @done="answered" />
+  <header class="page-head compact">
+    <h1 class="sr-only">Cần phê duyệt</h1>
   </header>
   <section class="card">
     <header class="card-header">
@@ -121,6 +148,7 @@ const tasks = useQuery({
             <th>Hồ sơ</th>
             <th>Bước xử lý</th>
             <th>Thời gian nhận</th>
+            <th>Hạn xử lý</th>
             <th>Trạng thái</th>
             <th />
           </tr>
@@ -131,11 +159,17 @@ const tasks = useQuery({
               <div class="primary-cell">
                 <span class="file-icon"><ClipboardCheck :size="20" /></span>
                 <div>
-                  <RouterLink class="row-link" :to="`/cases/${task.case_id}`">{{
+                  <RouterLink v-if="task.case_id" class="row-link" :to="`/cases/${task.case_id}`">{{
                     task.case_title || 'Hồ sơ cần phê duyệt'
-                  }}</RouterLink
-                  ><small class="mono">{{
-                    task.case_code || 'Hồ sơ'
+                  }}</RouterLink>
+                  <RouterLink v-else-if="task.subject?.link" class="row-link" :to="task.subject.link">{{ task.case_title }}</RouterLink>
+                  <span v-else>{{ task.case_title }}</span>
+                  <small v-if="!task.case_id || task.case_number" class="mono">{{
+                    task.case_id
+                      ? `HS-${String(task.case_number).padStart(6, '0')}`
+                      : task.subject?.type === 'post'
+                        ? 'Bài viết'
+                        : 'Công việc'
                   }}</small
                   ><small v-if="task.on_behalf_of" class="delegated-note"
                     ><UserRoundCheck :size="12" /> Duyệt thay {{ task.on_behalf_of }}</small
@@ -145,15 +179,20 @@ const tasks = useQuery({
             </td>
             <td>{{ task.label || task.step_label || 'Phê duyệt' }}</td>
             <td class="muted">{{ formatDate(task.created_at, true) }}</td>
+            <td :class="{ 'overdue-text': stepLate(task) }">
+              {{ task.due_at ? formatDate(task.due_at, true) : '—' }}<template v-if="stepLate(task)"> · quá hạn</template>
+            </td>
             <td>
               <StatusBadge :status="task.status || task.state || 'pending'" />
             </td>
             <td>
               <RouterLink
+                v-if="task.case_id"
                 :to="`/cases/${task.case_id}`"
                 class="button secondary small"
                 >Xem hồ sơ <ArrowRight :size="15"
               /></RouterLink>
+              <button v-else class="button secondary small" @click="answering = task">Xử lý</button>
             </td>
           </tr>
         </tbody>
@@ -178,39 +217,53 @@ const tasks = useQuery({
   <section class="card" style="margin-top: 22px">
     <header class="card-header">
       <div>
-        <span class="eyebrow">ỦY QUYỀN PHÊ DUYỆT</span>
-        <h2>Khi bạn vắng mặt</h2>
+        <h2>Ủy quyền phê duyệt</h2>
+        <small class="muted">Nhờ đồng nghiệp duyệt thay khi bạn vắng mặt.</small>
       </div>
       <button class="button secondary small" @click="showDelegate = true">
         <UserRoundCheck :size="15" />Ủy quyền
       </button>
     </header>
-    <p
-      v-if="!delegations.data.value?.items.length"
-      class="card-body muted"
-      style="font-size: 14px"
-    >
-      Ủy quyền cho đồng nghiệp duyệt thay trong một khoảng thời gian. Người nhận chỉ xử lý
-      hồ sơ được giao cho bạn, quyết định ghi rõ ai duyệt thay ai.
-    </p>
-    <div v-for="item in delegations.data.value?.items" :key="item.id" class="list-row">
-      <div class="grow">
-        <p>
-          {{ item.delegator_name }} → {{ item.delegate_name }}
-        </p>
-        <small
-          >{{ formatDate(item.starts_at, true) }} – {{ formatDate(item.ends_at, true) }} ·
-          {{ item.reason }}</small
-        >
+    <div class="card-body delegation-groups">
+      <div v-for="group in delegationGroups" :key="group.key" class="delegation-group">
+        <span class="section-label">{{ group.title }}</span>
+        <p v-if="!group.items.length" class="muted">{{ group.empty }}</p>
+        <div v-for="item in group.items" :key="item.id" class="list-row">
+          <div class="grow">
+            <p>
+              <strong>{{ group.key === 'given' ? item.delegate_name : item.delegator_name }}</strong>
+              <template v-if="group.key === 'given'"> duyệt thay bạn</template
+              ><template v-else> nhờ bạn duyệt thay</template>
+            </p>
+            <small
+              >{{ item.state === 'scheduled' ? 'Bắt đầu' : 'Từ' }} {{ formatDate(item.starts_at, true) }} đến
+              {{ formatDate(item.ends_at, true) }}<template v-if="item.reason"> · {{ item.reason }}</template></small
+            >
+          </div>
+          <StatusBadge :status="item.state" />
+          <button
+            v-if="item.delegator_id === session.user?.id && ['active', 'scheduled'].includes(item.state)"
+            class="button secondary small"
+            @click="revoke(item)"
+          >
+            Thu hồi
+          </button>
+        </div>
       </div>
-      <StatusBadge :status="item.state" />
-      <button
-        v-if="item.delegator_id === session.user?.id && ['active', 'scheduled'].includes(item.state)"
-        class="button secondary small"
-        @click="revoke(item)"
-      >
-        Thu hồi
-      </button>
+      <details v-if="pastDelegations.length" class="delegation-past">
+        <summary>Đã hết hạn hoặc đã thu hồi ({{ pastDelegations.length }})</summary>
+        <div v-for="item in pastDelegations" :key="item.id" class="list-row">
+          <div class="grow">
+            <p>{{ item.delegator_name }} → {{ item.delegate_name }}</p>
+            <small
+              >{{ formatDate(item.starts_at, true) }} – {{ formatDate(item.ends_at, true) }}<template v-if="item.reason">
+                · {{ item.reason }}</template
+              ></small
+            >
+          </div>
+          <StatusBadge :status="item.state" />
+        </div>
+      </details>
     </div>
   </section>
   <ModalDialog v-if="showDelegate" title="Ủy quyền phê duyệt" @close="showDelegate = false">

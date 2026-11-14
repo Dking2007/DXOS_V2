@@ -36,7 +36,7 @@ const CHOICES: { key: ThemeChoice; label: string; hint: string; icon: typeof Sun
           <small>{{ choice.hint }}</small>
         </button>
       </div>
-      <p class="muted" style="font-size: 13px; margin-top: 12px">
+      <p class="muted" style="font-size: 14px; margin-top: 12px">
         Lựa chọn được nhớ trên trình duyệt này. Có thể đổi nhanh bằng nút mặt trời/mặt trăng ở thanh trên cùng.
       </p>
     </div>

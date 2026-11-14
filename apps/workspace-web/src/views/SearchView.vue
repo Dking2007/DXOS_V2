@@ -2,7 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
 import { Files, FileText, ListChecks, MessageSquare, Newspaper, Search, Sparkles } from 'lucide-vue-next'
 import { api } from '../api'
@@ -10,6 +10,7 @@ import { formatDate } from '@dx/web-shared/api.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import { useAi } from '../ai/useAi'
+import { openPalette } from '../ui/palette'
 interface Hit {
   type: string
   id: string
@@ -24,14 +25,11 @@ interface Result {
   groups: Record<string, { total: number; items: Hit[] }>
 }
 const route = useRoute()
-const router = useRouter()
 const q = ref(String(route.query.q ?? ''))
-const input = ref(q.value)
 watch(
   () => route.query.q,
   (value) => {
     q.value = String(value ?? '')
-    input.value = q.value
   },
 )
 const result = useQuery({
@@ -65,30 +63,25 @@ const groups = [
   { key: 'post', label: 'Bảng tin', icon: Newspaper },
   { key: 'message', label: 'Tin nhắn', icon: MessageSquare },
 ]
-function go() {
-  router.push({ path: '/search', query: { q: input.value.trim() } })
-}
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <span class="eyebrow">TÌM KIẾM</span>
-      <h1>Tìm trong không gian làm việc</h1>
-      <p>Chỉ hiển thị và đếm những gì bạn được phép xem.</p>
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Tìm kiếm</h1>
   </header>
-  <form class="search-box search-large" @submit.prevent="go">
-    <Search :size="19" /><input
-      v-model="input"
-      type="search"
-      minlength="2"
-      placeholder="Công việc, hồ sơ (vd. HS-000012), tài liệu, bài viết, tin nhắn…"
-      aria-label="Từ khóa"
-      autofocus
-    /><button class="button small">Tìm</button>
-  </form>
+  <div class="search-refine">
+    <span v-if="q.length >= 2"
+      >Kết quả tìm cho <strong>“{{ q }}”</strong></span
+    ><span v-else class="muted">Gõ từ khóa vào ô tìm kiếm trên thanh trên cùng (Ctrl K).</span>
+    <button class="button secondary small" type="button" @click="openPalette(q)">
+      <Search :size="15" />{{ q.length >= 2 ? 'Đổi từ khóa' : 'Mở ô tìm kiếm' }}
+    </button>
+  </div>
   <section v-if="q.length < 2" class="card" style="margin-top: 20px">
-    <StatePanel :empty="true" title="Nhập ít nhất 2 ký tự" description="Tìm theo tiêu đề, nội dung, nhãn tài liệu hoặc mã hồ sơ." />
+    <StatePanel
+      :empty="true"
+      title="Nhập ít nhất 2 ký tự"
+      description="Tìm theo tiêu đề, nội dung, nhãn tài liệu hoặc mã hồ sơ (ví dụ HS-000012)."
+    />
   </section>
   <template v-else>
     <section v-if="result.isPending.value || result.error.value" class="card" style="margin-top: 20px">

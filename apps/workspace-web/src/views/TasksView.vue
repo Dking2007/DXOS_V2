@@ -21,11 +21,38 @@ import type { Task, TaskStatus } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import TaskCreateDialog from '../components/TaskCreateDialog.vue'
+import { useOverview } from '../ui/overview'
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
-type Scope = 'mine' | 'created' | 'watching' | 'managed' | 'all'
+type Scope = 'mine' | 'review' | 'created' | 'watching' | 'managed' | 'all'
 const scope = ref<Scope>((route.query.scope as Scope) || 'mine')
+// The menu badge counts work to do plus results to accept; each has its own tab with its count,
+// and the page opens on the tab that actually holds what the badge announced.
+const overview = useOverview()
+const counts = computed(() => overview.data.value?.counts)
+let chosen = !!route.query.scope
+watch(
+  counts,
+  (value) => {
+    if (chosen || !value) return
+    chosen = true
+    if (!value.tasks && value.tasks_to_review) scope.value = 'review'
+  },
+  { immediate: true },
+)
+const tabs = computed(() => [
+  { value: 'mine' as const, label: 'Việc của tôi', count: counts.value?.tasks ?? 0 },
+  { value: 'review' as const, label: 'Chờ tôi nghiệm thu', count: counts.value?.tasks_to_review ?? 0 },
+  { value: 'created' as const, label: 'Tôi đã giao', count: 0 },
+  { value: 'watching' as const, label: 'Đang theo dõi', count: 0 },
+  { value: 'managed' as const, label: 'Tôi điều phối', count: 0 },
+  { value: 'all' as const, label: 'Tất cả', count: 0 },
+])
+function pick(value: Scope) {
+  chosen = true
+  scope.value = value
+}
 const status = ref(String(route.query.status ?? ''))
 const overdueOnly = ref(route.query.overdue === 'true')
 const search = ref('')
@@ -108,12 +135,8 @@ function closeCreate() {
 }
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <span class="eyebrow">ĐIỀU HÀNH CÔNG VIỆC</span>
-      <h1>Công việc</h1>
-      <p>Giao việc theo cấp quản lý, theo dõi tiến độ và nghiệm thu kết quả.</p>
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Công việc</h1>
     <div class="page-actions">
       <button class="button" @click="showCreate = true">
         <Plus :size="18" />Giao việc
@@ -124,19 +147,13 @@ function closeCreate() {
     <div class="toolbar">
       <div class="tabs">
         <button
-          v-for="tab in [
-            { value: 'mine', label: 'Việc của tôi' },
-            { value: 'created', label: 'Tôi đã giao' },
-            { value: 'watching', label: 'Đang theo dõi' },
-            { value: 'managed', label: 'Tôi điều phối' },
-            { value: 'all', label: 'Tất cả' },
-          ] as const"
+          v-for="tab in tabs.filter((t) => t.value !== 'review' || t.count || scope === 'review')"
           :key="tab.value"
           class="tab"
           :class="{ active: scope === tab.value }"
-          @click="scope = tab.value"
+          @click="pick(tab.value)"
         >
-          {{ tab.label }}
+          {{ tab.label }}<span v-if="tab.count" class="tab-count">{{ tab.count }}</span>
         </button>
       </div>
       <div class="inline-actions">
@@ -191,7 +208,13 @@ function closeCreate() {
       :loading="tasks.isPending.value"
       :error="tasks.error.value"
       :empty="items.length === 0"
-      :title="scope === 'mine' ? 'Bạn chưa có việc được giao' : 'Chưa có công việc phù hợp'"
+      :title="
+        scope === 'mine'
+          ? 'Bạn chưa có việc được giao'
+          : scope === 'review'
+            ? 'Không có kết quả nào chờ bạn nghiệm thu'
+            : 'Chưa có công việc phù hợp'
+      "
       description="Công việc được giao cho bạn hoặc đơn vị bạn điều phối sẽ xuất hiện tại đây."
       @retry="tasks.refetch()"
       ><button class="button small" @click="showCreate = true">

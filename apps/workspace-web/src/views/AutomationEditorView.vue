@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
   FlaskConical,
   History,
   Info,
@@ -31,20 +32,26 @@ import {
   Search,
   X,
   Zap,
+  FilePen,
+  Rocket,
 } from 'lucide-vue-next'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import { api } from '../api'
 import { ApiError, errorText, formatDate } from '@dx/web-shared/api.ts'
 import type { Page } from '@dx/web-shared/api.ts'
-import type { Department, User } from '@dx/web-shared/types.ts'
+import type { Department, FormTemplate, User } from '@dx/web-shared/types.ts'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import FlowNode from '../flow/FlowNode.vue'
 import NodeInspector from '../flow/NodeInspector.vue'
+import ProcessFormDialog from '../flow/ProcessFormDialog.vue'
+import ProcessPanel from '../flow/ProcessPanel.vue'
 import { FLOW_CONTEXT } from '../flow/context'
 import {
   KINDS,
   OUTCOMES,
   PROCESS_TEMPLATES,
+  nodeOutputs,
+  plainCopy,
   TEMPLATES,
   canvasEdge,
   outputs,
@@ -55,6 +62,7 @@ import {
   tone,
 } from '../flow/nodes'
 import { useAi } from '../ai/useAi'
+import { fold } from '@dx/web-shared/text.ts'
 import type { ApiGraph, FlowKind, FlowNodeData, NodeKind, RunStep, TriggerInfo } from '../flow/nodes'
 type Step = RunStep & { error?: string; recipients?: string[] }
 interface ProcessForm {
@@ -77,6 +85,7 @@ interface Rule {
   name: string
   description: string
   enabled: boolean
+  active_version_no?: number | null
   revision: number
   graph: ApiGraph
   scope: 'all' | 'attached'
@@ -91,6 +100,7 @@ interface Catalog {
     fields: Record<string, string>
     sample: Record<string, unknown>
     forms: ProcessForm[]
+    subprocesses?: { id: string; name: string }[]
   }
 }
 const route = useRoute()
@@ -115,15 +125,17 @@ function userName(id: string) {
   return users.data.value?.items.find((u) => u.id === id)?.display_name ?? id.slice(0, 8)
 }
 
-// A dossier process, or an automation reacting to events; fixed once the flow is saved.
-const flowKind = ref<FlowKind>(route.query.kind === 'process' ? 'process' : 'automation')
-const isProcess = computed(() => flowKind.value === 'process')
+// A form on the trigger makes the flow the route of that form's dossiers; nothing else differs.
+const isProcess = computed(() => !!triggerNode.value?.data?.config.form_id)
 const forms = computed(() => catalog.data.value?.process.forms ?? [])
-const name = ref(isProcess.value ? 'Quy trình hồ sơ mới' : 'Luồng tự động mới')
+const name = ref('Quy trình mới')
 const description = ref('')
 const scope = ref<'all' | 'attached'>('all')
 const attachedCount = ref(0)
 const enabled = ref(false)
+const activeVersion = ref<number | null>(null)
+const panelOpen = ref(false)
+const editingForm = ref(false)
 const revision = ref(0)
 // Typed through `Ref` directly: unwrapping Vue Flow's node type recursively is too deep for TS.
 const nodes = ref([]) as Ref<Node<FlowNodeData>[]>
@@ -169,14 +181,14 @@ if (ruleId.value) {
       name.value = rule.name
       description.value = rule.description
       enabled.value = rule.enabled
+      activeVersion.value = rule.active_version_no ?? null
       revision.value = rule.revision
       scope.value = rule.scope
       attachedCount.value = rule.attached_count
-      flowKind.value = rule.kind ?? 'automation'
       load(rule.graph)
     })
     .catch((cause) => (error.value = cause))
-} else if (isProcess.value && route.query.from_form) {
+} else if (route.query.from_form) {
   // Start from the form's own approval steps, redrawn on the canvas.
   api
     .request<{ name: string; graph: ApiGraph }>(
@@ -188,11 +200,11 @@ if (ruleId.value) {
     })
     .catch((cause) => (error.value = cause))
 } else {
-  const list = isProcess.value ? PROCESS_TEMPLATES : TEMPLATES
+  const list = [...TEMPLATES, ...PROCESS_TEMPLATES]
   const template = list.find((t) => t.key === route.query.template) ?? list[0]
   if (template.key !== 'blank') name.value = template.title
-  const graph = structuredClone(template.graph)
-  if (isProcess.value && route.query.form) {
+  const graph = plainCopy(template.graph)
+  if (route.query.form) {
     const start = graph.nodes.find((node) => node.type === 'trigger')
     if (start) start.data = { ...start.data, form_id: String(route.query.form) }
   }
@@ -206,6 +218,7 @@ const triggerNode = computed(() => nodes.value.find((node) => node.data?.kind ==
 const processForm = computed(() => forms.value.find((f) => f.id === triggerNode.value?.data?.config.form_id))
 /** A process always starts when a dossier of its form is submitted. */
 const processTrigger = computed<TriggerInfo>(() => ({
+  ...triggers.value.find((item) => item.key === 'case.submitted'),
   key: 'case.submitted',
   label: processForm.value ? `hồ sơ “${processForm.value.name}” được trình` : 'hồ sơ được trình',
   fields: { ...(catalog.data.value?.process.fields ?? {}), ...(processForm.value?.fields ?? {}) },
@@ -214,9 +227,18 @@ const processTrigger = computed<TriggerInfo>(() => ({
 const trigger = computed(() =>
   isProcess.value ? processTrigger.value : triggers.value.find((t) => t.key === triggerNode.value?.data?.config.event),
 )
-// Answers of "Hỏi AI" steps become fields that later conditions can test.
+// What earlier steps produce becomes fields that later conditions and text can read.
 const fields = computed(() => ({
   ...(trigger.value?.fields ?? {}),
+  ...(catalog.data.value && triggerNode.value?.data?.config.event === 'case.submitted'
+    ? catalog.data.value.process.fields
+    : {}),
+  ...Object.assign(
+    {},
+    ...nodes.value.map((node) =>
+      nodeOutputs(node.id, node.data!.kind, node.data!.config, node.data!.label || KINDS[node.data!.kind].title),
+    ),
+  ),
   ...Object.fromEntries(
     nodes.value
       .filter((node) => node.data?.kind === 'ai')
@@ -332,7 +354,7 @@ function duplicateSelected() {
   if (!node?.data) return
   addNode(node.data.kind, { x: node.position.x + 40, y: node.position.y + 120 })
   const copy = nodes.value.at(-1)!
-  copy.data = { ...copy.data!, label: node.data.label, config: structuredClone(node.data.config) }
+  copy.data = { ...copy.data!, label: node.data.label, config: plainCopy(node.data.config) }
 }
 
 // ---- Live validation ----
@@ -349,7 +371,7 @@ async function validate() {
   if (!nodes.value.length) return
   try {
     const result = await api.request<{ errors: { node_id: string | null; message: string }[] }>(
-      `/automations/validate?kind=${flowKind.value}`,
+      '/automations/validate',
       { method: 'POST', body: JSON.stringify(toApi(nodes.value, edges.value)) },
     )
     errors.value = result.errors
@@ -424,7 +446,7 @@ async function runTest() {
   try {
     testResult.value = await api.request('/automations/test', {
       method: 'POST',
-      body: JSON.stringify({ graph: toApi(nodes.value, edges.value), data, kind: flowKind.value }),
+      body: JSON.stringify({ graph: toApi(nodes.value, edges.value), data }),
     })
     if (testResult.value?.valid) paint(testResult.value.steps, 'Kết quả chạy thử (không tác động thật)')
   } catch (cause) {
@@ -505,7 +527,6 @@ async function save() {
       description: description.value,
       graph: toApi(nodes.value, edges.value),
       scope: attachable.value ? scope.value : 'all',
-      kind: flowKind.value,
     }
     const rule = ruleId.value
       ? await api.request<Rule>(`/automations/${ruleId.value}`, {
@@ -520,7 +541,7 @@ async function save() {
     await queryClient.invalidateQueries({ queryKey: ['automations'] })
     if (!ruleId.value) {
       ruleId.value = rule.id
-      await router.replace(`/automations/${rule.id}`)
+      await router.replace(`/processes/${rule.id}`)
     }
   } catch (cause) {
     error.value = cause
@@ -528,23 +549,27 @@ async function save() {
     busy.value = false
   }
 }
-async function toggleEnabled() {
-  if (!ruleId.value || dirty.value) return
-  busy.value = true
-  error.value = null
-  try {
-    const rule = await api.request<Rule>(`/automations/${ruleId.value}/enabled`, {
-      method: 'POST',
-      body: JSON.stringify({ expected_revision: revision.value, enabled: !enabled.value }),
-    })
-    enabled.value = rule.enabled
-    revision.value = rule.revision
-    await queryClient.invalidateQueries({ queryKey: ['automations'] })
-  } catch (cause) {
-    error.value = cause
-  } finally {
-    busy.value = false
-  }
+/** Publishing happens in its own dialog; the top bar only has to keep up with the result. */
+function processChanged(rule: Pick<Rule, 'revision' | 'active_version_no'> & { active_version_id: string | null }) {
+  revision.value = rule.revision
+  enabled.value = !!rule.active_version_id
+  activeVersion.value = rule.active_version_no ?? null
+}
+const formDetails = useQuery({
+  queryKey: ['forms'],
+  queryFn: () => api.request<Page<FormTemplate>>('/forms'),
+  enabled: isProcess,
+})
+const processFormDetail = computed(() =>
+  formDetails.data.value?.items.find((form) => form.id === processForm.value?.id),
+)
+/** A changed form is a new form: the draft's trigger moves to it and saving keeps that. */
+async function formRevised(formId: string) {
+  editingForm.value = false
+  await Promise.all([catalog.refetch(), formDetails.refetch()])
+  const start = triggerNode.value
+  if (start?.data) start.data = { ...start.data, config: { ...start.data.config, form_id: formId } }
+  notice.value = 'Đã tạo biểu mẫu mới và gắn vào bản nháp. Bấm Lưu để giữ thay đổi.'
 }
 function onKey(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
@@ -563,20 +588,39 @@ useUnsavedGuard(dirty)
 provide(FLOW_CONTEXT, { triggers, userName, overlay, addAfter, forms })
 const ai = useAi()
 const offeredKinds = computed(() =>
-  paletteKinds(flowKind.value).filter((kind) => kind !== 'ai' || ai.on('automation_ai')),
+  paletteKinds().filter((kind) => !['ai', 'ai_extract'].includes(kind) || ai.on('automation_ai')),
 )
-const palette = computed(() =>
-  (isProcess.value ? (['Bước quy trình', 'Logic', 'Hành động'] as const) : (['Logic', 'Hành động'] as const)).map(
-    (group) => ({ group, kinds: offeredKinds.value.filter((kind) => KINDS[kind].group === group) }),
-  ),
-)
+// A long list of step kinds: find one by name or purpose, and fold the groups you do not need.
+const paletteQuery = ref('')
+const foldedGroups = ref<string[]>([])
+const palette = computed(() => {
+  const needle = fold(paletteQuery.value.trim())
+  return (['Bước cần người', 'Logic', 'Hành động', 'Dữ liệu và tài liệu'] as const)
+    .map((group) => ({
+      group,
+      kinds: offeredKinds.value.filter(
+        (kind) =>
+          KINDS[kind].group === group && (!needle || fold(`${KINDS[kind].title} ${KINDS[kind].hint}`).includes(needle)),
+      ),
+    }))
+    .filter((section) => section.kinds.length)
+})
+function toggleGroup(group: string) {
+  foldedGroups.value = foldedGroups.value.includes(group)
+    ? foldedGroups.value.filter((item) => item !== group)
+    : [...foldedGroups.value, group]
+}
 </script>
 <template>
   <div class="flow-editor">
     <header class="flow-topbar">
-      <RouterLink to="/automations" class="icon-button" aria-label="Về danh sách luồng"
+      <RouterLink
+        :to="isProcess ? '/processes' : '/processes?tab=automation'"
+        class="icon-button"
+        aria-label="Về danh sách"
         ><ArrowLeft :size="18"
       /></RouterLink>
+      <h1 class="sr-only">{{ name }}</h1>
       <input v-model="name" class="flow-name" aria-label="Tên luồng" maxlength="200" />
       <span v-if="dirty" class="tag">Chưa lưu</span>
       <span
@@ -605,19 +649,24 @@ const palette = computed(() =>
         <Info :size="17" />
       </button>
       <div class="flow-topbar-actions">
-        <label
-          class="flow-toggle"
-          :title="!ruleId ? 'Lưu luồng trước khi bật' : dirty ? 'Lưu thay đổi trước khi bật/tắt' : ''"
+        <span v-if="ruleId" class="tag">{{
+          activeVersion ? `Phiên bản ${activeVersion}` : 'Bản nháp'
+        }}</span>
+        <button
+          class="button secondary small"
+          :disabled="!ruleId"
+          :title="ruleId ? '' : 'Lưu trước khi phát hành'"
+          @click="panelOpen = true"
         >
-          <span class="switch"
-            ><input
-              type="checkbox"
-              :checked="enabled"
-              :disabled="!ruleId || dirty || busy"
-              aria-label="Bật luồng"
-              @change="toggleEnabled" /><span /></span
-          >{{ enabled ? 'Đang chạy' : 'Đang tắt' }}
-        </label>
+          <Rocket :size="15" />Phát hành
+        </button>
+        <button
+          v-if="isProcess && processFormDetail"
+          class="button secondary small"
+          @click="editingForm = true"
+        >
+          <FilePen :size="15" />Sửa biểu mẫu
+        </button>
         <button class="button secondary small" :class="{ active: drawer === 'test' }" @click="drawer = drawer === 'test' ? null : 'test'">
           <FlaskConical :size="15" />Chạy thử
         </button>
@@ -629,8 +678,16 @@ const palette = computed(() =>
         >
           <History :size="15" />Lịch sử chạy
         </button>
-        <button class="button small" :disabled="busy || (!dirty && !!ruleId)" title="Ctrl+S" @click="save">
-          <Save :size="15" />{{ busy ? 'Đang lưu…' : 'Lưu' }}
+        <button
+          class="button small"
+          :class="{ secondary: !dirty && !!ruleId }"
+          :disabled="busy || (!dirty && !!ruleId)"
+          :title="!dirty && !!ruleId ? 'Không có thay đổi cần lưu' : 'Ctrl+S'"
+          @click="save"
+        >
+          <component :is="!dirty && !!ruleId && !busy ? CheckCircle2 : Save" :size="15" />{{
+            busy ? 'Đang lưu…' : !dirty && ruleId ? 'Đã lưu' : 'Lưu'
+          }}
         </button>
       </div>
     </header>
@@ -638,20 +695,18 @@ const palette = computed(() =>
       <Zap v-if="enabled && ruleId" :size="16" /><Power v-else :size="16" />
       <template v-if="isProcess">
         <span v-if="!ruleId"
-          >Quy trình mới chưa lưu. Chọn biểu mẫu ở node kích hoạt, cấu hình từng bước → <b>Chạy thử</b> → lưu và bật
-          để mọi hồ sơ “{{ processForm?.name ?? 'của biểu mẫu' }}” trình sau đó đi theo quy trình này.</span
+          >Quy trình mới chưa lưu. Chọn biểu mẫu ở node kích hoạt, cấu hình từng bước, lưu rồi bấm <b>Phát hành</b>.</span
         >
         <span v-else-if="enabled"
-          >Đang áp dụng: hồ sơ <b>“{{ processForm?.name }}”</b> trình từ bây giờ đi theo quy trình này thay cho các bước
-          duyệt của biểu mẫu. Sửa quy trình không ảnh hưởng hồ sơ đang xử lý.</span
+          >Đang áp dụng phiên bản {{ activeVersion }} cho biểu mẫu <b>“{{ processForm?.name }}”</b>. Canvas là bản nháp: chỉnh
+          sửa không ảnh hưởng ai cho đến khi phát hành lại.</span
         >
         <span v-else
-          >Đang tắt: hồ sơ “{{ processForm?.name ?? 'của biểu mẫu' }}” vẫn đi theo các bước duyệt khai trong biểu mẫu.
-          Mỗi biểu mẫu chỉ bật được một quy trình.</span
+          >Bản nháp, chưa ai dùng được. Bấm <b>Phát hành</b> để phân quyền, chạy kịch bản thử và đưa vào áp dụng.</span
         >
       </template>
       <span v-else-if="!ruleId"
-        >Luồng mới chưa lưu. Lưu → <b>Chạy thử</b> với dữ liệu mẫu → bật công tắc để luồng
+        >Luồng mới chưa lưu. Lưu → <b>Chạy thử</b> với dữ liệu mẫu → <b>Phát hành</b> để luồng
         <b>tự chạy</b> mỗi khi “{{ trigger?.label ?? 'sự kiện' }}”.</span
       >
       <span v-else-if="enabled && attachedMode"
@@ -663,7 +718,7 @@ const palette = computed(() =>
         chạy luồng này — không cần bấm nút.</span
       >
       <span v-else
-        >Đang tắt: khi <b>{{ trigger?.label ?? 'sự kiện' }}</b> luồng <b>không</b> tự chạy. Bật công tắc ở góc phải
+        >Bản nháp: khi <b>{{ trigger?.label ?? 'sự kiện' }}</b> luồng <b>không</b> tự chạy. Bấm <b>Phát hành</b>
         để áp dụng, hoặc chạy ngay với một {{ familyLabel }} có sẵn.</span
       >
       <label v-if="attachable && !isProcess" class="scope-select"
@@ -691,9 +746,29 @@ const palette = computed(() =>
     </div>
     <div class="flow-body">
       <aside class="flow-palette" aria-label="Các loại bước">
+        <label class="search-box palette-search"
+          ><Search :size="15" /><input
+            v-model="paletteQuery"
+            type="search"
+            placeholder="Tìm bước…"
+            aria-label="Tìm loại bước"
+        /></label>
         <p class="muted">Kéo thả vào canvas hoặc bấm để thêm sau bước đang chọn.</p>
+        <p v-if="!palette.length" class="muted">Không có bước nào khớp “{{ paletteQuery }}”.</p>
         <div v-for="section in palette" :key="section.group" class="palette-group">
-          <span class="section-label">{{ section.group }}</span>
+          <button
+            type="button"
+            class="palette-group-head"
+            :aria-expanded="!!paletteQuery || !foldedGroups.includes(section.group)"
+            @click="toggleGroup(section.group)"
+          >
+            <ChevronDown
+              :size="14"
+              :class="{ folded: !paletteQuery && foldedGroups.includes(section.group) }"
+            /><span class="section-label">{{ section.group }}</span
+            ><small class="muted">{{ section.kinds.length }}</small>
+          </button>
+          <template v-if="paletteQuery || !foldedGroups.includes(section.group)">
           <button
             v-for="kind in section.kinds"
             :key="kind"
@@ -709,6 +784,7 @@ const palette = computed(() =>
               ><strong>{{ KINDS[kind].title }}</strong><small>{{ KINDS[kind].hint }}</small></span
             >
           </button>
+          </template>
         </div>
       </aside>
       <section class="flow-canvas" @drop.prevent="onDrop" @dragover.prevent>
@@ -727,7 +803,7 @@ const palette = computed(() =>
         >
           <template #node-flow="nodeProps"><FlowNode v-bind="nodeProps" /></template>
           <Background :gap="20" :size="1.4" pattern-color="#c5d3de" />
-          <Controls position="bottom-left" />
+          <Controls :show-interactive="false" position="bottom-left" />
           <MiniMap
             position="bottom-right"
             pannable
@@ -844,6 +920,7 @@ const palette = computed(() =>
         </button>
         <NodeInspector
           v-if="selected?.data"
+          :id="selected.id"
           :key="selected.id"
           :data="selected.data"
           :triggers="triggers"
@@ -854,6 +931,7 @@ const palette = computed(() =>
           :webhooks-enabled="!!catalog.data.value?.webhooks_enabled"
           :process="isProcess"
           :forms="forms"
+          :subprocesses="catalog.data.value?.process.subprocesses?.filter((item) => item.id !== ruleId)"
           @patch="patch"
           @label="setLabel"
           @remove="removeSelected"
@@ -941,4 +1019,19 @@ const palette = computed(() =>
       </div>
     </ModalDialog>
   </div>
+  <ProcessPanel
+    v-if="panelOpen && ruleId"
+    :rule-id="ruleId"
+    :dirty="dirty"
+    @close="panelOpen = false"
+    @changed="processChanged"
+  />
+  <ProcessFormDialog
+    v-if="editingForm && processFormDetail"
+    :name="processFormDetail.name"
+    :description="processFormDetail.description"
+    :fields="processFormDetail.fields"
+    @close="editingForm = false"
+    @created="formRevised"
+  />
 </template>

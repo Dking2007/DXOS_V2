@@ -140,7 +140,6 @@ const summary = computed(() => {
 <template>
   <section class="welcome-section">
     <div>
-      <span class="eyebrow">VIỆC HÔM NAY</span>
       <h1>Chào {{ firstName }}!</h1>
       <p>{{ summary }}</p>
     </div>
@@ -151,7 +150,6 @@ const summary = computed(() => {
     <section class="card agenda-card" data-tour="agenda">
       <header class="card-header">
         <div>
-          <span class="eyebrow">MỘT DANH SÁCH CHO MỌI VIỆC</span>
           <h2>Việc cần làm hôm nay</h2>
         </div>
         <span v-if="overdueCount" class="overdue-pill"><AlarmClock :size="14" />{{ overdueCount }} quá hạn</span>

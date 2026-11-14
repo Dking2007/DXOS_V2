@@ -202,6 +202,8 @@ def build_router(app):
             other = next((x for x in members if x.user_id != user.id), None)
             other_user = db.get(m.User, other.user_id) if other else None
             data["title"] = other_user.display_name if other_user else "Hội thoại riêng"
+            # Lets the client show the other person's photo for the conversation.
+            data["peer_id"] = other_user.id if other_user else None
         last = db.scalar(
             select(m.Message)
             .where(m.Message.conversation_id == conversation.id, m.Message.seq > member.history_from_seq)

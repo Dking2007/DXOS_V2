@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { Workflow, Zap } from 'lucide-vue-next'
 import { api } from '../api'
 import { errorText } from '@dx/web-shared/api.ts'
+import { useSession } from '../stores/session'
 const props = defineProps<{ taskId: string; closed: boolean }>()
 interface Item {
   id: string
@@ -28,6 +29,14 @@ const listing = useQuery({
 const busy = ref<string | null>(null)
 const error = ref<unknown>(null)
 const editable = computed(() => !!listing.data.value?.can_manage && !props.closed)
+const session = useSession()
+// Flows applied to every task are an administrator's concern; for the people doing the work they are noise.
+const admin = computed(() => session.can('automations.manage'))
+/** People who may attach flows see the choices; others only see what is attached to this task. */
+const shown = computed(() =>
+  (listing.data.value?.available ?? []).filter((item) => listing.data.value?.can_manage || item.attached),
+)
+const always = computed(() => (admin.value ? (listing.data.value?.always ?? []) : []))
 async function toggle(item: Item) {
   busy.value = item.id
   error.value = null
@@ -45,19 +54,19 @@ async function toggle(item: Item) {
 }
 </script>
 <template>
-  <section v-if="listing.data.value && (listing.data.value.available.length || listing.data.value.always.length)" class="card">
+  <section v-if="listing.data.value && (shown.length || always.length)" class="card">
     <header class="card-header">
       <h3><Workflow :size="16" style="vertical-align: -3px" /> Luồng tự động</h3>
     </header>
     <div class="card-body task-flows">
-      <p v-if="listing.data.value.available.length" class="muted task-flows-hint">
+      <p v-if="shown.length" class="muted task-flows-hint">
         {{
           editable
             ? 'Bật luồng muốn áp dụng cho công việc này. Luồng chạy tự động khi sự kiện xảy ra.'
-            : 'Người giao, người phụ trách hoặc điều phối công việc mới gắn/gỡ được.'
+            : 'Các luồng đang gắn với công việc này.'
         }}
       </p>
-      <div v-for="item in listing.data.value.available" :key="item.id" class="task-flow">
+      <div v-for="item in shown" :key="item.id" class="task-flow">
         <div class="grow">
           <strong>{{ item.name }}</strong>
           <small
@@ -76,9 +85,9 @@ async function toggle(item: Item) {
             @change="toggle(item)" /><span
         /></label>
       </div>
-      <div v-if="listing.data.value.always.length" class="task-flows-always">
+      <div v-if="always.length" class="task-flows-always">
         <span class="section-label"><Zap :size="12" /> Luôn áp dụng cho mọi công việc</span>
-        <small v-for="item in listing.data.value.always" :key="item.id"
+        <small v-for="item in always" :key="item.id"
           >{{ item.name }} · khi {{ item.trigger_label.toLowerCase() }}</small
         >
       </div>

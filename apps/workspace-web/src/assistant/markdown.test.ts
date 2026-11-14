@@ -33,4 +33,12 @@ describe('assistant markdown', () => {
   it('keeps code blocks as they are', () => {
     expect(parseMarkdown('```\na **b**\n```')).toEqual([{ t: 'code', v: 'a **b**' }])
   })
+
+  it('reads @n as a reference to an item of the asker, but not inside an address', () => {
+    expect(parseInline('Việc “Báo cáo” @3, hỏi a@4.vn')).toEqual([
+      { t: 'text', v: 'Việc “Báo cáo” ' },
+      { t: 'ref', n: 3 },
+      { t: 'text', v: ', hỏi a@4.vn' },
+    ])
+  })
 })

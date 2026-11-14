@@ -11,7 +11,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Search,
-  ShieldCheck,
   Sun,
   X,
 } from 'lucide-vue-next'
@@ -19,21 +18,26 @@ import { errorText } from '@dx/web-shared/api.ts'
 import { useSession } from './stores/session'
 import { badgeText, visibleGroups } from './ui/nav'
 import { useOverview } from './ui/overview'
+import { paletteRequest } from './ui/palette'
 import { cycleTheme, isDark, theme } from './ui/theme'
 import { roleLabel } from './ui/labels'
+import AvatarPhoto from './components/AvatarPhoto.vue'
 import AppToaster from './components/shell/AppToaster.vue'
 import CommandPalette from './components/shell/CommandPalette.vue'
 import CreateMenu from './components/shell/CreateMenu.vue'
 import MobileNav from './components/shell/MobileNav.vue'
 import NotificationPanel from './components/shell/NotificationPanel.vue'
 import OnboardingTour from './components/shell/OnboardingTour.vue'
+import PageHelp from './components/shell/PageHelp.vue'
 import AssistantWidget from './assistant/AssistantWidget.vue'
+import AiBusy from './ai/AiBusy.vue'
 const route = useRoute()
 const session = useSession()
 const sidebar = ref(false)
 const sidebarCollapsed = ref(readCollapsed())
 const sessionError = ref('')
 const palette = ref<InstanceType<typeof CommandPalette>>()
+watch(paletteRequest, (request) => request && palette.value?.show(request.text))
 const groups = computed(() => visibleGroups(session.can))
 const overview = useOverview()
 const counts = computed(() => overview.data.value?.counts)
@@ -87,10 +91,22 @@ function toggleSidebarCollapsed() {
     <a class="skip-link" href="#main-content">Đến nội dung chính</a>
     <div v-if="sidebar" class="sidebar-scrim" @click="sidebar = false" />
     <aside class="sidebar" :class="{ open: sidebar }">
-      <RouterLink to="/home" class="brand" aria-label="Trang chủ"
-        ><span class="brand-mark">D<span /></span
-        ><span>Desktiny<small>VĂN PHÒNG SỐ</small></span></RouterLink
-      >
+      <div class="sidebar-head">
+        <RouterLink to="/home" class="brand" aria-label="Trang chủ"
+          ><span class="brand-mark" aria-hidden="true">D</span><span>Desktiny</span></RouterLink
+        >
+        <button
+          class="sidebar-collapse"
+          type="button"
+          :aria-label="sidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'"
+          :title="sidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'"
+          :aria-expanded="!sidebarCollapsed"
+          @click="toggleSidebarCollapsed"
+        >
+          <PanelLeftOpen v-if="sidebarCollapsed" :size="18" />
+          <PanelLeftClose v-else :size="18" />
+        </button>
+      </div>
       <button
         class="icon-button sidebar-close"
         aria-label="Đóng điều hướng"
@@ -98,11 +114,7 @@ function toggleSidebarCollapsed() {
       >
         <X :size="20" />
       </button>
-      <div class="workspace-label">
-        <span class="organization-icon"><ShieldCheck :size="17" /></span>
-        <div><strong>e-Office</strong><small>Không gian nội bộ</small></div>
-      </div>
-      <nav aria-label="Điều hướng chính" data-tour="nav" class="nav-groups">
+            <nav aria-label="Điều hướng chính" data-tour="nav" class="nav-groups">
         <div
           v-for="group in groups"
           :key="group.label"
@@ -130,27 +142,14 @@ function toggleSidebarCollapsed() {
         </div>
       </nav>
       <div class="sidebar-bottom">
-        <button class="sidebar-collapse" type="button" :aria-label="sidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'" :title="sidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'" :aria-expanded="!sidebarCollapsed" @click="toggleSidebarCollapsed">
-          <PanelLeftOpen v-if="sidebarCollapsed" :size="18" />
-          <PanelLeftClose v-else :size="18" />
-          <span>{{ sidebarCollapsed ? 'Mở rộng menu' : 'Thu gọn menu' }}</span>
-        </button>
-        <div class="privacy-note">
-          <ShieldCheck :size="17" /><span
-            >Đúng người. Đúng quyền.<br />Giữ trọn lịch sử.</span
-          >
-        </div>
         <a
           v-if="session.user?.roles?.includes('technical_admin')"
           href="/console/"
           class="console-link"
-          aria-label="Mở trang quản trị hệ thống"
-          title="Mở trang quản trị hệ thống"
-          ><span class="console-link-text">Quản trị hệ thống</span><span aria-hidden="true">↗</span></a
+          aria-label="Mở bảng điều khiển kỹ thuật của nền tảng"
+          title="Công cụ cho quản trị kỹ thuật: schema, luồng, lượt chạy, nhật ký nền tảng. Không dùng cho nghiệp vụ hằng ngày."
+          ><span class="console-link-text">Bảng điều khiển kỹ thuật</span><span aria-hidden="true">↗</span></a
         >
-        <div class="sidebar-version">
-          <span class="connection-dot" /> Bản pilot · e-Office
-        </div>
       </div>
     </aside>
     <div class="workspace-main">
@@ -163,7 +162,7 @@ function toggleSidebarCollapsed() {
           >
             <Menu :size="21" /></button
           ><span class="topbar-crumb">Không gian nội bộ</span><span class="topbar-divider" aria-hidden="true">/</span
-          ><strong>{{ route.meta.title }}</strong>
+          ><strong>{{ route.meta.title }}</strong><PageHelp />
         </div>
         <button
           class="topbar-search"
@@ -187,13 +186,13 @@ function toggleSidebarCollapsed() {
           </button>
           <NotificationPanel data-tour="notifications" />
           <span class="topbar-separator" />
-          <div class="user-profile">
-            <span class="avatar" aria-hidden="true">{{ initials }}</span>
+          <RouterLink to="/profile" class="user-profile" title="Hồ sơ cá nhân" aria-label="Hồ sơ cá nhân">
+            <span class="avatar" aria-hidden="true">{{ initials }}<AvatarPhoto :url="session.user?.avatar_url" /></span>
             <div>
               <strong>{{ session.user?.display_name }}</strong
-              ><small>{{ roleLabel(session.user?.role) }}</small>
+              ><small>{{ session.user?.job_title || roleLabel(session.user?.role) }}</small>
             </div>
-          </div>
+          </RouterLink>
           <button class="icon-button" aria-label="Đăng xuất" title="Đăng xuất" @click="logout">
             <LogOut :size="18" />
           </button>
@@ -214,6 +213,7 @@ function toggleSidebarCollapsed() {
     <CommandPalette ref="palette" />
     <OnboardingTour />
     <AssistantWidget />
+    <AiBusy />
   </div>
   <AppToaster />
 </template>

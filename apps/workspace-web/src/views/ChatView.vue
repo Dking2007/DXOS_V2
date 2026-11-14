@@ -46,6 +46,7 @@ import ChatSummaryDialog from '../ai/ChatSummaryDialog.vue'
 import { useAi } from '../ai/useAi'
 import MessageAttachments from '../chat/MessageAttachments.vue'
 import FilePreview from '../components/FilePreview.vue'
+import AvatarPhoto from '../components/AvatarPhoto.vue'
 import {
   ACCEPT,
   MAX_FILE_BYTES,
@@ -517,7 +518,7 @@ const kindLabel: Record<Conversation['kind'], string> = {
         >
           <span class="chat-avatar" :style="{ background: avatarColor(item.title) }">{{
             item.kind === 'direct' ? initials(item.title) : kindLabel[item.kind][0]
-          }}</span>
+          }}<AvatarPhoto v-if="item.kind === 'direct'" :user-id="item.peer_id" /></span>
           <span class="chat-thread-text">
             <span class="chat-thread-top"
               ><strong>{{ item.title }}</strong
@@ -547,7 +548,7 @@ const kindLabel: Record<Conversation['kind'], string> = {
           </button>
           <span class="chat-avatar" :style="{ background: avatarColor(conversation.data.value.title) }">{{
             conversation.data.value.kind === 'direct' ? initials(conversation.data.value.title) : kindLabel[conversation.data.value.kind][0]
-          }}</span>
+          }}<AvatarPhoto v-if="conversation.data.value.kind === 'direct'" :user-id="conversation.data.value.peer_id" /></span>
           <div class="grow">
             <strong>{{ conversation.data.value.title }}</strong>
             <small
@@ -601,7 +602,7 @@ const kindLabel: Record<Conversation['kind'], string> = {
           <div v-if="!messages.length && !latest.isPending.value" class="chat-hello">
             <span class="chat-avatar large" :style="{ background: avatarColor(conversation.data.value.title) }">{{
               initials(conversation.data.value.title)
-            }}</span>
+            }}<AvatarPhoto v-if="conversation.data.value.kind === 'direct'" :user-id="conversation.data.value.peer_id" /></span>
             <strong>{{ conversation.data.value.title }}</strong>
             <small>Hãy gửi lời chào đầu tiên 👋</small>
           </div>
@@ -616,8 +617,8 @@ const kindLabel: Record<Conversation['kind'], string> = {
                 class="chat-avatar small"
                 :class="{ hidden: !row.last }"
                 :style="{ background: avatarColor(row.message.sender_name) }"
-                >{{ initials(row.message.sender_name) }}</span
-              >
+                >{{ initials(row.message.sender_name) }}<AvatarPhoto :user-id="row.message.sender_id"
+              /></span>
               <div class="chat-stack">
                 <small v-if="!row.message.mine && row.first && conversation.data.value.kind !== 'direct'" class="chat-sender">{{
                   row.message.sender_name
@@ -720,7 +721,7 @@ const kindLabel: Record<Conversation['kind'], string> = {
               </button>
               <div v-if="showMention" class="chat-menu">
                 <button v-for="member in others" :key="member.user_id" type="button" @click="mention(member)">
-                  <span class="chat-avatar tiny" :style="{ background: avatarColor(member.display_name) }">{{ initials(member.display_name) }}</span>
+                  <span class="chat-avatar tiny" :style="{ background: avatarColor(member.display_name) }">{{ initials(member.display_name) }}<AvatarPhoto :user-id="member.user_id" /></span>
                   {{ member.display_name }}
                 </button>
               </div>
@@ -818,7 +819,7 @@ const kindLabel: Record<Conversation['kind'], string> = {
             :class="{ active: newMembers.includes(user.id) }"
             @click="togglePerson(user.id)"
           >
-            <span class="chat-avatar small" :style="{ background: avatarColor(user.display_name) }">{{ initials(user.display_name) }}</span>
+            <span class="chat-avatar small" :style="{ background: avatarColor(user.display_name) }">{{ initials(user.display_name) }}<AvatarPhoto :url="user.avatar_url" /></span>
             <span class="grow">{{ user.display_name }}</span>
             <Check v-if="newMembers.includes(user.id)" :size="16" />
           </button>
@@ -850,7 +851,7 @@ const kindLabel: Record<Conversation['kind'], string> = {
           :class="{ active: addIds.includes(user.id) }"
           @click="addIds = addIds.includes(user.id) ? addIds.filter((x) => x !== user.id) : [...addIds, user.id]"
         >
-          <span class="chat-avatar small" :style="{ background: avatarColor(user.display_name) }">{{ initials(user.display_name) }}</span>
+          <span class="chat-avatar small" :style="{ background: avatarColor(user.display_name) }">{{ initials(user.display_name) }}<AvatarPhoto :url="user.avatar_url" /></span>
           <span class="grow">{{ user.display_name }}</span>
           <Check v-if="addIds.includes(user.id)" :size="16" />
         </button>

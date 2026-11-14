@@ -8,6 +8,7 @@ import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import { api } from '../api'
 import { toast } from '../ui/toast'
 import { useUnsavedGuard } from '../ui/unsaved'
+import { RECOMMENDED_FEATURES } from './useAi'
 
 interface Feature {
   key: string
@@ -149,6 +150,11 @@ function chooseModel(key: string, model: string) {
 function defaultModel(providerId: string | null) {
   return settings.data.value?.providers.find((p) => p.id === providerId)?.model ?? ''
 }
+const RECOMMENDED: string[] = RECOMMENDED_FEATURES
+function recommended() {
+  for (const [key, choice] of Object.entries(choices.value)) choice.enabled = RECOMMENDED.includes(key)
+  toast.success('Đã chọn gói khuyến nghị. Bấm “Lưu cấu hình” để áp dụng.')
+}
 function setAll(value: boolean) {
   for (const key of Object.keys(choices.value)) choices.value[key].enabled = value
 }
@@ -203,6 +209,13 @@ async function reindex() {
 <template>
   <StatePanel v-if="!settings.data.value" :loading="settings.isPending.value" :error="settings.error.value" @retry="settings.refetch()" />
   <template v-else>
+    <div v-if="active && !enabledCount" class="notice" style="margin-bottom: 16px">
+      <span class="grow"
+        >Chưa bật tính năng AI nào. Gói khuyến nghị bật {{ RECOMMENDED.length }} tính năng chỉ đọc những gì người dùng đã
+        được xem và trả lời bằng chữ; bạn vẫn xem lại được trước khi lưu.</span
+      >
+      <button type="button" class="button small" @click="recommended">Dùng gói khuyến nghị</button>
+    </div>
     <div v-if="!active" class="notice warning" style="margin-bottom: 16px">
       Chưa có dịch vụ AI đang dùng. Thêm và chọn một dịch vụ ở tab <strong>Dịch vụ AI</strong> trước; các tính năng
       dưới đây dùng dịch vụ đó nếu bạn không chọn riêng.
@@ -286,8 +299,7 @@ async function reindex() {
                 </button>
               </div>
               <small v-if="serviceOf(feature.key) && modelErrors[listKey(serviceOf(feature.key)!, 'chat')]" class="muted">
-                Không lấy được danh sách model ({{ modelErrors[listKey(serviceOf(feature.key)!, 'chat')] }}); gõ tên model
-                hoặc để trống để dùng model mặc định.
+                Không lấy được danh sách model của dịch vụ này; gõ tên model hoặc để trống.
               </small>
             </div>
           </div>
@@ -298,7 +310,7 @@ async function reindex() {
         <header class="card-header">
           <div>
             <h2><Database :size="18" /> Tìm theo ý nghĩa</h2>
-            <p class="muted" style="font-size: 13px; margin-top: 4px">
+            <p class="muted" style="font-size: 14px; margin-top: 4px">
               Cần một dịch vụ tạo vector (embedding): Ollama, OpenAI, Gemini, vLLM hoặc cổng Chat Completions. Nội
               dung tài liệu, công việc, hồ sơ được gửi tới dịch vụ này để lập chỉ mục.
             </p>
@@ -344,7 +356,7 @@ async function reindex() {
             <button type="button" class="button secondary small" :disabled="!settings.data.value.index.ready || dirty" @click="reindex">
               <RefreshCw :size="14" />Lập chỉ mục lại
             </button>
-            <span v-if="settings.data.value.index.ready" class="muted" style="font-size: 13px">
+            <span v-if="settings.data.value.index.ready" class="muted" style="font-size: 14px">
               Đã lập chỉ mục {{ settings.data.value.index.indexed }}/{{ settings.data.value.index.total }} mục
               ({{ settings.data.value.index.by_type.file ?? 0 }} tài liệu, {{ settings.data.value.index.by_type.task ?? 0 }}
               công việc, {{ settings.data.value.index.by_type.case ?? 0 }} hồ sơ).
@@ -354,10 +366,11 @@ async function reindex() {
       </section>
 
       <div class="form-actions sticky-actions">
-        <span class="muted grow" style="font-size: 13px">
+        <span class="muted grow" style="font-size: 14px">
           Đang bật {{ enabledCount }}/{{ settings.data.value.features.length }} tính năng. Mỗi lần dùng tính năng AI
           tính vào giới hạn lượt/người/ngày ở tab Cấu hình chung.
         </span>
+        <button type="button" class="button secondary" @click="recommended">Gói khuyến nghị</button>
         <button type="button" class="button secondary" @click="setAll(true)">Bật tất cả</button>
         <button type="button" class="button secondary" @click="setAll(false)">Tắt tất cả</button>
         <button class="button" :disabled="busy || !dirty"><Save :size="16" />{{ busy ? 'Đang lưu…' : 'Lưu cấu hình' }}</button>

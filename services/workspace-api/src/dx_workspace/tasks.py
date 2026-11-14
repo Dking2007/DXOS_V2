@@ -409,7 +409,7 @@ def build_router(app):
 
     @router.get("/tasks")
     def list_tasks(
-        scope: Literal["mine", "created", "watching", "managed", "all"] = "all",
+        scope: Literal["mine", "review", "created", "watching", "managed", "all"] = "all",
         status: str | None = None,
         q: str | None = Query(None, max_length=200),
         overdue: bool | None = None,
@@ -430,6 +430,11 @@ def build_router(app):
                 task.assignee_id == user.id
                 or not task.assignee_id
                 and manages_department(db, user, task.department_id)
+            ):
+                return False
+            # Results waiting for this person to accept: the same rule as the menu count.
+            if scope == "review" and not (
+                task.status == "submitted" and task.assignee_id != user.id and manages(db, user, task)
             ):
                 return False
             if scope == "created" and task.creator_id != user.id:
@@ -650,6 +655,12 @@ def build_router(app):
         values: dict = {"status": target, "updated_at": m.utcnow()}
         if body.action == "accept":
             values["accepted_at"] = m.utcnow()
+        if body.action == "submit" and len(task.file_ids or []) < (task.required_file_count or 0):
+            raise AppError(
+                422,
+                "task_result_required",
+                f"Cần đính kèm ít nhất {task.required_file_count} tệp kết quả trước khi nộp.",
+            )
         if body.action == "submit":
             if any(not item.get("done") for item in task.checklist or []):
                 raise AppError(422, "checklist_incomplete", "Hoàn thành checklist trước khi nộp kết quả.")

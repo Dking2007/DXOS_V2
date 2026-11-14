@@ -9,7 +9,9 @@ import {
   ChevronRight,
   FilePlus2,
   Files,
+  Pencil,
   Search,
+  Send,
 } from 'lucide-vue-next'
 import { api } from '../api'
 import {
@@ -32,6 +34,10 @@ import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import SchemaForm from '@dx/web-shared/components/SchemaForm.vue'
 const route = useRoute()
 const session = useSession()
+/** One's own draft or returned dossier: offer to continue it or submit it straight from the list. */
+function isMyDraft(item: CaseItem) {
+  return ['draft', 'needs_revision'].includes(item.status) && item.owner_id === session.user?.id
+}
 const router = useRouter()
 const queryClient = useQueryClient()
 // Archived dossiers are a separate pile rather than a status: they keep their result.
@@ -54,15 +60,18 @@ const forms = useQuery({
   queryKey: ['forms'],
   queryFn: () => api.request<Page<FormTemplate>>('/forms'),
 })
-interface ActivePackageVersion {
+interface AvailableProcess {
   id: string
-  form_id: string
+  name: string
+  description: string
   version_no: number
-  package_name: string
+  form_id: string
+  form_name: string
+  required_file_count: number
 }
-const activePackages = useQuery({
-  queryKey: ['business-packages', 'active'],
-  queryFn: () => api.request<Page<ActivePackageVersion>>('/business-packages/active-versions'),
+const processes = useQuery({
+  queryKey: ['processes', 'available'],
+  queryFn: () => api.request<Page<AvailableProcess>>('/processes/available'),
 })
 const files = useQuery({
   queryKey: ['drive', 'case-picker'],
@@ -71,11 +80,10 @@ const files = useQuery({
 const showCreate = ref(false)
 const title = ref('')
 const formId = ref('')
-const packageVersionId = ref('')
+const processId = ref('')
 const payload = ref<Record<string, unknown>>({})
 const fileIds = ref<string[]>([])
 const priority = ref<'low' | 'normal' | 'high' | 'urgent'>('normal')
-const dueAt = ref('')
 const errors = ref<Record<string, string>>({})
 const error = ref<unknown>(null)
 const busy = ref(false)
@@ -83,17 +91,24 @@ const intent = ref(newIntent())
 const selectedForm = computed(() =>
   forms.data.value?.items.find((form) => form.id === formId.value),
 )
-const matchingPackages = computed(() =>
-  activePackages.data.value?.items.filter((item) => item.form_id === formId.value) ?? [],
-)
+const selectedProcess = computed(() => processes.data.value?.items.find((item) => item.id === processId.value))
+// People start from a process they may use; a form with none of its own still works by its steps.
+const standaloneForms = computed(() => {
+  const covered = new Set(processes.data.value?.items.map((item) => item.form_id))
+  return forms.data.value?.items.filter((form) => !covered.has(form.id)) ?? []
+})
+const choice = computed({
+  get: () => (processId.value ? `process:${processId.value}` : formId.value ? `form:${formId.value}` : ''),
+  set: (value: string) => {
+    const [kind, id] = value.split(':') as [string, string | undefined]
+    processId.value = kind === 'process' ? (id ?? '') : ''
+    formId.value =
+      kind === 'process' ? (processes.data.value?.items.find((item) => item.id === id)?.form_id ?? '') : (id ?? '')
+  },
+})
 watch(formId, () => {
-  packageVersionId.value = ''
   payload.value = initialPayload(selectedForm.value?.fields ?? [])
   errors.value = {}
-})
-watch(matchingPackages, (items) => {
-  if (!items.some((item) => item.id === packageVersionId.value))
-    packageVersionId.value = items[0]?.id ?? ''
 })
 watch([status, search], () => {
   cursor.value = null
@@ -103,7 +118,6 @@ function openCreate() {
   error.value = null
   intent.value = newIntent()
   priority.value = 'normal'
-  dueAt.value = ''
 }
 const createDirty = computed(
   () =>
@@ -124,12 +138,6 @@ watch(
   },
   { immediate: true },
 )
-/** The local datetime input value as the timezone-aware instant the API requires. */
-function dueInstant() {
-  if (!dueAt.value) return null
-  const parsed = new Date(dueAt.value)
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
-}
 async function create() {
   if (!selectedForm.value) return
   errors.value = validatePayload(selectedForm.value.fields, payload.value)
@@ -143,11 +151,10 @@ async function create() {
       body: JSON.stringify({
         title: title.value,
         form_id: formId.value,
-        package_version_id: packageVersionId.value || null,
+        process_id: processId.value || null,
         payload: payload.value,
         file_ids: fileIds.value,
         priority: priority.value,
-        due_at: dueInstant(),
       } satisfies components['schemas']['CaseCreate']),
     })
     await queryClient.invalidateQueries({ queryKey: ['cases'] })
@@ -162,12 +169,8 @@ async function create() {
 }
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <span class="eyebrow">HỒ SƠ ĐIỆN TỬ</span>
-      <h1>Mọi hồ sơ, một dòng xử lý.</h1>
-      <p>Theo dõi từ bản nháp đến quyết định cuối cùng.</p>
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Hồ sơ</h1>
     <button class="button" @click="openCreate">
       <FilePlus2 :size="18" />Tạo hồ sơ
     </button>
@@ -222,8 +225,8 @@ async function create() {
           <tr>
             <th>Hồ sơ</th>
             <th>Trạng thái</th>
+            <th>Đang chờ</th>
             <th>Cập nhật</th>
-            <th>Lần sửa</th>
             <th />
           </tr>
         </thead>
@@ -241,11 +244,36 @@ async function create() {
               </div>
             </td>
             <td><StatusBadge :status="item.status" /></td>
+            <td class="waiting-cell">
+              <template v-if="item.waiting_on?.length">
+                <div v-for="(who, index) in item.waiting_on.slice(0, 2)" :key="index">
+                  <strong>{{ who.name || 'Chưa có người nhận' }}</strong>
+                  <small
+                    >{{ who.label
+                    }}<template v-if="who.due_at">
+                      ·
+                      <span :class="{ 'overdue-text': new Date(who.due_at) < new Date() }"
+                        >hạn {{ formatDate(who.due_at) }}</span
+                      ></template
+                    ></small
+                  >
+                </div>
+                <small v-if="item.waiting_on.length > 2" class="muted"
+                  >và {{ item.waiting_on.length - 2 }} người khác</small
+                >
+              </template>
+              <div v-else-if="isMyDraft(item)" class="row-actions">
+                <RouterLink :to="`/cases/${item.id}?action=edit`" class="button secondary small"
+                  ><Pencil :size="14" />Tiếp tục soạn</RouterLink
+                ><RouterLink :to="`/cases/${item.id}?action=submit`" class="button small"
+                  ><Send :size="14" />Trình</RouterLink
+                >
+              </div>
+              <span v-else-if="item.status === 'pending_workflow_start'" class="muted">Đang chuyển duyệt…</span>
+              <span v-else class="muted">—</span>
+            </td>
             <td class="muted">
               {{ formatDate(item.updated_at || item.created_at, true) }}
-            </td>
-            <td>
-              <span class="tag">{{ item.revision > 1 ? `${item.revision - 1} lần` : 'Chưa sửa' }}</span>
             </td>
             <td>
               <RouterLink
@@ -314,27 +342,24 @@ async function create() {
           </div>
           <div class="field full-width">
             <label for="case-form"
-              >Mẫu hồ sơ<span class="required"> *</span></label
-            ><select id="case-form" v-model="formId" required>
-              <option value="">Chọn mẫu đã phát hành</option>
-              <option
-                v-for="form in forms.data.value?.items"
-                :key="form.id"
-                :value="form.id"
-              >
-                {{ form.name }}
-              </option></select
-            ><small v-if="selectedForm?.description">{{
-              selectedForm.description
-            }}</small>
-          </div>
-          <div v-if="matchingPackages.length" class="field full-width">
-            <label for="case-package">Gói quy trình đã phát hành</label>
-            <select id="case-package" v-model="packageVersionId" required>
-              <option v-for="item in matchingPackages" :key="item.id" :value="item.id">
-                {{ item.package_name }} · phiên bản {{ item.version_no }}
-              </option>
-            </select>
+              >Quy trình<span class="required"> *</span></label
+            ><select id="case-form" v-model="choice" required>
+              <option value="">Chọn quy trình</option>
+              <optgroup v-if="processes.data.value?.items.length" label="Quy trình nghiệp vụ">
+                <option v-for="item in processes.data.value.items" :key="item.id" :value="`process:${item.id}`">
+                  {{ item.name }}
+                </option>
+              </optgroup>
+              <optgroup v-if="standaloneForms.length" label="Biểu mẫu chưa có quy trình">
+                <option v-for="form in standaloneForms" :key="form.id" :value="`form:${form.id}`">{{ form.name }}</option>
+              </optgroup></select
+            ><small v-if="selectedProcess"
+              >{{ selectedProcess.description || selectedForm?.description }} Biểu mẫu “{{ selectedProcess.form_name }}”,
+              phiên bản {{ selectedProcess.version_no
+              }}<template v-if="selectedProcess.required_file_count">
+                · cần ít nhất {{ selectedProcess.required_file_count }} tài liệu</template
+              >.</small
+            ><small v-else-if="selectedForm?.description">{{ selectedForm.description }}</small>
           </div>
         </div>
         <div class="form-grid">
@@ -346,10 +371,6 @@ async function create() {
               <option value="high">Cao</option>
               <option value="urgent">Khẩn</option>
             </select>
-          </div>
-          <div class="field">
-            <label for="case-due">Hạn xử lý</label
-            ><input id="case-due" v-model="dueAt" type="datetime-local" />
           </div>
         </div>
         <template v-if="selectedForm"
@@ -368,7 +389,7 @@ async function create() {
             <p
               v-if="!files.data.value?.items.length"
               class="muted"
-              style="font-size: 14px"
+              style="font-size: 15px"
             >
               Chưa có tài liệu. Bạn có thể bổ sung sau từ kho Tài liệu.
             </p>

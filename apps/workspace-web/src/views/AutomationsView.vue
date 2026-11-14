@@ -2,17 +2,17 @@
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ArrowRight, FileStack, Plug, Plus, Workflow, Zap } from 'lucide-vue-next'
+import { ArrowRight, CirclePause, FileCheck2, Paperclip, Plug, Plus, Workflow, Zap } from 'lucide-vue-next'
 import { api } from '../api'
-import { toast } from '../ui/toast'
 import { errorText, formatDate } from '@dx/web-shared/api.ts'
 import type { Page } from '@dx/web-shared/api.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import { KINDS, PROCESS_TEMPLATES, TEMPLATES } from '../flow/nodes'
+import ProcessFormDialog from '../flow/ProcessFormDialog.vue'
 import '../flow/flow.css'
 import type { ApiGraph, FlowKind } from '../flow/nodes'
 interface Rule {
@@ -28,6 +28,8 @@ interface Rule {
   graph: ApiGraph
   scope: 'all' | 'attached'
   attached_count: number
+  active_version_no: number | null
+  unpublished_changes: boolean
   updated_at: string
   last_run: { state: string; created_at: string } | null
 }
@@ -39,12 +41,6 @@ interface Connection {
   timeout_seconds: number
 }
 const router = useRouter()
-const route = useRoute()
-const tab = ref<FlowKind>(route.query.tab === 'process' ? 'process' : 'automation')
-function selectTab(value: FlowKind) {
-  tab.value = value
-  void router.replace({ query: value === 'process' ? { tab: 'process' } : {} })
-}
 const queryClient = useQueryClient()
 const catalog = useQuery({
   queryKey: ['automations', 'catalog'],
@@ -65,19 +61,13 @@ const connections = useQuery({
   queryKey: ['connections'],
   queryFn: () => api.request<Page<Connection>>('/connections'),
 })
-const shown = computed(() =>
-  (rules.data.value?.items ?? []).filter((rule) => (rule.kind ?? 'automation') === tab.value),
-)
-const count = computed(() => ({
-  automation: (rules.data.value?.items ?? []).filter((rule) => rule.kind !== 'process').length,
-  process: (rules.data.value?.items ?? []).filter((rule) => rule.kind === 'process').length,
-}))
+const shown = computed(() => rules.data.value?.items ?? [])
 /** Form a new process is drawn for; templates open with it already chosen. */
 const templateForm = ref('')
 function openProcess(query: Record<string, string>) {
   void router.push({
-    path: '/automations/new',
-    query: { kind: 'process', ...(templateForm.value ? { form: templateForm.value } : {}), ...query },
+    path: '/processes/new',
+    query: { ...(query.template?.startsWith('process') || query.from_form ? (templateForm.value ? { form: templateForm.value } : {}) : {}), ...query },
   })
 }
 const triggerLabel = computed(() =>
@@ -86,21 +76,11 @@ const triggerLabel = computed(() =>
 const error = ref<unknown>(null)
 const busy = ref(false)
 const showTemplates = ref(false)
-async function toggle(rule: Rule) {
-  busy.value = true
-  error.value = null
-  try {
-    await api.request(`/automations/${rule.id}/enabled`, {
-      method: 'POST',
-      body: JSON.stringify({ expected_revision: rule.revision, enabled: !rule.enabled }),
-    })
-    toast.success(rule.enabled ? `Đã tắt “${rule.name}”` : `Đã bật “${rule.name}”`)
-    await queryClient.invalidateQueries({ queryKey: ['automations'] })
-  } catch (cause) {
-    error.value = cause
-  } finally {
-    busy.value = false
-  }
+const creatingForm = ref(false)
+async function formCreated(formId: string) {
+  creatingForm.value = false
+  await catalog.refetch()
+  templateForm.value = formId
 }
 /** A tiny left-to-right sketch of the flow for the list card. */
 function sketch(graph: ApiGraph) {
@@ -152,117 +132,29 @@ async function saveConnection() {
 }
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <span class="eyebrow">TỰ ĐỘNG HÓA NGHIỆP VỤ</span>
-      <h1>{{ tab === 'process' ? 'Quy trình hồ sơ' : 'Luồng tự động' }}</h1>
-      <p v-if="tab === 'process'">
-        Vẽ đường đi của hồ sơ trên cùng canvas: duyệt, xin ý kiến, giao thẩm định, kiểm tra tài liệu, yêu cầu bổ sung.
-        Người tạo hồ sơ theo dõi hồ sơ đang ở bước nào ngay trên sơ đồ.
-      </p>
-      <p v-else>Vẽ luồng bằng kéo thả: khi sự kiện xảy ra → kiểm tra điều kiện → thông báo, tạo việc, chờ hoặc gọi hệ thống khác.</p>
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Quy trình nghiệp vụ</h1>
     <div class="page-actions">
-      <button class="button" @click="showTemplates = true">
-        <Plus :size="18" />{{ tab === 'process' ? 'Tạo quy trình' : 'Tạo luồng' }}
-      </button>
+      <button class="button" @click="showTemplates = true"><Plus :size="18" />Tạo luồng</button>
     </div>
   </header>
-  <div class="tabs" role="tablist" aria-label="Loại luồng">
-    <button
-      class="tab"
-      :class="{ active: tab === 'automation' }"
-      role="tab"
-      :aria-selected="tab === 'automation'"
-      @click="selectTab('automation')"
-    >
-      <Zap :size="16" />Luồng tự động<span v-if="count.automation" class="tab-count">{{ count.automation }}</span>
-    </button>
-    <button
-      class="tab"
-      :class="{ active: tab === 'process' }"
-      role="tab"
-      :aria-selected="tab === 'process'"
-      @click="selectTab('process')"
-    >
-      <FileStack :size="16" />Quy trình hồ sơ<span v-if="count.process" class="tab-count">{{ count.process }}</span>
-    </button>
-  </div>
-  <section v-if="tab === 'process'" class="how-it-works" aria-label="Cách quy trình hồ sơ hoạt động">
-    <div>
-      <span class="how-step">1</span>
-      <div>
-        <strong>Chọn mẫu và biểu mẫu</strong>
-        <small>Bắt đầu từ mẫu có sẵn hoặc từ chính các bước duyệt của biểu mẫu, rồi chỉnh từng bước trên canvas.</small>
-      </div>
-    </div>
-    <div>
-      <span class="how-step">2</span>
-      <div>
-        <strong>Bật để áp dụng</strong>
-        <small
-          >Hồ sơ trình sau khi bật đi theo quy trình thay cho bước duyệt của biểu mẫu. Mỗi biểu mẫu bật một quy trình;
-          hồ sơ đang xử lý giữ quy trình lúc trình.</small
-        >
-      </div>
-    </div>
-    <div>
-      <span class="how-step">3</span>
-      <div>
-        <strong>Theo dõi trên sơ đồ</strong>
-        <small>Mỗi hồ sơ có tab <b>Quy trình</b> tô sáng bước đã qua, bước đang chờ ai và kết quả.</small>
-      </div>
-    </div>
-  </section>
-  <section v-else class="how-it-works" aria-label="Cách luồng tự động hoạt động">
-    <div>
-      <span class="how-step">1</span>
-      <div>
-        <strong>Chọn khi nào chạy</strong>
-        <small
-          >Mỗi luồng gắn với một sự kiện có sẵn: công việc được nộp kết quả, bị trả lại; hồ sơ được trình, được
-          duyệt; bài viết mới…</small
-        >
-      </div>
-    </div>
-    <div>
-      <span class="how-step">2</span>
-      <div>
-        <strong>Bật luồng — không cần bấm chạy</strong>
-        <small
-          >Luồng đang bật <b>tự chạy</b> mỗi khi sự kiện đó xảy ra ở bất kỳ công việc/hồ sơ nào. Luồng tắt thì không
-          chạy.</small
-        >
-      </div>
-    </div>
-    <div>
-      <span class="how-step">3</span>
-      <div>
-        <strong>Kiểm tra và theo dõi</strong>
-        <small
-          ><b>Chạy thử</b> xem đường đi mà không tác động thật; <b>Chạy ngay</b> áp dụng cho một bản ghi có sẵn;
-          <b>Lịch sử chạy</b> cho biết đã chạy cho việc nào.</small
-        >
-      </div>
-    </div>
-  </section>
   <div v-if="error && !connectionForm" class="notice error error-inline">{{ errorText(error) }}</div>
   <section v-if="rules.isPending.value || rules.error.value || !shown.length" class="card">
     <StatePanel
       :loading="rules.isPending.value"
       :error="rules.error.value"
       :empty="!rules.isPending.value && !shown.length"
-      :title="tab === 'process' ? 'Chưa có quy trình hồ sơ' : 'Chưa có luồng tự động'"
-      description="Bắt đầu từ một mẫu có sẵn, chỉnh trên canvas và chạy thử trước khi bật."
+      title="Chưa có luồng nào"
+      description="Bắt đầu từ một mẫu có sẵn, chỉnh trên canvas rồi phát hành."
       @retry="rules.refetch()"
       ><button class="button small" @click="showTemplates = true">
-        <Plus :size="16" />{{ tab === 'process' ? 'Tạo quy trình' : 'Tạo luồng' }}
+        <Plus :size="16" />Tạo luồng
       </button></StatePanel
     >
   </section>
   <div class="flow-cards">
     <article v-for="rule in shown" :key="rule.id" class="card flow-card">
-      <RouterLink :to="`/automations/${rule.id}`" class="flow-card-sketch" :aria-label="`Mở ${rule.name}`">
+      <RouterLink :to="`/processes/${rule.id}`" class="flow-card-sketch" :aria-label="`Mở ${rule.name}`">
         <svg viewBox="0 0 200 70" aria-hidden="true">
           <path
             v-for="edge in sketch(rule.graph).edges"
@@ -286,33 +178,30 @@ async function saveConnection() {
       </RouterLink>
       <div class="flow-card-body">
         <div class="flow-card-title">
-          <RouterLink :to="`/automations/${rule.id}`" class="row-link">{{ rule.name }}</RouterLink>
-          <label class="switch" :title="rule.enabled ? 'Đang chạy' : 'Đang tắt'"
-            ><input
-              type="checkbox"
-              :checked="rule.enabled"
-              :disabled="busy"
-              :aria-label="`Bật/tắt ${rule.name}`"
-              @change="toggle(rule)" /><span
-          /></label>
+          <RouterLink :to="`/processes/${rule.id}`" class="row-link">{{ rule.name }}</RouterLink>
+          <span class="tag">{{
+            rule.active_version_no ? `Phiên bản ${rule.active_version_no}` : 'Bản nháp'
+          }}</span>
         </div>
         <small class="flow-card-when" :class="rule.enabled ? 'on' : 'off'">
           <template v-if="rule.kind === 'process' && rule.enabled"
-            >📋 Áp dụng cho hồ sơ <strong>“{{ rule.form_name ?? 'biểu mẫu' }}”</strong> trình từ bây giờ</template
+            ><FileCheck2 :size="14" aria-hidden="true" class="inline-icon" /> Đang áp dụng cho biểu mẫu <strong>“{{ rule.form_name ?? 'biểu mẫu' }}”</strong
+            ><template v-if="rule.unpublished_changes"> · có thay đổi chưa phát hành</template></template
           >
           <template v-else-if="rule.kind === 'process'"
-            >⏸ Đang tắt — hồ sơ <strong>“{{ rule.form_name ?? 'biểu mẫu' }}”</strong> vẫn theo bước duyệt của biểu
-            mẫu</template
+            ><CirclePause :size="14" aria-hidden="true" class="inline-icon" /> Chưa phát hành, chưa ai dùng được<template v-if="rule.form_name">
+              · biểu mẫu <strong>“{{ rule.form_name }}”</strong></template
+            ></template
           >
           <template v-else-if="rule.enabled && rule.scope === 'attached'"
-            >📎 Chạy cho {{ rule.attached_count }} công việc được gắn, mỗi khi
+            ><Paperclip :size="14" aria-hidden="true" class="inline-icon" /> Chạy cho {{ rule.attached_count }} công việc được gắn, mỗi khi
             <strong>{{ triggerLabel[rule.trigger] ?? rule.trigger }}</strong></template
           >
           <template v-else-if="rule.enabled"
-            >⚡ Tự chạy mỗi khi <strong>{{ triggerLabel[rule.trigger] ?? rule.trigger }}</strong></template
+            ><Zap :size="14" aria-hidden="true" class="inline-icon" /> Tự chạy mỗi khi <strong>{{ triggerLabel[rule.trigger] ?? rule.trigger }}</strong></template
           >
           <template v-else
-            >⏸ Đang tắt — sẽ không tự chạy khi
+            ><CirclePause :size="14" aria-hidden="true" class="inline-icon" /> Chưa phát hành — sẽ không tự chạy khi
             <strong>{{ triggerLabel[rule.trigger] ?? rule.trigger }}</strong></template
           >
           · {{ rule.graph.nodes.length }} bước
@@ -321,7 +210,7 @@ async function saveConnection() {
           <StatusBadge v-if="rule.last_run" :status="rule.last_run.state" />
           <small v-if="rule.last_run" class="muted">{{ formatDate(rule.last_run.created_at, true) }}</small>
           <small v-else class="muted">Chưa chạy lần nào</small>
-          <RouterLink :to="`/automations/${rule.id}`" class="button ghost small" style="margin-left: auto"
+          <RouterLink :to="`/processes/${rule.id}`" class="button ghost small" style="margin-left: auto"
             >Mở canvas <ArrowRight :size="14"
           /></RouterLink>
         </div>
@@ -350,8 +239,8 @@ async function saveConnection() {
       </button>
     </header>
     <p v-if="catalog.data.value && !catalog.data.value.webhooks_enabled" class="card-body muted">
-      Triển khai chưa cho phép gọi ra ngoài. Quản trị hệ thống cần đặt
-      <code>AUTOMATION_ALLOWED_HOSTS</code> với danh sách máy chủ được phép.
+      Hệ thống chưa cho phép gửi dữ liệu sang hệ thống khác. Liên hệ bộ phận kỹ thuật để mở danh sách máy chủ được
+      phép kết nối.
     </p>
     <p v-else-if="catalog.data.value" class="card-body muted" style="padding-bottom: 0">
       Máy chủ được phép: <code>{{ catalog.data.value.allowed_hosts.join(', ') }}</code>. Khóa bí mật được mã hóa và
@@ -368,8 +257,8 @@ async function saveConnection() {
   </section>
 
   <ModalDialog
-    v-if="showTemplates && tab === 'process'"
-    title="Tạo quy trình hồ sơ"
+    v-if="showTemplates"
+    title="Tạo luồng"
     wide
     @close="showTemplates = false"
   >
@@ -379,7 +268,10 @@ async function saveConnection() {
         <option value="">Chọn sau trên canvas…</option>
         <option v-for="form in forms" :key="form.id" :value="form.id">{{ form.name }}</option>
       </select>
-      <small class="muted">Hồ sơ của biểu mẫu này sẽ đi theo quy trình khi bạn bật nó.</small>
+      <small class="muted"
+        >Biểu mẫu là những gì người tạo hồ sơ phải điền.
+        <button type="button" class="button ghost small" @click="creatingForm = true">Tạo biểu mẫu mới</button></small
+      >
     </div>
     <div class="template-grid">
       <button
@@ -405,19 +297,13 @@ async function saveConnection() {
         <small>{{ template.description }}</small>
       </button>
     </div>
-  </ModalDialog>
-  <ModalDialog v-else-if="showTemplates" title="Tạo luồng mới" wide @close="showTemplates = false">
-    <p class="muted" style="margin-bottom: 16px">
-      Hệ thống đã tự báo những việc cơ bản (giao việc, nộp kết quả, trả lại, kết quả duyệt hồ sơ). Dùng luồng cho
-      những gì thông báo sẵn không làm được: nhắc khi việc vẫn chưa xong sau một thời gian, báo thêm người khác, tự
-      tạo việc. Mọi bước đều chỉnh được trên canvas.
-    </p>
+    <span class="section-label" style="display: block; margin: 18px 0 10px">Phản ứng với sự kiện</span>
     <div class="template-grid">
       <button
         v-for="template in TEMPLATES"
         :key="template.key"
         class="template-card"
-        @click="router.push({ path: '/automations/new', query: { template: template.key } })"
+        @click="openProcess({ template: template.key })"
       >
         <span class="template-dots">
           <i
@@ -431,7 +317,7 @@ async function saveConnection() {
       </button>
     </div>
   </ModalDialog>
-
+  <ProcessFormDialog v-if="creatingForm" @close="creatingForm = false" @created="formCreated" />
   <ModalDialog v-if="connectionForm" title="Thêm kết nối webhook" @close="connectionForm = null">
     <div v-if="error" class="notice error error-inline">{{ errorText(error) }}</div>
     <form class="stack" @submit.prevent="saveConnection">
@@ -469,8 +355,8 @@ async function saveConnection() {
       </div>
     </form>
   </ModalDialog>
-  <p class="muted" style="margin-top: 18px; font-size: 13px">
-    <Workflow :size="14" style="vertical-align: -2px" /> Mỗi sự kiện chỉ kích hoạt một luồng một lần; luồng không tự
-    kích hoạt lại chính nó, chuỗi luồng dừng ở độ sâu 3.
+  <p class="muted" style="margin-top: 18px; font-size: 14px">
+    <Workflow :size="14" style="vertical-align: -2px" /> Mỗi sự kiện chỉ chạy mỗi luồng một lần. Luồng không tự chạy
+    lại vì chính việc nó làm, và các luồng nối tiếp nhau sẽ dừng sau vài bước để tránh chạy vòng mãi.
   </p>
 </template>

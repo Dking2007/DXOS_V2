@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from . import models as m
 from . import schemas as s
-from .policies import case_filter, current_user, file_access, get_case, get_file, is_overdue
+from .policies import case_filter, current_user, file_access, get_case, get_file, is_overdue, step_overdue
 from .services import audit, idem_begin, page, serial
 
 
@@ -266,14 +266,16 @@ def build_router(app):
         overdue_cases = set()
         returns = 0
         for task, case, submission in rows:
-            group_key = (submission.package_version_id, task.label)
+            pinned = submission.process_version_id or submission.package_version_id
+            group_key = (pinned, task.label)
             group = groups.setdefault(
                 group_key,
                 {
                     "step": task.label,
-                    "package_version_id": submission.package_version_id,
+                    "package_version_id": pinned,
                     "count": 0,
                     "waiting": 0,
+                    "overdue": 0,
                     "completed": 0,
                     "wait_hours": 0.0,
                     "case_ids": [],
@@ -286,7 +288,10 @@ def build_router(app):
                 returns += 1
             if task.state in {"pending", "waiting", "open"}:
                 group["waiting"] += 1
-                if is_overdue(case):
+                # Past the deadline of this very step, or the dossier's own due date.
+                if step_overdue(task):
+                    group["overdue"] += 1
+                if step_overdue(task) or is_overdue(case):
                     overdue_cases.add(case.id)
             elif task.decided_at:
                 group["completed"] += 1

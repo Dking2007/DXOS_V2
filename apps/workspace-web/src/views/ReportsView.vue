@@ -46,6 +46,17 @@ interface Overview {
     pending_my_approval: number
   }
   storage: { my_files: number; my_bytes: number }
+  by_department: {
+    department_id: string | null
+    name: string
+    tasks_open: number
+    tasks_overdue: number
+    tasks_completed: number
+    cases_total: number
+    cases_waiting: number
+    cases_overdue: number
+    returns: number
+  }[]
   automations?: { failed_in_period: number; enabled_rules: number }
 }
 const session = useSession()
@@ -60,6 +71,13 @@ const report = useQuery({
   queryFn: () => api.request<Overview>(`/reports/overview?days=${days.value}&scope=${scope.value}`),
 })
 const data = computed(() => report.data.value)
+const SCOPE_LABEL = { all: 'Mọi việc bạn xem được', managed: 'Việc bạn giao hoặc điều phối', mine: 'Việc của bạn' }
+const PERIOD_LABEL: Record<number, string> = { 7: '7 ngày qua', 30: '30 ngày qua', 90: '90 ngày qua', 365: '12 tháng qua' }
+function hoursText(hours: number | null) {
+  if (hours === null) return '—'
+  if (hours < 1) return 'dưới 1 giờ'
+  return hours >= 48 ? `${Math.round(hours / 24)} ngày` : `${Math.round(hours)} giờ`
+}
 function percent(value: number | null | undefined) {
   return value === null || value === undefined ? '—' : `${Math.round(value * 100)}%`
 }
@@ -71,12 +89,8 @@ function bars(record: Record<string, number>) {
 }
 </script>
 <template>
-  <header class="page-head">
-    <div>
-      <span class="eyebrow">BÁO CÁO VÀ ĐIỀU HÀNH</span>
-      <h1>Báo cáo</h1>
-      <p>Số liệu tính trên dữ liệu bạn được phép xem; mỗi chỉ số có định nghĩa rõ ràng.</p>
-    </div>
+  <header class="page-head compact">
+    <h1 class="sr-only">Báo cáo</h1>
     <div class="page-actions">
       <select v-model="scope" aria-label="Phạm vi" class="compact-select">
         <option value="all">Mọi việc tôi xem được</option>
@@ -90,8 +104,8 @@ function bars(record: Record<string, number>) {
         <option :value="365">12 tháng</option>
       </select>
       <a class="button secondary" :href="`/workspace/v1/reports/tasks.csv?scope=${scope}`"
-        ><Download :size="16" />Xuất CSV</a
-      >
+        ><Download :size="16" />Tải danh sách công việc</a
+      ><a class="button secondary" href="/workspace/v1/reports/cases.csv"><Download :size="16" />Tải danh sách hồ sơ</a>
     </div>
   </header>
   <section v-if="report.isPending.value || report.error.value" class="card">
@@ -102,9 +116,8 @@ function bars(record: Record<string, number>) {
     />
   </section>
   <template v-if="data">
-    <p class="muted" style="font-size: 13px; margin-bottom: 14px">
-      Cập nhật lúc {{ formatDate(data.as_of, true) }} (tính khi tải trang, không phải thời gian
-      thực).
+    <p class="muted report-asof">
+      {{ SCOPE_LABEL[scope] }} · {{ PERIOD_LABEL[days] }} · số liệu lúc {{ formatDate(data.as_of, true) }}
     </p>
     <NarrativeCard v-if="ai.on('report_narrative')" :days="days" :scope="scope" />
     <div class="stat-grid">
@@ -116,7 +129,7 @@ function bars(record: Record<string, number>) {
         <span class="stat-icon red"><AlarmClock :size="21" /></span>
         <div>
           <strong>{{ data.tasks.overdue }}</strong
-          ><small>Quá hạn · {{ percent(data.tasks.overdue_rate) }} việc có hạn</small>
+          ><small>Việc quá hạn · chiếm {{ percent(data.tasks.overdue_rate) }} việc có hạn</small>
         </div>
       </RouterLink>
       <div class="stat-tile">
@@ -124,7 +137,7 @@ function bars(record: Record<string, number>) {
         <div>
           <strong>{{ data.tasks.completed_in_period }}</strong
           ><small
-            >Hoàn tất trong kỳ · trễ {{ percent(data.tasks.late_completion_rate) }}</small
+            >Việc hoàn tất trong kỳ · {{ percent(data.tasks.late_completion_rate) }} bị trễ hạn</small
           >
         </div>
       </div>
@@ -139,14 +152,9 @@ function bars(record: Record<string, number>) {
       <div class="stack">
         <section class="card">
           <header class="card-header">
-            <div><span class="eyebrow">CÔNG VIỆC</span><h2>Theo trạng thái</h2></div>
-            <span class="muted" style="font-size: 13px"
-              >TB hoàn tất:
-              {{
-                data.tasks.average_completion_hours === null
-                  ? '—'
-                  : `${data.tasks.average_completion_hours} giờ`
-              }}</span
+            <h2>Công việc theo trạng thái</h2>
+            <span class="muted" style="font-size: 14px"
+              >Thời gian hoàn tất trung bình: {{ hoursText(data.tasks.average_completion_hours) }}</span
             >
           </header>
           <div class="card-body">
@@ -160,7 +168,7 @@ function bars(record: Record<string, number>) {
         </section>
         <section class="card">
           <header class="card-header">
-            <div><span class="eyebrow">PHÂN BỔ</span><h2>Việc đang mở theo người</h2></div>
+            <h2>Việc đang mở theo người</h2>
           </header>
           <div v-if="data.tasks.by_assignee.length" class="table-wrap">
             <table>
@@ -182,8 +190,8 @@ function bars(record: Record<string, number>) {
       <aside class="stack" style="align-content: start">
         <section class="card">
           <header class="card-header">
-            <div><span class="eyebrow">HỒ SƠ</span><h2>{{ data.cases.total }} hồ sơ</h2></div>
-            <span class="muted" style="font-size: 13px"
+            <h2>Hồ sơ theo trạng thái <span class="muted">({{ data.cases.total }})</span></h2>
+            <span class="muted" style="font-size: 14px"
               ><Undo2 :size="14" /> {{ data.cases.returns_in_period }} lần trả lại</span
             >
           </header>
@@ -205,7 +213,7 @@ function bars(record: Record<string, number>) {
             <template v-if="data.automations">
               <div class="date-line"><Workflow :size="16" /> Tự động hóa</div>
               <p>
-                {{ data.automations.enabled_rules }} luật đang bật ·
+                {{ data.automations.enabled_rules }} luồng đang áp dụng ·
                 <span :class="{ 'overdue-text': data.automations.failed_in_period }"
                   >{{ data.automations.failed_in_period }} lượt lỗi trong kỳ</span
                 >
@@ -213,16 +221,51 @@ function bars(record: Record<string, number>) {
             </template>
           </div>
         </section>
-        <section class="card">
-          <header class="card-header"><h3>Định nghĩa chỉ số</h3></header>
+        <details class="card report-definitions">
+          <summary>Cách tính các con số</summary>
           <dl class="card-body detail-meta">
             <div><dt>Tỷ lệ quá hạn</dt><dd>{{ data.definitions.overdue_rate }}</dd></div>
             <div><dt>Tỷ lệ hoàn tất trễ</dt><dd>{{ data.definitions.late_completion_rate }}</dd></div>
             <div><dt>Việc đã hủy</dt><dd>{{ data.definitions.cancelled }}</dd></div>
+            <div><dt>Phạm vi</dt><dd>Chỉ tính những việc và hồ sơ bạn được phép xem.</dd></div>
           </dl>
-        </section>
+        </details>
       </aside>
     </div>
+    <section v-if="data.by_department.length" class="card" style="margin-top: 20px">
+      <header class="card-header">
+        <h2>Tình hình từng phòng ban</h2>
+        <span class="muted" style="font-size: 14px">Phòng có nhiều việc, hồ sơ quá hạn xếp trên</span>
+      </header>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Đơn vị</th>
+              <th>Việc đang mở</th>
+              <th>Việc quá hạn</th>
+              <th>Hoàn tất trong kỳ</th>
+              <th>Hồ sơ</th>
+              <th>Đang chờ duyệt</th>
+              <th>Hồ sơ quá hạn</th>
+              <th>Lần trả lại</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in data.by_department" :key="row.department_id ?? 'none'">
+              <td>{{ row.name }}</td>
+              <td>{{ row.tasks_open }}</td>
+              <td :class="{ 'overdue-text': row.tasks_overdue }">{{ row.tasks_overdue }}</td>
+              <td>{{ row.tasks_completed }}</td>
+              <td>{{ row.cases_total }}</td>
+              <td>{{ row.cases_waiting }}</td>
+              <td :class="{ 'overdue-text': row.cases_overdue }">{{ row.cases_overdue }}</td>
+              <td>{{ row.returns }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
     <ProcessWaitCard v-if="canSeeProcess" :days="days" />
   </template>
 </template>

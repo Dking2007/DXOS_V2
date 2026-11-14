@@ -31,7 +31,7 @@ const entries = computed(() => log.data.value?.pages.flatMap((page) => page.item
     <header class="card-header">
       <div>
         <h2>Nhật ký hoạt động</h2>
-        <p class="muted" style="font-size: 13px; margin-top: 5px">
+        <p class="muted" style="font-size: 14px; margin-top: 5px">
           Ai đã làm gì, lúc nào trong không gian làm việc. Mới nhất ở trên.
         </p>
       </div>

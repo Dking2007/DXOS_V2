@@ -66,6 +66,15 @@ class FakeAi:
                     }
                 )
             )
+        if "hỏi đáp về một hồ sơ" in system:
+            return reply(
+                json.dumps(
+                    {
+                        "answer": "Hồ sơ xin kinh phí **100 đồng**, đang chờ Giám đốc duyệt.",
+                        "sources": ["Biểu mẫu", "Quy trình", "Tệp: bao-gia.txt", "Nguồn bịa"],
+                    }
+                )
+            )
         if "tóm tắt hồ sơ" in system:
             return reply('{"lines": ["Xin duyệt công tác", "Kinh phí 100 đồng"]}')
         if "phiếu giao việc" in system:
@@ -104,6 +113,8 @@ class FakeAi:
             return reply('{"cases": [{"name": "Đủ hồ sơ", "payload": {"reason": "Họp", "amount": 10}, "file_count": 0, "decisions": ["approve"]}]}')
         if "tiêu đề ngắn" in system:
             return reply('{"titles": ["Họp giao ban"]}')
+        if "Trợ lý Desktiny" in system and "<du_lieu_cua_ban>" in system and "mã" in prompt:
+            return reply("Xem @1 và @2; còn @99 không có.")
         if "Trợ lý Desktiny" in system:
             return reply("Hồ sơ của bạn đang chờ duyệt." if "<du_lieu_cua_ban>" in system else "Chưa rõ.")
         return reply('{"issues": []}')
@@ -401,15 +412,26 @@ def test_every_other_feature_answers_through_its_own_checks(world):  # noqa: F81
     assert digest["text"] and as_(world, "manager").get(API + "/ai/digest").json()["digest"] == digest
     assert as_(world, "director").post(API + "/ai/reports/narrative", json={"days": 30}).json()["text"]
     assert as_(world, "staff").post(API + "/ai/write", json={"action": "title", "text": "Mai họp giao ban lúc 8h"}).json() == {"titles": ["Họp giao ban"]}
-    package = as_(world, "manager").post(
-        API + "/business-packages", json={"name": "Mua sắm", "form_id": form["id"]}, headers={"Idempotency-Key": "pkg-ai"}
+    process = as_(world, "director").post(
+        API + "/automations",
+        json={
+            "name": "Mua sắm",
+            "kind": "process",
+            "graph": {
+                "nodes": [
+                    {"id": "start", "type": "trigger", "position": {"x": 0, "y": 0},
+                     "data": {"event": "case.submitted", "form_id": form["id"]}},
+                    {"id": "a", "type": "approval", "position": {"x": 300, "y": 0},
+                     "data": {"resolver": "user", "user_id": world[7]["manager"]}},
+                ],
+                "edges": [{"id": "e", "source": "start", "target": "a"}],
+            },
+        },
     ).json()
-    fixtures = as_(world, "manager").post(f"{API}/ai/package-versions/{package['version']['id']}/scenarios").json()["fixtures"]
-    assert fixtures[0]["name"] == "Đủ hồ sơ" and fixtures[0]["decisions"] == {
-        "review_0": {"decision": "approve"}, "review_1": {"decision": "approve"}
-    }  # fmt: skip
-    # The expectation is what the package really does: the manager would be approving their own case.
-    assert fixtures[0]["expected_error_code"] == "self_approval_denied" and fixtures[0]["expected_path"] == []
+    fixtures = as_(world, "director").post(f"{API}/ai/processes/{process['id']}/scenarios").json()["fixtures"]
+    # The expectation is what the process really does, worked out by walking it.
+    assert fixtures[0]["name"] == "Đủ hồ sơ" and fixtures[0]["decisions"] == {}
+    assert fixtures[0]["expected_outcome"] == "approved" and fixtures[0]["expected_path"] == ["start", "a"]
     remaining = as_(world, "staff").get(API + "/ai/features").json()["remaining"]
     assert remaining is not None and remaining < 50
 
@@ -435,3 +457,63 @@ def test_one_service_serves_several_features_each_with_its_own_model(world):  # 
         json={"expected_revision": saved.json()["revision"], "features": {"task_parse": {"enabled": True, "model": "x"}}},
     )
     assert orphan.status_code == 422 and orphan.json()["code"] == "ai_model_needs_provider"
+
+
+def test_questions_about_a_dossier_are_answered_from_that_dossier(world):  # noqa: F811
+    fake = setup(world, ["case_qa"])
+    form = make_form(world, two_steps=True)
+    quotation = upload(world, "bao-gia.txt", QUOTATION)
+    staff = as_(world, "staff")
+    case = staff.post(
+        API + "/cases",
+        json={
+            "title": "Mua máy chiếu",
+            "form_id": form["id"],
+            "payload": {"reason": "Phòng họp tầng 3", "amount": 100},
+            "file_ids": [quotation["id"]],
+        },
+        headers={"Idempotency-Key": "case-qa"},
+    ).json()
+    submitted = staff.post(
+        f"{API}/cases/{case['id']}/submit",
+        json={"expected_revision": case["revision"]},
+        headers={"Idempotency-Key": "submit-qa"},
+    )
+    assert submitted.status_code == 202, submitted.text
+    drain(world)
+    manager = as_(world, "manager")
+    task = manager.get(API + "/approval-tasks").json()["items"][0]
+    decided = manager.post(
+        f"{API}/approval-tasks/{task['id']}/decisions",
+        json={"expected_revision": task["revision"], "decision": "approve", "reason": "Đúng nhu cầu phòng"},
+        headers={"Idempotency-Key": "decide-qa"},
+    )
+    assert decided.status_code == 202, decided.text
+    drain(world)
+
+    staff = as_(world, "staff")
+    asked = staff.post(
+        f"{API}/ai/cases/{case['id']}/ask",
+        json={
+            "question": "Hồ sơ đang chờ ai?",
+            "history": [
+                {"role": "user", "content": "Hồ sơ xin gì?"},
+                {"role": "assistant", "content": "Xin mua máy chiếu."},
+            ],
+        },
+    )
+    assert asked.status_code == 200, asked.text
+    body = asked.json()
+    assert body["answer"].startswith("Hồ sơ xin kinh phí")
+    # Only parts the dossier really has are kept as sources.
+    assert body["sources"] == ["Biểu mẫu", "Quy trình", "Tệp: bao-gia.txt"]
+    prompt = fake.calls[-1]["messages"][-1]["content"]
+    assert "Phòng họp tầng 3" in prompt and QUOTE in prompt
+    assert "Trưởng phòng A đồng ý" in prompt and "Đúng nhu cầu phòng" in prompt
+    assert "đang chờ Giám đốc" in prompt
+    assert "Người hỏi: Hồ sơ xin gì?" in prompt and "Câu hỏi: Hồ sơ đang chờ ai?" in prompt
+
+    # Someone who cannot see the dossier cannot ask about it.
+    outsider = as_(world, "outsider").post(f"{API}/ai/cases/{case['id']}/ask", json={"question": "Xin gì?"})
+    assert outsider.status_code == 404
+

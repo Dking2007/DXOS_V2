@@ -10,14 +10,35 @@ import httpx
 import jwt
 from dx_platform.auth import Actor
 from dx_platform.errors import AppError
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import DriveFile, OfficeSave, OfficeSession, uid, utcnow
+from .models import Case, DriveFile, OfficeSave, OfficeSession, Submission, uid, utcnow
 from .policies import current_user, file_access, get_file
 from .services import audit
+
+
+def case_document(db: Session, user, case_id: str, file_id: str) -> DriveFile:
+    """A document of a dossier the person may see, opened from that dossier (read-only)."""
+    from .policies import get_case
+    from .processes import step_limits
+
+    case: Case = get_case(db, user, case_id)
+    if step_limits(db, user, case)[1]:
+        raise AppError(403, "files_hidden_at_step", "Bước của bạn không được xem tài liệu của hồ sơ.")
+    submitted = {
+        item["file_id"]
+        for submission in db.scalars(select(Submission).where(Submission.case_id == case.id))
+        for item in submission.files_snapshot or []
+    }
+    file = db.get(DriveFile, file_id)
+    if not file or file_id not in {*(case.file_ids or []), *submitted}:
+        raise AppError(404, "attachment_not_found", "Không tìm thấy tài liệu của hồ sơ.")
+    if file.deleted_at or file.acl_state != "ready":
+        raise AppError(409, "attachment_unavailable", "Tài liệu chưa sẵn sàng.")
+    return file
 
 
 def callback_claims(secret: str, body: dict, authorization: str = ""):
@@ -99,7 +120,12 @@ def office_router(app):
     settings = app.state.settings
 
     @router.post("/drive/files/{file_id}/office-sessions")
-    def open_office(file_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+    def open_office(
+        file_id: str,
+        case_id: str | None = Query(None, max_length=36),
+        db: Session = Depends(db_dep),
+        actor: Actor = Depends(actor_dep),
+    ):
         if not settings.onlyoffice_enabled or not settings.onlyoffice_jwt_secret:
             raise AppError(
                 503,
@@ -107,8 +133,12 @@ def office_router(app):
                 "ONLYOFFICE chưa bật. Chạy profile office và cấu hình JWT secret.",
             )
         user = current_user(db, actor)
-        file = get_file(db, user, file_id)
-        editable = file_access(db, user, file, True)
+        if case_id:
+            file = case_document(db, user, case_id, file_id)
+            editable = False
+        else:
+            file = get_file(db, user, file_id)
+            editable = file_access(db, user, file, True)
         extension = file.name.rsplit(".", 1)[-1].lower()
         types = {"docx": "word", "xlsx": "cell", "pptx": "slide"}
         if extension not in types:

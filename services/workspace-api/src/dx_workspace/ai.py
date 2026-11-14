@@ -22,10 +22,11 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import ai_core, ai_docx, ai_index, ai_text
+from . import ai_core, ai_docx, ai_index, ai_text, process_versions
 from . import assistant_llm as llm
 from . import models as m
 from . import schemas as s
+from .automations import BRANCH_LABELS, OUTCOMES
 from .policies import (
     approval_assignees,
     case_filter,
@@ -38,6 +39,7 @@ from .policies import (
     permissions,
     require,
 )
+from .processes import step_limits
 from .services import audit, enqueue, serial
 from .tasks import visible as task_visible
 from .text import fold
@@ -102,6 +104,60 @@ class QuestionInput(s.Input):
     question: str = Field(min_length=2, max_length=1000)
 
 
+class Turn(s.Input):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class CaseQuestionInput(s.Input):
+    question: str = Field(min_length=2, max_length=1000)
+    # The conversation so far, kept only in the browser tab; the latest turns give follow-ups context.
+    history: list[Turn] = Field(default_factory=list, max_length=12)
+
+
+CASE_STATUS = {
+    "draft": "Bản nháp",
+    "pending_workflow_start": "Đang chuyển duyệt",
+    "processing": "Đang xử lý",
+    "approved": "Đã duyệt",
+    "rejected": "Bị từ chối",
+    "needs_revision": "Cần bổ sung",
+    "cancelled": "Đã hủy",
+}
+STEP_STATE = {
+    "succeeded": "đã xong",
+    "waiting": "đang chờ",
+    "failed": "không thực hiện được",
+    "cancelled": "đã dừng",
+    "queued": "đang gửi",
+    "skipped": "bỏ qua",
+    "unknown": "chưa rõ kết quả",
+}
+DECISION_TEXT = {"approve": "đồng ý / duyệt", "reject": "không đồng ý / từ chối", "return": "trả lại"}
+STEP_KIND = {
+    "approval": "Duyệt",
+    "consult": "Xin ý kiến",
+    "assign_task": "Giao việc",
+    "request_info": "Yêu cầu bổ sung",
+    "finish": "Kết thúc",
+    "notify": "Thông báo",
+    "create_task": "Tạo việc",
+    "wait": "Chờ",
+    "if": "Điều kiện",
+}
+TASK_STATUS = {
+    "draft": "nháp",
+    "assigned": "đã giao",
+    "accepted": "đã nhận",
+    "in_progress": "đang làm",
+    "submitted": "đã nộp kết quả",
+    "completed": "đã nghiệm thu",
+    "returned": "bị trả lại",
+    "blocked": "vướng mắc",
+    "cancelled": "đã hủy",
+}
+
+
 class SearchInput(s.Input):
     q: str = Field(min_length=2, max_length=300)
     limit: int = Field(default=12, ge=1, le=30)
@@ -127,6 +183,20 @@ class WriteInput(s.Input):
 
 def now_vn() -> datetime:
     return datetime.now(UTC).astimezone(VIETNAM)
+
+
+def when(moment: datetime | str | None) -> str:
+    """A stored moment as people read it here: Vietnam time, day first."""
+    if isinstance(moment, str):
+        try:
+            moment = datetime.fromisoformat(moment)
+        except ValueError:
+            return ""
+    if not moment:
+        return ""
+    if moment.tzinfo is None:  # SQLite drops the zone; stored values are UTC
+        moment = moment.replace(tzinfo=UTC)
+    return f"{moment.astimezone(VIETNAM):%d/%m/%Y %H:%M}"
 
 
 def today_text() -> str:
@@ -347,7 +417,7 @@ def build_router(app):
         return "\n".join(f"- {labels.get(k, k)}: {v}" for k, v in payload.items() if v not in (None, "", []))
 
     def editable_case(db, user, case_id):
-        case = get_case(db, user, case_id)
+        case = whole_case(db, user, case_id)
         if case.owner_id != user.id or case.status not in {"draft", "needs_revision"}:
             raise AppError(
                 409, "case_not_editable", "Chỉ người lập được dùng tính năng này khi hồ sơ là bản nháp."
@@ -461,7 +531,7 @@ def build_router(app):
     @router.get("/ai/cases/{case_id}/summary")
     def stored_summary(case_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
         user = user_for(db, actor)
-        case = get_case(db, user, case_id)
+        case = whole_case(db, user, case_id)
         return {"summary": ai_core.cached(db, summary_key(db, case))}
 
     @router.post("/ai/cases/{case_id}/summary")
@@ -469,7 +539,7 @@ def build_router(app):
         """2. A few lines for the approver: what is asked, how much, what is attached, who said what."""
         user = user_for(db, actor)
         ai_core.require_feature(db, "case_summary")
-        case = get_case(db, user, case_id)
+        case = whole_case(db, user, case_id)
         form = db.get(m.Form, case.form_id)
         history = []
         for task in db.scalars(
@@ -523,12 +593,12 @@ def build_router(app):
             s.validate_payload(form, payload)
         except AppError as exc:
             issues.append({"level": "error", "message": exc.detail, "source": "rule"})
-        version = db.get(m.PackageVersion, case.package_version_id) if case.package_version_id else None
+        version = process_versions.pinned_or_live(db, case)
         if version and len(case.file_ids) < version.required_file_count:
             issues.append(
                 {
                     "level": "error",
-                    "message": f"Gói nghiệp vụ cần ít nhất {version.required_file_count} tài liệu, hồ sơ mới có {len(case.file_ids)}.",
+                    "message": f"Quy trình cần ít nhất {version.required_file_count} tài liệu, hồ sơ mới có {len(case.file_ids)}.",
                     "source": "rule",
                 }
             )
@@ -563,7 +633,7 @@ def build_router(app):
         """4. A polite approval note or return reason, for the person deciding to edit."""
         user = user_for(db, actor)
         ai_core.require_feature(db, "decision_draft")
-        case = get_case(db, user, case_id)
+        case = whole_case(db, user, case_id)
         pending = db.scalar(
             select(m.ApprovalTask).where(
                 m.ApprovalTask.case_id == case.id,
@@ -594,6 +664,115 @@ def build_router(app):
         )
         db.commit()
         return {"text": answer.strip()[:3000]}
+
+    def process_text(db, case: m.Case) -> str:
+        """Every submission of the dossier: the steps in the order it went through them, who said what."""
+        lines = []
+        for submission in db.scalars(
+            select(m.Submission).where(m.Submission.case_id == case.id).order_by(m.Submission.number)
+        ):
+            lines.append(f"Lần trình {submission.number} ({when(submission.created_at)}):")
+            run = db.get(m.AutomationRun, submission.process_run_id) if submission.process_run_id else None
+            labels = {
+                n["id"]: n.get("label") or STEP_KIND.get(n["type"], n["type"]) for n in (run.graph if run else {}).get("nodes", [])
+            }
+            for step in (run.steps if run else None) or []:
+                if not step.get("node_id") or step["type"] in {"trigger", "if"}:
+                    continue
+                text = f"  - Bước “{labels.get(step['node_id'], step['node_id'])}”: {STEP_STATE.get(step['state'], step['state'])}"
+                if step.get("branch"):
+                    text += f", đi nhánh {BRANCH_LABELS.get(step['branch'], step['branch'])}"
+                if step.get("people"):
+                    text += f", người được hỏi: {', '.join(step['people'])}"
+                if step.get("superseded"):
+                    text += " (lượt cũ, sau đó hồ sơ quay lại bước trước)"
+                if step.get("message"):
+                    text += f" — {step['message']}"
+                lines.append(text)
+            for task in db.scalars(
+                select(m.ApprovalTask)
+                .where(m.ApprovalTask.submission_id == submission.id)
+                .order_by(m.ApprovalTask.step_index)
+            ):
+                person = db.get(m.User, task.decided_by_id or task.assignee_id)
+                name = person.display_name if person else ""
+                if task.decision:
+                    text = f"  * {task.label}: {name} {DECISION_TEXT.get(task.decision, task.decision)} lúc {when(task.decided_at)}"
+                    text += f" — “{task.reason}”" if task.reason else ""
+                elif task.state == "pending":
+                    text = f"  * {task.label}: đang chờ {name}" + (f", hạn {when(task.due_at)}" if task.due_at else "")
+                else:
+                    text = f"  * {task.label}: {name}, yêu cầu đã đóng"
+                lines.append(text)
+            outcome = (run.outcome if run else None) or (submission.state if submission.state in OUTCOMES else None)
+            lines.append(f"  Kết quả lần trình: {OUTCOMES.get(outcome, 'chưa có')}")
+        return "\n".join(lines) or "(hồ sơ chưa được trình)"
+
+    def related_tasks_text(db, user, case: m.Case) -> str:
+        lines = []
+        for task in db.scalars(select(m.Task).where(m.Task.case_id == case.id).order_by(m.Task.created_at)):
+            if not task_visible(db, user, task):
+                continue
+            person = db.get(m.User, task.assignee_id) if task.assignee_id else None
+            lines.append(
+                f"- {task.title}: {TASK_STATUS.get(task.status, task.status)}"
+                + (f", người làm {person.display_name}" if person else "")
+                + (f", hạn {when(task.due_at)}" if task.due_at else "")
+            )
+        return "\n".join(lines) or "(không có)"
+
+    @router.post("/ai/cases/{case_id}/ask")
+    def ask_case(
+        case_id: str, body: CaseQuestionInput, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)
+    ):
+        """Questions about the dossier open on screen, answered from that dossier only."""
+        user = user_for(db, actor)
+        ai_core.require_feature(db, "case_qa")
+        case = whole_case(db, user, case_id)
+        form = db.get(m.Form, case.form_id)
+        owner = db.get(m.User, case.owner_id)
+        department = db.get(m.Department, case.department_id) if case.department_id else None
+        dossier = (
+            f"Hồ sơ HS-{case.number:06d}: {case.title}\nMẫu: {form.name}\n"
+            f"Trạng thái: {CASE_STATUS.get(case.status, case.status)}; ưu tiên: {case.priority}"
+            + (f"; hạn xử lý: {when(case.due_at)}" if case.due_at else "")
+            + f"\nNgười tạo: {owner.display_name if owner else ''}"
+            + (f" ({department.name})" if department else "")
+            + f"; tạo lúc {when(case.created_at)}, cập nhật {when(case.updated_at)}\n\n"
+            f"## Biểu mẫu\n{payload_text(form, case_payload(case)) or '(trống)'}\n\n"
+            f"## Quy trình\n{process_text(db, case)}\n\n"
+            f"## Công việc gắn với hồ sơ\n{related_tasks_text(db, user, case)}\n\n"
+            f"## Tài liệu kèm\n{attachments_text(db, user, case, 'case_qa', limit_files=5, limit_chars=8000)}"
+        )
+        conversation = "\n".join(
+            f"{'Người hỏi' if turn.role == 'user' else 'Trợ lý'}: {turn.content}" for turn in body.history[-8:]
+        )
+        answer = ask_json(
+            db,
+            user,
+            "case_qa",
+            "Bạn là trợ lý hỏi đáp về một hồ sơ hành chính cụ thể. Chỉ trả lời từ dữ liệu hồ sơ được cung cấp "
+            "(biểu mẫu, quy trình, công việc, tài liệu kèm). Điều gì không có trong hồ sơ thì nói rõ là hồ sơ không "
+            "đề cập, không đoán. Trả lời tiếng Việt, ngắn gọn, nêu số liệu và tên cụ thể; được dùng gạch đầu dòng. "
+            "Không quyết định thay người duyệt và không khuyên duyệt hay từ chối. " + ai_core.DATA_RULE,
+            ai_core.wrap(dossier)
+            + (f"\n\nTrao đổi trước đó:\n{conversation}" if conversation else "")
+            + f"\n\nCâu hỏi: {body.question}\n\n"
+            'Trả về {"answer": "câu trả lời", "sources": ["Biểu mẫu" | "Quy trình" | "Công việc" | "Tệp: <tên tệp>"]} '
+            "với sources là những phần của hồ sơ đã dùng để trả lời.",
+            max_tokens=1500,
+        )
+        known = {"Biểu mẫu", "Quy trình", "Công việc"} | {
+            f"Tệp: {file.name}" for file in (db.get(m.DriveFile, file_id) for file_id in case.file_ids) if file
+        }
+        sources = []
+        for item in (answer.get("sources") if isinstance(answer, dict) else None) or []:
+            label = str(item).strip()
+            if label in known and label not in sources:
+                sources.append(label)
+        text = str(answer.get("answer") or "").strip() if isinstance(answer, dict) else str(answer).strip()
+        db.commit()
+        return {"answer": text[:6000] or "AI chưa trả lời được câu hỏi này.", "sources": sources[:5]}
 
     # ---- 5–8. Documents ---------------------------------------------------------------
 
@@ -1132,27 +1311,27 @@ def build_router(app):
 
     # ---- 17. Test scenarios for a business package ------------------------------------
 
-    @router.post("/ai/package-versions/{version_id}/scenarios")
-    def scenarios(version_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
-        """17. Scenarios worth testing (amounts at the threshold, missing files) with their real path."""
+    @router.post("/ai/processes/{rule_id}/scenarios")
+    def scenarios(rule_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        """17. Scenarios worth testing (amounts at the threshold, missing files) with their real result."""
         user = user_for(db, actor)
         ai_core.require_feature(db, "package_scenarios")
-        version = db.get(m.PackageVersion, version_id)
-        if not version:
-            raise AppError(404, "package_version_not_found", "Không tìm thấy phiên bản gói.")
-        package = db.get(m.BusinessPackage, version.package_id)
-        require(db, user, "forms.manage")
-        if package.owner_id != user.id and user.role != "director":
-            raise AppError(404, "package_not_found", "Không tìm thấy gói nghiệp vụ.")
-        form = db.get(m.Form, version.form_id)
+        require(db, user, process_versions.MANAGE)
+        rule = db.get(m.AutomationRule, rule_id)
+        if not rule or rule.kind != "process":
+            raise AppError(404, "process_not_found", "Không tìm thấy quy trình.")
+        form = db.get(m.Form, rule.form_id) if rule.form_id else None
+        if not form:
+            raise AppError(422, "form_invalid", "Quy trình cần gắn với một biểu mẫu đã phát hành.")
+        graph = rule.graph
+        branching = {"approval", "consult", "assign_task"}
         steps = "\n".join(
-            f"- Bước {i + 1}: {step['label']}"
-            + (
-                f" (chỉ khi {step['condition']['field']} {step['condition']['operator']} {step['condition'].get('value')})"
-                if step.get("condition")
-                else ""
-            )
-            for i, step in enumerate(version.approval_steps)
+            f"- {node['id']} ({node['type']}): {node.get('label') or ''}"
+            for node in graph["nodes"]
+            if node["type"] != "trigger"
+        )
+        links = "\n".join(
+            f"- {edge['source']} --{edge.get('branch') or 'tiếp'}--> {edge['target']}" for edge in graph["edges"]
         )
         answer = ask_json(
             db,
@@ -1160,52 +1339,49 @@ def build_router(app):
             "package_scenarios",
             "Bạn là kiểm thử viên quy trình phê duyệt. Đề xuất kịch bản thử bao phủ: giá trị sát ngưỡng điều "
             "kiện (dưới, bằng, trên), thiếu tài liệu bắt buộc, trường bắt buộc để trống, có người trả lại.",
-            f"Biểu mẫu “{form.name}”:\n{form_fields_text(form)}\n\nCác bước duyệt:\n{steps}\n"
-            f"Số tài liệu bắt buộc: {version.required_file_count}\n\n"
+            f"Biểu mẫu “{form.name}”:\n{form_fields_text(form)}\n\nCác bước:\n{steps}\n\nĐường nối:\n{links}\n"
+            f"Số tài liệu bắt buộc: {rule.required_file_count}\n\n"
             'Trả về {"cases": [{"name": "tên ngắn", "payload": {"key": giá trị}, "file_count": số, "decisions": '
-            '["approve|return|reject cho từng bước theo thứ tự"], "why": "kiểm tra điều gì"}]}, 4 đến 8 kịch bản.',
+            '{"mã bước": "approve|return|reject|completed|cancelled"}, "why": "kiểm tra điều gì"}]}, 4 đến 8 kịch bản.',
             max_tokens=3000,
         )
+        known = {node["id"] for node in graph["nodes"] if node["type"] in branching}
         fixtures = []
         for item in (answer.get("cases") if isinstance(answer, dict) else None) or []:
             if not isinstance(item, dict) or not isinstance(item.get("payload"), dict):
                 continue
-            decisions = {
-                f"review_{i}": {"decision": d if d in {"approve", "return", "reject"} else "approve"}
-                for i, d in enumerate((item.get("decisions") or [])[: len(version.approval_steps)])
-            }
-            for i in range(len(version.approval_steps)):
-                decisions.setdefault(f"review_{i}", {"decision": "approve"})
+            given = item.get("decisions") if isinstance(item.get("decisions"), dict) else {}
             fixture = {
                 "name": str(item.get("name") or "Kịch bản AI")[:120],
                 "payload": item["payload"],
-                "decisions": decisions,
+                "decisions": {key: str(value) for key, value in given.items() if key in known},
                 "file_count": max(0, min(30, int(item.get("file_count") or 0))),
+                "expected_outcome": None,
                 "expected_path": [],
-                "expected_assignees": [],
                 "expected_error_code": None,
                 "why": str(item.get("why") or "")[:300],
             }
-            # The expectation is what the package actually does today; the person checks it is right.
-            try:
-                result = app.state.simulate_package(
-                    db,
-                    version,
-                    SimpleNamespace(
-                        payload=fixture["payload"],
-                        decisions=fixture["decisions"],
-                        file_count=fixture["file_count"],
-                        owner_id=user.id,
-                        department_id=user.department_id,
-                    ),
-                )
-                fixture["expected_path"] = result.get("path", [])
-            except AppError as exc:
-                fixture["expected_error_code"] = exc.code if exc.code in {
-                    "required_documents_missing", "approval_configuration_error", "form_validation_error", "self_approval_denied"
-                } else None  # fmt: skip
-                if not fixture["expected_error_code"]:
+            # The expectation is what the process does today; the person checks that it is right.
+            result = process_versions.rehearse(
+                db,
+                graph,
+                form,
+                rule.required_file_count,
+                SimpleNamespace(
+                    payload=fixture["payload"],
+                    decisions=fixture["decisions"],
+                    file_count=fixture["file_count"],
+                    owner_id=user.id,
+                    department_id=user.department_id,
+                ),
+            )
+            if result["error"]:
+                if result["error"] not in process_versions.ERROR_CODES.__args__:
                     continue
+                fixture["expected_error_code"] = result["error"]
+            else:
+                fixture["expected_outcome"] = result["outcome"]
+                fixture["expected_path"] = result["path"]
             fixtures.append(fixture)
         db.commit()
         return {"fixtures": fixtures[:10]}
@@ -1213,62 +1389,10 @@ def build_router(app):
     return router
 
 
-def personal_context(db: Session, user: m.User) -> str:
-    """16. What the help chat may know about the person asking: their own work, nothing else."""
-    lines = [f"Người hỏi: {user.display_name}. Hôm nay: {today_text()}."]
-    cases = list(
-        db.scalars(
-            select(m.Case)
-            .where(m.Case.owner_id == user.id, m.Case.deleted_at.is_(None), m.Case.archived_at.is_(None))
-            .order_by(m.Case.updated_at.desc())
-            .limit(15)
-        )
-    )
-    if cases:
-        lines.append("Hồ sơ của người hỏi:")
-    for case in cases:
-        waiting = [
-            (db.get(m.User, t.assignee_id), t.label)
-            for t in db.scalars(
-                select(m.ApprovalTask).where(
-                    m.ApprovalTask.case_id == case.id, m.ApprovalTask.state == "pending"
-                )
-            )
-        ]
-        who = (
-            "; đang chờ " + ", ".join(f"{u.display_name if u else '?'} ({label})" for u, label in waiting)
-            if waiting
-            else ""
-        )
-        lines.append(
-            f"- HS-{case.number:06d} “{case.title}”: {STATUS_TEXT.get(case.status, case.status)}{who}"
-        )
-    tasks = [
-        t
-        for t in db.scalars(
-            select(m.Task).where(m.Task.assignee_id == user.id).order_by(m.Task.due_at).limit(40)
-        )
-        if t.status not in {"completed", "cancelled"}
-    ][:15]
-    if tasks:
-        lines.append("Việc được giao cho người hỏi:")
-    for task in tasks:
-        due = task.due_at.replace(tzinfo=UTC) if task.due_at and task.due_at.tzinfo is None else task.due_at
-        lines.append(
-            f"- “{task.title}”: {STATUS_TEXT.get(task.status, task.status)}"
-            + (f", hạn {due.astimezone(VIETNAM):%d/%m/%Y %H:%M}" if due else "")
-        )
-    approvals = list(
-        db.scalars(
-            select(m.ApprovalTask).where(
-                m.ApprovalTask.assignee_id.in_(approval_assignees(db, user)),
-                m.ApprovalTask.state == "pending",
-            )
-        )
-    )[:15]
-    if approvals:
-        lines.append("Hồ sơ đang chờ người hỏi duyệt:")
-    for item in approvals:
-        case = db.get(m.Case, item.case_id)
-        lines.append(f"- “{case.title if case else '?'}” ở bước {item.label}")
-    return "\n".join(lines)
+def whole_case(db: Session, user: m.User, case_id: str) -> m.Case:
+    """AI features read the dossier in full, so a person limited to part of it cannot use them."""
+    case = get_case(db, user, case_id)
+    fields, hide_files = step_limits(db, user, case)
+    if fields is not None or hide_files:
+        raise AppError(403, "case_partly_hidden", "Bước của bạn chỉ được xem một phần hồ sơ nên không dùng được AI ở đây.")
+    return case

@@ -4,14 +4,46 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { BookOpen, Bot, Check, Copy, RotateCcw, SendHorizontal, Settings2, Sparkles, X } from 'lucide-vue-next'
+import {
+  BookOpen,
+  Bot,
+  BriefcaseBusiness,
+  Check,
+  ClipboardCheck,
+  Copy,
+  FileText,
+  FolderOpen,
+  ListTodo,
+  RotateCcw,
+  SendHorizontal,
+  Settings2,
+  Sparkles,
+  X,
+} from 'lucide-vue-next'
 import type { AssistantReply, AssistantStatus } from '@dx/web-shared/types.ts'
 import { errorText } from '@dx/web-shared/api.ts'
 import { api } from '../api'
 import { useSession } from '../stores/session'
 import AssistantText from './AssistantText.vue'
+import type { AssistantItem } from '@dx/web-shared/types.ts'
 import './assistant.css'
-import { assistantOpen, historyFor, type ChatTurn } from './state'
+
+const ITEM_ICON: Record<AssistantItem['kind'], typeof FileText> = {
+  task: ListTodo,
+  case: ClipboardCheck,
+  approval: ClipboardCheck,
+  file: FileText,
+  folder: FolderOpen,
+}
+const ITEM_KIND: Record<AssistantItem['kind'], string> = {
+  task: 'Công việc',
+  case: 'Hồ sơ',
+  approval: 'Phê duyệt',
+  file: 'Tài liệu',
+  folder: 'Thư mục',
+}
+import CaseChat from './CaseChat.vue'
+import { assistantOpen, assistantTab, caseContext, historyFor, type ChatTurn } from './state'
 
 const session = useSession()
 const route = useRoute()
@@ -23,7 +55,19 @@ const status = useQuery({
   staleTime: 60_000,
 })
 const ready = computed(() => !!status.data.value?.ready)
-const visible = computed(() => ready.value || !!status.data.value?.can_manage)
+// On a dossier page the work tab is there even when the general assistant is off.
+const visible = computed(() => ready.value || !!status.data.value?.can_manage || !!caseContext.value)
+const onCase = computed(() => assistantTab.value === 'case' && !!caseContext.value)
+const caseChat = ref<InstanceType<typeof CaseChat> | null>(null)
+// Opening a dossier brings its tab forward; leaving it goes back to the general assistant.
+watch(
+  () => caseContext.value?.id,
+  (id, before) => {
+    if (id && id !== before) assistantTab.value = 'case'
+    if (!id) assistantTab.value = 'general'
+  },
+  { immediate: true },
+)
 // The chat page and the flow canvas keep their bottom corner; the palette still opens it.
 const showButton = computed(() => visible.value && !route.meta.bleed && !route.meta.wide)
 
@@ -80,7 +124,13 @@ async function send(text = draft.value) {
       method: 'POST',
       body: JSON.stringify({ messages: historyFor(turns.value) }),
     })
-    turns.value.push({ role: 'assistant', content: reply.answer, sources: reply.sources, truncated: reply.truncated })
+    turns.value.push({
+      role: 'assistant',
+      content: reply.answer,
+      sources: reply.sources,
+      items: reply.items,
+      truncated: reply.truncated,
+    })
     remaining.value = reply.remaining
     save()
   } catch (cause) {
@@ -96,6 +146,7 @@ async function send(text = draft.value) {
   }
 }
 function reset() {
+  if (onCase.value) return caseChat.value?.clear()
   turns.value = []
   error.value = ''
   save()
@@ -119,8 +170,24 @@ function onKey(event: KeyboardEvent) {
 function onGlobalKey(event: KeyboardEvent) {
   if (event.key === 'Escape' && assistantOpen.value) assistantOpen.value = false
 }
-onMounted(() => document.addEventListener('keydown', onGlobalKey))
-onBeforeUnmount(() => document.removeEventListener('keydown', onGlobalKey))
+// On a phone the round button floats over list rows; it slides aside while the page scrolls
+// down and comes back as soon as the person scrolls up.
+const tucked = ref(false)
+let lastY = 0
+function onScroll() {
+  const y = window.scrollY
+  if (Math.abs(y - lastY) < 8) return
+  tucked.value = y > lastY && y > 80
+  lastY = y
+}
+onMounted(() => {
+  document.addEventListener('keydown', onGlobalKey)
+  window.addEventListener('scroll', onScroll, { passive: true })
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onGlobalKey)
+  window.removeEventListener('scroll', onScroll)
+})
 watch(
   () => route.fullPath,
   () => queryClient.invalidateQueries({ queryKey: ['assistant-status'] }),
@@ -131,6 +198,7 @@ watch(
     v-if="showButton && !assistantOpen"
     type="button"
     class="assistant-fab"
+    :class="{ tucked }"
     aria-label="Mở trợ lý AI"
     title="Hỏi trợ lý AI"
     @click="assistantOpen = true"
@@ -142,11 +210,16 @@ watch(
       <header class="assistant-head">
         <span class="assistant-avatar" aria-hidden="true"><Bot :size="20" /></span>
         <div class="grow">
-          <strong>Trợ lý Desktiny</strong>
-          <small>{{ ready ? 'Quy trình & cách dùng phần mềm' : 'Chưa sẵn sàng' }}</small>
+          <strong>{{ onCase ? 'Trợ lý công việc' : 'Trợ lý Desktiny' }}</strong>
+          <small v-if="onCase" :title="caseContext?.title">{{ caseContext?.title }}</small>
+          <small v-else>{{ !ready
+              ? 'Chưa sẵn sàng'
+              : status.data.value?.my_data
+                ? 'Quy trình, việc & tài liệu của bạn'
+                : 'Quy trình & cách dùng phần mềm' }}</small>
         </div>
         <button
-          v-if="turns.length"
+          v-if="onCase ? caseChat?.turns.length : turns.length"
           class="icon-button"
           type="button"
           aria-label="Bắt đầu cuộc trò chuyện mới"
@@ -168,7 +241,34 @@ watch(
           <X :size="19" />
         </button>
       </header>
-      <div ref="scroller" class="assistant-body" aria-live="polite">
+      <div v-if="caseContext" class="assistant-tabs" role="tablist" aria-label="Chọn trợ lý">
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="!onCase"
+          :class="{ active: !onCase }"
+          @click="assistantTab = 'general'"
+        >
+          <Bot :size="15" />Trợ lý chung
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="onCase"
+          :class="{ active: onCase }"
+          @click="assistantTab = 'case'"
+        >
+          <BriefcaseBusiness :size="15" />Trợ lý công việc
+        </button>
+      </div>
+      <CaseChat
+        v-if="onCase && caseContext"
+        ref="caseChat"
+        :key="caseContext.id"
+        :case-id="caseContext.id"
+        :suggestions="caseContext.suggestions"
+      />
+      <div v-else ref="scroller" class="assistant-body" aria-live="polite">
         <div v-if="!ready" class="assistant-setup">
           <Settings2 :size="26" />
           <strong>Trợ lý chưa được bật</strong>
@@ -187,7 +287,20 @@ watch(
           <template v-for="(turn, index) in turns" :key="index">
             <div v-if="turn.role === 'user'" class="assistant-msg me">{{ turn.content }}</div>
             <div v-else class="assistant-msg bot">
-              <AssistantText :text="turn.content" />
+              <AssistantText :text="turn.content" :items="turn.items" />
+              <div v-if="turn.items?.length" class="assistant-items" aria-label="Mở nhanh">
+                <RouterLink
+                  v-for="item in turn.items.slice(0, 8)"
+                  :key="item.ref"
+                  :to="item.link"
+                  class="assistant-item"
+                  :title="item.title"
+                >
+                  <component :is="ITEM_ICON[item.kind]" :size="14" aria-hidden="true" />
+                  <span>{{ item.title }}</span>
+                  <small>{{ ITEM_KIND[item.kind] }}</small>
+                </RouterLink>
+              </div>
               <p v-if="turn.truncated" class="assistant-note">Câu trả lời bị cắt vì quá dài. Hãy hỏi cụ thể hơn.</p>
               <div v-if="turn.sources?.length" class="assistant-sources">
                 <BookOpen :size="13" />
@@ -213,7 +326,7 @@ watch(
           <p v-if="error" class="assistant-error" role="alert">{{ error }}</p>
         </template>
       </div>
-      <form v-if="ready" class="assistant-input" @submit.prevent="send()">
+      <form v-if="ready && !onCase" class="assistant-input" @submit.prevent="send()">
         <textarea
           ref="input"
           v-model="draft"
@@ -227,7 +340,7 @@ watch(
           <SendHorizontal :size="18" />
         </button>
       </form>
-      <footer v-if="ready" class="assistant-foot">
+      <footer v-if="ready && !onCase" class="assistant-foot">
         <span>Có thể nhầm — đối chiếu văn bản chính thức.</span>
         <span v-if="remaining !== null" :title="`Còn ${remaining} câu hỏi hôm nay`">Còn {{ remaining }} câu</span>
       </footer>

@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
@@ -10,18 +10,20 @@ import {
   ArrowLeft,
   Ban,
   Check,
-  CheckCheck,
   ClipboardCheck,
   Download,
   Eye,
   FileText,
+  Flag,
   GitBranch,
   History,
+  Hourglass,
   Info,
   ListPlus,
   MessagesSquare,
   Paperclip,
   Pencil,
+  Plus,
   RotateCcw,
   Save,
   Undo2,
@@ -30,7 +32,7 @@ import {
   Sparkles,
   Trash2,
   Workflow,
-  XCircle,
+  X,
 } from 'lucide-vue-next'
 import { api } from '../api'
 import { useSession } from '../stores/session'
@@ -58,12 +60,15 @@ import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import SchemaForm from '@dx/web-shared/components/SchemaForm.vue'
 import TaskCreateDialog from '../components/TaskCreateDialog.vue'
 import CaseAiPanel from '../ai/CaseAiPanel.vue'
+import { askAboutCase, caseContext } from '../assistant/state'
 import { useAi } from '../ai/useAi'
 import { OPERATORS } from '../flow/nodes'
 import ProcessCanvas from '../flow/ProcessCanvas.vue'
+import StepAnswerDialog from '../components/StepAnswerDialog.vue'
 import { toast } from '../ui/toast'
-import { previewKind } from '../ui/preview'
+import { isOfficeFile, previewKind } from '../ui/preview'
 import FilePreview from '../components/FilePreview.vue'
+import type { StepFile } from '../flow/ProcessCanvas.vue'
 import { useUnsavedGuard } from '../ui/unsaved'
 const route = useRoute()
 const router = useRouter()
@@ -126,6 +131,8 @@ const fieldEvidence = useQuery({
   queryKey: ['field-evidence', id],
   queryFn: () => api.request<Page<FieldEvidence>>(`/cases/${id}/field-evidence`),
 })
+// The manual form is rarely needed now that AI proposes evidence; it stays one click away.
+const manualEvidence = ref(false)
 const evidenceField = ref('')
 const evidenceFile = ref('')
 const evidencePage = ref(1)
@@ -143,6 +150,7 @@ async function addEvidence() {
         suggested_value: parseValue(evidenceValue.value) }),
     })
     evidenceQuote.value = ''
+    manualEvidence.value = false
     await queryClient.invalidateQueries({ queryKey: ['field-evidence', id] })
   } catch (cause) { error.value = cause } finally { busy.value = false }
 }
@@ -205,8 +213,70 @@ const myTask = computed(() =>
   ),
 )
 /** Process steps may ask for an opinion, or leave out returning / rejecting. */
+// Administrators who chose not to switch the feature on are not reminded on every dossier.
+function readHint() {
+  try {
+    return localStorage.getItem('dx-case-ask-hint') === 'hidden'
+  } catch {
+    return false
+  }
+}
+const askHintHidden = ref(readHint())
+function hideAskHint() {
+  askHintHidden.value = true
+  try {
+    localStorage.setItem('dx-case-ask-hint', 'hidden')
+  } catch {
+    // Without storage the hint only stays hidden on this page.
+  }
+}
+const quickQuestion = ref('')
+function openAsk(question = '') {
+  quickQuestion.value = ''
+  askAboutCase(question)
+}
+/** Questions that fit where the dossier stands and who is looking at it. */
+const askSuggestions = computed(() => {
+  const data = detail.data.value
+  if (!data) return []
+  const mine = data.owner_id === session.user?.id
+  if (data.status === 'draft')
+    return mine
+      ? ['Hồ sơ còn thiếu gì trước khi trình?', 'Tài liệu kèm có khớp với nội dung đã điền không?', 'Tóm tắt hồ sơ này giúp tôi']
+      : ['Tóm tắt hồ sơ này giúp tôi', 'Hồ sơ đề nghị gì, giá trị bao nhiêu?']
+  if (data.status === 'needs_revision')
+    return ['Vì sao hồ sơ bị trả lại, cần sửa gì?', 'Ai đã trả lại và ghi chú gì?', 'Tài liệu kèm có khớp với nội dung đã điền không?']
+  if (['approved', 'rejected', 'cancelled'].includes(data.status))
+    return ['Hồ sơ đã đi qua những bước nào?', 'Ai đã quyết định và lý do là gì?', 'Tóm tắt hồ sơ này giúp tôi']
+  return ['Hồ sơ đang chờ ai xử lý, hạn khi nào?', 'Các bước trước đã có ý kiến gì?', 'Hồ sơ đề nghị gì, giá trị bao nhiêu?']
+})
 const opinion = computed(() => myTask.value?.kind === 'opinion')
 const offers = computed(() => new Set(myTask.value?.options ?? ['approve', 'return', 'reject']))
+const fillingIn = computed(() => ['input', 'acknowledge'].includes(String(myTask.value?.kind)))
+const acknowledging = computed(() => myTask.value?.kind === 'acknowledge')
+const stepDialog = ref<'answer' | 'forward' | null>(null)
+const answering = ref<string | undefined>()
+function fill() {
+  answering.value = 'submit'
+  stepDialog.value = 'answer'
+}
+/** Approving a step that asks for results means handing them in with the answer. */
+function approve() {
+  const step = myTask.value?.step
+  if (step?.result_fields?.length || step?.require_files) {
+    answering.value = 'approve'
+    stepDialog.value = 'answer'
+  } else ask('approve')
+}
+/** Fields this step lets the person correct when they approve. */
+const correctable = computed(() =>
+  (detail.data.value?.form.fields ?? []).filter((field) => myTask.value?.step?.editable_fields?.includes(field.key)),
+)
+const corrections = ref<Record<string, unknown>>({})
+async function stepAnswered() {
+  stepDialog.value = null
+  await refresh()
+}
 const canWithdraw = computed(
   () =>
     detail.data.value?.owner_id === session.user?.id &&
@@ -296,6 +366,17 @@ function askClosing(action: Closing) {
   error.value = null
 }
 const ai = useAi()
+// While this page is open and the feature is on, the assistant offers a tab about this dossier.
+watch(
+  () => [detail.data.value, ai.on('case_qa'), askSuggestions.value] as const,
+  ([data, on, suggestions]) => {
+    caseContext.value = data && on ? { id, title: `${data.code} · ${data.title}`, suggestions } : null
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => {
+  if (caseContext.value?.id === id) caseContext.value = null
+})
 const drafting = ref(false)
 /** Let AI draft the approval note or return reason; the person edits it before confirming. */
 async function draftReason() {
@@ -368,6 +449,21 @@ function userName(userId?: string) {
     (userId ? userId.slice(0, 8) : '—')
   )
 }
+// Arriving from the list's "Continue" or "Submit" buttons opens that action once the dossier is loaded.
+let actionDone = false
+watch(
+  () => detail.data.value,
+  (data) => {
+    if (actionDone || !data || !canEdit.value) return
+    const action = route.query.action
+    if (action !== 'edit' && action !== 'submit') return
+    actionDone = true
+    void router.replace({ query: { ...route.query, action: undefined } })
+    if (action === 'edit') startEdit()
+    else ask('submit')
+  },
+  { immediate: true },
+)
 function startEdit() {
   if (!detail.data.value) return
   editTitle.value = detail.data.value.title
@@ -421,6 +517,15 @@ function ask(action: typeof confirmation.value) {
   error.value = null
   intent.value = newIntent()
 }
+function changedCorrections() {
+  const values: Record<string, unknown> = {}
+  for (const field of correctable.value) {
+    const value = corrections.value[field.key]
+    if (value === undefined || value === '') continue
+    values[field.key] = field.type === 'number' ? Number(value) : value
+  }
+  return values
+}
 const DONE = {
   submit: 'Đã chuyển hồ sơ đi duyệt',
   approve: 'Đã phê duyệt hồ sơ',
@@ -452,6 +557,7 @@ async function confirm() {
           expected_revision: myTask.value.revision,
           decision: confirmation.value,
           reason: reason.value,
+          values: confirmation.value === 'approve' ? changedCorrections() : {},
         } satisfies components['schemas']['DecisionInput']),
       })
     toast.success(DONE[confirmation.value ?? 'submit'])
@@ -485,6 +591,15 @@ async function downloadAttachment(fileId: string, submissionId?: string) {
 }
 // Submitted files open at the exact version that was submitted.
 const preview = ref<{ fileId: string; name: string; submissionId?: string } | null>(null)
+/** A file picked on the process tab: office documents in the editor (read-only), others in the viewer. */
+function openStepFile(file: StepFile, submissionId: string | null) {
+  if (isOfficeFile(file.name)) {
+    const target = router.resolve({ path: `/drive/${file.id}/edit`, query: { case: id } })
+    window.open(target.href, '_blank', 'noopener')
+    return
+  }
+  preview.value = { fileId: file.id, name: file.name, submissionId: submissionId ?? undefined }
+}
 function eventLabel(event: HistoryEvent) {
   const actions: Record<string, string> = {
     'case.created': 'Đã tạo hồ sơ',
@@ -502,6 +617,27 @@ function eventLabel(event: HistoryEvent) {
 function taskState(task: ApprovalTask) {
   return task.state || task.status || 'pending'
 }
+const DECISION_TEXT: Record<string, string> = { approve: 'Đã duyệt', return: 'Trả lại', reject: 'Từ chối' }
+const progress = computed(() => {
+  const value = detail.data.value
+  if (!value) return { tone: '', text: '' }
+  const waiting = value.approval_tasks.filter(
+    (task) => !task.decision && ['pending', 'waiting'].includes(taskState(task)),
+  )
+  if (value.status === 'approved') return { tone: 'ok', text: 'Đã phê duyệt' }
+  if (value.status === 'rejected') return { tone: 'bad', text: 'Bị từ chối' }
+  if (value.status === 'cancelled') return { tone: '', text: 'Đã hủy' }
+  if (value.status === 'needs_revision') return { tone: 'warn', text: 'Bị trả lại, chờ người lập sửa' }
+  if (value.status === 'draft') return { tone: '', text: 'Bản nháp, chưa trình' }
+  if (waiting.length)
+    return {
+      tone: 'wait',
+      text:
+        'Đang chờ ' +
+        waiting.map((task) => task.assignee_name || userName(task.assignee_id)).join(', '),
+    }
+  return { tone: 'wait', text: 'Đang xử lý' }
+})
 const { confirmDiscard } = useUnsavedGuard(dirty)
 function parseValue(text: string): unknown {
   const value = text.trim()
@@ -552,7 +688,7 @@ function moveTab(step: number) {
         :size="14"
         style="vertical-align: middle; margin-right: 5px"
       />Hồ sơ</RouterLink
-    ><span>/</span
+    ><span aria-hidden="true">/</span
     ><span>{{ detail.data.value?.code || 'Chi tiết hồ sơ' }}</span>
   </div>
   <StatePanel
@@ -564,7 +700,6 @@ function moveTab(step: number) {
   <template v-if="detail.data.value">
     <header class="page-head">
       <div>
-        <span class="eyebrow">Mã hồ sơ {{ detail.data.value.code }}</span>
         <h1>{{ detail.data.value.title }}</h1>
         <div class="case-subline">
           <StatusBadge :status="detail.data.value.status" /><span v-if="detail.data.value.archived_at" class="tag"
@@ -575,7 +710,9 @@ function moveTab(step: number) {
         </div>
       </div>
       <div v-if="!editing" class="page-actions">
-        <button class="button secondary" @click="discuss">
+        <button v-if="ai.on('case_qa')" class="button ai-ask" @click="openAsk()">
+          <Sparkles :size="16" />Hỏi AI về hồ sơ</button
+        ><button class="button secondary" @click="discuss">
           <MessagesSquare :size="16" />Trao đổi</button
         ><button
           v-if="session.can('tasks.create')"
@@ -635,65 +772,70 @@ function moveTab(step: number) {
       >
     </div>
     <section class="card case-progress">
-      <div class="processing-rail" aria-label="Tiến trình xử lý">
-        <div class="rail-step done">
-          <span class="rail-circle"><Check :size="14" /></span>
+      <header class="progress-head">
+        <strong>Tiến trình xử lý</strong>
+        <span class="progress-summary" :class="progress.tone">{{ progress.text }}</span>
+      </header>
+      <ol class="processing-rail" aria-label="Tiến trình xử lý">
+        <li class="rail-step done">
+          <span class="rail-circle"><Check :size="15" /></span>
           <div class="rail-content">
-            <strong>Tạo hồ sơ</strong
-            ><small>{{ userName(detail.data.value.owner_id) }}</small
-            ><small>{{ formatDate(detail.data.value.created_at) }}</small>
+            <strong>Tạo hồ sơ</strong>
+            <small class="rail-person">{{ userName(detail.data.value.owner_id) }}</small>
+            <small class="rail-time">{{ formatDate(detail.data.value.created_at) }}</small>
           </div>
-        </div>
-        <div
+        </li>
+        <li
           v-for="task in detail.data.value.approval_tasks"
           :key="task.id"
           class="rail-step"
           :class="{
-            done: !!task.decision,
-            current: ['pending', 'waiting'].includes(taskState(task)),
+            done: task.decision === 'approve',
+            returned: task.decision === 'return',
+            rejected: task.decision === 'reject',
+            current: !task.decision && ['pending', 'waiting'].includes(taskState(task)),
+          }"
+          :aria-current="!task.decision && ['pending', 'waiting'].includes(taskState(task)) ? 'step' : undefined"
+        >
+          <span class="rail-circle"
+            ><Check v-if="task.decision === 'approve'" :size="15" /><RotateCcw
+              v-else-if="task.decision === 'return'"
+              :size="14" /><X v-else-if="task.decision === 'reject'" :size="15" /><Hourglass
+              v-else-if="['pending', 'waiting'].includes(taskState(task))"
+              :size="14" /><span v-else class="rail-dot"
+          /></span>
+          <div class="rail-content">
+            <strong>{{ task.label || task.step_label || 'Phê duyệt' }}</strong>
+            <small class="rail-person">{{ task.assignee_name || userName(task.assignee_id) }}</small>
+            <small class="rail-time">{{
+              task.decided_at
+                ? `${DECISION_TEXT[task.decision ?? ''] ?? 'Đã xử lý'} · ${formatDate(task.decided_at)}`
+                : 'Đang chờ quyết định'
+            }}</small>
+          </div>
+        </li>
+        <li
+          class="rail-step final"
+          :class="{
+            done: detail.data.value.status === 'approved',
+            rejected: detail.data.value.status === 'rejected',
           }"
         >
           <span class="rail-circle"
-            ><Check
-              v-if="task.decision === 'approve'"
-              :size="14"
-            /><RotateCcw
-              v-else-if="task.decision === 'return'"
-              :size="12"
-            /><XCircle
-              v-else-if="task.decision === 'reject'"
-              :size="12"
-            /><span v-else>•</span></span
-          >
+            ><X v-if="detail.data.value.status === 'rejected'" :size="15" /><Flag v-else :size="14"
+          /></span>
           <div class="rail-content">
-            <strong>{{
-              task.label || task.step_label || 'Phê duyệt'
-            }}</strong
-            ><small>{{
-              task.assignee_name || userName(task.assignee_id)
-            }}</small
-            ><small>{{
-              task.decided_at
-                ? formatDate(task.decided_at)
-                : 'Chờ quyết định'
-            }}</small>
-          </div>
-        </div>
-        <div
-          class="rail-step"
-          :class="{ done: detail.data.value.status === 'approved' }"
-        >
-          <span class="rail-circle"><CheckCheck :size="13" /></span>
-          <div class="rail-content">
-            <strong>Hoàn tất</strong
-            ><small>{{
+            <strong>Hoàn tất</strong>
+            <small class="rail-time">{{
               detail.data.value.status === 'approved'
                 ? 'Đã phê duyệt'
-                : 'Sau khi đủ quyết định'
+                : detail.data.value.status === 'rejected'
+                  ? 'Bị từ chối'
+                  : 'Sau khi đủ quyết định'
             }}</small>
           </div>
-        </div>
-      </div>
+        </li>
+      </ol>
     </section>
     <div class="tabs case-tabs" role="tablist" aria-label="Nội dung hồ sơ">
       <button
@@ -714,7 +856,7 @@ function moveTab(step: number) {
         }}<span v-if="item.count" class="tab-count">{{ item.count }}</span>
       </button>
     </div>
-    <div class="split">
+    <div class="split" :class="{ 'split-full': tab === 'process' }">
       <div
         :id="`case-panel-${tab}`"
         class="stack"
@@ -822,8 +964,20 @@ function moveTab(step: number) {
                 Điền {{ confirmedEvidence.length }} giá trị đã xác nhận vào biểu mẫu
               </button></header>
             <div class="card-body">
-              <p class="muted">Ghi lại một giá trị lấy từ trang nào của tài liệu để người duyệt dễ đối chiếu. Chỉ người tạo hồ sơ xác nhận; việc xác nhận không tự sửa biểu mẫu.</p>
-              <div v-if="canEdit" class="form-grid">
+              <p class="muted">
+                Mỗi giá trị trong biểu mẫu có thể kèm căn cứ: lấy từ trang nào, câu nào của tài liệu đính kèm, để người duyệt
+                đối chiếu. Đề xuất do AI đọc tài liệu hiện ở đây để bạn xác nhận; việc xác nhận không tự sửa biểu mẫu.
+              </p>
+              <button
+                v-if="canEdit && !manualEvidence"
+                type="button"
+                class="button ghost small"
+                style="justify-self: start; margin-bottom: 10px"
+                @click="manualEvidence = true"
+              >
+                <Plus :size="15" />Thêm căn cứ thủ công
+              </button>
+              <div v-if="canEdit && manualEvidence" class="form-grid">
                 <div class="field"><label for="evidence-field">Mục trong biểu mẫu</label><select id="evidence-field" v-model="evidenceField"><option value="">Chọn mục</option><option v-for="field in detail.data.value.form.fields" :key="field.key" :value="field.key">{{ field.label }}</option></select></div>
                 <div class="field"><label for="evidence-file">Tài liệu gốc</label><select id="evidence-file" v-model="evidenceFile"><option value="">Chọn tài liệu</option><option v-for="file in detail.data.value.files" :key="file.id" :value="file.id">{{ file.name }}</option></select></div>
                 <div class="field"><label for="evidence-page">Trang</label><input id="evidence-page" v-model.number="evidencePage" type="number" min="1" /></div>
@@ -860,7 +1014,7 @@ function moveTab(step: number) {
               <select
                 v-model="selectedSubmission"
                 aria-label="Chọn lần trình"
-                style="width: auto; min-height: 34px; font-size: 13px"
+                style="width: auto; min-height: 34px; font-size: 14px"
               >
                 <option
                   v-for="item in detail.data.value.submissions"
@@ -935,14 +1089,14 @@ function moveTab(step: number) {
                   <p
                     v-if="typeof event.detail === 'string'"
                     class="muted"
-                    style="font-size: 13px; margin-top: 5px"
+                    style="font-size: 14px; margin-top: 5px"
                   >
                     {{ event.detail }}
                   </p>
                   <p
                     v-else-if="event.detail?.reason"
                     class="muted"
-                    style="font-size: 13px; margin-top: 5px"
+                    style="font-size: 14px; margin-top: 5px"
                   >
                     {{ event.detail.reason }}
                   </p>
@@ -960,6 +1114,7 @@ function moveTab(step: number) {
           :status="detail.data.value.status"
           :form-id="detail.data.value.form.id"
           :form-name="detail.data.value.form.name"
+          @open="openStepFile"
         />
         <section v-if="tab === 'route'" class="card">
           <header class="card-header"><h2>Vì sao hồ sơ được chuyển đến những người này?</h2></header>
@@ -992,7 +1147,42 @@ function moveTab(step: number) {
           </div>
         </section>
       </div>
-      <aside class="stack" style="align-content: start">
+      <aside v-if="tab !== 'process'" class="stack" style="align-content: start">
+        <section v-if="ai.on('case_qa')" class="card case-ask-card" aria-label="Hỏi đáp về hồ sơ">
+          <header class="card-header">
+            <h3><Sparkles :size="16" /> Hỏi đáp về hồ sơ</h3>
+          </header>
+          <div class="card-body">
+            <p class="muted">
+              Hỏi AI về hồ sơ bạn đang làm: nội dung, tài liệu kèm, đang chờ ai, ý kiến từng bước.
+            </p>
+            <form class="case-ask-form" @submit.prevent="openAsk(quickQuestion)">
+              <input
+                v-model="quickQuestion"
+                maxlength="1000"
+                placeholder="Nhập câu hỏi…"
+                aria-label="Câu hỏi về hồ sơ"
+              /><button class="button small ai-ask" :disabled="quickQuestion.trim().length < 2">Hỏi</button>
+            </form>
+            <div class="case-ask-chips">
+              <button v-for="item in askSuggestions" :key="item" type="button" @click="openAsk(item)">
+                {{ item }}
+              </button>
+            </div>
+          </div>
+        </section>
+        <div
+          v-else-if="session.can('assistant.manage') && ai.status.data.value && !askHintHidden"
+          class="notice case-ask-hint"
+        >
+          <Sparkles :size="18" /><span
+            >Hỏi đáp AI về hồ sơ chưa bật.
+            <RouterLink to="/assistant?tab=features">Bật “Hỏi đáp về hồ sơ”</RouterLink> để mọi người hỏi AI ngay
+            trên trang hồ sơ. <small class="muted">Chỉ người quản trị AI thấy dòng này.</small></span
+          ><button class="icon-button" type="button" aria-label="Ẩn gợi ý này" title="Ẩn" @click="hideAskHint">
+            <X :size="15" />
+          </button>
+        </div>
         <section class="card">
           <header class="card-header"><h3>Tóm tắt</h3></header>
           <dl class="detail-meta card-body">
@@ -1039,13 +1229,21 @@ function moveTab(step: number) {
           ><small v-if="myTask.instructions" class="sticky-note">{{ myTask.instructions }}</small></span
         ></span
       >
-      <button v-if="offers.has('return')" class="button secondary" @click="ask('return')">
-        <RotateCcw :size="15" />Trả lại</button
-      ><button v-if="offers.has('reject')" class="button danger" @click="ask('reject')">
-        {{ opinion ? 'Không đồng ý' : 'Từ chối' }}</button
-      ><button class="button" @click="ask('approve')">
-        <Check :size="16" />{{ opinion ? 'Đồng ý' : 'Phê duyệt' }}
+      <button v-if="myTask.step?.allow_forward" class="button secondary" @click="stepDialog = 'forward'">
+        <Send :size="15" />Chuyển người xử lý
       </button>
+      <button v-if="fillingIn" class="button" @click="fill">
+        <Pencil :size="16" />{{ acknowledging ? 'Xác nhận đã đọc' : 'Nhập thông tin' }}
+      </button>
+      <template v-else>
+        <button v-if="offers.has('return')" class="button secondary" @click="ask('return')">
+          <RotateCcw :size="15" />Trả lại</button
+        ><button v-if="offers.has('reject')" class="button danger" @click="ask('reject')">
+          {{ opinion ? 'Không đồng ý' : 'Từ chối' }}</button
+        ><button class="button" @click="approve">
+          <Check :size="16" />{{ opinion ? 'Đồng ý' : 'Phê duyệt' }}
+        </button>
+      </template>
     </div>
     <div v-else-if="canEdit" class="sticky-actions" role="region" aria-label="Bản nháp">
       <span
@@ -1062,6 +1260,7 @@ function moveTab(step: number) {
       </button>
     </div>
   </template>
+  <StepAnswerDialog v-if="stepDialog && myTask" :task="myTask" :mode="stepDialog" :decision="answering" @close="stepDialog = null" @done="stepAnswered" />
   <ModalDialog
     v-if="confirmation"
     :title="
@@ -1131,6 +1330,18 @@ function moveTab(step: number) {
                     : 'Quyết định từ chối được lưu lại cùng hồ sơ và lý do.'
             }}
           </p>
+          <template v-if="confirmation === 'approve' && correctable.length">
+            <span class="section-label">Bước này cho phép sửa</span>
+            <div v-for="field in correctable" :key="field.key" class="field">
+              <label :for="`correct-${field.key}`">{{ field.label }}</label>
+              <input
+                :id="`correct-${field.key}`"
+                v-model="corrections[field.key]"
+                :type="field.type === 'number' ? 'number' : 'text'"
+                :placeholder="String(detail.data.value?.payload[field.key] ?? '')"
+              />
+            </div>
+          </template>
           <div class="field">
             <label for="decision-reason"
               >{{

@@ -403,6 +403,10 @@ async function validate() {
         </div>
       </header>
       <main class="console-content">
+        <p class="console-scope-note">
+          Công cụ kỹ thuật cho quản trị nền tảng. Người dùng nghiệp vụ làm việc ở Desktiny; nhật ký "ai làm gì"
+          của nghiệp vụ xem ở <strong>Thiết lập › Nhật ký hoạt động</strong> trong Desktiny.
+        </p>
         <header class="page-head">
           <div>
             <span class="eyebrow">APPLICATION / {{ me.application }}</span>

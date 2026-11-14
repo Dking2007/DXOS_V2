@@ -12,8 +12,8 @@ from dx_platform.errors import AppError
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from . import ai_core, ai_index, processes
-from .automations import deliver_webhook, dispatch, resume
+from . import ai_core, ai_index, flow_actions, processes
+from .automations import deliver_webhook, dispatch, needs_engine, resume
 from .config import get_settings
 from .core_client import CoreClient
 from .models import (
@@ -102,6 +102,7 @@ def sync_tasks(db: Session, core: CoreClient, submission: Submission):
                 label=step["label"],
                 core_task_id=item["id"],
                 core_revision=item.get("revision", 1),
+                due_at=utcnow() + timedelta(hours=step["due_hours"]) if step.get("due_hours") else None,
             )
             db.add(task)
             db.flush()
@@ -175,8 +176,8 @@ def complete_approval(db: Session, core: CoreClient, task_id: str):
         return
     if task.state != "syncing" or not task.core_task_id:
         raise AppError(409, "approval_not_syncing", "Quyết định không ở trạng thái chờ đồng bộ.")
-    submission = db.get(Submission, task.submission_id)
-    case = db.get(Case, task.case_id)
+    submission = db.get(Submission, task.submission_id) if task.submission_id else None
+    case = db.get(Case, task.case_id) if task.case_id else None
     core.post(
         f"/human-tasks/{task.core_task_id}/complete",
         {
@@ -306,16 +307,22 @@ def process_once(engine, settings, core=None) -> bool:
             elif job.kind == "case.withdraw":
                 withdraw_case(db, core, job.aggregate_id)
             elif job.kind == "automation.dispatch":
-                dispatch(db, job.payload)
+                dispatch(db, job.payload, core)
                 processes.on_task_event(db, core, job.payload)
             elif job.kind == "automation.webhook":
                 deliver_webhook(db, settings, job.payload)
             elif job.kind == "automation.resume":
                 run = db.get(AutomationRun, job.payload["run_id"])
-                if run and run.submission_id:
+                if run and (run.submission_id or needs_engine(run.graph or {})):
                     processes.resume(db, core, job.payload)
                 else:
                     resume(db, job.payload)
+            elif job.kind == "automation.http":
+                processes.on_http(db, core, settings, job.payload)
+            elif job.kind == "automation.email":
+                flow_actions.deliver_email(settings, job.payload)
+            elif job.kind == "process.overdue":
+                processes.on_overdue(db, core, job.payload)
             elif job.kind == "ai.index":
                 ai_index.run_job(db, settings, core, job.payload)
             else:
