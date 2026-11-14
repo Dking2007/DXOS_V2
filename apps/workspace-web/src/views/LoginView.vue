@@ -12,11 +12,24 @@ const route = useRoute()
 // The sector pack in force may name the organisation, change the titles and the ground.
 const entry = computed(() => appearance.value?.login ?? {})
 const style = computed(() => entry.value.style ?? 'framed')
-const ground = computed(() =>
-  style.value === 'image' && entry.value.background_url
-    ? { backgroundImage: `linear-gradient(160deg, rgba(8, 22, 52, 0.78), rgba(8, 22, 52, 0.55)), url("${entry.value.background_url}")` }
-    : undefined,
-)
+const effects = computed(() => entry.value.effects !== false)
+// The pack's ground colours, as CSS variables the styles below read; the photo is tinted with them.
+const ground = computed(() => {
+  const from = entry.value.ground || null
+  const to = entry.value.ground_to || from
+  const result: Record<string, string> = {}
+  if (from && to) {
+    result['--ground-from'] = from
+    result['--ground-to'] = to
+  }
+  if (style.value === 'image' && entry.value.background_url) {
+    const tint = from && to
+      ? `color-mix(in srgb, ${from} 80%, transparent), color-mix(in srgb, ${to} 58%, transparent)`
+      : 'rgba(8, 22, 52, 0.78), rgba(8, 22, 52, 0.55)'
+    result.backgroundImage = `linear-gradient(160deg, ${tint}), url("${entry.value.background_url}")`
+  }
+  return result
+})
 const busy = ref(false)
 function login() {
   busy.value = true
@@ -44,9 +57,13 @@ const SPECKS = [
 </script>
 
 <template>
-  <main class="entry" :class="`entry-${style}`" :style="ground">
-    <div v-if="style === 'framed'" class="entry-light" aria-hidden="true" />
-    <div v-if="style === 'framed'" class="entry-specks" aria-hidden="true">
+  <main
+    class="entry"
+    :class="[`entry-${style}`, { 'has-ground': !!entry.ground, 'entry-still': !effects }]"
+    :style="ground"
+  >
+    <div v-if="style === 'framed' && effects" class="entry-light" aria-hidden="true" />
+    <div v-if="style === 'framed' && effects" class="entry-specks" aria-hidden="true">
       <i
         v-for="(speck, index) in SPECKS"
         :key="index"
@@ -112,13 +129,15 @@ const SPECKS = [
           @click="login"
         >
           <span>{{
-            busy ? 'Đang chuyển tới trang đăng nhập…' : 'Đăng nhập bằng SSO'
+            busy ? 'Đang chuyển tới trang đăng nhập…' : entry.button_label || 'Đăng nhập bằng SSO'
           }}</span>
           <ChevronRight :size="20" aria-hidden="true" />
         </button>
         <p class="entry-note">
-          Đăng nhập bằng tài khoản của tổ chức. {{ brand.name }} không lưu mật khẩu của
-          bạn.
+          <template v-if="entry.note">{{ entry.note }}</template
+          ><template v-else
+            >Đăng nhập bằng tài khoản của tổ chức. {{ brand.name }} không lưu mật khẩu của bạn.</template
+          >
         </p>
       </div>
     </section>
@@ -130,9 +149,28 @@ const SPECKS = [
 .entry.entry-flat {
   background: linear-gradient(160deg, var(--teal-strong, #16304f), var(--teal, #1e3a5f));
 }
+/* A pack's own ground colours, for "framed" and "flat" (the photo is tinted in the script). */
+.entry.has-ground:not(.entry-image) {
+  background:
+    radial-gradient(90% 70% at 50% 110%, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0) 70%),
+    linear-gradient(160deg, var(--ground-from) 0%, var(--ground-to) 100%);
+}
 .entry.entry-image {
   background-size: cover;
   background-position: center;
+}
+/* Effects switched off by the pack: everything stands still, as for reduced motion. */
+.entry-still .entry-frame,
+.entry-still .entry-corner rect,
+.entry-still .entry-emblem::after,
+.entry-still .entry-emblem-ring::before,
+.entry-still .entry-button::before,
+.entry-still .entry-title {
+  animation: none;
+}
+.entry-still .entry-corner path {
+  animation: none;
+  stroke-dashoffset: 0;
 }
 .entry-emblem-core.has-logo {
   overflow: hidden;

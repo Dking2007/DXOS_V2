@@ -64,7 +64,7 @@ mỗi tệp văn bản 2 MB. Đường dẫn tuyệt đối hoặc có `..` bị
 | `font` | `source-sans-3` (mặc định), `be-vietnam-pro` | Phông đã đóng gói sẵn, không nhận URL. |
 | `density` | `comfortable`, `compact` | |
 | `radius` | `small`, `medium`, `large` | |
-| `login` | `{ "style": "framed" \| "flat" \| "image", "title", "subtitle", "background" }` | `image` cần `background` (PNG/JPEG/WebP ≤ 2 MB). |
+| `login` | `{ "style": "framed" \| "flat" \| "image", "title", "subtitle", "background", "ground", "ground_to", "button_label", "note", "effects" }` | `image` cần `background` (PNG/JPEG/WebP ≤ 2 MB). `ground`/`ground_to`: màu nền `#rrggbb` (trên → dưới; với `image` là lớp phủ lên ảnh), chữ trắng trên nền phải đạt tương phản ≥ 4,5:1. `button_label` (≤ 40), `note` (≤ 200): chữ trên nút và dòng dưới nút. `effects: false` tắt chuyển động của kiểu `framed`. Bỏ trống thì giữ như mặc định. |
 | `terminology` | `{ "Hồ sơ": "Hồ sơ học vụ" }`, ≤ 60 cặp | Đổi chữ hiển thị ở menu, tiêu đề trang, trang chủ (cả dạng viết hoa đầu và thường). Không đổi dữ liệu, đường dẫn, API. |
 | `menu.hide` | `tasks`, `cases`, `chat`, `feed`, `drive`, `reports` | Không ẩn được trang chủ, phê duyệt, phần quản trị. |
 | `menu.order` | khoá trong `home, tasks, approvals, cases, chat, feed, drive, reports, processes, assistant, plugins, packs, settings` | Phân hệ không nêu giữ chỗ sau các phân hệ được nêu. |

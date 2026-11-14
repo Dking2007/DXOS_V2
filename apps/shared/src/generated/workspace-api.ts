@@ -4161,6 +4161,25 @@ export interface components {
             subtitle: string;
             /** Background */
             background?: string | null;
+            /** Ground */
+            ground?: string | null;
+            /** Ground To */
+            ground_to?: string | null;
+            /**
+             * Button Label
+             * @default
+             */
+            button_label: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /**
+             * Effects
+             * @default true
+             */
+            effects: boolean;
         };
         /** ManualRun */
         ManualRun: {

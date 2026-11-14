@@ -23,6 +23,13 @@ export interface AppearanceLook {
     subtitle?: string
     background?: string | null
     background_url?: string | null
+    /** Ground colours of the gradient (top, bottom); empty keeps the stock look. */
+    ground?: string | null
+    ground_to?: string | null
+    button_label?: string
+    note?: string
+    /** Light, specks and moving frame of the "framed" style. */
+    effects?: boolean
   }
   terminology?: Record<string, string>
   menu?: { hide?: string[]; order?: string[] }

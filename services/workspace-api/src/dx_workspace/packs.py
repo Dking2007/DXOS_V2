@@ -133,11 +133,29 @@ def parse_version(text: str) -> tuple[int, ...]:
 # ---- Manifest ---------------------------------------------------------------------------
 
 
+# The login page writes light lettering (this colour) on its ground; a pack's ground must keep it readable.
+LOGIN_INK = "#e8eef8"
+
+
 class LoginLook(s.Input):
     style: Literal["framed", "flat", "image"] = "framed"
     title: str = Field(default="", max_length=120)
     subtitle: str = Field(default="", max_length=160)
     background: str | None = Field(default=None, max_length=200)
+    # Ground colours (top → bottom of the gradient); empty keeps the stock deep blue, or the main colour for "flat".
+    ground: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+    ground_to: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+    button_label: str = Field(default="", max_length=40)
+    note: str = Field(default="", max_length=200)
+    # Drifting light, specks and the animated corner frame of the "framed" style.
+    effects: bool = True
+
+    @model_validator(mode="after")
+    def readable(self):
+        for name, value in (("Màu nền", self.ground), ("Màu nền (cuối)", self.ground_to)):
+            if value and contrast(LOGIN_INK, value) < 4.5:
+                raise ValueError(f"{name} trang đăng nhập quá sáng: chữ trắng trên nền đó khó đọc (cần tương phản ≥ 4,5:1).")
+        return self
 
 
 class MenuLook(s.Input):

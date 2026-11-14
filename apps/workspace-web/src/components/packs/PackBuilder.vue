@@ -10,7 +10,7 @@ import { ArrowDown, ArrowUp, Check, ImagePlus, Moon, Plus, Save, Sun, Trash2, X 
 import { api } from '../../api'
 import { errorText } from '@dx/web-shared/api.ts'
 import type { Page } from '@dx/web-shared/api.ts'
-import { DEFAULT_COLORS, contrastReport, term } from '../../ui/appearance'
+import { DEFAULT_COLORS, contrast, contrastReport, term } from '../../ui/appearance'
 import type { AppearanceLook } from '../../ui/appearance'
 import { NAV_GROUPS } from '../../ui/nav'
 import { toast } from '../../ui/toast'
@@ -72,7 +72,26 @@ const form = reactive({
     title: look.login?.title ?? '',
     subtitle: look.login?.subtitle ?? '',
     background: look.login?.background ?? null,
+    ground: look.login?.ground ?? null,
+    ground_to: look.login?.ground_to ?? null,
+    button_label: look.login?.button_label ?? '',
+    note: look.login?.note ?? '',
+    effects: look.login?.effects !== false,
   },
+})
+// The login page writes light lettering (#e8eef8) on its ground: a ground must keep it readable.
+const LOGIN_INK = '#e8eef8'
+const STOCK_GROUND = { from: '#183670', to: '#081634' }
+const loginGroundIssue = computed(() =>
+  [form.login.ground, form.login.ground_to].some((value) => value && contrast(LOGIN_INK, value) < 4.5)
+    ? 'Màu nền trang đăng nhập quá sáng: chữ trắng khó đọc (cần tương phản ≥ 4,5:1).'
+    : '',
+)
+const loginPreview = computed(() => {
+  const from = form.login.ground || null
+  const to = form.login.ground_to || from
+  if (!withLook.value || !from || !to) return undefined
+  return { background: `linear-gradient(160deg, ${from}, ${to})` }
 })
 const colors = reactive({ light: { ...(look.colors?.light ?? {}) }, dark: { ...(look.colors?.dark ?? {}) } })
 const terms = ref<{ from: string; to: string }[]>(
@@ -199,6 +218,10 @@ async function save() {
   error.value = null
   if (withLook.value && failing.value.length) {
     error.value = new Error('Còn cặp màu khó đọc; chỉnh lại trước khi lưu.')
+    return
+  }
+  if (withLook.value && loginGroundIssue.value) {
+    error.value = new Error(loginGroundIssue.value)
     return
   }
   busy.value = true
@@ -421,6 +444,49 @@ const previewLinks = computed(() =>
                 ><input id="login-sub" v-model="form.login.subtitle" maxlength="160" placeholder="E-OFFICE · KHÔNG GIAN NỘI BỘ" />
               </div>
             </div>
+            <div class="form-grid">
+              <div class="field">
+                <label for="login-button">Chữ trên nút</label
+                ><input id="login-button" v-model="form.login.button_label" maxlength="40" placeholder="Đăng nhập bằng SSO" />
+              </div>
+              <div class="field">
+                <label for="login-note">Dòng ghi chú dưới nút</label
+                ><input
+                  id="login-note"
+                  v-model="form.login.note"
+                  maxlength="200"
+                  placeholder="Đăng nhập bằng tài khoản của tổ chức…"
+                />
+              </div>
+            </div>
+            <div class="pack-login-ground">
+              <span class="section-label">Màu nền{{ form.login.style === 'image' ? ' (phủ lên ảnh)' : '' }}</span>
+              <span v-for="key in ['ground', 'ground_to'] as const" :key="key" class="pack-color">
+                <input
+                  type="color"
+                  :value="form.login[key] || (key === 'ground' ? STOCK_GROUND.from : STOCK_GROUND.to)"
+                  :aria-label="key === 'ground' ? 'Màu nền trên' : 'Màu nền dưới'"
+                  @input="form.login[key] = ($event.target as HTMLInputElement).value"
+                /><code :class="{ muted: !form.login[key] }">{{
+                  form.login[key] || (key === 'ground' ? 'mặc định' : 'như màu trên')
+                }}</code
+                ><button
+                  v-if="form.login[key]"
+                  class="icon-button"
+                  type="button"
+                  aria-label="Về màu mặc định"
+                  title="Về màu mặc định"
+                  @click="form.login[key] = null"
+                >
+                  <X :size="13" />
+                </button>
+              </span>
+              <small v-if="loginGroundIssue" class="overdue-text">{{ loginGroundIssue }}</small>
+            </div>
+            <label v-if="form.login.style === 'framed'" class="checkbox-label"
+              ><input v-model="form.login.effects" type="checkbox" /> Hiệu ứng chuyển động (ánh sáng, hạt sáng, khung vẽ
+              dần)</label
+            >
             <div v-if="form.login.style === 'image'" class="pack-asset">
               <span class="pack-asset-box wide"
                 ><img v-if="assetUrls.background" :src="assetUrls.background" alt="" /><ImagePlus v-else :size="20"
@@ -562,7 +628,7 @@ const previewLinks = computed(() =>
             </div>
           </div>
         </div>
-        <div class="pv-login" :class="`pv-login-${form.login.style}`">
+        <div class="pv-login" :class="`pv-login-${form.login.style}`" :style="loginPreview">
           <span class="pv-mark round"
             ><img v-if="withLook && assetUrls.logo" :src="assetUrls.logo" alt="" /><template v-else>{{
               previewName.charAt(0)
@@ -571,7 +637,8 @@ const previewLinks = computed(() =>
           <small>{{ previewName.toLocaleUpperCase('vi') }}</small>
           <b>{{ (withLook && form.login.title) || 'Hệ thống văn phòng điện tử' }}</b>
           <small>{{ (withLook && form.login.subtitle) || 'E-OFFICE · KHÔNG GIAN NỘI BỘ' }}</small>
-          <span class="pv-login-button">Đăng nhập bằng SSO</span>
+          <span class="pv-login-button">{{ (withLook && form.login.button_label) || 'Đăng nhập bằng SSO' }}</span>
+          <small v-if="withLook && form.login.note" class="pv-login-note">{{ form.login.note }}</small>
         </div>
       </aside>
     </div>
@@ -963,6 +1030,17 @@ legend {
 }
 .pv-login b {
   font-size: 14px;
+}
+.pv-login-note {
+  margin-top: 4px;
+  opacity: 0.8;
+}
+.pack-login-ground {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  margin: 10px 0;
 }
 .pv-login-button {
   margin-top: 6px;

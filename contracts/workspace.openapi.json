@@ -12587,6 +12587,47 @@
               }
             ],
             "title": "Background"
+          },
+          "ground": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ground"
+          },
+          "ground_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ground To"
+          },
+          "button_label": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Button Label",
+            "default": ""
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Note",
+            "default": ""
+          },
+          "effects": {
+            "type": "boolean",
+            "title": "Effects",
+            "default": true
           }
         },
         "additionalProperties": false,

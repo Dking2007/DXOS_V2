@@ -219,3 +219,13 @@ def test_the_organisation_builds_its_own_pack_exports_it_and_it_installs_elsewhe
         API + "/packs/preview", files={"file": ("p.zip", exported.content, "application/zip")}
     ).json()
     assert preview["conflicts"] and preview["appearance"]["app_name"] == "Văn phòng số Mẫu"
+
+
+def test_a_pack_can_restyle_the_login_page_but_not_make_it_unreadable():
+    look = packs.LoginLook(style="flat", ground="#123456", ground_to="#0a1a2a", button_label="Vào hệ thống",
+                           note="Dùng tài khoản một cửa.", effects=False)  # fmt: skip
+    assert look.button_label == "Vào hệ thống" and look.effects is False
+    assert packs.LoginLook().effects is True and packs.LoginLook().ground is None  # old packs keep the stock page
+    for bad in ({"ground": "#f5f5f5"}, {"ground_to": "#ffee88"}, {"ground": "blue"}, {"button_label": "x" * 41}):
+        with pytest.raises(ValueError):
+            packs.LoginLook(**bad)
