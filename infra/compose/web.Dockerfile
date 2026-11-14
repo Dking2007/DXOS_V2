@@ -5,8 +5,10 @@ ARG APP
 WORKDIR /app
 COPY package*.json ./
 COPY apps ./apps
-# The type check reads the core pack's templates (flow/nodes.test.ts); only the build stage needs them.
+# The type check reads the core pack's templates (flow/nodes.test.ts) and the sample plugin's
+# manifest (flow/pluginNodes.test.ts); only the build stage needs them.
 COPY packs ./packs
+COPY examples/plugins ./examples/plugins
 RUN npm ci
 RUN npm run build --workspace apps/${APP}
 RUN cp -R apps/${APP}/dist /web-dist
