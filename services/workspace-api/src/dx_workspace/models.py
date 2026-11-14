@@ -549,7 +549,8 @@ class AutomationRule(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
-    trigger: Mapped[str] = mapped_column(String(60), index=True)
+    # Room for plugin events: "plugin.<plugin id>.<type>".
+    trigger: Mapped[str] = mapped_column(String(200), index=True)
     # "automation" reacts to events; "process" is the approval flow a form's dossiers follow.
     kind: Mapped[str] = mapped_column(String(20), default="automation", index=True)
     form_id: Mapped[str | None] = mapped_column(String(36), index=True)
@@ -634,7 +635,7 @@ class AutomationRun(Base):
     rule_id: Mapped[str] = mapped_column(ForeignKey("automation_rules.id"), index=True)
     rule_revision: Mapped[int] = mapped_column(Integer)
     event_id: Mapped[str] = mapped_column(String(36))
-    event_type: Mapped[str] = mapped_column(String(60))
+    event_type: Mapped[str] = mapped_column(String(200))
     state: Mapped[str] = mapped_column(String(20))
     steps: Mapped[list] = mapped_column(JSON, default=list)
     # The flow as it was when the run started, so later edits never change a run in progress.

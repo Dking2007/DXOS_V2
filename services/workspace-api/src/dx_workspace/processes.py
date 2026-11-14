@@ -198,6 +198,11 @@ class ProcessExecution(Execution):
         # When the dossier reached the step, so its journey can be told in order.
         extra.setdefault("at", m.utcnow().isoformat())
         super().record(node, state, **({"attempt": attempt} if attempt > 1 else {}), **extra)
+        if state == "waiting" and self.case:
+            # A flow on this event cannot set itself off again: the chain names the rule that ran.
+            emit(self.db, "case.step_entered", self.case.id,
+                 {**case_event(self.case), "node_id": node["id"], "step": node.get("label") or node["type"]},
+                 {"rules": [*self.chain, self.rule.id] if self.rule else list(self.chain)})  # fmt: skip
 
     def step(self, node) -> list[str]:
         if node["id"] in self.ran:
@@ -406,6 +411,8 @@ def settle_dossier(execution: ProcessExecution, outcome: str, message: str):
     text = OWNER_MESSAGES[outcome] + ": " + case.title + (f". {message}" if message else "")
     notify(db, case.owner_id, f"process:{run.id}:{outcome}", text[:250], case.id)
     emit(db, "case." + outcome, case.id, case_event(case))
+    if outcome in {"approved", "rejected"}:
+        emit(db, "case.closed", case.id, case_event(case))
 
 
 def settle(execution: ProcessExecution):

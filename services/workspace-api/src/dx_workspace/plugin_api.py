@@ -49,7 +49,7 @@ from .plugins import (
 )
 from .policies import case_filter, get_case
 from .processes import lock_run, step_limits
-from .services import audit, enqueue, idem_begin, notify, page
+from .services import audit, case_event, emit, enqueue, idem_begin, notify, page
 from .tasks import TaskCreate, TaskSource, TaskTransition, add_comment, apply_transition, create_task
 from .tasks import visible as task_visible
 
@@ -117,6 +117,11 @@ class NotificationInput(s.Input):
     link: str | None = Field(default=None, pattern=INTERNAL_LINK)
 
 
+class EventInput(s.Input):
+    type: str = Field(min_length=1, max_length=90)
+    data: dict[str, Any] = Field(default_factory=dict, max_length=20)
+
+
 class CompleteInput(s.Input):
     branch: Literal["success", "error"] = "success"
     output: dict[str, Any] = Field(default_factory=dict, max_length=20)
@@ -154,13 +159,14 @@ def plugin_api(app) -> APIRouter:
                 "read": settings.plugin_reads_per_minute,
                 "write": settings.plugin_writes_per_minute,
                 "notify": settings.plugin_notifications_per_minute,
+                "inbound": settings.plugin_events_per_minute,
             }
             limiter.check(who.plugin.plugin_id, name, limits[name])
             return who
 
         return limited
 
-    reader, writer, notifier = channel("read"), channel("write"), channel("notify")
+    reader, writer, notifier, inbound = channel("read"), channel("write"), channel("notify"), channel("inbound")
 
     def need(who: Caller, scope: str):
         """Approved for the plugin *and* carried by this token; then checked as the viewer or the records told."""
@@ -481,6 +487,7 @@ def plugin_api(app) -> APIRouter:
             case.file_ids = list(dict.fromkeys([*(case.file_ids or []), value.id]))
             case.revision += 1
             case.updated_at = m.utcnow()
+            emit(db, "case.file_added", case.id, {**case_event(case), "file_ids": [value.id]})
             audit(db, who.actor, "plugin.write.attach", case.id,
                   {"file_id": value.id, "name": name, "node_id": node_id, "role": role, **who.via})  # fmt: skip
             entry = log(db, who.plugin.plugin_id, "write", event_type="POST /cases/files",
@@ -491,6 +498,58 @@ def plugin_api(app) -> APIRouter:
 
         return once(db, who, f"case.attach:{case.id}", idempotency_key,
                     {"name": name, "sha256": digest_hex, "node_id": node_id, "role": role}, work)  # fmt: skip
+
+    # ---- Events in --------------------------------------------------------------------------
+
+    def event_value(db, kind: str, key: str, value):
+        """A declared, plain value; people and dossiers must exist."""
+        if value is None:
+            return None
+        if kind == "number" and isinstance(value, int | float) and not isinstance(value, bool):
+            return value
+        if kind in {"string", "date", "person", "case"} and isinstance(value, str) and len(value) <= 1000:
+            if kind == "date":
+                try:
+                    datetime.fromisoformat(value)
+                except ValueError:
+                    raise AppError(422, "plugin_event_invalid", f"“{key}” phải là ngày ISO 8601.") from None
+            if kind == "person" and not db.get(m.User, value):
+                raise AppError(422, "plugin_event_invalid", f"“{key}” không phải người dùng.")
+            if kind == "case" and not db.get(m.Case, value):
+                raise AppError(422, "plugin_event_invalid", f"“{key}” không phải hồ sơ.")
+            return value
+        raise AppError(422, "plugin_event_invalid", f"“{key}” phải là {kind}.")
+
+    @router.post("/events", status_code=202)
+    def event_in(
+        body: EventInput,
+        idempotency_key: str | None = Header(None),
+        db: Session = Depends(db_dep),
+        who: Caller = Depends(inbound),
+    ):
+        """An event of the plugin's own (declared in `emits`): flows starting on it run."""
+        if who.user:
+            raise AppError(403, "plugin_install_token_required", "Sự kiện chỉ gửi từ máy chủ plugin (token cài đặt).")
+        declared = next((e for e in (who.plugin.manifest or {}).get("emits", []) if e["type"] == body.type), None)
+        if not declared:
+            raise AppError(422, "plugin_event_unknown", f"Plugin chưa khai sự kiện “{body.type}” trong `emits`.")
+        fields = declared.get("fields") or {}
+        unknown = set(body.data) - set(fields)
+        if unknown:
+            raise AppError(422, "plugin_event_invalid", "Dữ liệu chưa khai: " + ", ".join(sorted(unknown)))
+        values = {key: event_value(db, fields[key], key, value) for key, value in body.data.items()}
+        name = f"plugin.{who.plugin.plugin_id}.{body.type}"
+
+        def work():
+            data = {**values, "trigger": values, "plugin_id": who.plugin.plugin_id, "event": body.type}
+            case_ids = [value for key, value in values.items() if fields[key] == "case" and value]
+            if case_ids:
+                data["case_id"] = case_ids[0]  # flows reading a dossier find it as usual
+            emit(db, name, who.plugin.id, data)
+            record(db, who, body.type, {"type": "case", "id": case_ids[0]} if case_ids else None, "inbound")
+            return {"accepted": True, "event": name}
+
+        return once(db, who, "event", idempotency_key, body.model_dump(), work)
 
     # ---- Long-running steps -------------------------------------------------------------------
 

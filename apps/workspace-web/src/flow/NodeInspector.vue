@@ -138,7 +138,10 @@ const waitUnit = computed(() => {
         <div class="field">
           <label for="node-event">Chạy khi</label>
           <select id="node-event" :value="c.event" @change="setEvent(($event.target as HTMLSelectElement).value)">
-            <option v-for="t in triggers" :key="t.key" :value="t.key">{{ t.label }}</option>
+            <option v-for="t in triggers.filter((t) => !t.group)" :key="t.key" :value="t.key">{{ t.label }}</option>
+            <optgroup v-if="triggers.some((t) => t.group)" label="Sự kiện của plugin">
+              <option v-for="t in triggers.filter((t) => t.group)" :key="t.key" :value="t.key">{{ t.label }}</option>
+            </optgroup>
           </select>
         </div>
         <div v-if="c.event === 'case.submitted'" class="field">

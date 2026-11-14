@@ -29,6 +29,28 @@ def node_of(plugin: m.Plugin | None, kind: str) -> dict | None:
     return next((node for node in (plugin.manifest or {}).get("nodes", []) if node["kind"] == kind), None) if plugin else None
 
 
+# Kinds of value a plugin event may carry; nothing nested.
+EMIT_KINDS = {"string": "chữ", "number": "số", "date": "ngày", "person": "người", "case": "hồ sơ"}
+EMIT_SAMPLES = {"string": "…", "number": 3, "date": "2026-11-14", "person": None, "case": None}
+
+
+def plugin_triggers(db: Session) -> dict[str, dict]:
+    """Events switched-on plugins declare (`emits`), as flow triggers: `plugin.<plugin id>.<type>`."""
+    result = {}
+    for plugin in db.scalars(select(m.Plugin).where(m.Plugin.state == "enabled").order_by(m.Plugin.name)):
+        for item in (plugin.manifest or {}).get("emits", []):
+            fields = item.get("fields") or {}
+            result[f"plugin.{plugin.plugin_id}.{item['type']}"] = {
+                "label": f"{plugin.name}: {item['title']}",
+                # Readable as {so_lan} or {trigger.so_lan}.
+                "fields": {key: f"{key} ({EMIT_KINDS[kind]})" for key, kind in fields.items()},
+                "sample": {key: EMIT_SAMPLES[kind] for key, kind in fields.items()},
+                "plugin_id": plugin.plugin_id,
+                "type": item["type"],
+            }
+    return result
+
+
 def cancel_call(db: Session, call_id: str | None, notify_plugin: bool = True):
     """Stop waiting on a long-running plugin step and tell the plugin (`plugin.call.cancelled`)."""
     call = db.get(m.PluginCall, call_id) if call_id else None

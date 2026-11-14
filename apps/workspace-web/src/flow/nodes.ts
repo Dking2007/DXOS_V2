@@ -130,6 +130,8 @@ export interface TriggerInfo {
   sample: Record<string, unknown>
   /** Whether people may attach a flow with this trigger to individual tasks. */
   attachable?: boolean
+  /** Set on events a plugin declares ("Sự kiện của plugin"). */
+  group?: string
 }
 
 interface KindMeta {

@@ -35,6 +35,9 @@ class Settings(PlatformSettings):
     plugin_reads_per_minute: int = 600
     plugin_writes_per_minute: int = 120
     plugin_notifications_per_minute: int = 30
+    plugin_events_per_minute: int = 60
+    # How often the worker looks for dossiers and tasks that just passed their due date.
+    overdue_sweep_seconds: int = 300
     # Files a plugin attaches: per file, and in total per plugin over the last 24 hours.
     plugin_upload_max_bytes: int = 25 * 1024 * 1024
     plugin_upload_daily_bytes: int = 200 * 1024 * 1024

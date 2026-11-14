@@ -41,6 +41,7 @@ from .feed import can_see as can_see_post
 from .feed import visibility_filter as post_visibility
 from .flow_values import allowed_hosts, check_url, condition_holds, render
 from .plugin_steps import check_step as check_plugin_step
+from .plugin_steps import plugin_triggers
 from .policies import case_filter, current_user, get_case, require
 from .services import audit, cas, case_event, enqueue, notify, page, serial
 from .tasks import TaskCreate, TaskSource, create_task, event_data, get_task, log, manages, visible
@@ -57,6 +58,11 @@ TRIGGERS = {
     "case.approved": "Hồ sơ được duyệt",
     "case.rejected": "Hồ sơ bị từ chối",
     "case.needs_revision": "Hồ sơ bị trả lại",
+    "case.step_entered": "Hồ sơ đến một bước của quy trình",
+    "case.file_added": "Hồ sơ có thêm tài liệu",
+    "case.overdue": "Hồ sơ quá hạn",
+    "case.closed": "Hồ sơ kết thúc (duyệt, từ chối hoặc huỷ)",
+    "task.overdue": "Công việc quá hạn",
     "post.created": "Bài viết mới trên bảng tin",
 }
 TASK_FIELDS = {
@@ -912,8 +918,8 @@ def validate_graph(db: Session, settings, graph: dict, kind: str | None = None) 
                     fail(node_id, "Luồng gắn biểu mẫu bắt đầu khi hồ sơ được trình.")
                 if not db.get(m.Form, data.form_id):
                     fail(node_id, "Biểu mẫu đã chọn không tồn tại.")
-            elif data.event not in TRIGGERS:
-                fail(node_id, "Chọn sự kiện kích hoạt.")
+            elif data.event not in TRIGGERS and data.event not in plugin_triggers(db):
+                fail(node_id, "Chọn sự kiện kích hoạt (sự kiện của plugin cần plugin đang bật).")
             if not outgoing.get(node_id):
                 fail(node_id, "Nối node kích hoạt tới bước tiếp theo.")
         elif kind == "if":
@@ -1987,6 +1993,11 @@ def build_router(app):
                     "attachable": attachable(k),
                 }
                 for k, v in TRIGGERS.items()
+            ]
+            + [
+                {"key": k, "label": v["label"], "fields": v["fields"], "sample": v["sample"], "attachable": False,
+                 "group": "Sự kiện của plugin"}
+                for k, v in plugin_triggers(db).items()
             ],
             "operators": ["eq", "ne", "gt", "gte", "lt", "lte", "contains", "in", "empty", "not_empty"],
             "recipients": sorted(ROLE_RECIPIENTS),

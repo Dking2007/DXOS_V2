@@ -171,6 +171,21 @@ class Writes(s.Input):
         return list(dict.fromkeys(value))
 
 
+class PluginEvent(s.Input):
+    type: str = Field(pattern=r"^[a-z][a-z0-9_]{0,29}(\.[a-z][a-z0-9_]{0,29}){0,2}$")
+    title: str = Field(min_length=1, max_length=120)
+    fields: dict[str, Literal["string", "number", "date", "person", "case"]] = Field(default_factory=dict,
+                                                                                     max_length=20)  # fmt: skip
+
+    @field_validator("fields")
+    @classmethod
+    def names(cls, value):
+        for key in value:
+            if not re.fullmatch(r"[a-z][a-z0-9_]{0,39}", key) or key in {"plugin_id", "event", "trigger"}:
+                raise ValueError(f"Tên dữ liệu sự kiện “{key}” không hợp lệ.")
+        return value
+
+
 class ListScope(s.Input):
     # The administrator picks the forms (processes) at approval; nothing else is possible yet.
     forms: Literal["ask"] = "ask"
@@ -194,6 +209,8 @@ class PluginManifest(BaseModel):
     requires: Requires = Field(default_factory=Requires)
     writes: Writes = Field(default_factory=Writes)
     list_scope: ListScope = Field(default_factory=ListScope)
+    # Events of the plugin's own that flows may start on (sent in with POST /plugin/v1/events).
+    emits: list[PluginEvent] = Field(default_factory=list, max_length=30)
 
     @model_validator(mode="after")
     def known(self):
@@ -210,6 +227,8 @@ class PluginManifest(BaseModel):
             raise ValueError("`writes.fields` cần quyền cases.fields.write.")
         if "cases.fields.write" in self.permissions and not self.writes.fields:
             raise ValueError("Quyền cases.fields.write cần khai các trường sẽ ghi trong `writes.fields`.")
+        if len({event.type for event in self.emits}) != len(self.emits):
+            raise ValueError("Mỗi sự kiện trong `emits` cần `type` khác nhau.")
         if len({node.kind for node in self.nodes}) != len(self.nodes):
             raise ValueError("Mỗi bước quy trình của plugin cần `kind` khác nhau.")
         return self
@@ -623,6 +642,7 @@ def build_router(app):
                       for n in data.get("nodes", [])],  # fmt: skip
             "ui": [{"slot": u["slot"], "slot_label": SLOTS[u["slot"]], "title": u["title"]} for u in data.get("ui", [])],
             "fields": asked(data)["fields"],
+            "emits": [{"type": e["type"], "title": e["title"]} for e in data.get("emits", [])],
             "requires": (data.get("requires") or {}).get("desktiny", ">=1"),
         }
 

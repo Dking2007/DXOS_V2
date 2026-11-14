@@ -613,3 +613,87 @@ def test_a_cancelled_call_is_announced_to_the_plugin(world, plugin):  # noqa: F8
         assert db.get(PluginCall, "call-1").state == "cancelled"
     drain(world)
     assert [(e["type"], e["subject"]) for e in fake.events] == [("plugin.call.cancelled", {"type": "call", "id": "call-1"})]
+
+
+# ---- Events in, and new core events (5.5) ---------------------------------------------------------
+
+EMITTER = {**MANIFEST, "id": "vn.vi-du.cham-cong", "permissions": [], "events": [], "ui": [], "nodes": [],
+           "emits": [{"type": "di_muon", "title": "Đi muộn quá 3 lần/tháng",
+                      "fields": {"nhan_vien": "person", "so_lan": "number"}}]}  # fmt: skip
+
+
+def dispatched(env) -> list[str]:
+    from dx_workspace.models import Outbox
+
+    with Session(env[2]) as db:
+        return [job.payload["event_type"] for job in db.scalars(select(Outbox).where(Outbox.kind == "automation.dispatch"))]
+
+
+def test_a_plugin_event_starts_a_flow_with_its_values(world, plugin):  # noqa: F811
+    token = approve(world, EMITTER)["issued"]["token"]
+    name = f"plugin.{EMITTER['id']}.di_muon"
+    director = as_(world, "director")
+    catalog = director.get(API + "/automations/catalog").json()["triggers"]
+    listed = next(t for t in catalog if t["key"] == name)
+    assert listed["group"] == "Sự kiện của plugin" and "so_lan" in listed["fields"]
+    staff_id = world[7]["staff"]
+    graph = {
+        "nodes": [
+            {"id": "start", "type": "trigger", "position": {"x": 0, "y": 0}, "data": {"event": name}},
+            {"id": "bao", "type": "notify", "position": {"x": 0, "y": 0},
+             "data": {"recipients": [staff_id], "title": "Đi muộn {trigger.so_lan} lần"}},
+        ],
+        "edges": [{"id": "a", "source": "start", "target": "bao"}],
+    }  # fmt: skip
+    rule = director.post(API + "/automations", json={"name": "Nhắc đi muộn", "graph": graph})
+    assert rule.status_code == 201, rule.text
+    director.post(f"{API}/automations/{rule.json()['id']}/enabled",
+                  json={"expected_revision": rule.json()["revision"], "enabled": True})  # fmt: skip
+    path = "/events"
+    for bad in ({"type": "khac", "data": {}}, {"type": "di_muon", "data": {"la": 1}},
+                {"type": "di_muon", "data": {"so_lan": "bốn"}}, {"type": "di_muon", "data": {"nhan_vien": "ai-do"}}):
+        response = plugin_call(world, token, "POST", path, f"bad-{bad['type']}-{len(bad['data'])}-{list(bad['data'])}", json=bad)
+        assert response.status_code == 422, (bad, response.text)
+    event = {"type": "di_muon", "data": {"nhan_vien": staff_id, "so_lan": 4}}
+    sent = plugin_call(world, token, "POST", path, "e1", json=event)
+    assert sent.status_code == 202 and sent.json()["event"] == name, sent.text
+    assert plugin_call(world, token, "POST", path, "e1", json=event).json() == sent.json()
+    drain(world)
+    assert dispatched(world).count(name) == 1
+    assert "Đi muộn 4 lần" in titles_of(world)
+    world[8].plugin_events_per_minute = 1
+    assert plugin_call(world, token, "POST", path, "e2", json=event).status_code == 429
+
+
+def test_new_core_events_are_announced(world, plugin):  # noqa: F811
+    from dx_workspace.worker import sweep_overdue
+
+    fake, _, _ = plugin
+    approve(world, SIGNER)
+    plugins.use_transport(httpx.MockTransport(lambda request: httpx.Response(202, json={"accepted": True})))
+    async_flow(world)
+    form = make_form(world)
+    case = make_case(world, form, key="ev-1")
+    submit(world, case, "ev-submit")
+    assert "case.step_entered" in dispatched(world)
+    staff = as_(world, "staff")
+    uploaded = staff.post(API + "/drive/files", files={"file": ("b.txt", b"b", "text/plain")},
+                          headers={"Idempotency-Key": "ev-up"}).json()  # fmt: skip
+    draft = make_case(world, form, key="ev-2")
+    patched = staff.patch(f"{API}/cases/{draft['id']}", json={"expected_revision": draft["revision"],
+                                                               "file_ids": [uploaded["id"]]})  # fmt: skip
+    assert patched.status_code == 200, patched.text
+    assert "case.file_added" in dispatched(world)
+    cancelled = staff.post(f"{API}/cases/{draft['id']}/cancel", json={"expected_revision": patched.json()["revision"],
+                                                                       "reason": "Không cần nữa"})  # fmt: skip
+    assert cancelled.status_code == 200, cancelled.text
+    assert "case.closed" in dispatched(world)
+    late = staff.post(API + "/tasks", json={"title": "Báo cáo", "assignee_id": world[7]["staff"],
+                                            "due_at": "2020-01-01T00:00:00+00:00"})  # fmt: skip
+    assert late.status_code == 201, late.text
+    with Session(world[2]) as db:
+        assert sweep_overdue(db) >= 1
+        db.commit()
+        assert sweep_overdue(db) == 0  # once per due date
+        db.commit()
+    assert "task.overdue" in dispatched(world)
