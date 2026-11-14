@@ -3479,6 +3479,8 @@ export interface components {
             fields?: string[];
             /** Frame Permissions */
             frame_permissions?: string[];
+            /** Assistant Tools */
+            assistant_tools?: string[];
             /** List Forms */
             list_forms?: string[];
         };

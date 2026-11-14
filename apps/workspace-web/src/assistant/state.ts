@@ -29,6 +29,7 @@ export interface ChatTurn {
   content: string
   sources?: { n: number; id: string; title: string; category: string }[]
   items?: AssistantItem[]
+  tools?: { plugin_id: string; plugin: string; tool: string }[]
   truncated?: boolean
 }
 

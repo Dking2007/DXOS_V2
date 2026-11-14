@@ -10743,6 +10743,13 @@
             "type": "array",
             "title": "Frame Permissions"
           },
+          "assistant_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assistant Tools"
+          },
           "list_forms": {
             "items": {
               "type": "string"

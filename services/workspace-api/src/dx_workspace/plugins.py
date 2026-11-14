@@ -58,6 +58,8 @@ API_PREFIX = "/workspace/v1/plugin/v1"
 SESSION_MINUTES = 10
 CALL_TIMEOUT = 15
 MAX_RESPONSE_BYTES = 20_000
+TOOL_TIMEOUT = 10
+MAX_TOOL_BYTES = 8_000
 SCOPES = {
     "cases.read": "Đọc hồ sơ: thông tin chung, nội dung biểu mẫu, trạng thái",
     "tasks.read": "Đọc công việc: tiêu đề, trạng thái, hạn, người làm",
@@ -168,6 +170,15 @@ class PluginUi(s.Input):
     height: int = Field(default=240, ge=80, le=1200)
 
 
+class AssistantTool(s.Input):
+    """A read-only question the assistant may put to the plugin, as the person asking."""
+
+    name: str = Field(pattern=r"^[a-z][a-z0-9_]{1,39}$")
+    description: str = Field(min_length=10, max_length=300)
+    endpoint: str = Field(pattern=PATH)
+    parameters: ConfigSchema = Field(default_factory=ConfigSchema)
+
+
 class Requires(s.Input):
     desktiny: str = Field(default=">=1", pattern=r"^>=\d{1,3}$")
 
@@ -226,6 +237,7 @@ class PluginManifest(BaseModel):
     emits: list[PluginEvent] = Field(default_factory=list, max_length=30)
     # What each organisation fills in for the plugin (agency code, an outside system's API key…).
     settings_schema: ConfigSchema = Field(default_factory=ConfigSchema)
+    assistant_tools: list[AssistantTool] = Field(default_factory=list, max_length=10)
     frame_permissions: list[Literal["geolocation", "camera", "clipboard-write"]] = Field(default_factory=list,
                                                                                          max_length=3)  # fmt: skip
     # GET here answers 2xx when the plugin's server is well; the plugin page shows it.
@@ -248,6 +260,8 @@ class PluginManifest(BaseModel):
             raise ValueError("Quyền cases.fields.write cần khai các trường sẽ ghi trong `writes.fields`.")
         if any(field.secret for node in self.nodes for field in node.config_schema.properties.values()):
             raise ValueError("Ô cấu hình của bước quy trình không được là `secret`; dùng `settings_schema`.")
+        if len({tool.name for tool in self.assistant_tools}) != len(self.assistant_tools):
+            raise ValueError("Mỗi công cụ trong `assistant_tools` cần `name` khác nhau.")
         if len({event.type for event in self.emits}) != len(self.emits):
             raise ValueError("Mỗi sự kiện trong `emits` cần `type` khác nhau.")
         if len({node.kind for node in self.nodes}) != len(self.nodes):
@@ -262,6 +276,7 @@ def asked(manifest: dict) -> dict[str, list[str]]:
         "events": list(manifest.get("events", [])),
         "fields": list((manifest.get("writes") or {}).get("fields", [])),
         "frame_permissions": list(manifest.get("frame_permissions", [])),
+        "assistant_tools": [tool["name"] for tool in manifest.get("assistant_tools", [])],
     }
 
 
@@ -470,6 +485,62 @@ def alert_failing(db: Session, plugin: m.Plugin, streak: int = 5):
                f"Plugin “{plugin.name}” lỗi {streak} lần liên tiếp. Xem nhật ký ở trang Plugin.", link="/plugins")  # fmt: skip
 
 
+# ---- Assistant tools ----------------------------------------------------------------------
+
+
+def assistant_tools(db: Session, settings) -> list[tuple[m.Plugin, dict]]:
+    """Tools of switched-on plugins an administrator approved for the assistant."""
+    found = []
+    for plugin in db.scalars(select(m.Plugin).where(m.Plugin.state == "enabled").order_by(m.Plugin.name)):
+        approved = set((plugin.granted or {}).get("assistant_tools", []))
+        if approved and host_allowed(settings, plugin.base_url):
+            found += [(plugin, t) for t in (plugin.manifest or {}).get("assistant_tools", []) if t["name"] in approved]
+    return found
+
+
+def call_tool(db: Session, settings, plugin: m.Plugin, tool: dict, arguments: dict, user: m.User) -> str | None:
+    """Ask a plugin tool, with a short session token of the person asking that can only read.
+
+    Returns the answer as text (at most 8 KB), or None when the plugin did not answer usefully.
+    """
+    readable = [p for p in (plugin.granted or {}).get("permissions", []) if p.endswith((".read", ".list"))]
+    token, _ = issue(db, plugin, "session", readable, user_id=user.id, context={"tool": tool["name"]}, minutes=2)
+    row = log(db, plugin.plugin_id, "tool", event_type=tool["name"], event_id=user.id, state="pending")
+    body = json.dumps(
+        {"call_id": row.id, "tool": tool["name"], "arguments": arguments,
+         "user": {"id": user.id, "display_name": user.display_name}, "token": token, "api_base": API_PREFIX},
+        ensure_ascii=False,
+    ).encode()  # fmt: skip
+    stamp = str(int(time.time()))
+    headers = {
+        "Content-Type": "application/json",
+        "X-Desktiny-Tool": tool["name"],
+        "X-Desktiny-Delivery": row.id,
+        "X-Desktiny-Timestamp": stamp,
+        "X-Desktiny-Signature": sign(secret_of(settings, plugin), stamp, body),
+    }
+    row.attempts += 1
+    started = time.monotonic()
+    try:
+        with client(TOOL_TIMEOUT) as http:
+            response = http.post(target(plugin, tool["endpoint"]), content=body, headers=headers)
+    except httpx.HTTPError:
+        row.state, row.error, row.delivered_at = "failed", "Plugin không trả lời công cụ.", m.utcnow()
+        return None
+    row.duration_ms = int((time.monotonic() - started) * 1000)
+    row.status_code, row.delivered_at = response.status_code, m.utcnow()
+    if response.status_code >= 400 or len(response.content) > MAX_TOOL_BYTES:
+        row.state, row.error = "failed", f"Công cụ trả {response.status_code} hoặc quá 8 KB."
+        return None
+    row.state = "sent"
+    try:
+        answer = response.json()
+    except ValueError:
+        return response.text[:MAX_TOOL_BYTES]
+    result = answer.get("result", answer) if isinstance(answer, dict) else answer
+    return json.dumps(result, ensure_ascii=False)[:MAX_TOOL_BYTES]
+
+
 # ---- Flow step (worker) ------------------------------------------------------------------
 
 
@@ -638,6 +709,7 @@ class Approval(s.Revision):
     events: list[str] = Field(default_factory=list)
     fields: list[str] = Field(default_factory=list)
     frame_permissions: list[str] = Field(default_factory=list)
+    assistant_tools: list[str] = Field(default_factory=list)
     # Forms whose dossiers `cases.list` may list (and so read).
     list_forms: list[str] = Field(default_factory=list, max_length=100)
 
@@ -731,6 +803,7 @@ def build_router(app):
             "fields": asked(data)["fields"],
             "emits": [{"type": e["type"], "title": e["title"]} for e in data.get("emits", [])],
             "frame_permissions": [{"key": key, "label": FRAME_PERMISSIONS[key]} for key in data.get("frame_permissions", [])],
+            "assistant_tools": [{"name": t["name"], "description": t["description"]} for t in data.get("assistant_tools", [])],
             "requires": (data.get("requires") or {}).get("desktiny", ">=1"),
         }
 
@@ -867,7 +940,7 @@ def build_router(app):
             raise AppError(409, "revision_conflict", "Plugin vừa được người khác thay đổi. Tải lại để xem.")
         wanted = asked(row.manifest or {})
         chosen = {"permissions": body.permissions, "events": body.events, "fields": body.fields,
-                  "frame_permissions": body.frame_permissions}  # fmt: skip
+                  "frame_permissions": body.frame_permissions, "assistant_tools": body.assistant_tools}  # fmt: skip
         if any(set(values) - set(wanted[key]) for key, values in chosen.items()):
             raise AppError(422, "plugin_grant_invalid", "Chỉ duyệt được những gì plugin đã xin.")
         if body.fields and "cases.fields.write" not in body.permissions:

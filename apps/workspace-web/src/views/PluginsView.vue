@@ -43,6 +43,7 @@ interface PluginSummary {
   fields: string[]
   requires: string
   frame_permissions: Labelled[]
+  assistant_tools: { name: string; description: string }[]
   host_allowed: boolean
 }
 interface PluginRow extends PluginSummary {
@@ -53,6 +54,7 @@ interface PluginRow extends PluginSummary {
     fields: string[]
     list_forms: string[]
     frame_permissions: string[]
+    assistant_tools?: string[]
   }
   list_form_names: Record<string, string>
   revision: number
@@ -106,7 +108,8 @@ const chosen = ref<{
   fields: string[]
   list_forms: string[]
   frame_permissions: string[]
-}>({ permissions: [], events: [], fields: [], list_forms: [], frame_permissions: [] })
+  assistant_tools: string[]
+}>({ permissions: [], events: [], fields: [], list_forms: [], frame_permissions: [], assistant_tools: [] })
 // Forms whose dossiers a plugin with cases.list may list: chosen here, at approval.
 const forms = useQuery({
   queryKey: ['forms', 'published'],
@@ -236,6 +239,7 @@ function openApprove(row: PluginRow) {
     fields: [...row.fields],
     list_forms: [...(row.granted.list_forms ?? [])],
     frame_permissions: row.frame_permissions.map((item) => item.key),
+    assistant_tools: row.assistant_tools.map((tool) => tool.name),
   }
 }
 function toggleIn(list: string[], key: string) {
@@ -407,6 +411,17 @@ async function copy(text: string) {
             <li v-if="row.ui.length">
               <strong>Khung giao diện:</strong> {{ row.ui.map((u) => `${u.title} (${u.slot_label})`).join(', ') }}
             </li>
+            <li v-if="row.assistant_tools.length">
+              <strong>Công cụ cho trợ lý AI:</strong>
+              <span
+                v-for="tool in row.assistant_tools"
+                :key="tool.name"
+                class="chip"
+                :class="{ off: !row.granted.assistant_tools?.includes(tool.name) }"
+                :title="tool.description"
+                >{{ tool.name }}</span
+              >
+            </li>
             <li v-if="row.frame_permissions.length">
               <strong>Quyền thiết bị:</strong>
               <span
@@ -523,6 +538,7 @@ async function copy(text: string) {
             <li v-for="node in preview.nodes" :key="node.kind">Bước quy trình: {{ node.title }}</li>
             <li v-for="ui in preview.ui" :key="ui.title">Khung “{{ ui.title }}” ở {{ ui.slot_label.toLowerCase() }}</li>
             <li v-for="item in preview.frame_permissions" :key="item.key">Dùng {{ item.label.toLowerCase() }}</li>
+            <li v-for="tool in preview.assistant_tools" :key="tool.name">Công cụ trợ lý: {{ tool.description }}</li>
           </ul>
         </div>
       </div>
@@ -572,6 +588,17 @@ async function copy(text: string) {
           />{{ item.name }}</label
         >
         <small class="muted">Plugin chỉ liệt kê (và đọc) hồ sơ của các quy trình được chọn; không chọn thì không thấy hồ sơ nào.</small>
+      </div>
+      <div v-if="approving.assistant_tools.length">
+        <span class="section-label">Công cụ trợ lý AI được hỏi (chỉ đọc, theo quyền người hỏi)</span>
+        <label v-for="tool in approving.assistant_tools" :key="tool.name" class="checkbox-label"
+          ><input
+            type="checkbox"
+            :checked="chosen.assistant_tools.includes(tool.name)"
+            @change="toggleIn(chosen.assistant_tools, tool.name)"
+          />{{ tool.description }}</label
+        >
+        <small class="muted">Trợ lý chỉ dùng khi tính năng “Trợ lý dùng công cụ của plugin” được bật ở Cài đặt AI.</small>
       </div>
       <div v-if="approving.frame_permissions.length">
         <span class="section-label">Quyền thiết bị cho khung giao diện</span>

@@ -800,3 +800,61 @@ def test_new_frame_places_get_only_the_device_rights_approved(world, plugin):  #
     assert director.post(API + "/plugin-sessions", json={"plugin_id": FRAMED["id"], "slot": "admin.page"}).status_code == 201
     camera = {**FRAMED, "version": "1.1.0", "frame_permissions": ["geolocation", "clipboard-write", "camera"]}
     assert upload(director, "/plugins", camera).json()["state"] == "pending"
+
+
+# ---- Assistant tools (5.7) -----------------------------------------------------------------------
+
+TOOLED = {
+    **MANIFEST,
+    "id": "vn.vi-du.tro-ly-cham-cong",
+    "permissions": ["people.read", "tasks.write"],
+    "events": [],
+    "nodes": [],
+    "ui": [],
+    "assistant_tools": [{"name": "so_lan_di_muon", "description": "Số lần đi muộn của người hỏi trong một tháng",
+                         "endpoint": "/tools/di-muon",
+                         "parameters": {"type": "object", "properties": {"thang": {"type": "string", "title": "Tháng"}}}}],
+}  # fmt: skip
+
+
+def test_the_assistant_asks_an_approved_plugin_tool_as_the_person_asking(world, plugin):  # noqa: F811
+    from dx_workspace.models import PluginToken
+    from test_assistant_data import enable
+
+    approved = approve(world, TOOLED, assistant_tools=["so_lan_di_muon"])
+    secret = approved["issued"]["secret"]
+    asked = []
+
+    def tool_server(request):
+        body = read_delivery(secret, request.headers, request.content)
+        asked.append(body)
+        return httpx.Response(200, json={"result": {"thang": body["arguments"].get("thang"), "so_lan": 4}})
+
+    plugins.use_transport(httpx.MockTransport(tool_server))
+    enable(world)
+    feature = as_(world, "director").get(API + "/ai/settings").json()
+    as_(world, "director").put(API + "/ai/settings", json={"expected_revision": feature["revision"],
+                                                          "features": {"assistant_plugins": {"enabled": True}}})  # fmt: skip
+    seen = []
+
+    def llm(request):
+        body = json.loads(request.content)
+        system = body["messages"][0]["content"]
+        seen.append(system)
+        if "Bạn chọn công cụ" in system:
+            text = json.dumps({"tool": f"{TOOLED['id']}/so_lan_di_muon", "arguments": {"thang": "2026-11", "x": 1}})
+        else:
+            text = "Tháng 11 bạn đi muộn 4 lần (theo plugin)." if '"so_lan": 4' in system else "Không rõ."
+        return httpx.Response(200, json={"choices": [{"message": {"content": text}, "finish_reason": "stop"}]})
+
+    world[1].state.assistant_transport = httpx.MockTransport(llm)
+    answer = as_(world, "staff").post(API + "/assistant/chat", json={"messages": [
+        {"role": "user", "content": "Tháng này tôi đi muộn mấy lần?"}]})  # fmt: skip
+    assert answer.status_code == 200, answer.text
+    assert answer.json()["answer"].startswith("Tháng 11 bạn đi muộn 4 lần")
+    assert answer.json()["tools"] == [{"plugin_id": TOOLED["id"], "plugin": TOOLED["name"], "tool": "so_lan_di_muon"}]
+    assert asked[0]["arguments"] == {"thang": "2026-11"} and asked[0]["user"]["id"] == world[7]["staff"]
+    with Session(world[2]) as db:
+        token = db.scalar(select(PluginToken).where(PluginToken.token_hash == plugins.digest(asked[0]["token"])))
+        assert token.user_id == world[7]["staff"] and token.scopes == ["people.read"]  # read-only, never tasks.write
+        assert db.scalar(select(PluginDelivery.id).where(PluginDelivery.kind == "tool"))

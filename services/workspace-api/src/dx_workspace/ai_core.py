@@ -53,6 +53,7 @@ FEATURES = {
     "writing_help": ("talk", "Hỗ trợ viết bài bảng tin", "Viết lại cho gọn, sửa chính tả, gợi ý tiêu đề, tạo mô tả cho ảnh.", False),
     "automation_ai": ("extend", "Bước “Hỏi AI” trong luồng tự động", "Node mới trong trình thiết kế luồng: AI phân loại (ví dụ mức gấp) để rẽ nhánh.", False),
     "assistant_my_data": ("extend", "Trợ lý trả lời về dữ liệu của người hỏi", "Trợ lý xem được công việc (được giao, đã giao, điều phối, theo dõi), bàn giao và ủy quyền, hồ sơ, việc chờ duyệt, tài liệu của mình và được chia sẻ của chính người hỏi (theo quyền xem) để trả lời “Việc nào của tôi sắp quá hạn?”, “Ai chia sẻ tài liệu cho tôi?”.", False),
+    "assistant_plugins": ("extend", "Trợ lý dùng công cụ của plugin", "Trợ lý hỏi công cụ chỉ đọc mà plugin kết nối cung cấp (đã được duyệt), bằng phiên của chính người hỏi, rồi trả lời kèm nguồn “theo plugin X”. Kết quả không đưa vào chỉ mục tri thức.", False),
     "package_scenarios": ("extend", "Sinh kịch bản thử cho Quy trình nghiệp vụ", "Đề xuất kịch bản kiểm thử (số tiền sát ngưỡng, thiếu tài liệu…) để chạy thử trước khi phát hành.", False),
 }  # fmt: skip
 MAX_FILE_BYTES = 20 * 1024 * 1024

@@ -4,22 +4,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import {
-  BookOpen,
-  Bot,
-  BriefcaseBusiness,
-  Check,
-  ClipboardCheck,
-  Copy,
-  FileText,
-  FolderOpen,
-  ListTodo,
-  RotateCcw,
-  SendHorizontal,
-  Settings2,
-  Sparkles,
-  X,
-} from 'lucide-vue-next'
+import { BookOpen, Bot, BriefcaseBusiness, Check, ClipboardCheck, Copy, FileText, FolderOpen, ListTodo, Puzzle, RotateCcw, SendHorizontal, Settings2, Sparkles, X } from 'lucide-vue-next'
 import type { AssistantReply, AssistantStatus } from '@dx/web-shared/types.ts'
 import { errorText } from '@dx/web-shared/api.ts'
 import { api } from '../api'
@@ -129,6 +114,7 @@ async function send(text = draft.value) {
       content: reply.answer,
       sources: reply.sources,
       items: reply.items,
+      tools: reply.tools,
       truncated: reply.truncated,
     })
     remaining.value = reply.remaining
@@ -302,6 +288,10 @@ watch(
                 </RouterLink>
               </div>
               <p v-if="turn.truncated" class="assistant-note">Câu trả lời bị cắt vì quá dài. Hãy hỏi cụ thể hơn.</p>
+              <div v-if="turn.tools?.length" class="assistant-sources">
+                <Puzzle :size="13" />
+                <span v-for="tool in turn.tools" :key="`${tool.plugin_id}/${tool.tool}`">Theo plugin {{ tool.plugin }}</span>
+              </div>
               <div v-if="turn.sources?.length" class="assistant-sources">
                 <BookOpen :size="13" />
                 <span v-for="source in turn.sources" :key="source.id" :title="source.title"

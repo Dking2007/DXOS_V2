@@ -25,6 +25,7 @@ export type AiFeature =
   | 'writing_help'
   | 'automation_ai'
   | 'assistant_my_data'
+  | 'assistant_plugins'
   | 'package_scenarios'
 
 export const ALL_FEATURES: AiFeature[] = [
@@ -45,14 +46,15 @@ export const ALL_FEATURES: AiFeature[] = [
   'writing_help',
   'automation_ai',
   'assistant_my_data',
+  'assistant_plugins',
   'package_scenarios',
 ]
 
 /**
  * What most offices can switch on safely to start with: features that only read what the person
  * already sees and answer in text. Left for a deliberate choice: search by meaning (needs a
- * vector model), the flow step (runs on every event), the chat reading people's own work, and
- * test scenarios for packages.
+ * vector model), the flow step (runs on every event), the chat reading people's own work or asking
+ * plugins, and test scenarios for packages.
  */
 export const RECOMMENDED_FEATURES: AiFeature[] = ALL_FEATURES.filter(
   (key) =>
@@ -60,6 +62,7 @@ export const RECOMMENDED_FEATURES: AiFeature[] = ALL_FEATURES.filter(
       'semantic_search',
       'automation_ai',
       'assistant_my_data',
+      'assistant_plugins',
       'package_scenarios',
     ].includes(key),
 )

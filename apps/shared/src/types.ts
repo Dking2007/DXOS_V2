@@ -416,6 +416,8 @@ export interface AssistantReply {
   truncated: boolean
   sources: AssistantSource[]
   items?: AssistantItem[]
+  /** Plugin tools the answer drew on ("theo plugin X"). */
+  tools?: { plugin_id: string; plugin: string; tool: string }[]
   remaining: number | null
 }
 export interface AssistantProvider {
