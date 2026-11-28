@@ -63,6 +63,7 @@ duy nhất là luồng đăng nhập OIDC.
 - Icon điều hướng có màu theo module, tương phản ≥ 3:1 ở cả nền sáng và tối (9bf7477); nút "Lên đầu trang" (9bf7477).
 
 ### Changed
+- Gói giao diện đang dùng có màu riêng thì biểu tượng menu, nút trợ lý AI và trang đăng nhập (ánh sáng, vòng bạc, nút) ngả theo màu của gói thay vì giữ màu xanh mặc định; mỗi phân hệ vẫn giữ sắc riêng để phân biệt.
 - Trang đăng nhập mặc định lại có khung (`framed`), thiết kế lại: viền đôi sáng dần về góc, góc bạc có viên đá, dấu thoi giữa cạnh, một vệt sáng chạy chậm quanh viền; tiêu đề mặc định chỉ xuống dòng giữa các cụm từ nên điện thoại 360 px không còn chữ "TỬ", "DUYỆT" đứng một mình. Gói giao diện vẫn chọn được `flat` hoặc `image`.
 - Tài khoản demo mới có tên người và chức danh riêng; lời chào dùng đầy đủ họ tên.
 - Hộp xác nhận trong ứng dụng thay hộp `confirm()` của trình duyệt.
@@ -89,6 +90,7 @@ duy nhất là luồng đăng nhập OIDC.
   (3e8aa00).
 
 ### Fixed
+- Trang chủ: tên hồ sơ dài trong "Hồ sơ gần đây" kết thúc bằng "…" thay vì chạy đè lên nhãn trạng thái.
 - Xóa được biểu mẫu không còn dùng (B7): nút "Xóa biểu mẫu" cạnh ô chọn biểu mẫu khi tạo luồng, `DELETE /forms/{id}`. Biểu mẫu
   đã có hồ sơ thì được lưu trữ (hồ sơ vẫn xem được); biểu mẫu quy trình còn dùng hoặc do gói cài thì bị từ chối kèm lý do.
 - Khung plugin co lại vừa nội dung: SDK khung đo chiều cao phần thân trang thay cho `scrollHeight` của `<html>` (giá trị này

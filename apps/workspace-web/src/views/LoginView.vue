@@ -195,6 +195,18 @@ const SPECKS = [
 .entry.entry-flat {
   background: linear-gradient(160deg, var(--teal-strong, #16304f), var(--teal, #1e3a5f));
 }
+/* A pack's ground colours carry through the light, the silver and the button, so nothing stays stock blue. */
+.entry.has-ground {
+  --glow: color-mix(in srgb, var(--ground-from) 28%, #fff);
+  --metal-1: color-mix(in srgb, var(--ground-from) 8%, #f2f2f2);
+  --metal-2: color-mix(in srgb, var(--ground-from) 30%, #a6a6a6);
+  --metal-3: #ffffff;
+  --metal-4: color-mix(in srgb, var(--ground-from) 38%, #8f8f8f);
+  --core-1: color-mix(in srgb, var(--ground-from) 70%, #fff);
+  --core-2: var(--ground-from);
+  --button-top: color-mix(in srgb, var(--ground-from) 78%, #fff);
+  --button-bottom: color-mix(in srgb, var(--ground-from) 70%, #000);
+}
 /* A pack's own ground colours, for "framed" and "flat" (the photo is tinted in the script). */
 .entry.has-ground:not(.entry-image) {
   background:
@@ -223,8 +235,8 @@ const SPECKS = [
 }
 .entry-emblem-core.has-logo {
   overflow: hidden;
-  padding: 18%;
-  background: #fff;
+  padding: 16%;
+  background: radial-gradient(circle at 35% 30%, #fff, var(--metal-1));
   border-radius: 50%;
 }
 .entry-emblem-core.has-logo img {
@@ -236,6 +248,16 @@ const SPECKS = [
   --ink: #e8eef8;
   --soft: #b9c6db;
   --line: rgba(205, 220, 245, 0.42);
+  /* Light, metal and button tones; a pack's ground colours retint them (has-ground below). */
+  --glow: rgb(170 200 255);
+  --metal-1: #d9e4f7;
+  --metal-2: #8fa9d6;
+  --metal-3: #f3f7ff;
+  --metal-4: #7f9ccd;
+  --core-1: #2b5bb0;
+  --core-2: #12306a;
+  --button-top: rgba(70, 84, 112, 0.85);
+  --button-bottom: rgba(28, 36, 56, 0.92);
   /* One scale for everything, from the smaller of the screen's height and width, so it always fits. */
   --u: min(1vh, 0.62vw);
   position: relative;
@@ -279,7 +301,7 @@ const SPECKS = [
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(160, 190, 240, 0.17),
+    color-mix(in srgb, var(--glow) 17%, transparent),
     transparent
   );
   transform: rotate(18deg);
@@ -308,8 +330,8 @@ const SPECKS = [
   width: 3px;
   height: 3px;
   border-radius: 50%;
-  background: #d8e6ff;
-  box-shadow: 0 0 8px 2px rgba(170, 200, 255, 0.55);
+  background: color-mix(in srgb, var(--glow) 60%, #fff);
+  box-shadow: 0 0 8px 2px color-mix(in srgb, var(--glow) 55%, transparent);
   opacity: 0;
   animation: speck linear infinite;
 }
@@ -348,7 +370,7 @@ const SPECKS = [
   inset: 22px;
   pointer-events: none;
   /* A faint glow inside the frame, as if the card were lit from within. */
-  box-shadow: inset 0 0 140px rgba(120, 160, 230, 0.08);
+  box-shadow: inset 0 0 140px color-mix(in srgb, var(--glow) 8%, transparent);
   animation: frame-in 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 .entry-frame::before,
@@ -396,7 +418,7 @@ const SPECKS = [
   background: conic-gradient(
     from var(--entry-turn),
     transparent 0deg 318deg,
-    rgba(170, 200, 255, 0.25) 338deg,
+    color-mix(in srgb, var(--glow) 25%, transparent) 338deg,
     rgba(240, 246, 255, 0.95) 354deg,
     transparent 360deg
   );
@@ -407,7 +429,7 @@ const SPECKS = [
   mask:
     linear-gradient(#000 0 0) content-box exclude,
     linear-gradient(#000 0 0);
-  filter: drop-shadow(0 0 4px rgba(170, 200, 255, 0.8));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--glow) 80%, transparent));
   opacity: 0.8;
   animation: comet 28s 1.8s linear infinite;
 }
@@ -424,7 +446,7 @@ const SPECKS = [
   border: 1px solid rgba(230, 238, 252, 0.85);
   background: var(--frame-ground);
   transform: rotate(45deg);
-  box-shadow: 0 0 10px rgba(170, 200, 255, 0.45);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--glow) 45%, transparent);
 }
 .entry-mark::before {
   content: '';
@@ -465,7 +487,7 @@ const SPECKS = [
 }
 .entry-corner .cap {
   stroke-width: 2.2;
-  filter: drop-shadow(0 0 3px rgba(170, 200, 255, 0.55));
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--glow) 55%, transparent));
 }
 .entry-corner .flourish {
   stroke: rgba(225, 235, 250, 0.4);
@@ -501,7 +523,7 @@ const SPECKS = [
   fill: var(--frame-ground);
   stroke: #eef4ff;
   stroke-width: 1.3;
-  filter: drop-shadow(0 0 5px rgba(170, 200, 255, 0.9));
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--glow) 90%, transparent));
   animation: diamond 4s 1.6s ease-in-out infinite;
 }
 @keyframes diamond {
@@ -592,8 +614,8 @@ const SPECKS = [
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    rgba(120, 160, 230, 0.18),
-    rgba(120, 160, 230, 0) 70%
+    color-mix(in srgb, var(--glow) 18%, transparent),
+    color-mix(in srgb, var(--glow) 0%, transparent) 70%
   );
   box-shadow:
     0 0 0 1px rgba(205, 220, 245, 0.16),
@@ -637,11 +659,11 @@ const SPECKS = [
   inset: -20%;
   background: conic-gradient(
     from 210deg,
-    #d9e4f7,
-    #8fa9d6,
-    #f3f7ff,
-    #7f9ccd,
-    #d9e4f7
+    var(--metal-1),
+    var(--metal-2),
+    var(--metal-3),
+    var(--metal-4),
+    var(--metal-1)
   );
   animation: turn 9s linear infinite;
 }
@@ -657,7 +679,7 @@ const SPECKS = [
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #2b5bb0, #12306a 70%);
+  background: radial-gradient(circle at 35% 30%, var(--core-1), var(--core-2) 70%);
   color: #f4f8ff;
   font-size: clamp(42px, calc(var(--u) * 6.6), 66px);
   font-weight: 600;
@@ -741,7 +763,7 @@ const SPECKS = [
   height: 7px;
   background: #dfe8f7;
   transform: rotate(45deg);
-  box-shadow: 0 0 10px rgba(200, 220, 255, 0.8);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--glow) 80%, transparent);
 }
 .entry-code {
   margin: 0;
@@ -769,11 +791,7 @@ const SPECKS = [
   overflow: hidden;
   border: 1px solid rgba(225, 235, 250, 0.55);
   border-radius: 999px;
-  background: linear-gradient(
-    180deg,
-    rgba(70, 84, 112, 0.85),
-    rgba(28, 36, 56, 0.92)
-  );
+  background: linear-gradient(180deg, var(--button-top), var(--button-bottom));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     0 12px 30px rgba(2, 8, 24, 0.45);
@@ -840,7 +858,7 @@ const SPECKS = [
   border-color: rgba(240, 246, 255, 0.9);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    0 0 24px rgba(140, 180, 255, 0.35),
+    0 0 24px color-mix(in srgb, var(--glow) 35%, transparent),
     0 16px 36px rgba(2, 8, 24, 0.55);
 }
 .entry-button:hover:not(:disabled) svg {
