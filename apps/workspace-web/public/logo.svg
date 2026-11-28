@@ -1,0 +1,24 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 112" role="img" aria-labelledby="t d">
+  <title id="t">Desktiny</title>
+  <desc id="d">Một tờ văn bản có dấu duyệt tròn, nằm trong quỹ đạo xanh ngọc vòng qua phía trước, với ngôi sao vàng bay trên quỹ đạo.</desc>
+  <defs>
+    <linearGradient id="nen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FBFDFE"/><stop offset="1" stop-color="#E7F0F3"/></linearGradient>
+    <radialGradient id="sang" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#F7C65A" stop-opacity=".5"/><stop offset="1" stop-color="#F7C65A" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect x=".75" y=".75" width="110.5" height="110.5" rx="28" fill="url(#nen)" stroke="#D3E0E6" stroke-width="1.5"/>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <g transform="rotate(-28 56 56)"><ellipse cx="56" cy="56" rx="47" ry="25" fill="none" stroke="#12A894" stroke-width="3.4"/></g>
+    <path d="M35 27h28l13 13v38a5 5 0 0 1-5 5H35a5 5 0 0 1-5-5V32a5 5 0 0 1 5-5z" fill="#FFFFFF" stroke="#14233B" stroke-width="4.5"/>
+    <path d="M63 27v9a4 4 0 0 0 4 4h9" fill="none" stroke="#14233B" stroke-width="3.4"/>
+    <path d="M38 47h22M38 53.5h26M38 60h16" stroke="#64748B" stroke-width="2.6"/>
+    <circle cx="70" cy="71" r="11" fill="#FFFFFF" stroke="#12A894" stroke-width="3.2"/>
+    <circle cx="70" cy="71" r="7" fill="none" stroke="#E5A943" stroke-width="1.6" stroke-dasharray=".1 2.6"/>
+    <path d="m65.6 71.3 2.97 2.97 5.49 -6.03" fill="none" stroke="#0F9A87" stroke-width="2.6"/>
+    <path d="M39.70 86.98 L38.35 87.09 L37.02 87.17 L35.71 87.20 L34.43 87.21 L33.17 87.17 L31.94 87.11 L30.74 87.00 L29.56 86.86 L28.42 86.68 L27.31 86.47 L26.23 86.22 L25.18 85.94 L24.17 85.62 L23.20 85.27 L22.27 84.88 L21.37 84.47 L20.52 84.01 L19.71 83.53 L18.93 83.01 L18.21 82.47 L17.52 81.89 L16.88 81.28 L16.29 80.64 L15.74 79.97 L15.23 79.28 L14.78 78.56 L14.37 77.81 L14.01 77.04 L13.70 76.24 L13.44 75.42 L13.23 74.58 L13.06 73.72 L12.95 72.83 L12.89 71.93 L12.88 71.01 L12.91 70.07 L13.00 69.11 L13.13 68.14 L13.32 67.15 L13.56 66.16" fill="none" stroke="#F1F6F8" stroke-width="8"/>
+    <path d="M39.70 86.98 L38.35 87.09 L37.02 87.17 L35.71 87.20 L34.43 87.21 L33.17 87.17 L31.94 87.11 L30.74 87.00 L29.56 86.86 L28.42 86.68 L27.31 86.47 L26.23 86.22 L25.18 85.94 L24.17 85.62 L23.20 85.27 L22.27 84.88 L21.37 84.47 L20.52 84.01 L19.71 83.53 L18.93 83.01 L18.21 82.47 L17.52 81.89 L16.88 81.28 L16.29 80.64 L15.74 79.97 L15.23 79.28 L14.78 78.56 L14.37 77.81 L14.01 77.04 L13.70 76.24 L13.44 75.42 L13.23 74.58 L13.06 73.72 L12.95 72.83 L12.89 71.93 L12.88 71.01 L12.91 70.07 L13.00 69.11 L13.13 68.14 L13.32 67.15 L13.56 66.16" fill="none" stroke="#12A894" stroke-width="3.6"/>
+    <circle cx="94.15" cy="29.83" r="12" fill="url(#sang)"/>
+    <path d="M94.15 20.83 L96.19 27.79 L103.15 29.83 L96.19 31.86 L94.15 38.83 L92.12 31.86 L85.15 29.83 L92.12 27.79Z" fill="#F2B43C" stroke="#F1F6F8" stroke-width="1.8"/>
+  </g>
+</svg>

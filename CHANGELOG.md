@@ -64,6 +64,7 @@ duy nhất là luồng đăng nhập OIDC.
 - Icon điều hướng có màu theo module, tương phản ≥ 3:1 ở cả nền sáng và tối (9bf7477); nút "Lên đầu trang" (9bf7477).
 
 ### Changed
+- Logo mới của Desktiny ("Văn bản đã duyệt": văn bản có dấu duyệt trong quỹ đạo có ngôi sao) thay chữ "D" ở thanh bên và trang đăng nhập; có favicon vẽ riêng cho 16–32 px ở Workspace và Console; tệp gốc và quy tắc dùng ở `design-system/desktiny/logo/`. Gói giao diện có logo riêng vẫn thay logo này.
 - Trình bày lại README (sơ đồ kiến trúc, luồng nghiệp vụ, bảng công nghệ), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT và mẫu issue.
 - Gói giao diện đang dùng có màu riêng thì biểu tượng menu, nút trợ lý AI và trang đăng nhập (ánh sáng, vòng bạc, nút) ngả theo màu của gói thay vì giữ màu xanh mặc định; mỗi phân hệ vẫn giữ sắc riêng để phân biệt.
 - Trang đăng nhập mặc định lại có khung (`framed`), thiết kế lại: viền đôi sáng dần về góc, góc bạc có viên đá, dấu thoi giữa cạnh, một vệt sáng chạy chậm quanh viền; tiêu đề mặc định chỉ xuống dòng giữa các cụm từ nên điện thoại 360 px không còn chữ "TỬ", "DUYỆT" đứng một mình. Gói giao diện vẫn chọn được `flat` hoặc `image`.

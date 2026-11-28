@@ -4,6 +4,8 @@
   <img src="docs/images/banner.svg" width="100%" alt="Desktiny: a shared Core at the bottom; Workspace, the console and other clients plug into it through the API; interface packs and plugins plug into Workspace">
 </p>
 
+<p align="center"><img src="design-system/desktiny/logo/desktiny-logo.svg" width="96" alt="Desktiny logo"></p>
+
 <h1 align="center">Desktiny</h1>
 
 <p align="center">
