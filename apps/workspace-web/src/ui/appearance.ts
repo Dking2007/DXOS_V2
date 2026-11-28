@@ -41,6 +41,9 @@ export interface AppearanceState {
   appearance: AppearanceLook | null
 }
 
+/** Desktiny's own mark (design-system/desktiny/logo), shown wherever no sector pack brings a logo. */
+export const STOCK_LOGO = '/logo.svg'
+
 export const appearance = ref<AppearanceLook | null>(null)
 export const appearancePack = ref<string | null>(null)
 

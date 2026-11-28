@@ -25,7 +25,7 @@ import { badgeText, navTone, visibleGroups } from './ui/nav'
 import type { NavGroup } from './ui/nav'
 import { useOverview } from './ui/overview'
 import { paletteRequest } from './ui/palette'
-import { brand, term } from './ui/appearance'
+import { STOCK_LOGO, brand, term } from './ui/appearance'
 import { cycleTheme, isDark } from './ui/theme'
 import { roleLabel } from './ui/labels'
 import { isCollapsed, sidebarPrefs, toggleLabel, toggleSidebar } from './ui/sidebar'
@@ -137,10 +137,8 @@ function toggleSidebarCollapsed() {
     <aside class="sidebar" :class="{ open: sidebar }">
       <div class="sidebar-head">
         <RouterLink to="/home" class="brand" aria-label="Trang chủ"
-          ><span class="brand-mark" :class="{ 'has-logo': !!brand.logo }" aria-hidden="true"
-            ><img v-if="brand.logo" :src="brand.logo" alt="" width="28" height="28" /><template v-else>{{
-              brand.name.charAt(0)
-            }}</template></span
+          ><span class="brand-mark has-logo" aria-hidden="true"
+            ><img :src="brand.logo || STOCK_LOGO" alt="" width="28" height="28" /></span
           ><span class="brand-text" :title="[brand.name, brand.org].filter(Boolean).join(' · ')"
             ><span>{{ brand.name }}</span><small v-if="brand.org">{{ brand.org }}</small></span
           ></RouterLink

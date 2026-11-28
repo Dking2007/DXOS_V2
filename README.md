@@ -4,6 +4,8 @@ Tiếng Việt | [English](README_EN.md)
   <img src="docs/images/banner.svg" width="100%" alt="Desktiny: khối Core dùng chung ở dưới, Workspace, console và client khác cắm vào qua API, gói giao diện và plugin cắm vào Workspace">
 </p>
 
+<p align="center"><img src="design-system/desktiny/logo/desktiny-logo.svg" width="96" alt="Logo Desktiny"></p>
+
 <h1 align="center">Desktiny</h1>
 
 <p align="center">

@@ -1,0 +1,16 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Desktiny">
+  <defs><linearGradient id="nen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FBFDFE"/><stop offset="1" stop-color="#E7F0F3"/></linearGradient></defs>
+  <rect x=".5" y=".5" width="31" height="31" rx="8" fill="url(#nen)" stroke="#D3E0E6"/>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <g transform="rotate(-28 16 16)"><ellipse cx="16" cy="16" rx="13.4" ry="7" fill="none" stroke="#12A894" stroke-width="1.7"/></g>
+    <path d="M11.5 6.5h7.6l4 4v12.2a1.8 1.8 0 0 1-1.8 1.8h-9.8a1.8 1.8 0 0 1-1.8-1.8V8.3a1.8 1.8 0 0 1 1.8-1.8z" fill="#FFFFFF" stroke="#14233B" stroke-width="2"/>
+    <path d="M12.6 12.5h5.2M12.6 15.6h6.4" stroke="#64748B" stroke-width="1.6"/>
+    <path d="M9.77 24.82 L9.35 24.81 L8.93 24.78 L8.53 24.74 L8.14 24.69 L7.76 24.62 L7.40 24.54 L7.05 24.44 L6.71 24.33 L6.39 24.21 L6.09 24.07 L5.80 23.92 L5.53 23.75 L5.28 23.57 L5.05 23.38 L4.83 23.18 L4.63 22.97 L4.45 22.74 L4.29 22.50 L4.15 22.25 L4.03 22.00 L3.93 21.73 L3.85 21.45 L3.78 21.16 L3.74 20.87 L3.72 20.57 L3.72 20.25 L3.74 19.94 L3.78 19.61 L3.84 19.28 L3.93 18.94" fill="none" stroke="#F1F6F8" stroke-width="3.6"/>
+    <path d="M9.77 24.82 L9.35 24.81 L8.93 24.78 L8.53 24.74 L8.14 24.69 L7.76 24.62 L7.40 24.54 L7.05 24.44 L6.71 24.33 L6.39 24.21 L6.09 24.07 L5.80 23.92 L5.53 23.75 L5.28 23.57 L5.05 23.38 L4.83 23.18 L4.63 22.97 L4.45 22.74 L4.29 22.50 L4.15 22.25 L4.03 22.00 L3.93 21.73 L3.85 21.45 L3.78 21.16 L3.74 20.87 L3.72 20.57 L3.72 20.25 L3.74 19.94 L3.78 19.61 L3.84 19.28 L3.93 18.94" fill="none" stroke="#12A894" stroke-width="1.9"/>
+    <circle cx="21.6" cy="21.6" r="5" fill="#FFFFFF" stroke="#12A894" stroke-width="1.7"/>
+    <path d="m19.5 21.7 1.5 1.5 2.8-3.1" fill="none" stroke="#0F9A87" stroke-width="1.6"/>
+    <path d="M26.40 5.20 L27.36 8.24 L30.40 9.20 L27.36 10.16 L26.40 13.20 L25.44 10.16 L22.40 9.20 L25.44 8.24Z" fill="#F2B43C" stroke="#F1F6F8" stroke-width=".8"/>
+  </g>
+</svg>

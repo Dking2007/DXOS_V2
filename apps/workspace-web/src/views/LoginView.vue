@@ -8,7 +8,7 @@
 import { ChevronRight, Loader2, TriangleAlert } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { appearance, brand } from '../ui/appearance'
+import { STOCK_LOGO, appearance, brand } from '../ui/appearance'
 
 const route = useRoute()
 // The sector pack in force may name the organisation, change the titles and the ground.
@@ -128,10 +128,8 @@ const SPECKS = [
 
       <div class="entry-emblem rise" style="--d: 0.3s" aria-hidden="true">
         <span class="entry-emblem-ring"
-          ><span class="entry-emblem-core" :class="{ 'has-logo': !!brand.logo }"
-            ><img v-if="brand.logo" :src="brand.logo" alt="" /><template v-else>{{
-              brand.name.charAt(0)
-            }}</template></span
+          ><span class="entry-emblem-core has-logo" :class="{ stock: !brand.logo }"
+            ><img :src="brand.logo || STOCK_LOGO" alt="" /></span
           ></span
         >
       </div>
@@ -238,6 +236,10 @@ const SPECKS = [
   padding: 16%;
   background: radial-gradient(circle at 35% 30%, #fff, var(--metal-1));
   border-radius: 50%;
+}
+.entry-emblem-core.stock {
+  /* Desktiny's own mark is a full tile: it sits larger in the silver ring than a pack's flat logo. */
+  padding: 12%;
 }
 .entry-emblem-core.has-logo img {
   width: 100%;
