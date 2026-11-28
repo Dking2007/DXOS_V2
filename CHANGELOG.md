@@ -36,6 +36,18 @@ duy nhất là luồng đăng nhập OIDC.
 - `scripts/backup.py`, `scripts/restore.py`: sao lưu và khôi phục ba cơ sở dữ liệu và kho tệp, kèm manifest SHA-256; số đo diễn tập trong `docs/operations.md`.
 - Tài khoản demo `lanh-dao-mfa` bắt buộc cài TOTP ở lần đăng nhập đầu (chỉ cài mới).
 - `scripts/check_version.py`: workflow phát hành kiểm số phiên bản theo SemVer; Release đính kèm SBOM CycloneDX.
+- **Trình soạn thảo ONLYOFFICE toàn màn hình**: nút "Toàn màn hình" trên trang chỉnh sửa tài liệu che cả cửa sổ (ẩn thanh
+  bên, đầu trang) và bật chế độ toàn màn hình của trình duyệt; "Thu nhỏ" hoặc Esc để quay lại, không tải lại tài liệu.
+- **Kho tài liệu** mặc định xem dạng lưới; lựa chọn danh sách/lưới của từng người được nhớ trên trình duyệt.
+- **Hoạt động của công việc** vẽ thành sơ đồ quy trình (cùng kiểu trình thiết kế quy trình): mỗi bước là một nút có
+  icon, người làm và giờ, nối bằng mũi tên theo màu trạng thái; cập nhật phụ nét đứt. Nút "Phóng to" mở sơ đồ ngang,
+  tự xuống hàng theo bề rộng, kéo và thu phóng được.
+- **Công việc dạng giấy** (kiểu xem mặc định, lựa chọn được nhớ trên trình duyệt): mỗi việc là một tờ giấy kẻ dòng
+  có băng dính màu theo mức ưu tiên, góc gấp, mô tả ngắn, nhãn, tiến độ checklist, người nhận và hạn; dấu mộc
+  "Quá hạn", "Trả lại", "Hoàn tất", "Đã hủy". Tờ giấy nghiêng nhẹ, nhấc lên khi rê chuột (đứng thẳng khi giảm chuyển động).
+- **Bảng tin** làm mới giao diện: dải chào theo buổi kèm ngày và số bài mới hôm nay; thanh lọc dạng kính mờ dính dưới
+  thanh trên cùng; thẻ bài bo tròn, bóng mềm, avatar có viền màu, nút thao tác dạng viên; ảnh đơn nằm trên nền mờ của
+  chính nó thay cho khung đen; thông báo chính thức ở cột phải xếp theo dòng thời gian.
 - **Cài đặt cá nhân** (`/preferences`, mọi người dùng; 9bf7477): giao diện sáng/tối/theo máy, mật độ hiển thị, thu
   gọn thanh bên, cỡ chữ 90–125% (toàn bộ cỡ chữ đổi sang `rem`), phông chữ, giãn dòng, giảm chuyển động, tăng tương
   phản, luôn hiện viền focus, gạch chân liên kết, định dạng ngày (dd/mm/yyyy hoặc yyyy-mm-dd), giờ 24h/12h, ngày đầu
@@ -52,9 +64,18 @@ duy nhất là luồng đăng nhập OIDC.
 
 ### Changed
 - Trình bày lại README (sơ đồ kiến trúc, luồng nghiệp vụ, bảng công nghệ), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT và mẫu issue.
-- Trang đăng nhập mặc định kiểu `flat`; khung, vệt sáng thuộc gói giao diện chọn `framed`.
+- Gói giao diện đang dùng có màu riêng thì biểu tượng menu, nút trợ lý AI và trang đăng nhập (ánh sáng, vòng bạc, nút) ngả theo màu của gói thay vì giữ màu xanh mặc định; mỗi phân hệ vẫn giữ sắc riêng để phân biệt.
+- Trang đăng nhập mặc định lại có khung (`framed`), thiết kế lại: viền đôi sáng dần về góc, góc bạc có viên đá, dấu thoi giữa cạnh, một vệt sáng chạy chậm quanh viền; tiêu đề mặc định chỉ xuống dòng giữa các cụm từ nên điện thoại 360 px không còn chữ "TỬ", "DUYỆT" đứng một mình. Gói giao diện vẫn chọn được `flat` hoặc `image`.
 - Tài khoản demo mới có tên người và chức danh riêng; lời chào dùng đầy đủ họ tên.
 - Hộp xác nhận trong ứng dụng thay hộp `confirm()` của trình duyệt.
+- **Core không có giao diện khi chạy riêng** (đúng yêu cầu Core headless của đề thi): công cụ quản trị kỹ thuật
+  Core admin (`apps/core-admin`) chuyển từ profile `core` sang profile mới `console` (vẫn có trong `workspace`).
+  `--profile core` chỉ chạy Core API, worker, Keycloak, gateway và kho lưu trữ; gateway trả 404 kèm lời giải thích
+  ở `/` và `/console/` thay vì 502. Muốn dùng Core admin khi chỉ chạy Core: thêm `--profile console`. README,
+  `docs/installation.md`, `docs/operations.md`, `SELF_REVIEW.md` hướng dẫn thử Core bằng `examples/core-client` và
+  `/core/v1/docs`; test triển khai kiểm `--profile core` không có ứng dụng giao diện nào.
+- Trang Công việc bỏ kiểu xem Kanban và "Theo hạn"; còn dạng giấy (mặc định) và danh sách dạng bảng. Lọc theo trạng
+  thái và "Quá hạn" vẫn có trong bộ lọc.
 - Chuẩn hóa khoảng cách theo token (`--space-*`, `--gap-icon`, `--field-gap`, `--control-h`): nút, tab, ô nhập,
   cảnh báo, bảng, hộp thoại không còn dính nhau; viền focus rõ khi dùng bàn phím (9bf7477).
 - Rà soát nút bấm trên các màn hình (fd29309, 0c682f3): chống gửi trùng, trạng thái "Đang …", nút bị khóa có lý do,
@@ -65,15 +86,35 @@ duy nhất là luồng đăng nhập OIDC.
 - Hiệu năng: canvas không tuần tự hóa sơ đồ trong lúc kéo bước và không vẽ lại cả trang theo từng khung thu phóng
   (c5d4bb9); nhắn tin và bảng tin chỉ vẽ lại dòng/bài thay đổi khi gõ phím (0c682f3); bộ định dạng ngày/dung lượng
   dùng lại thay vì tạo mới mỗi dòng; danh mục ít đổi không tải lại mỗi lần quay lại cửa sổ (9bf7477, c5d4bb9).
+- Bộ chọn người có tìm kiếm thay ô chọn thường ở "Chuyển cho", cấu hình bước quy trình (người nhận, giao cho, đơn vị
+  nhận, chuyển cấp) và thiết kế biểu mẫu (4e38e30); chặn tạo biểu mẫu khi bước "người cụ thể" chưa chọn người
+  (3e8aa00).
 
 ### Fixed
+- Trang chủ: tên hồ sơ dài trong "Hồ sơ gần đây" kết thúc bằng "…" thay vì chạy đè lên nhãn trạng thái.
+- Xóa được biểu mẫu không còn dùng (B7): nút "Xóa biểu mẫu" cạnh ô chọn biểu mẫu khi tạo luồng, `DELETE /forms/{id}`. Biểu mẫu
+  đã có hồ sơ thì được lưu trữ (hồ sơ vẫn xem được); biểu mẫu quy trình còn dùng hoặc do gói cài thì bị từ chối kèm lý do.
+- Khung plugin co lại vừa nội dung: SDK khung đo chiều cao phần thân trang thay cho `scrollHeight` của `<html>` (giá trị này
+  không bao giờ nhỏ hơn khung, nên khung chỉ giãn mà không co). Trạng thái công việc thống nhất "Đang thực hiện" (thanh
+  tiến trình và bộ lọc trước ghi "Đang làm").
+- Hồ sơ không còn kẹt ở "Đang xử lý" khi một nhánh quy trình hết bước mà không có bước Kết thúc (ví dụ kết thúc bằng "Gửi thông
+  báo"): hồ sơ nhận quyết định cuối cùng trên đường đi (duyệt, trả lại, từ chối), không có quyết định nào thì là đã duyệt;
+  diễn tập quy trình báo cùng kết quả. Hồ sơ đã kẹt vì một bước lỗi thì người tạo thu hồi được (B1).
+- `desktiny-plugin check` (và bước đóng gói dùng nó) kiểm cả độ dài tiêu đề, mô tả và cấu trúc ô cấu hình (`settings_schema`,
+  `config_schema`, `parameters`) như Desktiny, nên không còn manifest qua bước kiểm mà bị từ chối khi cài.
 - Tiêu đề màn đăng nhập không còn bị cắt dấu tiếng Việt (Ử, Ệ…).
 - Thanh trên cùng không tràn ngang ở 390 px; tên tổ chức và đường dẫn trang không bị rút khi còn chỗ.
 - Canvas quy trình mở vừa khung, tên bước hai dòng, nhãn nhánh dễ đọc, gọn trên điện thoại.
+- Điện thoại 360 px không còn cuộn ngang: nhóm nút thanh trên cùng không bị ép nhỏ hơn các nút (nút "Đăng xuất" lòi
+  ra 4 px khi tên trang dài), cột Bảng tin không giãn theo nội dung rộng nhất (tràn 112 px). Canvas quy trình trên
+  điện thoại mở ở cỡ đọc được (75%) từ bước kích hoạt thay vì thu cả luồng còn 20%; luồng ngắn vẫn hiện trọn và
+  "Vừa màn hình" vẫn cho xem toàn cảnh. Dòng trạng thái luồng không còn ép câu thành cột một chữ chiếm nửa màn hình.
 - Hộp thoại đặt tiêu điểm vào ô nhập đầu tiên; hướng dẫn làm quen chỉ hiện một lần; sửa lỗi tiếp cận bàn phím và nhãn.
 - Giao việc có tên rất dài không còn lỗi 500; nhãn mức ưu tiên không xuống dòng.
 - Người được giao gửi được hồ sơ do luồng tự động tạo (trước đây lỗi 404).
 - Danh sách Cần phê duyệt tự làm mới; lịch sử hồ sơ hiện "Quyết định: Duyệt/Trả lại/Từ chối" thay mã `case.decision`.
+- Bản cài bằng `make install` không nạp được gói giao diện dựng sẵn: mã tìm ở `$PREFIX/packs` trong khi gói được
+  chép vào `$PREFIX/share/desktiny/packs`. `.env.example` thêm `DATABASE_URL` và `PACKS_DIR` (tuỳ chọn) cho bản cài.
 - Đăng nhập để form Keycloak quá 5 phút trả JSON `oidc_state_invalid`: state đăng nhập nay sống 30 phút, callback
   lỗi chuyển về trang đăng nhập kèm thông báo (f3be40b).
 - Nút thu gọn thanh bên không có tác dụng ở trang thiết kế quy trình (9bf7477).

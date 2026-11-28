@@ -34,6 +34,7 @@ import TaskAutomations from '../components/TaskAutomations.vue'
 import PluginFrames from '../components/plugins/PluginFrames.vue'
 import PluginActions from '../components/plugins/PluginActions.vue'
 import TaskFiles from '../components/TaskFiles.vue'
+import TaskActivity from '../components/TaskActivity.vue'
 import { TASK_STAGES, dueText, nextStep, taskStage } from '../ui/taskGuide'
 import { initialsOf } from '../ui/people'
 import { confirmDiscard } from '../ui/unsaved'
@@ -123,23 +124,6 @@ const canTick = computed(
     (canManage.value || task.value.assignee_id === session.user?.id),
 )
 const priorityLabel = { low: 'Thấp', normal: 'Bình thường', high: 'Cao', urgent: 'Khẩn' }
-const eventLabels: Record<string, string> = {
-  created: 'Tạo công việc',
-  assigned: 'Giao / phân công',
-  accept: 'Tiếp nhận',
-  start: 'Bắt đầu thực hiện',
-  submit: 'Nộp kết quả',
-  complete: 'Nghiệm thu hoàn tất',
-  return: 'Trả lại',
-  block: 'Báo vướng mắc',
-  unblock: 'Tiếp tục xử lý',
-  cancel: 'Hủy việc',
-  due_changed: 'Đổi hạn',
-  automation_attached: 'Gắn luồng tự động',
-  files_changed: 'Cập nhật tài liệu đính kèm',
-  automation_detached: 'Gỡ luồng tự động',
-  updated: 'Cập nhật',
-}
 async function run(work: () => Promise<unknown>, label = '') {
   if (busy.value) return false
   busy.value = true
@@ -591,22 +575,7 @@ function localInput(value: string | null) {
         </section>
         <TaskAutomations :task-id="task.id" :closed="closed" />
         <PluginFrames place="task.side" :context="{ task_id: task.id }" />
-        <section class="card">
-          <header class="card-header"><h3>Hoạt động</h3></header>
-          <div class="card-body">
-            <ul class="timeline">
-              <li v-for="event in task.events" :key="event.id">
-                <p>{{ eventLabels[event.action] ?? event.action }}</p>
-                <small
-                  >{{ event.actor_name }} · {{ formatDate(event.created_at, true)
-                  }}<template v-if="event.detail?.reason">
-                    · “{{ event.detail.reason }}”</template
-                  ></small
-                >
-              </li>
-            </ul>
-          </div>
-        </section>
+        <TaskActivity :events="task.events" />
       </aside>
     </div>
     <ModalDialog

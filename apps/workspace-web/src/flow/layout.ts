@@ -220,12 +220,62 @@ export function makeRoom(
   return { at, moved }
 }
 
-/** Opening or "fit" shows the whole flow, never magnified past 100% and not so small that names are unreadable. */
+/**
+ * "Vừa màn hình" shows the whole flow, never magnified past 100%. On a wide screen names stay readable;
+ * on a phone the button gives the overview even if it is small (opening uses `narrowViewport` instead).
+ */
 export const FIT_VIEW = {
   padding: 0.08,
-  // On a phone the whole flow still has to be visible, even if it is small; pinch to zoom in.
   get minZoom() {
-    return window.innerWidth < 640 ? 0.2 : 0.5
+    return window.innerWidth < NARROW_CANVAS ? 0.2 : 0.5
   },
   maxZoom: 1,
+}
+
+/** A step's place and size on the canvas, in flow coordinates. */
+export type Area = Omit<Box, 'id'>
+export interface Viewport {
+  x: number
+  y: number
+  zoom: number
+}
+/** A canvas narrower than this is a phone (or a squeezed pane): it opens on readable steps, not a thumbnail. */
+export const NARROW_CANVAS = 640
+/** Smallest zoom at which a step's name (15px) still reads on a phone: about 11px. */
+export const READABLE_ZOOM = 0.75
+
+/**
+ * Where a narrow canvas opens. A flow that fits at a readable size is shown whole and centred, never
+ * past 100%. A longer one stays at the readable size and starts at the trigger on the left edge, so it
+ * reads from its first step and the rest is one swipe away instead of a pinch.
+ */
+export function narrowViewport(
+  boxes: Area[],
+  pane: { width: number; height: number },
+  options: { start?: Area; padding?: number; readable?: number; maxZoom?: number } = {},
+): Viewport {
+  const pad = options.padding ?? 16
+  const maxZoom = options.maxZoom ?? 1
+  const readable = Math.min(options.readable ?? READABLE_ZOOM, maxZoom)
+  if (!boxes.length || pane.width <= 0 || pane.height <= 0) return { x: 0, y: 0, zoom: 1 }
+  const left = Math.min(...boxes.map((b) => b.x))
+  const top = Math.min(...boxes.map((b) => b.y))
+  const right = Math.max(...boxes.map((b) => b.x + b.width))
+  const bottom = Math.max(...boxes.map((b) => b.y + b.height))
+  const width = Math.max(right - left, 1)
+  const height = Math.max(bottom - top, 1)
+  const roomX = Math.max(pane.width - pad * 2, 1)
+  const roomY = Math.max(pane.height - pad * 2, 1)
+  const fit = Math.min(roomX / width, roomY / height, maxZoom)
+  const centre = (size: number, room: number, from: number, zoom: number) => (room - size * zoom) / 2 - from * zoom
+  if (fit >= readable) {
+    return { x: centre(width, pane.width, left, fit), y: centre(height, pane.height, top, fit), zoom: fit }
+  }
+  const zoom = readable
+  const x = pad - left * zoom
+  if (height * zoom <= roomY) return { x, y: centre(height, pane.height, top, zoom), zoom }
+  // Taller than the pane as well: the trigger's row in the middle, without empty space above or below the flow.
+  const anchor = options.start ? options.start.y + options.start.height / 2 : top + height / 2
+  const y = Math.max(Math.min(pane.height / 2 - anchor * zoom, pad - top * zoom), pane.height - pad - bottom * zoom)
+  return { x, y, zoom }
 }

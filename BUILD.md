@@ -43,7 +43,8 @@ make install PREFIX=$HOME/desktiny   # cài ra ngoài thư mục mã nguồn
 Sau `make install`, gói Python (`dx_core`, `dx_workspace`, `dx_platform_kit`) nằm dưới
 `$PREFIX/lib/python3.13/site-packages`, web tĩnh dưới `$PREFIX/share/desktiny/`, migration
 CSDL ở `$PREFIX/share/desktiny/{core,workspace}-api/`, lệnh `$PREFIX/bin/desktiny-migrate`, cấu hình mẫu ở
-`$PREFIX/share/desktiny/config/env.example`. Có thể xóa thư mục mã nguồn rồi chạy:
+`$PREFIX/share/desktiny/config/env.example`, gói giao diện dựng sẵn ở `$PREFIX/share/desktiny/packs` (Workspace API
+tự tìm thấy; đặt `PACKS_DIR` nếu để ở chỗ khác). Có thể xóa thư mục mã nguồn rồi chạy:
 
 ```bash
 export PYTHONPATH=$HOME/desktiny/lib/python3.13/site-packages

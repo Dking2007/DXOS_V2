@@ -304,9 +304,11 @@ time {
   .topbar {
     gap: 4px;
   }
+  /* The buttons never shrink, so the group must not either: with `min-width: 0` a longer page name
+     squeezed the group below its buttons and pushed "Đăng xuất" past the edge of a 360px phone. */
   .topbar-actions {
     gap: 2px;
-    min-width: 0;
+    flex-shrink: 0;
   }
   .topbar .icon-button {
     width: 36px;

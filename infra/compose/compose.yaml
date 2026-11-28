@@ -331,7 +331,9 @@ services:
       dockerfile: infra/compose/web.Dockerfile
       args:
         APP: core-admin
-    profiles: [core, workspace]
+    # A client of the Core API, not part of Core: `--profile core` alone serves no page at all (Core is
+    # headless). Add `--profile console` for this technical tool; Workspace keeps it.
+    profiles: [console, workspace]
     restart: unless-stopped
     networks: [dx]
 
@@ -353,6 +355,7 @@ services:
         condition: service_healthy
       core-admin:
         condition: service_started
+        required: false  # absent with `--profile core` alone; /console/ then answers 404
       identity:
         condition: service_healthy
     networks: [dx]

@@ -8,7 +8,19 @@ import { computed, ref } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   AlertTriangle,
+  Bot,
+  Check,
+  CheckCircle2,
   Copy,
+  FileArchive,
+  FileJson,
+  Info,
+  LayoutPanelLeft,
+  MonitorSmartphone,
+  PackageOpen,
+  Radio,
+  Server,
+  Workflow,
   KeyRound,
   Activity,
   ListChecks,
@@ -245,13 +257,41 @@ function form(file: File) {
   body.append('file', file)
   return body
 }
+// Installing goes in three steps: choose the file, read what the plugin asks for, approve it.
+const installing = ref(false)
+const dragging = ref(false)
+const FILE_RULE = 'Chỉ cài được tệp .zip (plugin đóng gói) hoặc .json (bản kê plugin kết nối).'
+function openInstall() {
+  previewFile.value = null
+  preview.value = null
+  previewError.value = null
+  installing.value = true
+}
+function closeInstall() {
+  if (busy.value) return
+  installing.value = false
+  previewFile.value = null
+}
+function chooseAgain() {
+  previewFile.value = null
+  preview.value = null
+  previewError.value = null
+}
+function onDrop(event: DragEvent) {
+  dragging.value = false
+  const file = event.dataTransfer?.files?.[0]
+  if (file) void choose(file)
+}
 async function pick(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  if (!file) return
+  if (file) await choose(file)
+}
+async function choose(file: File) {
   if (!/\.(zip|json)$/i.test(file.name)) {
-    toast.error('Chỉ cài được tệp .zip (plugin đóng gói) hoặc .json (bản kê plugin kết nối).')
+    previewError.value = new Error(FILE_RULE)
+    previewFile.value = null
     return
   }
   previewFile.value = file
@@ -275,6 +315,7 @@ async function install() {
     for (const note of row.notes ?? []) toast.success(note)
     await queryClient.invalidateQueries({ queryKey: ['packs'] })
     previewFile.value = null
+    installing.value = false
     await refresh()
     if (row.state === 'pending') openApprove(row)
   } catch (cause) {
@@ -293,6 +334,41 @@ function openApprove(row: PluginRow) {
     frame_permissions: row.frame_permissions.map((item) => item.key),
     assistant_tools: row.assistant_tools.map((tool) => tool.name),
   }
+}
+// Scopes that change Desktiny's data: shown apart so the approver weighs them.
+const WRITE_SCOPES = new Set(['cases.comment', 'cases.fields.write', 'cases.attach', 'tasks.write', 'notifications.send'])
+const isWrite = (key: string) => WRITE_SCOPES.has(key)
+const previewReads = computed(() => preview.value?.permissions.filter((item) => !isWrite(item.key)) ?? [])
+const previewWrites = computed(() => preview.value?.permissions.filter((item) => isWrite(item.key)) ?? [])
+const previewAdds = computed(() => {
+  const value = preview.value
+  if (!value) return []
+  return [
+    ...value.nodes.map((node) => ({ icon: Workflow, text: `Bước quy trình “${node.title}”` })),
+    ...value.ui.map((ui) => ({ icon: LayoutPanelLeft, text: `Khung “${ui.title}” — ${ui.slot_label.toLowerCase()}` })),
+    ...value.assistant_tools.map((tool) => ({ icon: Bot, text: `Công cụ trợ lý AI: ${tool.description}` })),
+    ...value.frame_permissions.map((item) => ({ icon: MonitorSmartphone, text: `Dùng ${item.label.toLowerCase()}` })),
+  ]
+})
+/** Every choice the approval dialog offers, and how many are ticked. */
+const approvalCount = computed(() => {
+  const row = approving.value
+  if (!row) return { chosen: 0, total: 0 }
+  const lists: [string[], string[]][] = [
+    [row.permissions.map((item) => item.key), chosen.value.permissions],
+    [row.events.map((item) => item.key), chosen.value.events],
+    [row.frame_permissions.map((item) => item.key), chosen.value.frame_permissions],
+    [row.assistant_tools.map((tool) => tool.name), chosen.value.assistant_tools],
+  ]
+  if (chosen.value.permissions.includes('cases.fields.write')) lists.push([row.fields, chosen.value.fields])
+  return {
+    chosen: lists.reduce((sum, [all, picked]) => sum + all.filter((key) => picked.includes(key)).length, 0),
+    total: lists.reduce((sum, [all]) => sum + all.length, 0),
+  }
+})
+function setAll(list: string[], keys: string[], on: boolean) {
+  const rest = list.filter((key) => !keys.includes(key))
+  list.splice(0, list.length, ...rest, ...(on ? keys : []))
 }
 function toggleIn(list: string[], key: string) {
   const index = list.indexOf(key)
@@ -404,14 +480,7 @@ async function copy(text: string) {
   <header class="page-head compact">
     <h1 class="sr-only">Plugin</h1>
     <div class="page-actions">
-      <label class="button plugin-upload" :class="{ disabled: busy }" title="Chọn tệp .zip hoặc bản kê .json của plugin"
-        ><Upload :size="17" />Cài plugin (.zip)<input
-          type="file"
-          accept=".json,.zip,application/json,application/zip"
-          class="sr-only"
-          :disabled="busy"
-          @change="pick"
-      /></label>
+      <button type="button" class="button" :disabled="busy" @click="openInstall"><Upload :size="17" />Cài plugin</button>
     </div>
   </header>
   <StatePanel
@@ -602,81 +671,140 @@ async function copy(text: string) {
     </p>
   </template>
 
-  <ModalDialog v-if="previewFile" title="Cài plugin" wide @close="closeUnlessBusy(() => (previewFile = null))">
-    <div v-if="previewError" class="notice error error-inline" role="alert">{{ errorText(previewError) }}</div>
-    <StatePanel v-else-if="!preview" :loading="true" />
-    <div v-if="previewError && !preview" class="form-actions">
-      <button type="button" class="button secondary" @click="previewFile = null">Đóng</button>
-    </div>
-    <div v-if="preview" class="stack">
-      <div>
-        <strong>{{ preview.name }}</strong>
-        <small class="muted mono">
-          · {{ preview.id }} · <template v-if="preview.upgrade_from">{{ preview.upgrade_from }} → </template
-          >{{ preview.version }} · {{ preview.license }}</small
-        >
-        <p v-if="preview.description">{{ preview.description }}</p>
-        <small v-if="preview.packaged" class="muted"
-          >Plugin đóng gói: Desktiny tự phục vụ {{ preview.files }} tệp giao diện của nó, không cần máy chủ riêng.</small
-        >
-        <small v-else class="mono">{{ preview.base_url }}</small>
-      </div>
-      <div v-if="!preview.host_allowed" class="notice error">
-        <AlertTriangle :size="18" /><span
-          >Máy chủ của plugin chưa có trong <code>PLUGIN_ALLOWED_HOSTS</code>; không cài được.</span
-        >
-      </div>
-      <div class="plugin-asks">
-        <div>
-          <span class="section-label">Xin quyền</span>
-          <p v-if="!preview.permissions.length" class="muted">Không xin quyền dữ liệu.</p>
-          <ul>
-            <li v-for="item in preview.permissions" :key="item.key">{{ item.label }}</li>
-            <li v-if="preview.fields.length">
-              Ghi các trường: <span class="mono">{{ preview.fields.join(', ') }}</span>
-            </li>
-          </ul>
+  <ModalDialog v-if="installing" :title="preview?.upgrade_from ? 'Nâng cấp plugin' : 'Cài plugin'" wide @close="closeInstall">
+    <ol class="install-steps" aria-label="Các bước cài plugin">
+      <li :class="previewFile ? 'done' : 'current'" :aria-current="previewFile ? undefined : 'step'">
+        <span><Check v-if="previewFile" :size="13" /><template v-else>1</template></span>Chọn tệp
+      </li>
+      <li :class="previewFile ? 'current' : ''" :aria-current="previewFile ? 'step' : undefined"><span>2</span>Xem trước</li>
+      <li><span>3</span>Duyệt quyền</li>
+    </ol>
+
+    <template v-if="!previewFile">
+      <div v-if="previewError" class="notice error" role="alert"><AlertTriangle :size="18" /><span>{{ errorText(previewError) }}</span></div>
+      <label
+        class="install-drop"
+        :class="{ dragging }"
+        @dragenter.prevent="dragging = true"
+        @dragover.prevent="dragging = true"
+        @dragleave.prevent="dragging = false"
+        @drop.prevent="onDrop"
+      >
+        <span class="install-drop-icon"><Upload :size="24" /></span>
+        <strong>Kéo thả tệp plugin vào đây</strong>
+        <span class="muted">hoặc <span class="install-drop-link">chọn tệp từ máy</span> · .zip hoặc .json, tối đa 10 MB</span>
+        <input
+          type="file"
+          accept=".json,.zip,application/json,application/zip"
+          class="sr-only"
+          @change="pick"
+        />
+      </label>
+      <div class="install-kinds">
+        <div class="install-kind">
+          <span class="install-kind-icon"><FileArchive :size="18" /></span>
+          <div>
+            <strong>Plugin đóng gói (.zip)</strong>
+            <p class="muted">Trang giao diện nằm trong gói, Desktiny tự phục vụ; có thể kèm gói giao diện. Không cần máy chủ riêng.</p>
+          </div>
         </div>
-        <div>
-          <span class="section-label">Nhận sự kiện</span>
-          <p v-if="!preview.events.length" class="muted">Không nhận sự kiện.</p>
-          <ul>
-            <li v-for="item in preview.events" :key="item.key">{{ item.label }}</li>
-          </ul>
-        </div>
-        <div>
-          <span class="section-label">Thêm vào phần mềm</span>
-          <ul>
-            <li v-for="node in preview.nodes" :key="node.kind">Bước quy trình: {{ node.title }}</li>
-            <li v-for="ui in preview.ui" :key="ui.title">Khung “{{ ui.title }}” ở {{ ui.slot_label.toLowerCase() }}</li>
-            <li v-for="item in preview.frame_permissions" :key="item.key">Dùng {{ item.label.toLowerCase() }}</li>
-            <li v-for="tool in preview.assistant_tools" :key="tool.name">Công cụ trợ lý: {{ tool.description }}</li>
-          </ul>
+        <div class="install-kind">
+          <span class="install-kind-icon"><FileJson :size="18" /></span>
+          <div>
+            <strong>Plugin kết nối (.json hoặc .zip)</strong>
+            <p class="muted">Ứng dụng chạy ở máy chủ của cơ quan; máy chủ phải có trong <code>PLUGIN_ALLOWED_HOSTS</code>.</p>
+          </div>
         </div>
       </div>
-      <div v-if="preview.pack_preview" class="plugin-pack">
-        <span class="section-label"
-          >Gói giao diện đi kèm: {{ preview.pack_preview.pack.name }}
-          <template v-if="preview.pack_preview.upgrade_from">{{ preview.pack_preview.upgrade_from }} → </template
-          >{{ preview.pack_preview.pack.version }}</span
-        >
-        <ul>
-          <template v-for="(label, key) in PACK_ADDS" :key="key">
-            <li v-if="preview.pack_preview.adds[key]?.length">
-              {{ label }}: {{ preview.pack_preview.adds[key].join(', ') }}
-            </li>
-          </template>
-          <li v-if="preview.pack_preview.appearance">Giao diện riêng (chọn dùng ở Quản trị › Gói giao diện)</li>
-        </ul>
-        <div v-for="item in preview.pack_preview.conflicts" :key="item" class="notice warning">
-          <AlertTriangle :size="16" /><span>{{ item }}</span>
-        </div>
-        <small v-for="item in preview.pack_preview.warnings" :key="item" class="muted">{{ item }}</small>
-        <small class="muted">Gói được cài cùng plugin và gỡ cùng plugin.</small>
+      <p class="install-note muted"><ShieldCheck :size="15" />Cài xong plugin ở trạng thái chờ duyệt và chưa làm được gì cho tới khi bạn duyệt quyền.</p>
+    </template>
+
+    <template v-else>
+      <div v-if="previewError" class="notice error" role="alert"><AlertTriangle :size="18" /><span>{{ errorText(previewError) }}</span></div>
+      <div v-if="!preview && !previewError" class="install-loading"><Loader2 :size="20" class="spin" />Đang đọc {{ previewFile.name }}…</div>
+      <div v-if="!preview && previewError" class="form-actions">
+        <button type="button" class="button secondary" @click="chooseAgain">Chọn tệp khác</button>
       </div>
-      <small class="muted">Plugin được cài ở trạng thái chờ duyệt; nó chưa nhận gì cho tới khi bạn duyệt quyền.</small>
-      <div class="form-actions">
-        <button type="button" class="button secondary" :disabled="busy" @click="previewFile = null">Huỷ</button
+
+      <div v-if="preview" class="install-preview">
+        <header class="install-head">
+          <span class="install-head-icon"><Puzzle :size="24" /></span>
+          <div class="install-head-text">
+            <h3>{{ preview.name }}</h3>
+            <div class="install-badges">
+              <span class="tag">
+                <template v-if="preview.upgrade_from">{{ preview.upgrade_from }} → </template>{{ preview.version }}
+              </span>
+              <span class="tag" :class="preview.packaged ? 'kind-packaged' : 'kind-connected'">
+                <component :is="preview.packaged ? PackageOpen : Server" :size="12" />{{ preview.packaged ? 'Đóng gói' : 'Kết nối' }}
+              </span>
+              <span class="tag">{{ preview.license }}</span>
+            </div>
+            <small class="muted mono">{{ preview.id }}</small>
+          </div>
+        </header>
+        <p v-if="preview.description" class="install-desc">{{ preview.description }}</p>
+        <div class="install-source">
+          <template v-if="preview.packaged"
+            ><PackageOpen :size="15" />Desktiny tự phục vụ {{ preview.files ? `${preview.files} tệp` : 'các trang' }} giao diện
+            trong gói; không cần máy chủ riêng.</template
+          >
+          <template v-else><Server :size="15" />Máy chủ: <code>{{ preview.base_url }}</code></template>
+        </div>
+        <div v-if="!preview.host_allowed" class="notice error" role="alert">
+          <AlertTriangle :size="18" /><span>Máy chủ của plugin chưa có trong <code>PLUGIN_ALLOWED_HOSTS</code>; nhờ bộ phận kỹ thuật thêm vào rồi cài lại.</span>
+        </div>
+
+        <div class="install-grid">
+          <section class="install-section">
+            <h4><ShieldCheck :size="16" />Quyền xin cấp</h4>
+            <p v-if="!preview.permissions.length" class="muted">Không xin quyền dữ liệu nào.</p>
+            <ul class="install-list">
+              <li v-for="item in previewReads" :key="item.key"><span class="scope read">Đọc</span>{{ item.label }}</li>
+              <li v-for="item in previewWrites" :key="item.key"><span class="scope write">Ghi</span>{{ item.label }}</li>
+            </ul>
+            <div v-if="preview.fields.length" class="install-fields">
+              <small class="muted">Trường được ghi:</small>
+              <code v-for="key in preview.fields" :key="key">{{ key }}</code>
+            </div>
+          </section>
+          <section class="install-section">
+            <h4><LayoutPanelLeft :size="16" />Thêm vào Desktiny</h4>
+            <p v-if="!previewAdds.length" class="muted">Không thêm khung hay bước nào.</p>
+            <ul class="install-list">
+              <li v-for="(item, index) in previewAdds" :key="index"><component :is="item.icon" :size="15" class="install-li-icon" />{{ item.text }}</li>
+            </ul>
+          </section>
+          <section v-if="preview.events.length" class="install-section">
+            <h4><Radio :size="16" />Sự kiện plugin nhận</h4>
+            <div class="install-chips">
+              <span v-for="item in preview.events" :key="item.key" class="chip">{{ item.label }}</span>
+            </div>
+            <small class="muted">Chỉ gửi mã bản ghi, không gửi nội dung; mọi lần gửi đều có chữ ký.</small>
+          </section>
+          <section v-if="preview.pack_preview" class="install-section">
+            <h4>
+              <PackageOpen :size="16" />Gói giao diện đi kèm: {{ preview.pack_preview.pack.name }}
+              <span class="tag"><template v-if="preview.pack_preview.upgrade_from">{{ preview.pack_preview.upgrade_from }} → </template>{{ preview.pack_preview.pack.version }}</span>
+            </h4>
+            <ul class="install-list">
+              <template v-for="(label, key) in PACK_ADDS" :key="key">
+                <li v-if="preview.pack_preview.adds[key]?.length"><CheckCircle2 :size="15" class="install-li-icon" />{{ label }}: {{ preview.pack_preview.adds[key].join(', ') }}</li>
+              </template>
+              <li v-if="preview.pack_preview.appearance"><CheckCircle2 :size="15" class="install-li-icon" />Giao diện riêng (chọn dùng ở Quản trị › Gói giao diện)</li>
+            </ul>
+            <div v-for="item in preview.pack_preview.conflicts" :key="item" class="notice warning"><AlertTriangle :size="16" /><span>{{ item }}</span></div>
+            <small v-for="item in preview.pack_preview.warnings" :key="item" class="muted">{{ item }}</small>
+            <small class="muted">Gói được cài và gỡ cùng plugin.</small>
+          </section>
+        </div>
+        <p class="install-note muted"><Info :size="15" />Cài xong, bạn chọn cấp từng quyền ở bước tiếp theo; plugin chưa làm được gì cho tới khi được duyệt.</p>
+      </div>
+
+      <div v-if="preview" class="form-actions install-actions">
+        <button type="button" class="button ghost" :disabled="busy" @click="chooseAgain">Chọn tệp khác</button>
+        <span class="grow" />
+        <button type="button" class="button secondary" :disabled="busy" @click="closeInstall">Huỷ</button
         ><button
           type="button"
           class="button"
@@ -686,89 +814,129 @@ async function copy(text: string) {
           @click="install"
         >
           <Loader2 v-if="busy" :size="16" class="spin" />{{
-            busy ? (preview.upgrade_from ? 'Đang nâng cấp…' : 'Đang cài…') : preview.upgrade_from ? 'Nâng cấp' : 'Cài plugin'
+            busy ? (preview.upgrade_from ? 'Đang nâng cấp…' : 'Đang cài…') : preview.upgrade_from ? 'Nâng cấp' : 'Cài và duyệt quyền'
           }}
         </button>
       </div>
-    </div>
+    </template>
   </ModalDialog>
 
-  <ModalDialog v-if="approving" :title="`Duyệt quyền: ${approving.name}`" @close="closeUnlessBusy(() => (approving = null))">
-    <div class="stack">
-      <p class="muted">Chỉ cấp những gì plugin thật sự cần. Bỏ chọn mục nào thì plugin không có mục đó.</p>
-      <div v-if="approving.permissions.length" class="plugin-group">
-        <span class="section-label">Quyền dữ liệu</span>
-        <label v-for="item in approving.permissions" :key="item.key" class="checkbox-label"
-          ><input
-            type="checkbox"
-            :checked="chosen.permissions.includes(item.key)"
-            @change="toggleIn(chosen.permissions, item.key)"
-          />{{ item.label }}</label
+  <ModalDialog
+    v-if="approving"
+    :title="`Duyệt quyền: ${approving.name}`"
+    wide
+    @close="closeUnlessBusy(() => (approving = null))"
+  >
+    <ol v-if="approving.state === 'pending'" class="install-steps" aria-label="Các bước cài plugin">
+      <li class="done"><span><Check :size="13" /></span>Chọn tệp</li>
+      <li class="done"><span><Check :size="13" /></span>Xem trước</li>
+      <li class="current" aria-current="step"><span>3</span>Duyệt quyền</li>
+    </ol>
+    <div class="approve-summary">
+      <p class="muted">Chỉ cấp những gì plugin thật sự cần; mục bỏ chọn thì plugin không có. Đổi lại được bất cứ lúc nào ở nút “Quyền”.</p>
+      <span class="approve-count" aria-live="polite">Cấp {{ approvalCount.chosen }}/{{ approvalCount.total }}</span>
+    </div>
+
+    <div class="approve-groups">
+      <section v-if="approving.permissions.length" class="approve-group">
+        <header>
+          <h4><ShieldCheck :size="16" />Quyền dữ liệu</h4>
+          <button
+            type="button"
+            class="button ghost small"
+            @click="setAll(chosen.permissions, approving.permissions.map((i) => i.key), chosen.permissions.length < approving.permissions.length)"
+          >
+            {{ chosen.permissions.length < approving.permissions.length ? 'Chọn tất cả' : 'Bỏ chọn' }}
+          </button>
+        </header>
+        <label v-for="item in approving.permissions" :key="item.key" class="approve-item" :class="{ write: isWrite(item.key) }"
+          ><input type="checkbox" :checked="chosen.permissions.includes(item.key)" @change="toggleIn(chosen.permissions, item.key)" />
+          <span class="approve-text">{{ item.label }}<code>{{ item.key }}</code></span>
+          <span class="scope" :class="isWrite(item.key) ? 'write' : 'read'">{{ isWrite(item.key) ? 'Ghi' : 'Đọc' }}</span></label
         >
-      </div>
-      <div v-if="approving.fields.length && chosen.permissions.includes('cases.fields.write')" class="plugin-group">
-        <span class="section-label">Trường biểu mẫu plugin được ghi</span>
-        <label v-for="key in approving.fields" :key="key" class="checkbox-label"
-          ><input type="checkbox" :checked="chosen.fields.includes(key)" @change="toggleIn(chosen.fields, key)" /><span
-            class="mono"
-            >{{ key }}</span
+        <p v-if="approving.permissions.some((i) => isWrite(i.key) && chosen.permissions.includes(i.key))" class="approve-hint">
+          <AlertTriangle :size="14" />Quyền ghi để plugin thay đổi dữ liệu; mỗi lần ghi đều có tên plugin trong lịch sử.
+        </p>
+      </section>
+
+      <section v-if="approving.fields.length && chosen.permissions.includes('cases.fields.write')" class="approve-group">
+        <header>
+          <h4>Trường biểu mẫu được ghi</h4>
+          <button type="button" class="button ghost small" @click="setAll(chosen.fields, approving.fields, chosen.fields.length < approving.fields.length)">
+            {{ chosen.fields.length < approving.fields.length ? 'Chọn tất cả' : 'Bỏ chọn' }}
+          </button>
+        </header>
+        <div class="approve-chips">
+          <label v-for="key in approving.fields" :key="key" class="approve-chip" :class="{ on: chosen.fields.includes(key) }"
+            ><input type="checkbox" class="sr-only" :checked="chosen.fields.includes(key)" @change="toggleIn(chosen.fields, key)" /><Check
+              v-if="chosen.fields.includes(key)"
+              :size="13"
+            /><code>{{ key }}</code></label
+          >
+        </div>
+      </section>
+
+      <section v-if="chosen.permissions.includes('cases.list')" class="approve-group">
+        <header><h4>Quy trình được liệt kê hồ sơ</h4></header>
+        <p v-if="forms.isPending.value" class="muted">Đang tải quy trình…</p>
+        <label v-for="item in forms.data.value?.items ?? []" :key="item.id" class="approve-item"
+          ><input type="checkbox" :checked="chosen.list_forms.includes(item.id)" @change="toggleIn(chosen.list_forms, item.id)" /><span
+            class="approve-text"
+            >{{ item.name }}</span
           ></label
         >
-      </div>
-      <div v-if="chosen.permissions.includes('cases.list')" class="plugin-group">
-        <span class="section-label">Quy trình plugin được liệt kê hồ sơ</span>
-        <p v-if="forms.isPending.value" class="muted">Đang tải quy trình…</p>
-        <label
-          v-for="item in forms.data.value?.items ?? []"
-          :key="item.id"
-          class="checkbox-label"
-          ><input
-            type="checkbox"
-            :checked="chosen.list_forms.includes(item.id)"
-            @change="toggleIn(chosen.list_forms, item.id)"
-          />{{ item.name }}</label
+        <small class="muted">Plugin chỉ liệt kê (và đọc) hồ sơ của quy trình được chọn; không chọn thì không thấy hồ sơ nào.</small>
+      </section>
+
+      <section v-if="approving.events.length" class="approve-group">
+        <header>
+          <h4><Radio :size="16" />Sự kiện được gửi</h4>
+          <button
+            type="button"
+            class="button ghost small"
+            @click="setAll(chosen.events, approving.events.map((i) => i.key), chosen.events.length < approving.events.length)"
+          >
+            {{ chosen.events.length < approving.events.length ? 'Chọn tất cả' : 'Bỏ chọn' }}
+          </button>
+        </header>
+        <label v-for="item in approving.events" :key="item.key" class="approve-item"
+          ><input type="checkbox" :checked="chosen.events.includes(item.key)" @change="toggleIn(chosen.events, item.key)" /><span
+            class="approve-text"
+            >{{ item.label }}<code>{{ item.key }}</code></span
+          ></label
         >
-        <small class="muted">Plugin chỉ liệt kê (và đọc) hồ sơ của các quy trình được chọn; không chọn thì không thấy hồ sơ nào.</small>
-      </div>
-      <div v-if="approving.assistant_tools.length" class="plugin-group">
-        <span class="section-label">Công cụ trợ lý AI được hỏi (chỉ đọc, theo quyền người hỏi)</span>
-        <label v-for="tool in approving.assistant_tools" :key="tool.name" class="checkbox-label"
-          ><input
-            type="checkbox"
-            :checked="chosen.assistant_tools.includes(tool.name)"
-            @change="toggleIn(chosen.assistant_tools, tool.name)"
-          />{{ tool.description }}</label
-        >
-        <small class="muted">Trợ lý chỉ dùng khi tính năng “Trợ lý dùng công cụ của plugin” được bật ở Cài đặt AI.</small>
-      </div>
-      <div v-if="approving.frame_permissions.length" class="plugin-group">
-        <span class="section-label">Quyền thiết bị cho khung giao diện</span>
-        <label v-for="item in approving.frame_permissions" :key="item.key" class="checkbox-label"
+      </section>
+
+      <section v-if="approving.frame_permissions.length" class="approve-group">
+        <header><h4><MonitorSmartphone :size="16" />Quyền thiết bị cho khung giao diện</h4></header>
+        <label v-for="item in approving.frame_permissions" :key="item.key" class="approve-item"
           ><input
             type="checkbox"
             :checked="chosen.frame_permissions.includes(item.key)"
             @change="toggleIn(chosen.frame_permissions, item.key)"
-          />{{ item.label }}</label
+          /><span class="approve-text">{{ item.label }}</span></label
         >
-      </div>
-      <div v-if="approving.events.length" class="plugin-group">
-        <span class="section-label">Sự kiện được gửi</span>
-        <label v-for="item in approving.events" :key="item.key" class="checkbox-label"
+        <small class="muted">Trình duyệt vẫn hỏi người dùng trước khi cho dùng.</small>
+      </section>
+
+      <section v-if="approving.assistant_tools.length" class="approve-group">
+        <header><h4><Bot :size="16" />Công cụ cho trợ lý AI</h4></header>
+        <label v-for="tool in approving.assistant_tools" :key="tool.name" class="approve-item"
           ><input
             type="checkbox"
-            :checked="chosen.events.includes(item.key)"
-            @change="toggleIn(chosen.events, item.key)"
-          />{{ item.label }}</label
+            :checked="chosen.assistant_tools.includes(tool.name)"
+            @change="toggleIn(chosen.assistant_tools, tool.name)"
+          /><span class="approve-text">{{ tool.description }}<code>{{ tool.name }}</code></span></label
         >
-      </div>
-      <div class="form-actions">
-        <button type="button" class="button secondary" :disabled="busy" @click="approving = null">Huỷ</button
-        ><button type="button" class="button" :disabled="busy" :aria-busy="busy" @click="approve">
-          <Loader2 v-if="busy" :size="16" class="spin" /><ShieldCheck v-else :size="16" />{{
-            busy ? 'Đang duyệt…' : 'Duyệt và bật'
-          }}
-        </button>
-      </div>
+        <small class="muted">Chỉ đọc, theo quyền của người hỏi; dùng khi “Trợ lý dùng công cụ của plugin” bật ở Cài đặt AI.</small>
+      </section>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="button secondary" :disabled="busy" @click="approving = null">Để sau</button
+      ><button type="button" class="button" :disabled="busy" :aria-busy="busy" @click="approve">
+        <Loader2 v-if="busy" :size="16" class="spin" /><ShieldCheck v-else :size="16" />{{ busy ? 'Đang duyệt…' : 'Duyệt và bật' }}
+      </button>
     </div>
   </ModalDialog>
 
@@ -927,13 +1095,419 @@ async function copy(text: string) {
   </ModalDialog>
 </template>
 <style scoped>
-.plugin-upload:has(input:focus-visible) {
-  outline: 3px solid var(--focus);
+/* ---- Install: steps, drop zone, preview ---- */
+.install-steps {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.install-steps li {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.install-steps li:not(:last-child)::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  min-width: 12px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.install-steps li > span {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  font-size: 12px;
+}
+.install-steps li.current {
+  color: var(--teal-ink);
+}
+.install-steps li.current > span {
+  border-color: var(--teal);
+  color: #fff;
+  background: var(--teal);
+}
+.install-steps li.done {
+  color: var(--green-ink);
+}
+.install-steps li.done > span {
+  border-color: var(--green-ink);
+  color: var(--green-ink);
+  background: var(--green-soft);
+}
+.install-steps li.done::after {
+  background: var(--green-line);
+}
+.install-drop {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 34px 20px;
+  border: 2px dashed var(--border-strong);
+  border-radius: 14px;
+  background: var(--surface-2);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.install-drop:hover,
+.install-drop.dragging {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+.install-drop:focus-within {
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
-.plugin-upload.disabled {
-  opacity: 0.6;
-  pointer-events: none;
+.install-drop strong {
+  font-size: 16px;
+}
+.install-drop-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 4px;
+  border-radius: 14px;
+  color: var(--teal-ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.install-drop-link {
+  color: var(--teal-ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.install-kinds {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.install-kind {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.install-kind p {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.install-kind-icon,
+.install-head-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: var(--teal-ink);
+  background: var(--teal-soft);
+}
+.install-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 16px 0 0;
+  font-size: 13.5px;
+}
+.install-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+.install-loading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  color: var(--muted);
+}
+.install-preview {
+  display: grid;
+  gap: 14px;
+}
+.install-head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.install-head-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+}
+.install-head-text {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.install-head h3 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.3;
+}
+.install-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.install-badges .tag {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.tag.kind-packaged {
+  color: var(--violet-ink);
+  background: var(--violet-soft);
+}
+.tag.kind-connected {
+  color: var(--blue-ink);
+  background: var(--blue-soft);
+}
+.install-desc {
+  margin: 0;
+  line-height: 1.6;
+}
+.install-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  font-size: 13.5px;
+}
+.install-source code {
+  overflow-wrap: anywhere;
+}
+.install-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+.install-section {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.install-section h4,
+.approve-group h4 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  font-size: 14.5px;
+}
+.install-section h4 svg,
+.approve-group h4 svg {
+  color: var(--teal-ink);
+}
+.install-section p {
+  margin: 0;
+}
+.install-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.install-list li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.install-li-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--muted);
+}
+.scope {
+  flex: none;
+  min-width: 38px;
+  text-align: center;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.scope.read {
+  color: var(--green-ink);
+  background: var(--green-soft);
+}
+.scope.write {
+  color: var(--amber-ink);
+  background: var(--amber-soft);
+}
+.install-fields,
+.install-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.install-fields code {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+}
+.install-actions .grow {
+  flex: 1;
+}
+/* ---- Approval ---- */
+.approve-summary {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.approve-summary p {
+  margin: 0;
+}
+.approve-count {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--teal-ink);
+  background: var(--teal-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+.approve-groups {
+  display: grid;
+  gap: 12px;
+}
+.approve-group {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.approve-group > header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.approve-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.approve-item:hover {
+  background: var(--surface-2);
+}
+.approve-item input {
+  flex: none;
+  margin-top: 3px;
+}
+.approve-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.approve-text code {
+  width: fit-content;
+  color: var(--muted);
+  font-size: 12px;
+}
+.approve-hint {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--amber-ink);
+  background: var(--amber-soft);
+  font-size: 13px;
+}
+.approve-hint svg {
+  flex: none;
+  margin-top: 2px;
+}
+.approve-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.approve-chip {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.approve-chip.on {
+  border-color: var(--teal);
+  color: var(--teal-ink);
+  background: var(--teal-soft);
+}
+.approve-chip:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+@media (max-width: 560px) {
+  .install-steps li {
+    font-size: 0;
+  }
+  .install-steps li.current {
+    flex: 1 0 auto;
+    font-size: 13px;
+  }
+  .approve-summary {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .install-actions {
+    flex-wrap: wrap;
+  }
+  .install-actions .grow {
+    display: none;
+  }
 }
 .plugin-hosts {
   margin: 0 0 16px;
@@ -946,13 +1520,6 @@ async function copy(text: string) {
 .plugin-log-error {
   display: block;
   margin-top: 4px;
-}
-.plugin-group {
-  display: grid;
-  gap: 8px;
-}
-.plugin-group > small {
-  margin-top: 2px;
 }
 .plugin-row {
   display: flex;
@@ -1046,26 +1613,6 @@ async function copy(text: string) {
   .plugin-actions {
     width: 100%;
   }
-}
-.plugin-asks {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-}
-.plugin-asks ul {
-  margin: 6px 0 0;
-  padding-left: 18px;
-}
-.plugin-pack {
-  display: grid;
-  gap: 8px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-.plugin-pack ul {
-  margin: 0;
-  padding-left: 18px;
 }
 .plugin-secret {
   display: flex;

@@ -73,3 +73,25 @@ export function initials(name: string): string {
 export function isLong(body: string) {
   return body.length > 480 || body.split('\n').length > 8
 }
+
+/** "Chào buổi sáng" … by the hour of the reader's clock. */
+export function greeting(now = new Date()): string {
+  const hour = now.getHours()
+  if (hour < 11) return 'Chào buổi sáng'
+  if (hour < 13) return 'Chào buổi trưa'
+  if (hour < 18) return 'Chào buổi chiều'
+  return 'Chào buổi tối'
+}
+
+/** "Thứ Ba, 24 tháng 11" for the feed's heading. */
+export function longDay(now = new Date()): string {
+  const days = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
+  return `${days[now.getDay()]}, ${now.getDate()} tháng ${now.getMonth() + 1}`
+}
+
+/** Posts written since midnight of the reader's day. */
+export function postedToday(dates: string[], now = new Date()): number {
+  const start = new Date(now)
+  start.setHours(0, 0, 0, 0)
+  return dates.filter((value) => new Date(value) >= start).length
+}

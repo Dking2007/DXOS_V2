@@ -10,6 +10,8 @@
 }
 .feed-main {
   display: grid;
+  /* An implicit column is as wide as its widest card's content; on a phone that was wider than the screen. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   min-width: 0;
 }

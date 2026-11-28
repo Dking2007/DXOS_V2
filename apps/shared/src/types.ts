@@ -106,6 +106,8 @@ export interface CaseItem {
   form_id: string
   owner_id?: string
   owner_name?: string
+  form_name?: string
+  priority?: 'low' | 'normal' | 'high' | 'urgent'
   creator_id?: string
   created_by?: string
   created_at?: string

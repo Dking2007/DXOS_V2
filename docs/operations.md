@@ -12,8 +12,8 @@ python scripts/seed.py --confirm-demo
 docker compose --env-file .env -f infra/compose/compose.yaml --profile workspace --profile office up -d
 ```
 
-Profile `core` chạy Core/SSO/console/storage độc lập; `workspace` thêm Workspace và
-web. Profile `office` chỉ thêm editor, không tự thêm Workspace. Không chạy chỉ
+Profile `core` chạy Core/SSO/storage độc lập, không có giao diện nào; `console` thêm
+công cụ quản trị kỹ thuật Core admin; `workspace` thêm Workspace, web và Core admin. Profile `office` chỉ thêm editor, không tự thêm Workspace. Không chạy chỉ
 `--profile office` rồi mong toàn nền tảng xuất hiện. Không đổi project name giữa
 các lệnh nếu muốn dùng cùng volume.
 

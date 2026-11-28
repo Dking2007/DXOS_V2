@@ -61,72 +61,6 @@
 }
 
 /* Tasks */
-.kanban {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(230px, 1fr);
-  gap: 14px;
-  padding: 18px 22px 22px;
-  overflow-x: auto;
-  background: var(--surface-2);
-}
-.kanban-column {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-height: 120px;
-}
-.kanban-column > header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 2px 2px 4px;
-  font-size: 0.875rem;
-}
-.kanban-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 13px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--border-strong);
-  border-radius: 11px;
-  color: var(--navy);
-  box-shadow: var(--shadow-sm);
-  transition:
-    box-shadow 0.15s,
-    transform 0.15s;
-}
-.kanban-card:hover {
-  text-decoration: none;
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
-.kanban-card.overdue {
-  border-left-color: var(--red);
-}
-.kanban-card strong {
-  font-size: 0.9375rem;
-  font-weight: 600;
-}
-.kanban-card small {
-  color: var(--muted);
-  font-size: 0.8125rem;
-}
-.kanban-meta {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 6px 8px;
-  font-size: 0.8125rem;
-  color: var(--muted);
-}
-.due-groups section h3 {
-  padding: 20px 23px 8px;
-  font-size: 0.9375rem;
-}
 .checklist-edit {
   display: flex;
   gap: 8px;
@@ -395,8 +329,5 @@
 @media (max-width: 640px) {
   .bar-row {
     grid-template-columns: 120px minmax(0, 1fr) 32px;
-  }
-  .kanban {
-    padding: 14px;
   }
 }

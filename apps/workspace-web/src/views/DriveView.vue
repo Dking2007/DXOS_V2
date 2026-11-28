@@ -124,7 +124,22 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocumentPointer)
   document.removeEventListener('keydown', onDocumentKey)
 })
-const viewMode = ref<'list' | 'grid'>('list')
+// Grid by default; a person's own choice of list or grid is remembered on this browser.
+function storedViewMode(): 'list' | 'grid' {
+  try {
+    return window.localStorage.getItem('dx-drive-view') === 'list' ? 'list' : 'grid'
+  } catch {
+    return 'grid'
+  }
+}
+const viewMode = ref<'list' | 'grid'>(storedViewMode())
+watch(viewMode, (mode) => {
+  try {
+    window.localStorage.setItem('dx-drive-view', mode)
+  } catch {
+    // Storage blocked: the choice lasts for this visit only.
+  }
+})
 const sortBy = ref<'name' | 'created' | 'size'>('created')
 const sortDescending = ref(true)
 const dragging = ref(false)

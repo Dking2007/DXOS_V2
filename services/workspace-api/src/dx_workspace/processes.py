@@ -42,6 +42,7 @@ from .automations import (
     TERMINAL,
     Execution,
     current_data,
+    ending_outcome,
     offered,
     people_for,
     unit_manager,
@@ -428,6 +429,13 @@ def settle(execution: ProcessExecution):
     # A flow on anything but a dossier has no result it must reach: running out of steps is finishing.
     if not execution.submission and "failed" not in states:
         run.state = "succeeded"
+        return
+    # A dossier whose branches all ran out of steps (a notice after the last decision, say) ends
+    # with that decision, as an unconnected approval exit would; only a failed step leaves it stuck.
+    if "failed" not in states:
+        outcome, source = ending_outcome(execution.steps)
+        execution.conclude(outcome, {"id": source})
+        run.steps = list(execution.steps)
         return
     run.state = "failed"
     if execution.submission:

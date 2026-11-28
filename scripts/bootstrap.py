@@ -279,7 +279,7 @@ def create_files(base_url: str, scheme: str = "http") -> list[Path]:
     write_private(
         GENERATED / "demo-credentials.txt",
         "LOCAL DEVELOPMENT ONLY — synthetic demo accounts\n"
-        + f"Login: {base_url}\nCore console: {base_url}/console/\n"
+        + f"Login: {base_url}\nCore console (profile workspace or console): {base_url}/console/\n"
         + "\n".join(credentials)
         + f"\n\nKeycloak admin ({base_url}/identity/admin/):\n"
         + f"{values['KEYCLOAK_ADMIN']}: {values['KEYCLOAK_ADMIN_PASSWORD']}\n",

@@ -4,7 +4,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { Bookmark, Loader2, Megaphone, Newspaper, PenLine, UserRound } from 'lucide-vue-next'
+import { Bookmark, Loader2, Megaphone, Newspaper, PenLine, Sparkles, UserRound } from 'lucide-vue-next'
 import { api } from '../api'
 import { toast } from '../ui/toast'
 import { useUnsavedGuard } from '../ui/unsaved'
@@ -15,10 +15,11 @@ import type { Post, PostComment } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import PostCard from '../feed/PostCard.vue'
 import PostComposer from '../feed/PostComposer.vue'
-import { relativeTime } from '../feed/text'
+import { greeting, longDay, postedToday, relativeTime } from '../feed/text'
 import { scrollBehavior } from '../ui/preferences'
 import '../feed/feed.css'
 import { confirmDialog } from '@dx/web-shared/confirm.ts'
+import '../feed/feed-modern.css'
 
 const queryClient = useQueryClient()
 const session = useSession()
@@ -44,6 +45,10 @@ const announcements = useQuery({
   refetchInterval: 60_000,
 })
 const items = computed(() => posts.data.value?.items ?? [])
+// The heading: a greeting for the reader and how lively the feed is today.
+const firstName = computed(() => session.user?.display_name.trim().split(/\s+/).at(-1) ?? '')
+const today = computed(() => postedToday(items.value.map((post) => post.created_at)))
+const officialCount = computed(() => announcements.data.value?.items.length ?? 0)
 function setFilter(value: Filter) {
   filter.value = value
   cursor.value = null
@@ -175,6 +180,23 @@ async function openAnnouncement(post: Post) {
   </header>
   <div class="feed-page">
     <div class="feed-main">
+      <section class="feed-hero" aria-labelledby="feed-hero-title">
+        <div class="feed-hero-text">
+          <span class="feed-hero-day">{{ longDay() }}</span>
+          <h2 id="feed-hero-title">{{ greeting() }}{{ firstName ? `, ${firstName}` : '' }}</h2>
+          <p>Tin tức, thông báo và lời cảm ơn trong cơ quan.</p>
+        </div>
+        <ul class="feed-hero-stats">
+          <li>
+            <Sparkles :size="15" aria-hidden="true" /><template v-if="today"
+              ><strong>{{ today }}</strong> bài mới hôm nay</template
+            ><template v-else>Hôm nay chưa có bài mới</template>
+          </li>
+          <li v-if="officialCount">
+            <Megaphone :size="15" aria-hidden="true" /><strong>{{ officialCount }}</strong> thông báo chính thức
+          </li>
+        </ul>
+      </section>
       <PostComposer
         v-if="session.can('feed.post')"
         ref="composer"

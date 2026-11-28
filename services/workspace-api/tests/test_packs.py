@@ -72,6 +72,26 @@ def test_shipped_packs_pass_their_own_checks_and_stock_colours_are_readable():
     assert all(item["ok"] for item in packs.contrast_report(None))
 
 
+@pytest.mark.parametrize("site", ["lib/python3.13/site-packages", "local/lib/python3.12/dist-packages"])
+def test_an_installed_copy_finds_its_packs_without_the_source_tree(tmp_path, monkeypatch, site):
+    # `make install PREFIX=...` layout, with the source tree gone: the packs sit in <prefix>/share/desktiny/packs.
+    prefix = tmp_path / "desktiny"
+    module = prefix / site / "dx_workspace" / "packs.py"
+    module.parent.mkdir(parents=True)
+    module.write_text("")
+    shipped = prefix / "share" / "desktiny" / "packs"
+    (shipped / "truong-hoc").mkdir(parents=True)
+    manifest = (PACKS / "truong-hoc" / "desktiny-pack.json").read_bytes()
+    (shipped / "truong-hoc" / "desktiny-pack.json").write_bytes(manifest)
+    monkeypatch.setattr(packs, "__file__", str(module))
+    settings = type("Settings", (), {"packs_dir": ""})()
+
+    assert packs.packs_folder(settings) == shipped
+    assert packs.builtin_packs(settings) == {"vn.truong-hoc": shipped / "truong-hoc"}
+    # PACKS_DIR still wins over what was found next to the code.
+    assert packs.packs_folder(type("Settings", (), {"packs_dir": str(PACKS)})()) == PACKS
+
+
 def test_unsafe_or_unreadable_packs_are_refused():
     files = school()
     manifest = json.loads(files["desktiny-pack.json"])

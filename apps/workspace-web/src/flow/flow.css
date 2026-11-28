@@ -1355,7 +1355,10 @@ kbd {
   .flow-status {
     padding: 6px 10px;
   }
+  /* The sentence keeps a full row; the scope picker and "Chạy ngay" wrap below it instead of
+     squeezing it into a one-word column that pushed the canvas off the screen. */
   .flow-status > span {
+    flex: 1 1 200px;
     min-width: 0;
   }
   .flow-status .status-close {

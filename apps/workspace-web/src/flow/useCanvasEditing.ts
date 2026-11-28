@@ -7,7 +7,7 @@ import { copyNodes, parseClip, pasteClip, serializeClip } from './clipboard'
 import type { FlowClip, PasteResult } from './clipboard'
 import { heldWhile } from './held'
 import { UndoHistory } from './history'
-import { FIT_VIEW, alignBoxes, autoLayout } from './layout'
+import { FIT_VIEW, NARROW_CANVAS, alignBoxes, autoLayout, narrowViewport } from './layout'
 import type { AlignMode, Point } from './layout'
 import { outputs, toApi, toCanvas } from './nodes'
 import type { ApiGraph, FlowNodeData, NodeKind } from './nodes'
@@ -311,8 +311,19 @@ export function useCanvasEditing(o: CanvasEditingOptions) {
     )
     o.beforeChange?.()
     move(positions)
-    void nextTick(() => flow.fitView({ ...FIT_VIEW, duration: 300 }))
+    void nextTick(() => fitOpening(300))
     o.notify('Đã sắp xếp lại các bước.', true)
+  }
+  /**
+   * The view a flow opens on (and returns to after tidying). A wide canvas shows the whole flow; a phone
+   * shows it at a readable size from the trigger, instead of shrinking a long flow to a thumbnail.
+   */
+  function fitOpening(duration = 0) {
+    const pane = flow.dimensions.value
+    const shown = flow.getNodes.value.filter((node) => !node.hidden)
+    if (!shown.length || !pane.width || pane.width >= NARROW_CANVAS) return flow.fitView({ ...FIT_VIEW, duration })
+    const start = shown.find((node) => o.nodes.value.find((n) => n.id === node.id)?.data?.kind === 'trigger')
+    return flow.setViewport(narrowViewport(shown.map(box), pane, { start: start && box(start) }), { duration })
   }
 
   return {
@@ -336,5 +347,6 @@ export function useCanvasEditing(o: CanvasEditingOptions) {
     nudge,
     align,
     tidy,
+    fitOpening,
   }
 }

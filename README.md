@@ -94,22 +94,23 @@ riêng của từng cơ quan nằm trong **gói giao diện** và **plugin**, c�
 
 | Việc cần làm | Desktiny có |
 |---|---|
-| Giao việc và theo dõi tới khi xong | Giao cho người hoặc đơn vị (bộ chọn người tìm không dấu, chọn cả phòng); việc con, checklist; trả lại, báo vướng, đổi hạn đều cần lý do và ghi lịch sử. Xem dạng danh sách, Kanban, nhóm theo hạn |
+| Giao việc và theo dõi tới khi xong | Giao cho người hoặc đơn vị (bộ chọn người tìm không dấu, chọn cả phòng); việc con, checklist; trả lại, báo vướng, đổi hạn đều cần lý do và ghi lịch sử. Xem dạng giấy (mỗi việc một tờ) hoặc danh sách; trang chủ là *Việc cần làm hôm nay*|
 | Trình và duyệt hồ sơ | Biểu mẫu có trường ẩn/hiện theo điều kiện; duyệt, trả lại, từ chối, xin ý kiến song song; ủy quyền phê duyệt có thời hạn; thu hồi hồ sơ khi chưa ai quyết định |
 | Tự thiết kế quy trình | Canvas kéo thả: điều kiện, chờ, thông báo, tạo việc, webhook, bước duyệt; sao chép/dán, hoàn tác, sắp xếp tự động; chạy thử với dữ liệu mẫu |
 | Quản lý tài liệu | Thư mục, chia sẻ kế thừa theo thư mục, phiên bản, nhãn, sao chép; xem PDF, ảnh, video trong ứng dụng; mở tệp Office bằng ONLYOFFICE (tùy chọn) |
 | Trao đổi, tìm và báo cáo | Nhắn tin riêng, nhóm, kênh phòng ban; bảng tin; tìm kiếm gõ không dấu vẫn ra ("bao cao" tìm thấy "Báo cáo") và chỉ trả kết quả người tìm được xem; báo cáo quá hạn, xuất CSV |
+| An toàn và vận hành | Đăng nhập một lần qua Keycloak; tài khoản demo `lanh-dao-mfa` bắt buộc mã TOTP ở lần đăng nhập đầu. Quét mã độc tệp tải lên bằng ClamAV (tùy chọn, mặc định tắt). Cảnh báo dữ liệu cá nhân (CCCD, số điện thoại, e-mail…) trong tệp và xem bản đã che. Sao lưu, khôi phục bằng `scripts/backup.py`, `restore.py` (diễn tập 28/11/2026: 3,9 s và 6,2 s ở quy mô demo) |
 | Trợ giúp bằng AI (tùy chọn, mặc định tắt) | Trợ lý trả lời từ kho kiến thức do quản trị nhập; đọc tài liệu điền sẵn biểu mẫu, tóm tắt hồ sơ, soạn văn bản theo Nghị định 30/2020, tìm theo ý nghĩa. AI chỉ đề xuất, không tự trình, duyệt hay gửi |
 | Cài đặt cá nhân | Sáng/tối, cỡ chữ, mật độ, giảm chuyển động, tăng tương phản, định dạng ngày giờ |
 
 <table>
   <tr>
     <th width="50%">Nhân viên mở “Việc cần làm hôm nay”</th>
-    <th width="50%">Trưởng phòng duyệt, trả lại hoặc xin ý kiến ngay trên hồ sơ</th>
+    <th width="50%">Hồ sơ xếp thành tập: số, trạng thái, hạn và người đang xử lý</th>
   </tr>
   <tr>
     <td><img src="docs/images/trang-chu.png" width="100%" alt="Trang chủ với danh sách việc đến hạn hôm nay, hồ sơ chờ duyệt và số liệu tóm tắt"></td>
-    <td><img src="docs/images/ho-so.png" width="100%" alt="Trang hồ sơ với nội dung biểu mẫu, tệp đính kèm, các nút duyệt, trả lại và tab Quy trình"></td>
+    <td><img src="docs/images/ho-so.png" width="100%" alt="Danh sách hồ sơ dạng tập, mỗi hồ sơ một bìa có số, trạng thái, hạn và người đang xử lý"></td>
   </tr>
   <tr>
     <th>Quản trị kéo thả quy trình rồi chạy thử với dữ liệu mẫu</th>
@@ -304,6 +305,8 @@ flowchart TB
 | **Một cửa cấp xã** | Bộ phận một cửa của UBND cấp xã: hộ tịch, chứng thực, hòa giải | Sổ văn bản, Ký số, Tiếp nhận trực tuyến, Tính hạn, Đọc giấy tờ |
 | **Nhân sự doanh nghiệp** | Bộ phận nhân sự: quy trình đơn từ, quy chế cho trợ lý | Chấm công GPS, Tiền lương và KPI, Nhắc hạn hồ sơ |
 | **Văn thư – điều hành** | Văn thư, văn phòng: văn bản đến, văn bản đi, nộp lưu | Sổ văn bản đến; dùng chung Sổ văn bản, Ký số, Tính hạn |
+| **Vận hành – giám sát thiết bị** | Thiết bị gửi số đo qua HTTP; vượt ngưỡng thì luồng tạo hồ sơ sự cố, giao người phụ trách | Cảm biến thiết bị |
+| **Quản trị dữ liệu** (minh họa) | Hồ sơ đã kết thúc chép ra tệp JSONL theo tháng, nối chuỗi sha256, che dữ liệu cá nhân, truy về hồ sơ gốc; đánh dấu tháng cần chuyển kho lạnh | Lưu trữ lịch sử |
 
 Đây là bản mẫu: tên cơ quan là tên giả, thời hạn và mức tiền chỉ để minh họa, ký số là mô phỏng. **Tương thích:** bản
 mở rộng 1.1.0 cần Desktiny **3.1.0** trở lên.
@@ -455,11 +458,14 @@ từ mã nguồn và cài bằng `make venv deps build test install PREFIX=…`:
   Bootstrap từ chối ghi đè cấu hình đã có; không dùng nó để provision production.
 - **ONLYOFFICE:** đổi `ONLYOFFICE_ENABLED=true` trong `.env`, rồi chạy
   `docker compose --env-file .env -f infra/compose/compose.yaml --profile workspace --profile office up -d`.
-  Chờ Document Server sẵn sàng rồi mở tài liệu từ Kho tài liệu.
+  Chờ Document Server sẵn sàng rồi mở tài liệu từ Kho tài liệu. Khi chưa bật, editor không hoạt động.
 - **ClamAV:** đặt `CLAMAV_HOST=clamav` trong `.env`, thêm `--profile security`. Khi đã đặt, tải tệp lên phụ thuộc
   ClamAV: quét lỗi thì từ chối tệp ([docs/security.md](docs/security.md)).
-- **Chỉ Core:** `docker compose --env-file .env -f infra/compose/compose.yaml --profile core up --build -d`, rồi
-  mở `/console/`. Client `core-example` dùng namespace `equipment`, secret `CORE_EXAMPLE_CLIENT_SECRET` trong `.env`.
+- **Chỉ Core:** `docker compose --env-file .env -f infra/compose/compose.yaml --profile core up --build -d`. Core
+  **không có giao diện**: gateway chỉ phục vụ API `/core/v1/` (tài liệu ở `/core/v1/docs`) và `/identity/`; `/` và
+  `/console/` trả 404. Thử Core bằng [`examples/core-client`](examples/core-client): client `core-example` dùng
+  namespace `equipment`, secret `CORE_EXAMPLE_CLIENT_SECRET` trong `.env`. Muốn có công cụ quản trị kỹ thuật Core
+  admin (client riêng của Core API, Tầng 2) thì thêm `--profile console`.
 
 </details>
 
@@ -516,9 +522,13 @@ logic nhưng không thay nghiệm thu với PostgreSQL, SSO, Office thật hay c
 - **Chưa có chữ ký số có giá trị pháp lý.** Quyền phê duyệt và nhật ký kiểm toán không thay chữ ký số; plugin Ký số
   trong bản mở rộng Một cửa là mô phỏng.
 - **Chưa có ứng dụng di động native**; trên điện thoại dùng bản web.
-- **Quét mã độc là tùy chọn** (ClamAV, mặc định tắt); tệp đã lưu không được quét lại khi có chữ ký mới. Cảnh báo dữ
-  liệu cá nhân chỉ là gợi ý, không phải DLP.
-- **MFA** mới bắt buộc cho một tài khoản demo; bật cho người khác trong Keycloak ([docs/security.md](docs/security.md)).
+- **Quét mã độc là tùy chọn**, mặc định tắt (profile `security`, biến `CLAMAV_HOST`); khi bật, lỗi quét thì từ chối
+  tệp. Chỉ quét lúc tải lên, tệp đã lưu không được quét lại khi có chữ ký mới.
+- **MFA mới bắt buộc cho một tài khoản demo** (`lanh-dao-mfa`); các tài khoản demo khác không có yếu tố thứ hai để seed
+  và e2e chạy được. Production cần bật MFA cho vai trò lãnh đạo, quản trị (xem [docs/security.md](docs/security.md)).
+- **Cảm biến** chỉ nhận số đo qua HTTP, chưa có MQTT, OPC UA hay cơ sở dữ liệu chuỗi thời gian; **lưu trữ lịch sử** là
+  tệp JSONL minh họa, không phải data lake.
+- **Cảnh báo dữ liệu cá nhân** chỉ là gợi ý, không phải công cụ chống rò rỉ dữ liệu (DLP).
 - **AI cần dịch vụ bên ngoài** (Claude, OpenAI, Gemini, DeepSeek) hoặc máy chủ AI riêng (Ollama, vLLM) do tổ chức
   cấu hình. Đã kiểm bằng dịch vụ giả và một lần chạy thật với Ollama (31/10/2026); chưa thử với Claude, OpenAI,
   Gemini thật.

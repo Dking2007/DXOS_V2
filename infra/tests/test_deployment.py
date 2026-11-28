@@ -144,6 +144,34 @@ class DeploymentContractTests(unittest.TestCase):
             self.services["workspace-api"]["environment"]["DATABASE_URL"],
         )
 
+    def compose_services(self, *profiles):
+        command = [
+            "docker",
+            "compose",
+            "--env-file",
+            str(self.env_file),
+            "-f",
+            str(ROOT / "infra/compose/compose.yaml"),
+        ]
+        for profile in profiles:
+            command += ["--profile", profile]
+        result = subprocess.run(
+            [*command, "config", "--format", "json"], check=True, capture_output=True, text=True
+        )
+        return json.loads(result.stdout)["services"]
+
+    def test_core_alone_is_headless_and_the_console_is_opt_in(self):
+        """The contest asks for a Core with no UI: `--profile core` runs no web application at all."""
+        core = self.compose_services("core")
+        self.assertNotIn("core-admin", core)
+        self.assertFalse({"workspace-web", "workspace-api"} & set(core))
+        self.assertTrue({"core-api", "core-worker", "identity", "gateway"} <= set(core))
+        self.assertFalse(core["gateway"]["depends_on"].get("core-admin", {}).get("required", True))
+        self.assertIn("core-admin", self.compose_services("core", "console"))
+        self.assertIn("core-admin", self.services)  # Workspace keeps the technical console
+        gateway = (ROOT / "infra/gateway/nginx.conf").read_text(encoding="utf-8")
+        self.assertEqual(gateway.count("error_page 502 = @no_app;"), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

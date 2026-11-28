@@ -32,7 +32,7 @@ export const HELP: Record<string, HelpTopic> = {
       'Bấm "Giao việc", nhập tên, người hoặc đơn vị nhận, hạn hoàn thành; đính kèm tài liệu nếu cần.',
       'Chọn tab để xem: Việc của tôi, Tôi đã giao, Đang theo dõi, Tôi điều phối, Tất cả.',
       'Lọc theo trạng thái, đánh dấu "Quá hạn" hoặc tìm theo tên việc.',
-      'Đổi kiểu hiển thị: danh sách, bảng Kanban hoặc theo hạn.',
+      'Đổi kiểu hiển thị: dạng giấy (mỗi việc một tờ) hoặc danh sách.',
       'Bấm vào một việc để mở chi tiết, cập nhật tiến độ và trao đổi.',
     ],
     tips: [

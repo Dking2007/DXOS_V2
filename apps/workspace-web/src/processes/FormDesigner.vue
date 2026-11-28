@@ -1,13 +1,17 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
+import { computed } from 'vue'
 import { ArrowDown, ArrowUp, Clock, Plus, Trash2 } from 'lucide-vue-next'
 import type { ApprovalStep, FormField, User } from '@dx/web-shared/types.ts'
 import { fieldKey } from '@dx/web-shared/forms.ts'
 import { deadlineParts } from './deadline'
+import PeoplePicker from '../components/pickers/PeoplePicker.vue'
+import { asText, userOptions } from '../components/pickers/options'
 
 /** The fields a dossier asks for, or the approval steps it goes through, edited in place. */
-defineProps<{ section: 'fields' | 'steps'; users: User[] }>()
+const props = defineProps<{ section: 'fields' | 'steps'; users: User[] }>()
+const userChoices = computed(() => userOptions(props.users, 'Chọn người duyệt'))
 const fields = defineModel<FormField[]>('fields', { required: true })
 const steps = defineModel<ApprovalStep[]>('steps', { required: true })
 
@@ -119,10 +123,7 @@ function setDeadline(step: ApprovalStep, amount: number, unit: number) {
         </div>
         <div v-if="step.resolver === 'user'" class="field">
           <label :for="`step-user-${index}`">Thành viên nhận</label
-          ><select :id="`step-user-${index}`" v-model="step.user_id" required>
-            <option value="">Chọn người duyệt</option>
-            <option v-for="user in users" :key="user.id" :value="user.id">{{ user.display_name }}</option>
-          </select>
+          ><PeoplePicker :id="`step-user-${index}`" :model-value="step.user_id ?? ''" :options="userChoices" placeholder="Chọn người duyệt" @update:model-value="step.user_id = asText($event)" />
         </div>
         <div class="field">
           <label :for="`step-due-${index}`"><Clock :size="13" /> Thời hạn xử lý</label>

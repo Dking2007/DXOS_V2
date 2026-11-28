@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { describe, expect, it } from 'vitest'
-import { avatarHue, initials, isLong, linkify, relativeTime } from './text'
+import { avatarHue, initials, isLong, linkify, relativeTime, greeting, longDay, postedToday } from './text'
 
 describe('relativeTime', () => {
   const now = new Date('2026-10-23T15:00:00')
@@ -35,5 +35,21 @@ describe('people and length', () => {
     expect(isLong('ngắn')).toBe(false)
     expect(isLong('x'.repeat(500))).toBe(true)
     expect(isLong('a\n'.repeat(9))).toBe(true)
+  })
+})
+
+describe('feed heading', () => {
+  it('greets by the time of day', () => {
+    expect(greeting(new Date(2026, 10, 24, 7))).toBe('Chào buổi sáng')
+    expect(greeting(new Date(2026, 10, 24, 12))).toBe('Chào buổi trưa')
+    expect(greeting(new Date(2026, 10, 24, 15))).toBe('Chào buổi chiều')
+    expect(greeting(new Date(2026, 10, 24, 21))).toBe('Chào buổi tối')
+  })
+  it('names the day and counts the posts of today', () => {
+    const now = new Date(2026, 10, 24, 15)
+    expect(longDay(now)).toBe('Thứ Ba, 24 tháng 11')
+    const today = new Date(2026, 10, 24, 8).toISOString()
+    const yesterday = new Date(2026, 10, 23, 23).toISOString()
+    expect(postedToday([today, yesterday, today], now)).toBe(2)
   })
 })

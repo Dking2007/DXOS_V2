@@ -95,7 +95,7 @@ Each organisation's specific business lives in **interface packs** and **plugins
 
 | Need | Desktiny has |
 |---|---|
-| Assign work and follow it to completion | Assign to people or units (people picker with accent-insensitive search, whole-department selection); subtasks, checklists; returning, flagging a blocker or changing a deadline all need a reason and are logged. List, Kanban and by-deadline views |
+| Assign work and follow it to completion | Assign to people or units (people picker with accent-insensitive search, whole-department selection); subtasks, checklists; returning, flagging a blocker or changing a deadline all need a reason and are logged. Paper view (one sheet per task) or list; the home page is *Today's work*. |
 | Submit and approve cases | Forms with conditional fields; approve, return, reject, parallel opinions; time-limited approval delegation; withdraw a case while nobody has decided |
 | Design processes yourself | Drag-and-drop canvas: conditions, waits, notifications, task creation, webhooks, approval steps; copy/paste, undo, auto-layout; test runs on sample data |
 | Manage documents | Folders, sharing inherited through folders, versions, labels, copies; view PDF, images, video in the app; open Office files in ONLYOFFICE (optional) |
@@ -106,11 +106,11 @@ Each organisation's specific business lives in **interface packs** and **plugins
 <table>
   <tr>
     <th width="50%">A staff member opens “Today's work”</th>
-    <th width="50%">A head of department approves, returns or asks for opinions right on the case</th>
+    <th width="50%">Cases filed as folders: number, status, deadline and who is handling it</th>
   </tr>
   <tr>
     <td><img src="docs/images/trang-chu.png" width="100%" alt="Home page listing tasks due today, cases awaiting approval and summary figures"></td>
-    <td><img src="docs/images/ho-so.png" width="100%" alt="Case page with form content, attachments, approve and return buttons and the Workflow tab"></td>
+    <td><img src="docs/images/ho-so.png" width="100%" alt="Case list as folders, each with a cover showing number, status, deadline and current handler"></td>
   </tr>
   <tr>
     <th>An administrator drags a process together and test-runs it on sample data</th>
@@ -464,8 +464,11 @@ Building from source and installing with `make venv deps build test install PREF
   Wait for the Document Server to be ready, then open documents from the document store.
 - **ClamAV:** set `CLAMAV_HOST=clamav` in `.env` and add `--profile security`. Once set, uploads depend on ClamAV: a
   failed scan rejects the file ([docs/security.md](docs/security.md)).
-- **Core only:** `docker compose --env-file .env -f infra/compose/compose.yaml --profile core up --build -d`, then
-  open `/console/`. The `core-example` client uses namespace `equipment` and secret `CORE_EXAMPLE_CLIENT_SECRET` in `.env`.
+- **Core only:** `docker compose --env-file .env -f infra/compose/compose.yaml --profile core up --build -d`. Core
+  **has no user interface**: the gateway serves only the API `/core/v1/` (docs at `/core/v1/docs`) and `/identity/`; `/` and
+  `/console/` return 404. Try Core with [`examples/core-client`](examples/core-client): the `core-example` client uses
+  namespace `equipment` and secret `CORE_EXAMPLE_CLIENT_SECRET` in `.env`. For the Core admin technical console (a separate
+  client of the Core API, tier 2) add `--profile console`.
 
 </details>
 
@@ -526,7 +529,10 @@ doubles check the logic but do not replace acceptance with real PostgreSQL, SSO,
 - **No native mobile app**; phones use the web version.
 - **Malware scanning is optional** (ClamAV, off by default); stored files are not rescanned when new signatures
   arrive. The personal-data warning is a hint, not DLP.
-- **MFA** is enforced only for one demo account; enable it for others in Keycloak ([docs/security.md](docs/security.md)).
+- **MFA** is enforced only for one demo account (`lanh-dao-mfa`); the other demo accounts have no second factor so seeding
+  and e2e tests can log in. Production should enable MFA for managers and administrators ([docs/security.md](docs/security.md)).
+- **Sensors** accept readings over HTTP only (no MQTT, OPC UA or time-series database); the **history archive** is an
+  illustrative JSONL file, not a data lake.
 - **AI needs an external service** (Claude, OpenAI, Gemini, DeepSeek) or a self-hosted AI server (Ollama, vLLM)
   configured by the organisation. Tested with fake services and one real run against Ollama (31/10/2026); not yet
   tried with real Claude, OpenAI or Gemini.

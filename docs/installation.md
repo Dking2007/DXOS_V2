@@ -129,7 +129,7 @@ migrate + Keycloak import). Nếu API không healthy, đọc log `core-migrate` 
 | Đường dẫn | Nội dung |
 |---|---|
 | <http://localhost:8080/> | Workspace web |
-| <http://localhost:8080/console/> | Core admin console |
+| <http://localhost:8080/console/> | Core admin, công cụ kỹ thuật (profile `workspace` hoặc `console`) |
 | <http://localhost:8080/identity/admin/> | Keycloak console kỹ thuật |
 | <http://localhost:8080/office/> | ONLYOFFICE (chỉ khi bật profile `office`) |
 
@@ -170,10 +170,19 @@ nếu ClamAV không trả lời; chi tiết ở [security.md](security.md).
 docker compose --env-file .env -f infra/compose/compose.yaml --profile core up --build -d
 ```
 
-Truy cập `/console/`; trang Workspace `/` không có trong profile này. Client
-`core-example` được bootstrap cấp namespace `equipment` (khác `workspace`); secret nằm
-trong `.env` dưới `CORE_EXAMPLE_CLIENT_SECRET`. Ví dụ gọi API ở
-[`examples/core-client`](../examples/core-client).
+Core **không có giao diện**: profile này chỉ chạy Core API, worker, Keycloak, gateway và
+kho lưu trữ. Gateway phục vụ API `/core/v1/` (tài liệu OpenAPI ở `/core/v1/docs`) và
+Keycloak `/identity/`; `/` và `/console/` trả 404. Thử Core bằng client ngoài
+[`examples/core-client`](../examples/core-client): client `core-example` được bootstrap
+cấp namespace `equipment` (khác `workspace`); secret nằm trong `.env` dưới
+`CORE_EXAMPLE_CLIENT_SECRET`.
+
+Công cụ quản trị kỹ thuật Core admin là một client riêng của Core API (Tầng 2), không
+thuộc Core. Muốn dùng khi chỉ chạy Core, thêm `--profile console`:
+
+```bash
+docker compose --env-file .env -f infra/compose/compose.yaml --profile core --profile console up --build -d
+```
 
 ---
 

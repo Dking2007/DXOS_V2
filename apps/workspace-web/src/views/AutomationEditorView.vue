@@ -220,7 +220,7 @@ onNodesInitialized(() => {
   nextTick(() => {
     saved.value = snapshot()
     editing.history.reset()
-    fitView(FIT_VIEW)
+    void editing.fitOpening()
   })
 })
 // The graph part comes from the editing helper's JSON, which is already kept up to date (and

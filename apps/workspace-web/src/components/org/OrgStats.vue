@@ -187,4 +187,7 @@ const tiles = computed<Tile[]>(() => {
     transform: none;
   }
 }
+:root[data-motion='reduce'] .org-stat.action:hover {
+  transform: none;
+}
 </style>

@@ -15,7 +15,7 @@ Tệp này mô tả từng tính năng của ứng dụng Workspace và Core, k�
   người chịu trách nhiệm. Trạng thái `draft → assigned → accepted → in_progress → submitted → completed`, nhánh
   `blocked/returned/cancelled`; trả lại, báo vướng mắc, hủy và đổi hạn bắt buộc lý do và được ghi lịch sử.
   Checklist phải xong mới nộp được; việc cha chỉ nghiệm thu khi mọi việc con đã xong/hủy. Lãnh đạo phòng giao
-  trong phòng mình, ban giám đốc giao liên phòng. UI có danh sách, Kanban và nhóm theo hạn.
+  trong phòng mình, ban giám đốc giao liên phòng. UI có dạng giấy (mặc định, mỗi việc một tờ) và danh sách dạng bảng.
   - Phạm vi hiện tại: chưa có lịch dạng tháng hay Gantt.
 
 ## Hồ sơ và phê duyệt

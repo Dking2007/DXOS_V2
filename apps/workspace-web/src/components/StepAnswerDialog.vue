@@ -12,6 +12,8 @@ import { toast } from '../ui/toast'
 import { uploadToDrive } from './attachments'
 import { confirmDiscard } from '../ui/unsaved'
 import { reasonMissing, uploadLabel } from './workForms'
+import PeoplePicker from './pickers/PeoplePicker.vue'
+import { asText, userOptions } from './pickers/options'
 
 /**
  * Answering a flow's request: what it asks to be handed in, the decision when none was picked on
@@ -52,6 +54,7 @@ const users = useQuery({
   enabled: computed(() => props.mode === 'forward'),
 })
 const target = ref('')
+const targetOptions = computed(() => userOptions(users.data.value?.items ?? [], 'Chọn người…'))
 
 const picker = ref<HTMLInputElement>()
 const progress = ref({ done: 0, total: 0 })
@@ -133,10 +136,7 @@ async function send() {
       <template v-if="mode === 'forward'">
         <div class="field">
           <label for="forward-user">Chuyển cho<span class="required"> *</span></label>
-          <select id="forward-user" v-model="target" required :disabled="busy">
-            <option value="">Chọn người…</option>
-            <option v-for="user in users.data.value?.items" :key="user.id" :value="user.id">{{ user.display_name }}</option>
-          </select>
+          <PeoplePicker id="forward-user" :model-value="target" :options="targetOptions" placeholder="Chọn người…" :disabled="busy" @update:model-value="target = asText($event)" />
         </div>
         <div class="field">
           <label for="forward-reason">Lý do</label>

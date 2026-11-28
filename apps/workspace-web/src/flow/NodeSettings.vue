@@ -9,6 +9,8 @@ import { api } from '../api'
 import { OPERATORS, nodeReference } from './nodes'
 import type { FlowCondition, NodeKind } from './nodes'
 import { usePluginSteps } from './pluginNodes'
+import PeoplePicker from '../components/pickers/PeoplePicker.vue'
+import { asText, userOptions } from '../components/pickers/options'
 
 /** Settings of the logic, data and message steps, whose results later steps can read. */
 const props = defineProps<{
@@ -73,6 +75,7 @@ const cases = computed(() => list<{ label: string; operator: string; value: unkn
 const changes = computed(() => list<{ field: string; value: string }>('changes'))
 const extractFields = computed(() => list<{ key: string; label: string }>('fields'))
 const userIds = computed(() => list<string>('user_ids'))
+const userChoices = computed(() => userOptions(props.users))
 function toggleUser(id: string) {
   const current = list<string>('user_ids')
   set('user_ids', current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
@@ -237,10 +240,7 @@ function toggleUser(id: string) {
     </div>
     <div class="field">
       <label for="fs-user">Cho xem</label>
-      <select id="fs-user" value="" @change="(event) => { if (text(event)) toggleUser(text(event)); (event.target as HTMLSelectElement).value = '' }">
-        <option value="">+ Thêm người…</option>
-        <option v-for="u in users" :key="u.id" :value="u.id">{{ u.display_name }}</option>
-      </select>
+      <PeoplePicker id="fs-user" model-value="" :options="userChoices" placeholder="+ Thêm người…" @update:model-value="(v) => { if (asText(v)) toggleUser(asText(v)) }" />
       <div class="chip-select">
         <button v-for="userId in userIds" :key="userId" type="button" class="active" @click="toggleUser(userId)">
           {{ users.find((u) => u.id === userId)?.display_name ?? userId.slice(0, 8) }} ✕

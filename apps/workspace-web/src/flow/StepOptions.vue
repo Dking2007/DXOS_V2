@@ -6,6 +6,8 @@ import DocumentListEditor from './DocumentListEditor.vue'
 import { roleLabel } from '../ui/labels'
 import FieldListEditor, { type StepField } from './FieldListEditor.vue'
 import { nodeReference } from './nodes'
+import PeoplePicker from '../components/pickers/PeoplePicker.vue'
+import { asText, userOptions } from '../components/pickers/options'
 
 /** What every step that waits for people has: who is asked, how many, by when, what they see. */
 const props = defineProps<{
@@ -53,6 +55,9 @@ function setDays(event: Event) {
   const text = value(event)
   set('due_in_days', text === '' ? null : Math.min(365, Math.max(0, Number(text))))
 }
+const userChoices = computed(() => userOptions(props.users))
+const userChoicesNone = computed(() => userOptions(props.users, 'Chọn người…'))
+const escalateChoices = computed(() => userOptions(props.users, 'Lãnh đạo đơn vị của hồ sơ'))
 function toggle(key: 'user_ids', id: string) {
   const list = (c.value[key] as string[]) ?? []
   set(key, list.includes(id) ? list.filter((item) => item !== id) : [...list, id].slice(0, 30))
@@ -79,26 +84,11 @@ function toggleEditable(key: string) {
   </div>
   <div v-if="resolver === 'user'" class="field">
     <label for="step-user">Chọn người</label>
-    <select id="step-user" :value="c.user_id ?? ''" @change="set('user_id', value($event) || null)">
-      <option value="">Chọn người…</option>
-      <option v-for="u in users" :key="u.id" :value="u.id">{{ u.display_name }}</option>
-    </select>
+    <PeoplePicker id="step-user" :model-value="(c.user_id as string) ?? ''" :options="userChoicesNone" placeholder="Chọn người…" @update:model-value="set('user_id', asText($event) || null)" />
   </div>
   <div v-if="resolver === 'users'" class="field">
     <label for="step-users">Những người được hỏi</label>
-    <select
-      id="step-users"
-      value=""
-      @change="
-        (event) => {
-          if (value(event)) toggle('user_ids', value(event))
-          ;(event.target as HTMLSelectElement).value = ''
-        }
-      "
-    >
-      <option value="">+ Thêm người…</option>
-      <option v-for="u in users" :key="u.id" :value="u.id">{{ u.display_name }}</option>
-    </select>
+    <PeoplePicker id="step-users" model-value="" :options="userChoices" placeholder="+ Thêm người…" @update:model-value="(v) => { if (asText(v)) toggle('user_ids', asText(v)) }" />
     <div class="chip-select">
       <button v-for="id in (c.user_ids as string[]) ?? []" :key="id" type="button" class="active" @click="toggle('user_ids', id)">
         {{ users.find((u) => u.id === id)?.display_name ?? id.slice(0, 8) }} ✕
@@ -184,10 +174,7 @@ function toggleEditable(key: string) {
   </div>
   <div v-if="overdue.action === 'escalate'" class="field">
     <label for="step-escalate">Chuyển cho</label>
-    <select id="step-escalate" :value="overdue.user_id ?? ''" @change="set('overdue', { ...overdue, user_id: value($event) || null })">
-      <option value="">Lãnh đạo đơn vị của hồ sơ</option>
-      <option v-for="u in users" :key="u.id" :value="u.id">{{ u.display_name }}</option>
-    </select>
+    <PeoplePicker id="step-escalate" :model-value="overdue.user_id ?? ''" :options="escalateChoices" placeholder="Lãnh đạo đơn vị của hồ sơ" @update:model-value="set('overdue', { ...overdue, user_id: asText($event) || null })" />
   </div>
 
   <div class="field">

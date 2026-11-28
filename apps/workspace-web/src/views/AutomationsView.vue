@@ -1,13 +1,15 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ArrowRight, CirclePause, FileCheck2, Paperclip, Plug, Plus, Workflow, Zap } from 'lucide-vue-next'
+import { ArrowRight, CirclePause, FileCheck2, Paperclip, Plug, Plus, Trash2, Workflow, Zap } from 'lucide-vue-next'
 import { api } from '../api'
-import { errorText, formatDate } from '@dx/web-shared/api.ts'
+import { ApiError, errorText, formatDate } from '@dx/web-shared/api.ts'
 import { confirmDiscard } from '../ui/unsaved'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
+import { toast } from '../ui/toast'
 import type { Page } from '@dx/web-shared/api.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
@@ -80,6 +82,38 @@ const error = ref<unknown>(null)
 const busy = ref(false)
 const showTemplates = ref(false)
 const creatingForm = ref(false)
+const formError = ref<unknown>(null)
+watch(showTemplates, () => (formError.value = null))
+// The server says which process or pack holds the form; the generic 409 text would hide that.
+const formErrorText = computed(() =>
+  formError.value instanceof ApiError && ['form_in_use', 'form_from_pack'].includes(formError.value.code)
+    ? formError.value.message
+    : errorText(formError.value),
+)
+/** Remove the chosen form: unused ones are deleted, ones dossiers used are archived; the server refuses a
+ * form a process still uses or one a pack installed, and says why. */
+async function removeForm() {
+  const chosen = forms.value.find((form) => form.id === templateForm.value)
+  if (!chosen || busy.value) return
+  const ok = await confirmDialog({
+    message: `Xóa biểu mẫu “${chosen.name}”? Hồ sơ đã tạo bằng biểu mẫu này vẫn xem được; biểu mẫu không còn hiện khi tạo hồ sơ hay quy trình.`,
+    confirmLabel: 'Xóa biểu mẫu',
+    danger: true,
+  })
+  if (!ok) return
+  busy.value = true
+  formError.value = null
+  try {
+    await api.request(`/forms/${chosen.id}`, { method: 'DELETE' })
+    templateForm.value = ''
+    await Promise.all([catalog.refetch(), queryClient.invalidateQueries({ queryKey: ['forms'] })])
+    toast.success(`Đã xóa biểu mẫu “${chosen.name}”.`)
+  } catch (cause) {
+    formError.value = cause
+  } finally {
+    busy.value = false
+  }
+}
 async function formCreated(formId: string) {
   creatingForm.value = false
   await catalog.refetch()
@@ -299,8 +333,19 @@ async function saveConnection() {
         <button type="button" class="button secondary small" @click="creatingForm = true">
           <Plus :size="15" />Tạo biểu mẫu mới
         </button>
+        <button
+          v-if="templateForm"
+          type="button"
+          class="button secondary small remove-form"
+          :disabled="busy"
+          title="Xóa biểu mẫu đang chọn"
+          @click="removeForm"
+        >
+          <Trash2 :size="15" />Xóa biểu mẫu
+        </button>
       </div>
       <small class="muted">Biểu mẫu là những gì người tạo hồ sơ phải điền.</small>
+      <div v-if="formError" class="notice error error-inline" role="alert">{{ formErrorText }}</div>
     </div>
     <div class="template-grid">
       <button
@@ -398,6 +443,9 @@ async function saveConnection() {
   </p>
 </template>
 <style scoped>
+.remove-form {
+  color: var(--red-ink);
+}
 .connections-card {
   margin-top: 24px;
 }

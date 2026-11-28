@@ -75,7 +75,7 @@ up:
 	$(PYTHON) scripts/seed.py --confirm-demo
 
 down:
-	$(COMPOSE) --profile workspace --profile office --profile core down
+	$(COMPOSE) --profile workspace --profile office --profile core --profile console down
 
 seed:
 	$(PYTHON) scripts/seed.py --confirm-demo

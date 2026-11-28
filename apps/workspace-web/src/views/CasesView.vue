@@ -7,8 +7,13 @@ import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   ArrowRight,
   ChevronRight,
+  CalendarClock,
   FilePlus2,
   Files,
+  Flame,
+  Grid2X2,
+  List,
+  Paperclip,
   Pencil,
   Search,
   Send,
@@ -32,6 +37,8 @@ import { useSession } from '../stores/session'
 import { confirmDiscard } from '../ui/unsaved'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import SchemaForm from '@dx/web-shared/components/SchemaForm.vue'
+import { initialsOf } from '../ui/people'
+import { caseTone } from '../ui/caseFolder'
 const route = useRoute()
 const session = useSession()
 /** One's own draft or returned dossier: offer to continue it or submit it straight from the list. */
@@ -43,6 +50,23 @@ const queryClient = useQueryClient()
 // Archived dossiers are a separate pile rather than a status: they keep their result.
 const ARCHIVED = 'archived'
 const status = ref('')
+// Folders by default; a person's own choice of folders or table is remembered on this browser.
+function storedView(): 'folders' | 'table' {
+  try {
+    return window.localStorage.getItem('dx-cases-view') === 'table' ? 'table' : 'folders'
+  } catch {
+    return 'folders'
+  }
+}
+const view = ref<'folders' | 'table'>(storedView())
+watch(view, (mode) => {
+  try {
+    window.localStorage.setItem('dx-cases-view', mode)
+  } catch {
+    // Storage blocked: the choice lasts for this visit only.
+  }
+})
+const isPast = (value: string | null | undefined) => !!value && new Date(value) < new Date()
 const search = ref('')
 const cursor = ref<string | null>(null)
 const cases = useQuery({
@@ -213,13 +237,36 @@ async function create() {
           {{ tab.label }}
         </button>
       </div>
-      <label class="search-box"
-        ><Search :size="17" /><input
-          v-model.lazy="search"
-          type="search"
-          placeholder="Tìm hồ sơ…"
-          aria-label="Tìm hồ sơ"
-      /></label>
+      <div class="toolbar-end">
+        <label class="search-box"
+          ><Search :size="17" /><input
+            v-model.lazy="search"
+            type="search"
+            placeholder="Tìm hồ sơ…"
+            aria-label="Tìm hồ sơ"
+        /></label>
+        <div class="view-switch" role="group" aria-label="Cách xem">
+          <button
+            type="button"
+            :class="{ active: view === 'folders' }"
+            :aria-pressed="view === 'folders'"
+            aria-label="Xem dạng tập hồ sơ"
+            title="Xem dạng tập hồ sơ"
+            @click="view = 'folders'"
+          >
+            <Grid2X2 :size="17" /></button
+          ><button
+            type="button"
+            :class="{ active: view === 'table' }"
+            :aria-pressed="view === 'table'"
+            aria-label="Xem dạng bảng"
+            title="Xem dạng bảng"
+            @click="view = 'table'"
+          >
+            <List :size="17" />
+          </button>
+        </div>
+      </div>
     </div>
     <StatePanel
       :loading="cases.isPending.value"
@@ -238,7 +285,67 @@ async function create() {
         <FilePlus2 :size="16" />Tạo hồ sơ
       </button></StatePanel
     >
-    <div v-if="cases.data.value?.items.length" class="table-wrap">
+    <ul v-if="view === 'folders' && cases.data.value?.items.length" class="folders">
+      <li
+        v-for="item in cases.data.value.items"
+        :key="item.id"
+        class="folder"
+        :class="[`tone-${caseTone(item.status, item.archived_at)}`, { overdue: item.overdue }]"
+      >
+        <span class="folder-tab mono">{{ item.code }}</span>
+        <div class="folder-body">
+          <div class="folder-top">
+            <span class="folder-form" :title="item.form_name">{{ item.form_name || 'Hồ sơ' }}</span>
+            <span v-if="item.priority === 'urgent' || item.priority === 'high'" class="folder-flag" :class="item.priority"
+              ><Flame :size="13" />{{ item.priority === 'urgent' ? 'Khẩn' : 'Cao' }}</span
+            >
+          </div>
+          <RouterLink :to="`/cases/${item.id}`" class="folder-title" :title="item.title">{{ item.title }}</RouterLink>
+          <div class="folder-status">
+            <StatusBadge :status="item.status" /><span v-if="item.overdue" class="folder-overdue">Quá hạn</span>
+          </div>
+          <div class="folder-waiting">
+            <template v-if="item.waiting_on?.length">
+              <small class="muted">Đang chờ</small>
+              <span class="folder-who"
+                ><strong>{{ item.waiting_on[0]!.name || 'Chưa có người nhận' }}</strong>
+                <small
+                  >{{ item.waiting_on[0]!.label
+                  }}<template v-if="item.waiting_on[0]!.due_at">
+                    ·
+                    <span :class="{ 'overdue-text': isPast(item.waiting_on[0]!.due_at) }"
+                      >hạn {{ formatDate(item.waiting_on[0]!.due_at) }}</span
+                    ></template
+                  ><template v-if="item.waiting_on.length > 1"> · +{{ item.waiting_on.length - 1 }}</template></small
+                ></span
+              >
+            </template>
+            <div v-else-if="isMyDraft(item)" class="row-actions folder-actions">
+              <RouterLink :to="`/cases/${item.id}?action=edit`" class="button secondary small"
+                ><Pencil :size="14" />Tiếp tục soạn</RouterLink
+              ><RouterLink :to="`/cases/${item.id}?action=submit`" class="button small"
+                ><Send :size="14" />Trình</RouterLink
+              >
+            </div>
+            <small v-else-if="item.status === 'pending_workflow_start'" class="muted">Đang chuyển duyệt…</small>
+            <small v-else-if="item.due_at" class="muted folder-due"
+              ><CalendarClock :size="13" />Hạn {{ formatDate(item.due_at) }}</small
+            >
+          </div>
+          <footer class="folder-foot">
+            <span class="folder-owner" :title="item.owner_name"
+              ><span class="folder-avatar" aria-hidden="true">{{ initialsOf(item.owner_name) }}</span
+              >{{ item.owner_name || '—' }}</span
+            >
+            <span v-if="item.file_ids?.length" class="folder-meta" :title="`${item.file_ids.length} tài liệu`"
+              ><Paperclip :size="13" />{{ item.file_ids.length }}</span
+            >
+            <span class="folder-meta">{{ formatDate(item.updated_at || item.created_at) }}</span>
+          </footer>
+        </div>
+      </li>
+    </ul>
+    <div v-else-if="cases.data.value?.items.length" class="table-wrap">
       <table>
         <thead>
           <tr>
@@ -447,6 +554,308 @@ async function create() {
   >
 </template>
 <style scoped>
+.toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.view-switch {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.view-switch button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.view-switch button.active {
+  background: var(--surface);
+  color: var(--teal-ink);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 12%);
+}
+.view-switch button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* Each dossier is a folder: a tab with its number, a cover tinted by where it stands, and the
+   edge of the papers inside showing underneath. */
+.folders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 30px 20px;
+  margin: 0;
+  padding: 30px var(--space-5) var(--space-6);
+  list-style: none;
+}
+.folder {
+  --tone-ink: var(--muted);
+  --tone-soft: var(--surface-3);
+  --tone-line: var(--border);
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.tone-moving {
+  --tone-ink: var(--teal-ink);
+  --tone-soft: var(--teal-soft);
+  --tone-line: var(--teal-line);
+}
+.tone-attention {
+  --tone-ink: var(--amber-ink);
+  --tone-soft: var(--amber-soft);
+  --tone-line: var(--amber-line);
+}
+.tone-done {
+  --tone-ink: var(--green-ink);
+  --tone-soft: var(--green-soft);
+  --tone-line: var(--green-line);
+}
+.tone-stopped {
+  --tone-ink: var(--red-ink);
+  --tone-soft: var(--red-soft);
+  --tone-line: var(--red-line);
+}
+.folder-tab {
+  position: absolute;
+  top: -19px;
+  left: 0;
+  z-index: 1;
+  max-width: 60%;
+  height: 20px;
+  padding: 2px 14px 0 12px;
+  border: 1px solid var(--tone-line);
+  border-bottom: 0;
+  border-radius: 9px 14px 0 0;
+  background: var(--tone-line);
+  color: var(--tone-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 17px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folder-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 16px 16px 12px;
+  border: 1px solid var(--tone-line);
+  border-top: 4px solid var(--tone-line);
+  border-radius: 0 14px 14px 14px;
+  background: linear-gradient(180deg, var(--tone-soft), var(--surface) 64px);
+  /* Two sheets peeking out below the cover. */
+  box-shadow:
+    0 4px 0 -1px var(--surface),
+    0 4px 0 0 var(--border),
+    0 8px 0 -2px var(--surface),
+    0 8px 0 -1px var(--border);
+  transition:
+    transform 0.16s,
+    box-shadow 0.16s;
+}
+.folder:hover .folder-body,
+.folder:focus-within .folder-body {
+  transform: translateY(-3px);
+  box-shadow:
+    0 4px 0 -1px var(--surface),
+    0 4px 0 0 var(--border),
+    0 8px 0 -2px var(--surface),
+    0 8px 0 -1px var(--border),
+    0 16px 30px -12px rgb(15 23 42 / 28%);
+}
+.folder:hover .folder-tab,
+.folder:focus-within .folder-tab {
+  transform: translateY(-3px);
+  transition: transform 0.16s;
+}
+.folder-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 20px;
+}
+.folder-form {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--tone-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.folder-flag {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.folder-flag.urgent {
+  background: var(--red-soft);
+  color: var(--red-ink);
+}
+.folder-title {
+  display: -webkit-box;
+  min-height: 2.6em;
+  overflow: hidden;
+  color: var(--navy);
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.3;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+/* The whole folder opens the dossier; its own buttons sit above this. */
+.folder-title::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.folder-title:focus-visible {
+  outline: none;
+}
+.folder:has(.folder-title:focus-visible) .folder-body {
+  box-shadow: var(--focus-ring);
+}
+.folder-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.folder-overdue {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--red-soft);
+  color: var(--red-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.folder-waiting {
+  display: grid;
+  gap: 2px;
+  min-height: 40px;
+  align-content: start;
+}
+.folder-who {
+  display: grid;
+  min-width: 0;
+}
+.folder-who strong {
+  overflow: hidden;
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folder-who small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.folder-actions {
+  position: relative;
+  z-index: 1;
+}
+.folder-due {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.folder-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.folder-owner {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folder-avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--surface-3);
+  color: var(--navy);
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+.folder-meta {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .folders {
+    grid-template-columns: 1fr;
+    padding-inline: var(--space-4);
+  }
+  .toolbar-end {
+    width: 100%;
+  }
+  .folder-waiting {
+    min-height: 0;
+  }
+  .folder-waiting:empty {
+    display: none;
+  }
+  .folder-title {
+    min-height: 0;
+  }
+  .toolbar-end .search-box {
+    flex: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .folder-body,
+  .folder-tab {
+    transition: none !important;
+  }
+  .folder:hover .folder-body,
+  .folder:hover .folder-tab {
+    transform: none;
+  }
+}
 .case-title {
   display: -webkit-box;
   -webkit-line-clamp: 2;
