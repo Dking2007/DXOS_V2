@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="t d">
+  <title id="t">Desktiny: văn phòng số mã nguồn mở trên một Core dùng chung</title>
+  <desc id="d">Khối Core ở dưới cùng; Workspace, console quản trị và client khác cắm vào Core qua API; gói giao diện và plugin cắm vào Workspace.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#1E3A5F"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="320" fill="url(#bg)"/>
+  <g font-family="'Be Vietnam Pro','Segoe UI','Helvetica Neue',Arial,sans-serif" fill="#FFFFFF">
+    <text x="64" y="146" font-size="68" font-weight="700">Desktiny</text>
+    <text x="64" y="196" font-size="26" fill="#E9EEF5">Văn phòng số mã nguồn mở trên một Core dùng chung</text>
+    <text x="64" y="238" font-size="18" fill="#CBD5E1">Core headless · ứng dụng H-P-D-I · gói và plugin cài bằng .zip</text>
+  </g>
+  <g font-family="'Be Vietnam Pro','Segoe UI','Helvetica Neue',Arial,sans-serif" text-anchor="middle">
+    <g stroke="#CBD5E1" stroke-width="3" stroke-dasharray="6 5">
+      <line x1="810" y1="80" x2="810" y2="112"/>
+      <line x1="910" y1="80" x2="910" y2="112"/>
+      <line x1="860" y1="158" x2="860" y2="196"/>
+      <line x1="1035" y1="158" x2="1035" y2="196"/>
+      <line x1="1165" y1="158" x2="1165" y2="196"/>
+    </g>
+    <g fill="#E9EEF5">
+      <rect x="765" y="44" width="90" height="36" rx="8"/>
+      <rect x="865" y="44" width="90" height="36" rx="8"/>
+    </g>
+    <g fill="#0F172A" font-size="12" font-weight="600">
+      <text x="810" y="67">Gói giao diện</text>
+      <text x="910" y="67">Plugin .zip</text>
+    </g>
+    <g fill="#FFFFFF">
+      <rect x="760" y="112" width="200" height="46" rx="10"/>
+      <rect x="980" y="112" width="110" height="46" rx="10"/>
+      <rect x="1110" y="112" width="110" height="46" rx="10"/>
+    </g>
+    <g fill="#1E3A5F" font-size="15" font-weight="600">
+      <text x="860" y="141">Workspace</text>
+      <text x="1035" y="141">Console</text>
+      <text x="1165" y="141">Client khác</text>
+    </g>
+    <rect x="760" y="196" width="460" height="68" rx="12" fill="#2563EB"/>
+    <text x="990" y="226" fill="#FFFFFF" font-size="21" font-weight="700">Core · /core/v1/</text>
+    <text x="990" y="250" fill="#E9EEF5" font-size="14">định danh · dữ liệu · tệp · quy trình · kiểm toán</text>
+  </g>
+</svg>
