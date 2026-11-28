@@ -22,6 +22,11 @@
     transform 0.15s,
     box-shadow 0.15s;
 }
+/* With a sector pack's colours in force the button takes the pack's main colour (darkened in the dark theme,
+   see --nav-brand-solid in shell.css) instead of the stock navy. */
+:root[data-pack-colors] .assistant-fab {
+  background: linear-gradient(140deg, var(--nav-brand-solid), color-mix(in oklab, var(--nav-brand-solid) 72%, #000));
+}
 .assistant-fab:hover {
   transform: translateY(-2px) scale(1.04);
   box-shadow: 0 14px 34px #16304f73;

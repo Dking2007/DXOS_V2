@@ -273,7 +273,9 @@ const summary = computed(() => {
 .home-aside {
   align-content: start;
 }
+/* A block, so a long title ends in "…" before its status badge instead of running under it. */
 .home-case-title {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
