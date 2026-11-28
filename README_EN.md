@@ -26,6 +26,10 @@
   <a href="docs/doi-chieu-de-thi.md"><b>Contest requirements map</b></a> (Vietnamese)
 </p>
 
+<p align="center">
+  <img src="docs/images/hero-ghep.png" width="100%" alt="Desktiny screens: case list, home page, process designer and the phone version">
+</p>
+
 Entry for the OLP Open Source Software contest 2026, topic: the DX-OS Open-Core digital office platform. Latest
 release: **v3.1.0**; changes waiting for 3.2.0 are under `[Unreleased]` in the [CHANGELOG](CHANGELOG.md).
 *Desk + destiny*; the former name was DX Workspace, so code, databases and containers still use `dx_workspace` /
@@ -139,15 +143,37 @@ Each organisation's specific business lives in **interface packs** and **plugins
 </table>
 
 <p align="center">
-  <img src="docs/images/dien-thoai.png" width="220" alt="Desktiny on a phone screen, web version"><br>
-  <sub>A staff member checks tasks on a phone with the web version</sub>
+  <img src="docs/images/dt-trang-chu.png" width="180" alt="Home on a phone">
+  <img src="docs/images/dt-ho-so.png" width="180" alt="Cases on a phone">
+  <img src="docs/images/dt-cong-viec.png" width="180" alt="Tasks on a phone">
+  <img src="docs/images/dt-dang-nhap.png" width="180" alt="Sign-in on a phone">
+  <br><sub>The web app on a phone: home, cases, tasks, sign-in</sub>
 </p>
+
+<table>
+  <tr>
+    <th width="50%">Case detail: step-by-step progress and who is handling it</th>
+    <th width="50%">The same screen in dark mode</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/ho-so-chi-tiet.png" width="100%" alt="Case detail page in light mode with processing steps"></td>
+    <td><img src="docs/images/toi-ho-so.png" width="100%" alt="Case detail page in dark mode"></td>
+  </tr>
+</table>
 
 <sub>All images: synthetic sample data. Image provenance: [docs/images/README.md](docs/images/README.md). Full feature
 description and scope (Vietnamese): [docs/tinh-nang.md](docs/tinh-nang.md); AI features:
 [docs/ai-features.md](docs/ai-features.md).</sub>
 
 ## Architecture
+
+<p align="center">
+  <img src="docs/images/kien-truc-dong.svg" width="100%" alt="Animated architecture diagram (Vietnamese labels). Users go through the Nginx gateway (rate limits, CSP, /internal/ returns 404). The gateway routes / to Workspace web, /workspace/v1/ to workspace-api and workspace-worker, /console/ to Core admin, /office/ to optional ONLYOFFICE, /identity/ to Keycloak on the left, /core/v1/ to core-api. Tier 2 reaches Tier 1 only over HTTP /core/v1/ with an OIDC token. Tier 1 is core-api and core-worker, with optional ClamAV. Storage: PostgreSQL with three databases dx_identity, dx_workspace, dx_core; RustFS holds file bytes; Valkey is provisioned but unused. On the right: the plugin server receives HMAC-signed events and calls back the plugin API with a scoped token; external systems only talk to the plugin server. Six numbered steps light up in turn, matching the list below">
+  <br><sub>Animated diagram, labels in Vietnamese: a request travels through the gateway, the two tiers, storage and the plugin server; steps 1–6 match the list below.</sub>
+</p>
+
+<details>
+<summary>Text diagram (Mermaid)</summary>
 
 ```mermaid
 flowchart TB
@@ -190,7 +216,11 @@ flowchart TB
     class WEB,WAPI,ADM,CAPI own
 ```
 
+</details>
+
 Dark blue blocks are the project's own code; the others are open-source software used unchanged from official images.
+Arrow colours: blue is request/response, green is a data write, brown is an event, purple is a file; dashed means
+optional.
 
 1. Every request goes through the Nginx gateway (in the dev configuration it listens only on `127.0.0.1:8080`). The
    gateway routes by prefix, rate-limits, adds CSP and returns 404 for `/internal/`.
@@ -204,6 +234,16 @@ Dark blue blocks are the project's own code; the others are open-source software
    permissions to the Core, delivers plugin events, webhooks and email.
 6. Core admin is a static web app that calls `/core/v1/` directly like any other client. ONLYOFFICE talks only to
    `workspace-api` (JWT-signed).
+
+### Where the data lives
+
+<p align="center">
+  <img src="docs/images/luong-du-lieu-dong.svg" width="100%" alt="Animated three-column diagram (Vietnamese labels): what the user does, which service writes, where the data lives. Sign-in: Keycloak, database dx_identity holds accounts, hashed passwords, TOTP keys. Submitting and approving cases, tasks, messages: workspace-api writes to dx_workspace (organisation, tasks, cases, snapshots, decisions, file names, shares, outbox). Workspace calls core-api over /core/v1/; dx_core holds principals, ACLs, versioned schemas and records, file versions with SHA-256, runs, human tasks and the hash-chained audit log. File bytes live in RustFS. When a file is previewed, the personal-data check result is not stored. Devices and citizens send to plugin servers, whose data lives in each plugin's own SQLite; closed cases are written by the archive plugin to a JSONL file chained with sha256">
+  <br><sub>Animated diagram, labels in Vietnamese: user actions on the left, the service that writes in the middle, where each kind of data is stored on the right.</sub>
+</p>
+
+Each kind of data has exactly one owner ([docs/architecture.md](docs/architecture.md), section *Nguồn sự thật*).
+Connected plugins keep their data in the plugin server's volume, not in Desktiny's databases, so back it up separately.
 
 | Mandatory requirement of the brief | Component | Configuration, code |
 |---|---|---|
@@ -222,6 +262,14 @@ The Core runs on its own with Workspace switched off: profile `core` plus the sa
 ## Business flow
 
 One case, from submission to decision:
+
+<p align="center">
+  <img src="docs/images/luong-ho-so-dong.svg" width="100%" alt="Animated swimlane diagram (Vietnamese labels) with four lanes: staff member, Workspace, Core, head of department; ten steps light up from left to right. 1 Staff fills in the form and attaches files. 2 The Core stores a versioned file: bytes to RustFS, SHA-256 to dx_core. 3 Staff submits. 4 Workspace pins the form, file and process snapshot in dx_workspace. 5 The worker holds the files and starts a run; the approval step is a human task in dx_core. 6 Workspace creates the approval task and notifies. 7 The head approves, returns, rejects or asks for opinions. 8 The decision is recorded in Workspace first. 9 The Core completes the human task and appends to the hash-chained audit log. 10 Staff sees the result on the Workflow tab">
+  <br><sub>Animated diagram, labels in Vietnamese: who does each of the ten steps and where each step writes its data.</sub>
+</p>
+
+<details>
+<summary>Text diagram (Mermaid)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -245,6 +293,10 @@ sequenceDiagram
     C->>C: Append to the hash-chained audit log
     WA-->>NV: Result and history on the Workflow tab
 ```
+
+</details>
+
+The animated diagram numbers ten steps in time order; the list below groups them by the service that runs them.
 
 1. **Store files** (`workspace-api` → `core-api`): the Core checks extension, content signature and decompression
    limits and scans with ClamAV when enabled; an `.exe` is rejected with `unsupported_file_type`.
@@ -313,14 +365,16 @@ flowchart TB
 These are samples: agency names are fictitious, deadlines and amounts are illustrative, and the digital signature is
 simulated. **Compatibility:** expansion packs 1.1.0 need Desktiny **3.1.0** or later.
 
+<p align="center">
+  <img src="docs/images/goi-truoc-sau.png" width="100%" alt="Two images side by side: the default look and the look after installing the one-stop pack"><br>
+  <sub>The same Desktiny before and after installing the “commune one-stop” pack: colours, terms, menus and processes follow the business</sub>
+</p>
+
 <table>
   <tr>
-    <th width="50%">An administrator installs a <code>.zip</code> pack, previews it, then turns it on</th>
-    <th width="50%">After installing “One-stop desk”: wording, colours and processes follow the one-stop office</th>
-  </tr>
-  <tr>
-    <td><img src="docs/images/goi-giao-dien.png" width="100%" alt="Admin › Interface packs screen with an installed pack and its preview"></td>
-    <td><img src="docs/images/mot-cua-trang-chu.png" width="100%" alt="Desktiny home page after installing the One-stop desk expansion pack"></td>
+    <td width="33%"><img src="docs/images/goi-mot-cua.png" width="100%" alt="Desktiny home page with the Commune one-stop pack"><br><sub>Commune one-stop</sub></td>
+    <td width="33%"><img src="docs/images/goi-nhan-su.png" width="100%" alt="Desktiny home page with the Company HR pack"><br><sub>Company HR</sub></td>
+    <td width="33%"><img src="docs/images/goi-van-thu.png" width="100%" alt="Desktiny home page with the Records office pack"><br><sub>Records office</sub></td>
   </tr>
 </table>
 
@@ -438,12 +492,20 @@ There is no online instance; follow [Quick start](#quick-start).
     <td><img src="docs/media/gif-thiet-ke-quy-trinh.gif" width="100%" alt="Animation: drag approval and condition steps on the canvas, test-run with sample data"></td>
   </tr>
   <tr>
-    <th>Installing one expansion pack turns Desktiny into a one-stop desk</th>
+    <th>Switch the theme pack: the whole app turns into one-stop or HR</th>
     <th>A citizen applies online, the one-stop desk receives it</th>
   </tr>
   <tr>
-    <td><img src="docs/media/gif-doi-nghiep-vu.gif" width="100%" alt="Animation: upload a zip in Admin, preview, enable; interface and processes change"></td>
+    <td><img src="docs/media/gif-doi-nghiep-vu.gif" width="100%" alt="Animation: pick a theme pack in Administration; colours, terms and menus change to one-stop, then HR"></td>
     <td><img src="docs/media/gif-cong-dan-nop.gif" width="100%" alt="Animation: fill in the online application form, the case appears in the intake register"></td>
+  </tr>
+  <tr>
+    <th>A device crosses a threshold; a flow opens an incident case</th>
+    <th>Staff update a task on a phone</th>
+  </tr>
+  <tr>
+    <td><img src="docs/media/gif-canh-bao-cam-bien.gif" width="100%" alt="Animation: a sensor reading crosses the threshold, the plugin logs an incident and a flow creates an incident case"></td>
+    <td align="center"><img src="docs/media/gif-dien-thoai.gif" width="60%" alt="Animation: open a task on a phone and update its progress"></td>
   </tr>
 </table>
 

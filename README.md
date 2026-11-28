@@ -26,6 +26,10 @@ Tiếng Việt | [English](README_EN.md)
   <a href="docs/doi-chieu-de-thi.md"><b>Đối chiếu đề</b></a>
 </p>
 
+<p align="center">
+  <img src="docs/images/hero-ghep.png" width="100%" alt="Các màn hình Desktiny: danh sách hồ sơ, trang chủ, trình thiết kế quy trình và bản trên điện thoại">
+</p>
+
 Sản phẩm dự thi OLP Phần mềm nguồn mở 2026, chủ đề nền tảng văn phòng số DX-OS Open-Core. Bản phát hành mới nhất:
 **v3.1.0**; các thay đổi chờ bản 3.2.0 nằm ở mục `[Unreleased]` của [CHANGELOG](CHANGELOG.md). *Desk + destiny*;
 tên cũ DX Workspace, nên mã, cơ sở dữ liệu và container vẫn dùng tên `dx_workspace` / `dx-workspace`.
@@ -139,14 +143,35 @@ riêng của từng cơ quan nằm trong **gói giao diện** và **plugin**, c�
 </table>
 
 <p align="center">
-  <img src="docs/images/dien-thoai.png" width="220" alt="Desktiny trên màn hình điện thoại, bản web"><br>
-  <sub>Nhân viên xem việc trên điện thoại bằng bản web</sub>
+  <img src="docs/images/dt-trang-chu.png" width="180" alt="Trang chủ trên điện thoại">
+  <img src="docs/images/dt-ho-so.png" width="180" alt="Hồ sơ trên điện thoại">
+  <img src="docs/images/dt-cong-viec.png" width="180" alt="Công việc trên điện thoại">
+  <img src="docs/images/dt-dang-nhap.png" width="180" alt="Đăng nhập trên điện thoại">
+  <br><sub>Bản web trên điện thoại: trang chủ, hồ sơ, công việc, đăng nhập</sub>
 </p>
+
+<table>
+  <tr>
+    <th width="50%">Chi tiết hồ sơ: tiến trình từng bước, ai đang xử lý</th>
+    <th width="50%">Cùng màn hình ở chế độ tối</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/ho-so-chi-tiet.png" width="100%" alt="Trang chi tiết hồ sơ ở chế độ sáng với các bước xử lý"></td>
+    <td><img src="docs/images/toi-ho-so.png" width="100%" alt="Trang chi tiết hồ sơ ở chế độ tối"></td>
+  </tr>
+</table>
 
 <sub>Mọi ảnh: dữ liệu mẫu giả. Nguồn gốc ảnh: [docs/images/README.md](docs/images/README.md). Mô tả đầy đủ và phạm vi
 từng tính năng: [docs/tinh-nang.md](docs/tinh-nang.md); tính năng AI: [docs/ai-features.md](docs/ai-features.md).</sub>
 
 ## Kiến trúc
+
+<p align="center">
+  <img src="docs/images/kien-truc-dong.svg" width="100%" alt="Sơ đồ kiến trúc động. Người dùng đi qua cổng Nginx (giới hạn tần suất, CSP, /internal/ trả 404). Cổng chia đường: / tới Workspace web, /workspace/v1/ tới workspace-api và workspace-worker, /console/ tới Core admin, /office/ tới ONLYOFFICE tùy chọn, /identity/ tới Keycloak ở bên trái, /core/v1/ tới core-api. Tầng 2 gọi Tầng 1 chỉ qua HTTP /core/v1/ bằng token OIDC. Tầng 1 là core-api và core-worker, ClamAV tùy chọn. Lưu trữ: PostgreSQL với ba CSDL dx_identity, dx_workspace, dx_core; RustFS giữ byte tệp; Valkey cấp sẵn nhưng chưa dùng. Bên phải: máy chủ plugin nhận sự kiện ký HMAC, gọi lại API plugin bằng token có phạm vi; hệ thống ngoài chỉ nói chuyện với máy chủ plugin. Sáu bước đánh số lần lượt sáng lên, khớp danh sách bên dưới">
+</p>
+
+<details>
+<summary>Sơ đồ dạng chữ (Mermaid)</summary>
 
 ```mermaid
 flowchart TB
@@ -189,7 +214,10 @@ flowchart TB
     class WEB,WAPI,ADM,CAPI own
 ```
 
-Khối nền xanh đậm là mã của dự án; các khối còn lại là phần mềm nguồn mở dùng nguyên bản từ image chính thức.
+</details>
+
+Khối nền xanh đậm là mã của dự án; các khối còn lại là phần mềm nguồn mở dùng nguyên bản từ image chính thức. Màu
+mũi tên: xanh dương là yêu cầu/phản hồi, xanh lá là ghi dữ liệu, nâu vàng là sự kiện, tím là tệp; nét đứt là tùy chọn.
 
 1. Mọi yêu cầu đi qua cổng Nginx (ở cấu hình dev chỉ mở `127.0.0.1:8080`). Cổng chia đường theo tiền tố, giới hạn
    tần suất, gắn CSP và trả 404 cho `/internal/`.
@@ -202,6 +230,15 @@ Khối nền xanh đậm là mã của dự án; các khối còn lại là ph�
    tệp sang Core, gửi sự kiện plugin, webhook, email.
 6. Core admin là ứng dụng web tĩnh gọi thẳng `/core/v1/` như mọi client khác. ONLYOFFICE chỉ nói chuyện với
    `workspace-api` (ký JWT).
+
+### Dữ liệu nằm ở đâu
+
+<p align="center">
+  <img src="docs/images/luong-du-lieu-dong.svg" width="100%" alt="Sơ đồ động ba cột: người dùng làm gì, dịch vụ nào ghi, dữ liệu nằm ở đâu. Đăng nhập: Keycloak, CSDL dx_identity giữ tài khoản, mật khẩu đã băm, khóa TOTP. Trình, duyệt hồ sơ, giao việc, nhắn tin: workspace-api ghi vào dx_workspace (tổ chức, việc, hồ sơ, snapshot, quyết định, tên tệp, chia sẻ, outbox). Workspace gọi core-api qua /core/v1/; dx_core giữ principal, ACL, schema và record có phiên bản, phiên bản tệp kèm SHA-256, run, human task, nhật ký chuỗi băm. Byte tệp nằm trong RustFS. Khi xem trước tệp, kết quả kiểm dữ liệu cá nhân không được lưu. Thiết bị, người dân gửi tới máy chủ plugin, dữ liệu nằm trong SQLite riêng của plugin; hồ sơ kết thúc được plugin Lưu trữ lịch sử ghi vào tệp JSONL nối sha256">
+</p>
+
+Mỗi loại dữ liệu có đúng một nơi sở hữu ([docs/architecture.md](docs/architecture.md), mục *Nguồn sự thật*). Dữ
+liệu của plugin kết nối không nằm trong CSDL của Desktiny mà trong volume của máy chủ plugin, nên cần sao lưu riêng.
 
 | Yêu cầu bắt buộc của đề | Thành phần | Cấu hình, mã |
 |---|---|---|
@@ -220,6 +257,13 @@ Chi tiết: [docs/architecture.md](docs/architecture.md).
 ## Luồng nghiệp vụ
 
 Một hồ sơ trình duyệt đi từ đầu đến cuối:
+
+<p align="center">
+  <img src="docs/images/luong-ho-so-dong.svg" width="100%" alt="Sơ đồ động bốn làn: Nhân viên, Workspace, Core, Trưởng phòng; mười bước sáng lần lượt từ trái sang phải. 1 Nhân viên điền biểu mẫu, đính kèm tệp. 2 Core lưu tệp có phiên bản: byte vào RustFS, SHA-256 vào dx_core. 3 Nhân viên bấm Trình. 4 Workspace ghim snapshot biểu mẫu, tệp, quy trình vào dx_workspace. 5 Worker đặt hold lên tệp, khởi chạy run; bước duyệt là human task trong dx_core. 6 Workspace tạo việc duyệt, gửi thông báo. 7 Trưởng phòng duyệt, trả lại, từ chối hoặc xin ý kiến. 8 Quyết định ghi ở Workspace trước. 9 Core hoàn tất human task, ghi nhật ký nối chuỗi băm. 10 Nhân viên xem kết quả ở tab Quy trình">
+</p>
+
+<details>
+<summary>Sơ đồ dạng chữ (Mermaid)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -243,6 +287,10 @@ sequenceDiagram
     C->>C: Ghi nhật ký kiểm toán nối chuỗi băm
     WA-->>NV: Kết quả và lịch sử trên tab Quy trình
 ```
+
+</details>
+
+Sơ đồ động đánh số mười bước theo thời gian; danh sách dưới đây gom các bước theo dịch vụ thực hiện.
 
 1. **Lưu tệp** (`workspace-api` → `core-api`): Core kiểm đuôi, chữ ký nội dung, giới hạn giải nén, quét ClamAV khi
    bật; tệp `.exe` bị từ chối `unsupported_file_type`.
@@ -311,14 +359,16 @@ flowchart TB
 Đây là bản mẫu: tên cơ quan là tên giả, thời hạn và mức tiền chỉ để minh họa, ký số là mô phỏng. **Tương thích:** bản
 mở rộng 1.1.0 cần Desktiny **3.1.0** trở lên.
 
+<p align="center">
+  <img src="docs/images/goi-truoc-sau.png" width="100%" alt="Hai ảnh cạnh nhau: giao diện mặc định và giao diện sau khi cài gói Một cửa"><br>
+  <sub>Cùng một Desktiny trước và sau khi cài gói “Một cửa cấp xã”: màu, từ ngữ, menu và quy trình đổi theo nghiệp vụ</sub>
+</p>
+
 <table>
   <tr>
-    <th width="50%">Quản trị cài gói <code>.zip</code>, xem trước rồi bật</th>
-    <th width="50%">Sau khi cài “Một cửa cấp xã”: từ ngữ, màu và quy trình đổi theo bộ phận một cửa</th>
-  </tr>
-  <tr>
-    <td><img src="docs/images/goi-giao-dien.png" width="100%" alt="Màn Quản trị › Gói giao diện với gói đã cài và phần xem trước"></td>
-    <td><img src="docs/images/mot-cua-trang-chu.png" width="100%" alt="Trang chủ Desktiny sau khi cài bản mở rộng Một cửa cấp xã"></td>
+    <td width="33%"><img src="docs/images/goi-mot-cua.png" width="100%" alt="Trang chủ Desktiny với gói Một cửa cấp xã"><br><sub>Một cửa cấp xã</sub></td>
+    <td width="33%"><img src="docs/images/goi-nhan-su.png" width="100%" alt="Trang chủ Desktiny với gói Nhân sự doanh nghiệp"><br><sub>Nhân sự doanh nghiệp</sub></td>
+    <td width="33%"><img src="docs/images/goi-van-thu.png" width="100%" alt="Trang chủ Desktiny với gói Văn thư – điều hành"><br><sub>Văn thư – điều hành</sub></td>
   </tr>
 </table>
 
@@ -435,12 +485,20 @@ Chưa có bản chạy trực tuyến; chạy theo [Dùng thử nhanh](#dùng-th
     <td><img src="docs/media/gif-thiet-ke-quy-trinh.gif" width="100%" alt="Ảnh động: kéo thả bước duyệt và điều kiện trên canvas, chạy thử với dữ liệu mẫu"></td>
   </tr>
   <tr>
-    <th>Cài một bản mở rộng, Desktiny đổi sang nghiệp vụ một cửa</th>
+    <th>Đổi gói giao diện: cả ứng dụng đổi sang nghiệp vụ một cửa, nhân sự</th>
     <th>Người dân nộp hồ sơ trực tuyến, bộ phận một cửa tiếp nhận</th>
   </tr>
   <tr>
-    <td><img src="docs/media/gif-doi-nghiep-vu.gif" width="100%" alt="Ảnh động: tải tệp zip ở Quản trị, xem trước, bật; giao diện và quy trình đổi"></td>
+    <td><img src="docs/media/gif-doi-nghiep-vu.gif" width="100%" alt="Ảnh động: chọn gói giao diện ở Quản trị, ứng dụng đổi màu, từ ngữ và menu theo Một cửa rồi Nhân sự"></td>
     <td><img src="docs/media/gif-cong-dan-nop.gif" width="100%" alt="Ảnh động: điền biểu mẫu nộp trực tuyến, hồ sơ xuất hiện ở sổ tiếp nhận"></td>
+  </tr>
+  <tr>
+    <th>Thiết bị vượt ngưỡng, luồng tự tạo hồ sơ sự cố</th>
+    <th>Nhân viên cập nhật việc trên điện thoại</th>
+  </tr>
+  <tr>
+    <td><img src="docs/media/gif-canh-bao-cam-bien.gif" width="100%" alt="Ảnh động: số đo cảm biến vượt ngưỡng, plugin ghi sự cố và luồng tạo hồ sơ sự cố"></td>
+    <td align="center"><img src="docs/media/gif-dien-thoai.gif" width="60%" alt="Ảnh động: mở một công việc trên điện thoại và cập nhật tiến độ"></td>
   </tr>
 </table>
 

@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 876" width="1120" height="876" role="img" aria-labelledby="tt dd">
+<title id="tt">Desktiny: dữ liệu đi đâu</title>
+<desc id="dd">Ba cột: người dùng làm gì, dịch vụ nào ghi, dữ liệu nằm ở đâu. Đăng nhập đi tới Keycloak, tài khoản, mật khẩu đã băm và khóa TOTP nằm trong CSDL dx_identity. Trình, duyệt hồ sơ, giao việc, nhắn tin đi tới workspace-api; tổ chức, việc, hồ sơ, snapshot đã trình, quyết định, tên tệp, thư mục, chia sẻ và outbox nằm trong dx_workspace. Workspace gọi core-api qua HTTP /core/v1/, không đọc CSDL của Core; principal, ACL, schema và record có phiên bản, phiên bản tệp kèm SHA-256, run và human task, nhật ký kiểm toán nối chuỗi băm nằm trong dx_core. Byte tệp nằm trong RustFS (S3), bucket dx-files. Khi xem trước tệp, dx-piivn đếm dữ liệu cá nhân và trả bản đã che, giá trị tìm thấy không được lưu. Thiết bị và người dân gửi tới máy chủ plugin; dữ liệu plugin nằm trong SQLite riêng của từng plugin. Khi hồ sơ kết thúc, sự kiện ký HMAC tới plugin Lưu trữ lịch sử, bản đã che được ghi vào tệp archive/YYYY-MM.jsonl, mỗi dòng nối sha256 với dòng trước.</desc>
+<style>
+svg{font-family:'Be Vietnam Pro','Segoe UI',Arial,sans-serif}
+text{fill:#0F172A;font-size:14px}
+.t{font-size:26px;font-weight:700}
+.h{font-size:15px;font-weight:700}
+.k{font-size:14px;font-weight:700;fill:#475569;letter-spacing:.5px}
+.m{fill:#475569}
+.w{fill:#fff}.wm{fill:#D6E0EC}
+.c{font-family:Consolas,'Courier New',monospace}
+.b{font-weight:700}
+.mid{text-anchor:middle}
+.act{fill:#fff;stroke:#94A3B8;stroke-width:1.5}
+.own{fill:#1E3A5F}
+.kc{fill:#fff;stroke:#94A3B8;stroke-width:1.5}
+.db{fill:#E8F6EE;stroke:#A7DBBC;stroke-width:1.5}
+.fv{fill:#F0ECFB;stroke:#D6CDF3;stroke-width:1.5}
+.no{fill:#F4F7FA;stroke:#94A3B8;stroke-width:1.5;stroke-dasharray:6 4}
+.l{fill:none;stroke-width:2.2}
+.rq{stroke:#2563EB}.wr{stroke:#15803D}.ev{stroke:#92600A}.fi{stroke:#5D43B5}.gy{stroke:#94A3B8;stroke-dasharray:6 4}
+.ring{fill:none;stroke:#F1B862;stroke-width:5}
+.cap,.ring{opacity:0;animation:hien 12s linear infinite}
+@keyframes hien{0%,15.8%{opacity:1}16.6%,100%{opacity:0}}
+.s2{animation-delay:2s}.s3{animation-delay:4s}.s4{animation-delay:6s}.s5{animation-delay:8s}.s6{animation-delay:10s}
+.dot{stroke:#fff;stroke-width:2}
+.tinh{display:none}
+@media (prefers-reduced-motion:reduce){.dong,.cap,.ring{display:none}.tinh{display:inline}}
+</style>
+<defs>
+<marker id="aq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#2563EB"/></marker>
+<marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#15803D"/></marker>
+<marker id="ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#92600A"/></marker>
+<marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#5D43B5"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#94A3B8"/></marker>
+</defs>
+<rect width="1120" height="876" rx="16" fill="#F8FAFC"/>
+<text x="24" y="44" class="t">Dữ liệu đi đâu</text>
+<text x="24" y="70" class="m" font-size="15">Mỗi loại dữ liệu có một nơi sở hữu · ba CSDL tách riêng, không khóa ngoại hay SQL xuyên tầng</text>
+<text x="20" y="104" class="k">AI LÀM GÌ</text>
+<text x="400" y="104" class="k">DỊCH VỤ GHI</text>
+<text x="700" y="104" class="k">DỮ LIỆU NẰM Ở ĐÂU</text>
+
+<!-- mũi tên tĩnh -->
+<path d="M300,148H398" class="l rq" marker-end="url(#aq)"/>
+<path d="M600,148H698" class="l wr" marker-end="url(#aw)"/>
+<path d="M300,224H398" class="l rq" marker-end="url(#aq)"/>
+<path d="M600,224H698" class="l wr" marker-end="url(#aw)"/>
+<path d="M300,300H398" class="l fi" marker-end="url(#af)"/>
+<path d="M300,376H398" class="l rq" marker-end="url(#aq)"/>
+<path d="M600,376H698" class="l gy" marker-end="url(#ag)"/>
+<path d="M450,410V438" class="l rq" marker-end="url(#aq)"/>
+<path d="M580,410V438" class="l fi" marker-end="url(#af)"/>
+<text x="460" y="430" class="c">/core/v1/</text>
+<path d="M600,470H698" class="l wr" marker-end="url(#aw)"/>
+<path d="M600,568H698" class="l fi" marker-end="url(#af)"/>
+<path d="M400,400H360V632H398" class="l ev" marker-end="url(#ae)"/>
+<text x="350" y="508" text-anchor="end" fill="#854D0E">hồ sơ kết thúc:</text>
+<text x="350" y="527" text-anchor="end" fill="#854D0E">sự kiện ký HMAC</text>
+<path d="M300,680H398" class="l rq" marker-end="url(#aq)"/>
+<path d="M600,643H698" class="l wr" marker-end="url(#aw)"/>
+<path d="M600,719H698" class="l wr" marker-end="url(#aw)"/>
+
+<!-- ai làm gì -->
+<rect x="20" y="120" width="280" height="56" rx="10" class="act"/>
+<text x="36" y="143" class="b">Đăng nhập</text><text x="36" y="164" class="m">mật khẩu, mã TOTP</text>
+<rect x="20" y="196" width="280" height="56" rx="10" class="act"/>
+<text x="36" y="219" class="b">Trình, duyệt hồ sơ</text><text x="36" y="240" class="m">giao việc, nhắn tin, bảng tin</text>
+<rect x="20" y="272" width="280" height="56" rx="10" class="act"/>
+<text x="36" y="295" class="b">Tải tệp lên</text><text x="36" y="316" class="m">Kho tài liệu, đính kèm hồ sơ</text>
+<rect x="20" y="348" width="280" height="56" rx="10" class="act"/>
+<text x="36" y="371" class="b">Xem trước tệp</text><text x="36" y="392" class="m">cảnh báo dữ liệu cá nhân</text>
+<rect x="20" y="652" width="280" height="56" rx="10" class="act"/>
+<text x="36" y="675" class="b">Thiết bị, người dân</text><text x="36" y="696" class="m">số đo có khóa riêng; nộp ở <tspan class="c">/cong/</tspan></text>
+
+<!-- dịch vụ -->
+<rect x="400" y="120" width="200" height="56" rx="10" class="kc"/>
+<text x="500" y="143" class="h mid">Keycloak</text><text x="500" y="164" class="m mid">OIDC + PKCE</text>
+<rect x="400" y="196" width="200" height="214" rx="10" class="own"/>
+<text x="500" y="222" class="h mid w">workspace-api</text>
+<text x="500" y="242" class="mid wm">+ workspace-worker</text>
+<text x="500" y="296" class="mid wm">gửi tệp sang Core</text>
+<text x="500" y="372" class="mid wm">kiểm bằng dx-piivn</text>
+<rect x="400" y="440" width="200" height="140" rx="10" class="own"/>
+<text x="500" y="466" class="h mid w">core-api</text>
+<text x="500" y="490" class="mid wm">kiểm nội dung tệp,</text>
+<text x="500" y="510" class="mid wm">quét ClamAV khi bật</text>
+<text x="500" y="534" class="mid wm">ghi nhật ký nối</text>
+<text x="500" y="554" class="mid wm">chuỗi băm</text>
+<rect x="400" y="616" width="200" height="130" rx="10" class="kc"/>
+<text x="500" y="642" class="h mid">Máy chủ plugin</text>
+<text x="500" y="664" class="m mid">repo Expansion Pack</text>
+<text x="500" y="684" class="m mid">cổng 9201–9209</text>
+<text x="500" y="704" class="m mid">mỗi plugin</text>
+<text x="500" y="724" class="m mid">một volume</text>
+
+<!-- nơi lưu -->
+<rect x="700" y="120" width="400" height="56" rx="10" class="db"/>
+<text x="716" y="143"><tspan class="b">Keycloak · </tspan><tspan class="c b">dx_identity</tspan></text>
+<text x="716" y="164" class="m">tài khoản, mật khẩu đã băm, khóa TOTP</text>
+<rect x="700" y="196" width="400" height="104" rx="10" class="db"/>
+<text x="716" y="220" class="c b">dx_workspace</text>
+<text x="716" y="241" class="m">tổ chức, phòng ban, việc, tin nhắn, bảng tin</text>
+<text x="716" y="261" class="m">hồ sơ, snapshot đã trình, quyết định</text>
+<text x="716" y="281" class="m">tên tệp, thư mục, chia sẻ; outbox</text>
+<rect x="700" y="332" width="400" height="80" rx="10" class="no"/>
+<text x="716" y="356" class="b m">Không lưu</text>
+<text x="716" y="376" class="m">số CCCD, điện thoại, e-mail tìm thấy khi xem:</text>
+<text x="716" y="396" class="m">chỉ trả số lượng và bản đã che</text>
+<rect x="700" y="432" width="400" height="98" rx="10" class="db"/>
+<text x="716" y="456" class="c b">dx_core</text>
+<text x="716" y="477" class="m">principal, ACL; schema, record có phiên bản</text>
+<text x="716" y="497" class="m">phiên bản tệp + SHA-256; run, human task</text>
+<text x="716" y="517" class="m">nhật ký kiểm toán nối chuỗi băm</text>
+<rect x="700" y="540" width="400" height="56" rx="10" class="fv"/>
+<text x="716" y="563" class="b">RustFS (S3) · <tspan class="c">dx-files</tspan></text>
+<text x="716" y="584" class="m">byte tệp, khóa object không dùng tên gốc</text>
+<rect x="700" y="612" width="400" height="62" rx="10" class="db"/>
+<text x="716" y="636" class="b">SQLite của từng plugin</text>
+<text x="716" y="657" class="m">số đo, thiết bị, sự kiện chờ gửi, yêu cầu nộp</text>
+<rect x="700" y="688" width="400" height="62" rx="10" class="db"/>
+<text x="716" y="712" class="c b">archive/YYYY-MM.jsonl</text>
+<text x="716" y="733" class="m">bản đã che + sha256, prev nối dòng trước</text>
+
+<!-- vòng sáng -->
+<rect x="16" y="116" width="288" height="64" rx="12" class="ring"/>
+<rect x="16" y="192" width="288" height="64" rx="12" class="ring s2"/>
+<rect x="16" y="268" width="288" height="64" rx="12" class="ring s3"/>
+<rect x="16" y="344" width="288" height="64" rx="12" class="ring s4"/>
+<rect x="16" y="648" width="288" height="64" rx="12" class="ring s5"/>
+<rect x="696" y="684" width="408" height="70" rx="12" class="ring s6"/>
+
+<!-- chấm chạy -->
+<g class="dong">
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.005;.06;1" calcMode="linear" path="M300,148H400"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.005;.065"/></circle>
+<circle r="7" class="dot" fill="#15803D" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.07;.13;1" calcMode="linear" path="M600,148H700"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.07;.14"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.17;.22;1" calcMode="linear" path="M300,224H400"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.17;.225"/></circle>
+<circle r="7" class="dot" fill="#15803D" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.23;.29;1" calcMode="linear" path="M600,224H700"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.23;.3"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.23;.26;1" calcMode="linear" path="M450,410V440"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.23;.265"/></circle>
+<circle r="7" class="dot" fill="#15803D" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.27;.32;1" calcMode="linear" path="M600,470H700"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.27;.325"/></circle>
+<circle r="7" class="dot" fill="#5D43B5" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.34;.39;1" calcMode="linear" path="M300,300H400"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.34;.395"/></circle>
+<circle r="7" class="dot" fill="#15803D" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.40;.46;1" calcMode="linear" path="M600,224H700"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.40;.465"/></circle>
+<circle r="7" class="dot" fill="#5D43B5" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.40;.43;1" calcMode="linear" path="M580,410V440"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.40;.435"/></circle>
+<circle r="7" class="dot" fill="#5D43B5" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.44;.49;1" calcMode="linear" path="M600,568H700"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.44;.495"/></circle>
+<circle r="7" class="dot" fill="#15803D" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.44;.49;1" calcMode="linear" path="M600,470H700"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.44;.495"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.505;.56;1" calcMode="linear" path="M300,376H400"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.505;.565"/></circle>
+<circle r="7" class="dot" fill="#94A3B8" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.57;.63;1" calcMode="linear" path="M600,376H700"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.57;.635"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.67;.72;1" calcMode="linear" path="M300,680H400"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.67;.725"/></circle>
+<circle r="7" class="dot" fill="#15803D" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.73;.79;1" calcMode="linear" path="M600,643H700"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.73;.795"/></circle>
+<circle r="7" class="dot" fill="#F1B862" stroke="#92600A" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.84;.92;1" calcMode="linear" path="M400,400H360V632H400"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.84;.925"/></circle>
+<circle r="7" class="dot" fill="#15803D" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.93;.98;1" calcMode="linear" path="M600,719H700"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.93;.985"/></circle>
+</g>
+
+<!-- chú thích -->
+<rect x="20" y="772" width="1080" height="44" rx="10" fill="#fff" stroke="#CBD5E1"/>
+<text x="40" y="800" class="cap"><tspan class="b">Đăng nhập:</tspan> Keycloak giữ tài khoản, mật khẩu đã băm, khóa TOTP trong dx_identity; trình duyệt chỉ có cookie phiên.</text>
+<text x="40" y="800" class="cap s2"><tspan class="b">Hồ sơ:</tspan> Workspace ghi hồ sơ, snapshot, quyết định vào dx_workspace; dữ liệu biểu mẫu, run quy trình ở dx_core.</text>
+<text x="40" y="800" class="cap s3"><tspan class="b">Tệp:</tspan> byte vào RustFS; phiên bản, SHA-256, quyền ở dx_core; tên, thư mục, chia sẻ ở dx_workspace.</text>
+<text x="40" y="800" class="cap s4"><tspan class="b">Xem trước:</tspan> dx-piivn đếm CCCD, điện thoại, e-mail… và che; giá trị tìm thấy không ghi log, không lưu.</text>
+<text x="40" y="800" class="cap s5"><tspan class="b">Plugin:</tspan> thiết bị, người dân gửi tới máy chủ plugin; dữ liệu nằm trong SQLite riêng của plugin đó.</text>
+<text x="40" y="800" class="cap s6"><tspan class="b">Lưu trữ:</tspan> hồ sơ kết thúc, sự kiện ký HMAC tới plugin Lưu trữ lịch sử; một dòng JSONL đã che, nối sha256.</text>
+<text x="40" y="800" class="tinh"><tspan class="b">Đọc theo hàng:</tspan> thao tác bên trái, dịch vụ ghi ở giữa, nơi dữ liệu nằm bên phải.</text>
+
+<!-- chú giải -->
+<g transform="translate(20,836)">
+<path d="M0,10H34" class="l rq" marker-end="url(#aq)"/><text x="44" y="15">yêu cầu / phản hồi</text>
+<path d="M190,10H224" class="l wr" marker-end="url(#aw)"/><text x="234" y="15">ghi dữ liệu</text>
+<path d="M340,10H374" class="l ev" marker-end="url(#ae)"/><text x="384" y="15">sự kiện, tín hiệu</text>
+<path d="M520,10H554" class="l fi" marker-end="url(#af)"/><text x="564" y="15">tệp</text>
+<path d="M612,10H646" class="l gy" marker-end="url(#ag)"/><text x="656" y="15">không lưu</text>
+<rect x="760" y="1" width="24" height="18" rx="4" class="own"/><text x="792" y="15">mã của dự án</text>
+<rect x="900" y="1" width="24" height="18" rx="4" class="db"/><text x="932" y="15">nơi lưu bền</text>
+</g>
+</svg>
