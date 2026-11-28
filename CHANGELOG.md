@@ -91,6 +91,7 @@ duy nhất là luồng đăng nhập OIDC.
   (3e8aa00).
 
 ### Fixed
+- Khung Thông báo: hàng nút lọc (Tất cả, Chưa đọc, Phê duyệt…) không còn bị danh sách dài đè mất nửa dưới và sinh thanh cuộn thừa; danh sách cuộn riêng phần còn lại.
 - Trang chủ: tên hồ sơ dài trong "Hồ sơ gần đây" kết thúc bằng "…" thay vì chạy đè lên nhãn trạng thái.
 - Xóa được biểu mẫu không còn dùng (B7): nút "Xóa biểu mẫu" cạnh ô chọn biểu mẫu khi tạo luồng, `DELETE /forms/{id}`. Biểu mẫu
   đã có hồ sơ thì được lưu trữ (hồ sơ vẫn xem được); biểu mẫu quy trình còn dùng hoặc do gói cài thì bị từ chối kèm lý do.
