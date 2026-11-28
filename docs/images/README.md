@@ -6,11 +6,16 @@ SPDX-FileCopyrightText: 2026 Desktiny contributors
 # Nguồn gốc hình ảnh
 
 Mọi ảnh chụp màn hình và ảnh động dùng **dữ liệu mẫu giả** (tên người, cơ quan, hồ sơ đều là giả), không chứa mật
-khẩu hay dữ liệu thật. Giấy phép theo [REUSE.toml](../../REUSE.toml) (mục `docs/**`).
+khẩu hay dữ liệu thật. Giấy phép theo [REUSE.toml](../../REUSE.toml) (mục `docs/**`). Các sơ đồ `*-dong.svg`
+chuyển động bằng CSS và SMIL, không có script, phông hay ảnh ngoài; khi người xem bật giảm chuyển động thì chỉ còn sơ
+đồ tĩnh.
 
 | Tệp | Nội dung | Dùng ở | Nguồn |
 |---|---|---|---|
 | `banner.svg` | Tên sản phẩm, câu giới thiệu, sơ đồ Core với ứng dụng, gói và plugin cắm vào | README, README_EN | Vẽ tay SVG |
+| `kien-truc-dong.svg` | Sơ đồ kiến trúc động: cổng, Tầng 2, Tầng 1, lưu trữ, Keycloak, máy chủ plugin; 6 bước khớp danh sách trong mục Kiến trúc | README, README_EN mục Kiến trúc | Vẽ tay SVG, 2026 |
+| `luong-du-lieu-dong.svg` | Dữ liệu đi đâu: thao tác của người dùng, dịch vụ ghi, nơi dữ liệu nằm | README, README_EN mục Kiến trúc › Dữ liệu nằm ở đâu | Vẽ tay SVG, 2026 |
+| `luong-ho-so-dong.svg` | Một hồ sơ trình duyệt qua bốn làn, 10 bước, nơi ghi dữ liệu của từng bước | README, README_EN mục Luồng nghiệp vụ | Vẽ tay SVG, 2026 |
 | `trang-chu.png` | Trang chủ *Việc cần làm hôm nay* | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |
 | `ho-so.png` | Trang hồ sơ với nút duyệt, trả lại và tab Quy trình | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |
 | `quy-trinh-canvas.png` | Trình thiết kế quy trình dạng canvas | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |

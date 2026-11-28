@@ -149,6 +149,14 @@ description and scope (Vietnamese): [docs/tinh-nang.md](docs/tinh-nang.md); AI f
 
 ## Architecture
 
+<p align="center">
+  <img src="docs/images/kien-truc-dong.svg" width="100%" alt="Animated architecture diagram (Vietnamese labels). Users go through the Nginx gateway (rate limits, CSP, /internal/ returns 404). The gateway routes / to Workspace web, /workspace/v1/ to workspace-api and workspace-worker, /console/ to Core admin, /office/ to optional ONLYOFFICE, /identity/ to Keycloak on the left, /core/v1/ to core-api. Tier 2 reaches Tier 1 only over HTTP /core/v1/ with an OIDC token. Tier 1 is core-api and core-worker, with optional ClamAV. Storage: PostgreSQL with three databases dx_identity, dx_workspace, dx_core; RustFS holds file bytes; Valkey is provisioned but unused. On the right: the plugin server receives HMAC-signed events and calls back the plugin API with a scoped token; external systems only talk to the plugin server. Six numbered steps light up in turn, matching the list below">
+  <br><sub>Animated diagram, labels in Vietnamese: a request travels through the gateway, the two tiers, storage and the plugin server; steps 1–6 match the list below.</sub>
+</p>
+
+<details>
+<summary>Text diagram (Mermaid)</summary>
+
 ```mermaid
 flowchart TB
     U["Users<br/>browser, phone"]
@@ -190,7 +198,11 @@ flowchart TB
     class WEB,WAPI,ADM,CAPI own
 ```
 
+</details>
+
 Dark blue blocks are the project's own code; the others are open-source software used unchanged from official images.
+Arrow colours: blue is request/response, green is a data write, brown is an event, purple is a file; dashed means
+optional.
 
 1. Every request goes through the Nginx gateway (in the dev configuration it listens only on `127.0.0.1:8080`). The
    gateway routes by prefix, rate-limits, adds CSP and returns 404 for `/internal/`.
@@ -204,6 +216,16 @@ Dark blue blocks are the project's own code; the others are open-source software
    permissions to the Core, delivers plugin events, webhooks and email.
 6. Core admin is a static web app that calls `/core/v1/` directly like any other client. ONLYOFFICE talks only to
    `workspace-api` (JWT-signed).
+
+### Where the data lives
+
+<p align="center">
+  <img src="docs/images/luong-du-lieu-dong.svg" width="100%" alt="Animated three-column diagram (Vietnamese labels): what the user does, which service writes, where the data lives. Sign-in: Keycloak, database dx_identity holds accounts, hashed passwords, TOTP keys. Submitting and approving cases, tasks, messages: workspace-api writes to dx_workspace (organisation, tasks, cases, snapshots, decisions, file names, shares, outbox). Workspace calls core-api over /core/v1/; dx_core holds principals, ACLs, versioned schemas and records, file versions with SHA-256, runs, human tasks and the hash-chained audit log. File bytes live in RustFS. When a file is previewed, the personal-data check result is not stored. Devices and citizens send to plugin servers, whose data lives in each plugin's own SQLite; closed cases are written by the archive plugin to a JSONL file chained with sha256">
+  <br><sub>Animated diagram, labels in Vietnamese: user actions on the left, the service that writes in the middle, where each kind of data is stored on the right.</sub>
+</p>
+
+Each kind of data has exactly one owner ([docs/architecture.md](docs/architecture.md), section *Nguồn sự thật*).
+Connected plugins keep their data in the plugin server's volume, not in Desktiny's databases, so back it up separately.
 
 | Mandatory requirement of the brief | Component | Configuration, code |
 |---|---|---|
@@ -222,6 +244,14 @@ The Core runs on its own with Workspace switched off: profile `core` plus the sa
 ## Business flow
 
 One case, from submission to decision:
+
+<p align="center">
+  <img src="docs/images/luong-ho-so-dong.svg" width="100%" alt="Animated swimlane diagram (Vietnamese labels) with four lanes: staff member, Workspace, Core, head of department; ten steps light up from left to right. 1 Staff fills in the form and attaches files. 2 The Core stores a versioned file: bytes to RustFS, SHA-256 to dx_core. 3 Staff submits. 4 Workspace pins the form, file and process snapshot in dx_workspace. 5 The worker holds the files and starts a run; the approval step is a human task in dx_core. 6 Workspace creates the approval task and notifies. 7 The head approves, returns, rejects or asks for opinions. 8 The decision is recorded in Workspace first. 9 The Core completes the human task and appends to the hash-chained audit log. 10 Staff sees the result on the Workflow tab">
+  <br><sub>Animated diagram, labels in Vietnamese: who does each of the ten steps and where each step writes its data.</sub>
+</p>
+
+<details>
+<summary>Text diagram (Mermaid)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -245,6 +275,10 @@ sequenceDiagram
     C->>C: Append to the hash-chained audit log
     WA-->>NV: Result and history on the Workflow tab
 ```
+
+</details>
+
+The animated diagram numbers ten steps in time order; the list below groups them by the service that runs them.
 
 1. **Store files** (`workspace-api` → `core-api`): the Core checks extension, content signature and decompression
    limits and scans with ClamAV when enabled; an `.exe` is rejected with `unsupported_file_type`.

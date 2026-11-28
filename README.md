@@ -148,6 +148,13 @@ từng tính năng: [docs/tinh-nang.md](docs/tinh-nang.md); tính năng AI: [doc
 
 ## Kiến trúc
 
+<p align="center">
+  <img src="docs/images/kien-truc-dong.svg" width="100%" alt="Sơ đồ kiến trúc động. Người dùng đi qua cổng Nginx (giới hạn tần suất, CSP, /internal/ trả 404). Cổng chia đường: / tới Workspace web, /workspace/v1/ tới workspace-api và workspace-worker, /console/ tới Core admin, /office/ tới ONLYOFFICE tùy chọn, /identity/ tới Keycloak ở bên trái, /core/v1/ tới core-api. Tầng 2 gọi Tầng 1 chỉ qua HTTP /core/v1/ bằng token OIDC. Tầng 1 là core-api và core-worker, ClamAV tùy chọn. Lưu trữ: PostgreSQL với ba CSDL dx_identity, dx_workspace, dx_core; RustFS giữ byte tệp; Valkey cấp sẵn nhưng chưa dùng. Bên phải: máy chủ plugin nhận sự kiện ký HMAC, gọi lại API plugin bằng token có phạm vi; hệ thống ngoài chỉ nói chuyện với máy chủ plugin. Sáu bước đánh số lần lượt sáng lên, khớp danh sách bên dưới">
+</p>
+
+<details>
+<summary>Sơ đồ dạng chữ (Mermaid)</summary>
+
 ```mermaid
 flowchart TB
     U["Người dùng<br/>trình duyệt, điện thoại"]
@@ -189,7 +196,10 @@ flowchart TB
     class WEB,WAPI,ADM,CAPI own
 ```
 
-Khối nền xanh đậm là mã của dự án; các khối còn lại là phần mềm nguồn mở dùng nguyên bản từ image chính thức.
+</details>
+
+Khối nền xanh đậm là mã của dự án; các khối còn lại là phần mềm nguồn mở dùng nguyên bản từ image chính thức. Màu
+mũi tên: xanh dương là yêu cầu/phản hồi, xanh lá là ghi dữ liệu, nâu vàng là sự kiện, tím là tệp; nét đứt là tùy chọn.
 
 1. Mọi yêu cầu đi qua cổng Nginx (ở cấu hình dev chỉ mở `127.0.0.1:8080`). Cổng chia đường theo tiền tố, giới hạn
    tần suất, gắn CSP và trả 404 cho `/internal/`.
@@ -202,6 +212,15 @@ Khối nền xanh đậm là mã của dự án; các khối còn lại là ph�
    tệp sang Core, gửi sự kiện plugin, webhook, email.
 6. Core admin là ứng dụng web tĩnh gọi thẳng `/core/v1/` như mọi client khác. ONLYOFFICE chỉ nói chuyện với
    `workspace-api` (ký JWT).
+
+### Dữ liệu nằm ở đâu
+
+<p align="center">
+  <img src="docs/images/luong-du-lieu-dong.svg" width="100%" alt="Sơ đồ động ba cột: người dùng làm gì, dịch vụ nào ghi, dữ liệu nằm ở đâu. Đăng nhập: Keycloak, CSDL dx_identity giữ tài khoản, mật khẩu đã băm, khóa TOTP. Trình, duyệt hồ sơ, giao việc, nhắn tin: workspace-api ghi vào dx_workspace (tổ chức, việc, hồ sơ, snapshot, quyết định, tên tệp, chia sẻ, outbox). Workspace gọi core-api qua /core/v1/; dx_core giữ principal, ACL, schema và record có phiên bản, phiên bản tệp kèm SHA-256, run, human task, nhật ký chuỗi băm. Byte tệp nằm trong RustFS. Khi xem trước tệp, kết quả kiểm dữ liệu cá nhân không được lưu. Thiết bị, người dân gửi tới máy chủ plugin, dữ liệu nằm trong SQLite riêng của plugin; hồ sơ kết thúc được plugin Lưu trữ lịch sử ghi vào tệp JSONL nối sha256">
+</p>
+
+Mỗi loại dữ liệu có đúng một nơi sở hữu ([docs/architecture.md](docs/architecture.md), mục *Nguồn sự thật*). Dữ
+liệu của plugin kết nối không nằm trong CSDL của Desktiny mà trong volume của máy chủ plugin, nên cần sao lưu riêng.
 
 | Yêu cầu bắt buộc của đề | Thành phần | Cấu hình, mã |
 |---|---|---|
@@ -220,6 +239,13 @@ Chi tiết: [docs/architecture.md](docs/architecture.md).
 ## Luồng nghiệp vụ
 
 Một hồ sơ trình duyệt đi từ đầu đến cuối:
+
+<p align="center">
+  <img src="docs/images/luong-ho-so-dong.svg" width="100%" alt="Sơ đồ động bốn làn: Nhân viên, Workspace, Core, Trưởng phòng; mười bước sáng lần lượt từ trái sang phải. 1 Nhân viên điền biểu mẫu, đính kèm tệp. 2 Core lưu tệp có phiên bản: byte vào RustFS, SHA-256 vào dx_core. 3 Nhân viên bấm Trình. 4 Workspace ghim snapshot biểu mẫu, tệp, quy trình vào dx_workspace. 5 Worker đặt hold lên tệp, khởi chạy run; bước duyệt là human task trong dx_core. 6 Workspace tạo việc duyệt, gửi thông báo. 7 Trưởng phòng duyệt, trả lại, từ chối hoặc xin ý kiến. 8 Quyết định ghi ở Workspace trước. 9 Core hoàn tất human task, ghi nhật ký nối chuỗi băm. 10 Nhân viên xem kết quả ở tab Quy trình">
+</p>
+
+<details>
+<summary>Sơ đồ dạng chữ (Mermaid)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -243,6 +269,10 @@ sequenceDiagram
     C->>C: Ghi nhật ký kiểm toán nối chuỗi băm
     WA-->>NV: Kết quả và lịch sử trên tab Quy trình
 ```
+
+</details>
+
+Sơ đồ động đánh số mười bước theo thời gian; danh sách dưới đây gom các bước theo dịch vụ thực hiện.
 
 1. **Lưu tệp** (`workspace-api` → `core-api`): Core kiểm đuôi, chữ ký nội dung, giới hạn giải nén, quét ClamAV khi
    bật; tệp `.exe` bị từ chối `unsupported_file_type`.

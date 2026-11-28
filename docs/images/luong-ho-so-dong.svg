@@ -1,0 +1,168 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1120 780" width="1120" height="780" role="img" aria-labelledby="tt dd">
+<title id="tt">Desktiny: một hồ sơ trình duyệt đi qua bốn làn</title>
+<desc id="dd">Bốn làn từ trên xuống: Nhân viên, Workspace, Core, Trưởng phòng; thời gian chạy từ trái sang phải qua 10 bước. 1 Nhân viên điền biểu mẫu, đính kèm tệp. 2 Core lưu tệp có phiên bản: byte vào RustFS, SHA-256 vào dx_core. 3 Nhân viên bấm Trình. 4 Workspace ghim snapshot biểu mẫu, phiên bản tệp, phiên bản quy trình và ghi outbox vào dx_workspace. 5 workspace-worker đặt hold lên tệp và khởi chạy run trên Core; bước duyệt là một human task, lưu ở dx_core. 6 Workspace tạo việc duyệt và gửi thông báo. 7 Trưởng phòng duyệt, trả lại, từ chối hoặc xin ý kiến. 8 Quyết định được ghi ở Workspace trước. 9 Core hoàn tất human task và ghi nhật ký kiểm toán, mỗi dòng nối với dòng trước bằng SHA-256. 10 Nhân viên xem kết quả và lịch sử ở tab Quy trình. Các bước lần lượt sáng lên, vòng 10 giây.</desc>
+<style>
+svg{font-family:'Be Vietnam Pro','Segoe UI',Arial,sans-serif}
+text{fill:#0F172A;font-size:14px}
+.t{font-size:26px;font-weight:700}
+.h{font-size:15px;font-weight:700}
+.m{fill:#475569}
+.c{font-family:Consolas,'Courier New',monospace}
+.b{font-weight:700}
+.mid{text-anchor:middle}
+.lane{stroke:#CBD5E1;stroke-width:1}
+.hd{fill:#1E3A5F}.sub{fill:#D6E0EC;font-size:14px}.hw{fill:#fff;font-weight:700;font-size:15px;text-anchor:middle}
+.st{fill:#fff;stroke:#94A3B8;stroke-width:1.5}
+.wr{fill:#E8F6EE;stroke:#A7DBBC}.fv{fill:#F0ECFB;stroke:#D6CDF3}
+.l{fill:none;stroke-width:2.2}
+.rq{stroke:#2563EB}.gw{stroke:#15803D}.ev{stroke:#92600A}.fi{stroke:#5D43B5}
+.bd circle{fill:#1E3A5F}.bd text{fill:#fff;font-size:13px;font-weight:700;text-anchor:middle}
+.ring{fill:none;stroke:#F1B862;stroke-width:5}
+.cap,.ring{opacity:0;animation:hien 10s linear infinite}
+@keyframes hien{0%,9.4%{opacity:1}10%,100%{opacity:0}}
+.d1{animation-delay:1s}.d2{animation-delay:2s}.d3{animation-delay:3s}.d4{animation-delay:4s}.d5{animation-delay:5s}.d6{animation-delay:6s}.d7{animation-delay:7s}.d8{animation-delay:8s}.d9{animation-delay:9s}
+.dot{stroke:#fff;stroke-width:2}
+.tinh{display:none}
+@media (prefers-reduced-motion:reduce){.dong,.cap,.ring{display:none}.tinh{display:inline}}
+</style>
+<defs>
+<marker id="aq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#2563EB"/></marker>
+<marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#15803D"/></marker>
+<marker id="ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#92600A"/></marker>
+<marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#5D43B5"/></marker>
+</defs>
+<rect width="1120" height="780" rx="16" fill="#F8FAFC"/>
+<text x="24" y="44" class="t">Một hồ sơ trình duyệt đi qua Desktiny</text>
+<text x="24" y="70" class="m" font-size="15">Ai làm bước nào, dữ liệu được ghi ở đâu · thời gian chạy từ trái sang phải</text>
+
+<!-- làn -->
+<rect x="20" y="84" width="1080" height="112" fill="#fff" class="lane"/>
+<rect x="20" y="196" width="1080" height="150" fill="#F4F7FA" class="lane"/>
+<rect x="20" y="346" width="1080" height="170" fill="#fff" class="lane"/>
+<rect x="20" y="516" width="1080" height="100" fill="#F4F7FA" class="lane"/>
+<rect x="20" y="84" width="100" height="112" class="hd"/><text x="70" y="145" class="hw">Nhân viên</text>
+<rect x="20" y="196" width="100" height="150" class="hd"/><text x="70" y="268" class="hw">Workspace</text><text x="70" y="288" class="mid sub">api + worker</text>
+<rect x="20" y="346" width="100" height="170" class="hd"/><text x="70" y="428" class="hw">Core</text><text x="70" y="448" class="mid sub">api + worker</text>
+<rect x="20" y="516" width="100" height="100" class="hd"/><text x="70" y="560" class="hw">Trưởng</text><text x="70" y="580" class="hw">phòng</text>
+
+<!-- mũi tên -->
+<path d="M198,160V358" class="l fi" marker-end="url(#af)"/>
+<text x="206" y="262" class="m">qua API</text>
+<path d="M337,160V208" class="l rq" marker-end="url(#aq)"/>
+<path d="M403,250H477V358" class="l rq" marker-end="url(#aq)"/>
+<text x="410" y="242" class="m">worker, outbox</text>
+<path d="M543,410H590V312" class="l rq" marker-end="url(#aq)"/>
+<path d="M650,310V526" class="l ev" marker-end="url(#ae)"/>
+<path d="M682,566H730V312" class="l rq" marker-end="url(#aq)"/>
+<path d="M822,260H895V358" class="l rq" marker-end="url(#aq)"/>
+<path d="M961,410H1000V162" class="l rq" marker-end="url(#aq)"/>
+
+<!-- bước -->
+<rect x="132" y="100" width="132" height="60" rx="10" class="st"/>
+<text x="198" y="126" class="mid">Điền biểu mẫu,</text><text x="198" y="145" class="mid">đính kèm tệp</text>
+
+<rect x="132" y="360" width="132" height="100" rx="10" class="st"/>
+<text x="198" y="382" class="mid">Lưu tệp có</text><text x="198" y="400" class="mid">phiên bản</text>
+<rect x="138" y="406" width="120" height="22" rx="6" class="fv"/><text x="198" y="422" class="mid">byte: RustFS</text>
+<rect x="138" y="432" width="120" height="22" rx="6" class="wr"/><text x="198" y="448" class="mid">hash: dx_core</text>
+
+<rect x="271" y="100" width="132" height="60" rx="10" class="st"/>
+<text x="337" y="136" class="mid h">Bấm Trình</text>
+
+<rect x="271" y="210" width="132" height="100" rx="10" class="st"/>
+<text x="337" y="232" class="mid">Ghim snapshot:</text><text x="337" y="250" class="mid">biểu mẫu, tệp,</text><text x="337" y="268" class="mid">quy trình</text>
+<rect x="277" y="280" width="120" height="24" rx="6" class="wr"/><text x="337" y="297" class="mid c">dx_workspace</text>
+
+<rect x="411" y="360" width="132" height="100" rx="10" class="st"/>
+<text x="477" y="382" class="mid">Hold tệp,</text><text x="477" y="400" class="mid">chạy run →</text><text x="477" y="418" class="mid">human task</text>
+<rect x="417" y="430" width="120" height="24" rx="6" class="wr"/><text x="477" y="447" class="mid c">dx_core</text>
+
+<rect x="550" y="210" width="132" height="100" rx="10" class="st"/>
+<text x="616" y="236" class="mid">Tạo việc duyệt,</text><text x="616" y="256" class="mid">gửi thông báo</text>
+<rect x="556" y="280" width="120" height="24" rx="6" class="wr"/><text x="616" y="297" class="mid c">dx_workspace</text>
+
+<rect x="550" y="530" width="132" height="72" rx="10" class="st"/>
+<text x="616" y="552" class="mid">Duyệt, trả lại,</text><text x="616" y="570" class="mid">từ chối hoặc</text><text x="616" y="588" class="mid">xin ý kiến</text>
+
+<rect x="690" y="210" width="132" height="100" rx="10" class="st"/>
+<text x="756" y="232" class="mid">Ghi quyết định</text><text x="756" y="250" class="mid">ở Workspace</text><text x="756" y="268" class="mid b">trước</text>
+<rect x="696" y="280" width="120" height="24" rx="6" class="wr"/><text x="756" y="297" class="mid c">dx_workspace</text>
+
+<rect x="829" y="360" width="132" height="100" rx="10" class="st"/>
+<text x="895" y="382" class="mid">Hoàn tất</text><text x="895" y="400" class="mid">human task,</text><text x="895" y="418" class="mid">ghi nhật ký</text>
+<rect x="835" y="430" width="120" height="24" rx="6" class="wr"/><text x="895" y="447" class="mid c">dx_core</text>
+<rect x="835" y="472" width="52" height="26" rx="6" fill="#fff" stroke="#A7DBBC"/><text x="861" y="490" class="mid c">#n</text>
+<rect x="903" y="472" width="58" height="26" rx="6" class="wr" stroke-width="2"/><text x="932" y="490" class="mid c">#n+1</text>
+<path d="M903,485H889" class="l gw" marker-end="url(#aw)"/>
+
+<rect x="968" y="100" width="132" height="60" rx="10" class="st"/>
+<text x="1034" y="126" class="mid">Xem kết quả,</text><text x="1034" y="145" class="mid">tab Quy trình</text>
+
+<!-- vòng sáng -->
+<rect x="128" y="96" width="140" height="68" rx="12" class="ring"/>
+<rect x="128" y="356" width="140" height="108" rx="12" class="ring d1"/>
+<rect x="267" y="96" width="140" height="68" rx="12" class="ring d2"/>
+<rect x="267" y="206" width="140" height="108" rx="12" class="ring d3"/>
+<rect x="407" y="356" width="140" height="108" rx="12" class="ring d4"/>
+<rect x="546" y="206" width="140" height="108" rx="12" class="ring d5"/>
+<rect x="546" y="526" width="140" height="80" rx="12" class="ring d6"/>
+<rect x="686" y="206" width="140" height="108" rx="12" class="ring d7"/>
+<rect x="825" y="356" width="140" height="146" rx="12" class="ring d8"/>
+<rect x="964" y="96" width="140" height="68" rx="12" class="ring d9"/>
+
+<g class="bd">
+<circle cx="134" cy="102" r="11"/><text x="134" y="107">1</text>
+<circle cx="134" cy="362" r="11"/><text x="134" y="367">2</text>
+<circle cx="273" cy="102" r="11"/><text x="273" y="107">3</text>
+<circle cx="273" cy="212" r="11"/><text x="273" y="217">4</text>
+<circle cx="413" cy="362" r="11"/><text x="413" y="367">5</text>
+<circle cx="552" cy="212" r="11"/><text x="552" y="217">6</text>
+<circle cx="552" cy="532" r="11"/><text x="552" y="537">7</text>
+<circle cx="692" cy="212" r="11"/><text x="692" y="217">8</text>
+<circle cx="831" cy="362" r="11"/><text x="831" y="367">9</text>
+<circle cx="970" cy="102" r="12"/><text x="970" y="107" font-size="12">10</text>
+</g>
+
+<!-- chấm chạy -->
+<g class="dong">
+<circle r="7" class="dot" fill="#5D43B5" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.105;.16;1" path="M198,160V358"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.105;.17"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.305;.35;1" path="M337,160V208"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.305;.36"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.405;.47;1" path="M403,250H477V358"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.405;.48"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.505;.56;1" path="M543,410H590V312"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.505;.57"/></circle>
+<circle r="7" class="dot" fill="#F1B862" stroke="#92600A" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.605;.67;1" path="M650,310V526"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.605;.68"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.705;.77;1" path="M682,566H730V312"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.705;.78"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.805;.87;1" path="M822,260H895V358"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.805;.88"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.905;.97;1" path="M961,410H1000V162"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.905;.98"/></circle>
+</g>
+
+<!-- chú thích từng bước -->
+<rect x="20" y="632" width="1080" height="44" rx="10" fill="#fff" stroke="#CBD5E1"/>
+<g font-size="15">
+<text x="40" y="660" class="cap"><tspan class="b">1 ·</tspan> Nhân viên điền biểu mẫu (trường ẩn/hiện theo điều kiện) và đính kèm tệp.</text>
+<text x="40" y="660" class="cap d1"><tspan class="b">2 ·</tspan> Core kiểm định dạng, chữ ký nội dung, quét ClamAV nếu bật; byte vào RustFS, phiên bản + SHA-256 vào dx_core.</text>
+<text x="40" y="660" class="cap d2"><tspan class="b">3 ·</tspan> Nhân viên bấm Trình.</text>
+<text x="40" y="660" class="cap d3"><tspan class="b">4 ·</tspan> Workspace ghim snapshot biểu mẫu, phiên bản tệp và quy trình, ghi outbox cùng giao dịch.</text>
+<text x="40" y="660" class="cap d4"><tspan class="b">5 ·</tspan> workspace-worker đặt hold lên tệp đã trình, khởi chạy run; bước duyệt là một human task của Core.</text>
+<text x="40" y="660" class="cap d5"><tspan class="b">6 ·</tspan> Human task thành việc trong Cần phê duyệt của đúng người, kèm thông báo.</text>
+<text x="40" y="660" class="cap d6"><tspan class="b">7 ·</tspan> Trưởng phòng duyệt, trả lại, từ chối hoặc xin ý kiến.</text>
+<text x="40" y="660" class="cap d7"><tspan class="b">8 ·</tspan> Quyết định ghi ở Workspace trước; người dùng không gọi được Core để tự đặt hồ sơ thành đã duyệt.</text>
+<text x="40" y="660" class="cap d8"><tspan class="b">9 ·</tspan> Core hoàn tất human task, ghi nhật ký: mỗi dòng chứa SHA-256 của dòng trước (prev_hash).</text>
+<text x="40" y="660" class="cap d9"><tspan class="b">10 ·</tspan> Nhân viên thấy kết quả và lịch sử xử lý trên tab Quy trình.</text>
+<text x="40" y="660" class="tinh"><tspan class="b">1–10:</tspan> thứ tự các bước; ô xanh lá là nơi ghi dữ liệu, ô tím là nơi giữ byte tệp.</text>
+</g>
+
+<!-- nơi lưu -->
+<text x="20" y="716" class="b">Nơi lưu</text>
+<rect x="88" y="698" width="318" height="26" rx="6" class="wr"/><text x="98" y="716"><tspan class="c">dx_workspace</tspan>: snapshot, việc, quyết định</text>
+<rect x="416" y="698" width="408" height="26" rx="6" class="wr"/><text x="426" y="716"><tspan class="c">dx_core</tspan>: phiên bản tệp, run, human task, nhật ký</text>
+<rect x="834" y="698" width="160" height="26" rx="6" class="fv"/><text x="844" y="716">RustFS: byte tệp</text>
+
+<!-- chú giải -->
+<g transform="translate(20,742)">
+<path d="M0,10H34" class="l rq" marker-end="url(#aq)"/><text x="44" y="15">yêu cầu / phản hồi</text>
+<path d="M200,10H234" class="l gw" marker-end="url(#aw)"/><text x="244" y="15">ghi dữ liệu</text>
+<path d="M420,10H454" class="l ev" marker-end="url(#ae)"/><text x="464" y="15">sự kiện, tín hiệu</text>
+<path d="M610,10H644" class="l fi" marker-end="url(#af)"/><text x="654" y="15">tệp</text>
+<rect x="710" y="0" width="34" height="20" rx="6" fill="none" stroke="#F1B862" stroke-width="4"/><text x="754" y="15">bước đang chạy (vòng 10 giây)</text>
+</g>
+</svg>

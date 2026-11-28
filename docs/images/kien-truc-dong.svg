@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1120 890" width="1120" height="890" role="img" aria-labelledby="tt dd">
+<title id="tt">Desktiny: kiến trúc hai tầng và đường đi của một yêu cầu</title>
+<desc id="dd">Người dùng đi qua cổng Nginx (giới hạn tần suất, CSP, /internal/ trả 404). Cổng chia đường: / tới Workspace web, /workspace/v1/ tới workspace-api và workspace-worker, /console/ tới Core admin, /office/ tới ONLYOFFICE tùy chọn, /identity/ tới Keycloak, /core/v1/ tới core-api. Workspace gọi Core chỉ qua HTTP /core/v1/ bằng token OIDC. Core gồm core-api và core-worker: principal và ACL, schema và record có phiên bản, tệp có phiên bản kèm SHA-256, workflow và human task, nhật ký kiểm toán nối chuỗi băm; quét tệp bằng ClamAV khi bật. Lưu trữ: PostgreSQL với ba CSDL tách riêng dx_identity, dx_workspace, dx_core; RustFS (S3) giữ byte tệp; Valkey được cấp sẵn nhưng mã chưa dùng. Bên phải: máy chủ plugin nhận sự kiện ký HMAC và gọi lại API plugin bằng token có phạm vi; hệ thống ngoài như thiết bị, cổng nộp hồ sơ chỉ nói chuyện với máy chủ plugin. Sáu bước được đánh số và lần lượt sáng lên.</desc>
+<style>
+svg{font-family:'Be Vietnam Pro','Segoe UI',Arial,sans-serif}
+text{fill:#0F172A;font-size:14px}
+.h{font-size:16px;font-weight:700}
+.t{font-size:26px;font-weight:700}
+.m{fill:#475569}
+.w{fill:#fff}
+.wm{fill:#D6E0EC}
+.c{font-family:Consolas,'Courier New',monospace}
+.b{font-weight:700}
+.k{font-size:14px;font-weight:700;fill:#475569;letter-spacing:.5px}
+.own{fill:#1E3A5F}
+.box{fill:#fff;stroke:#94A3B8;stroke-width:1.5}
+.opt{fill:#fff;stroke:#94A3B8;stroke-width:1.5;stroke-dasharray:6 4}
+.off{fill:#F4F7FA;stroke:#CBD5E1;stroke-width:1.5;stroke-dasharray:4 4}
+.band{fill:#F4F7FA;stroke:#CBD5E1;stroke-width:1.5}
+.chip{fill:#E9EEF5;stroke:#CBD5E1}
+.red{fill:#FDECEC;stroke:#F3C4C4}
+.l{fill:none;stroke-width:2.2}
+.rq{stroke:#2563EB}.wr{stroke:#15803D}.ev{stroke:#92600A}.fi{stroke:#5D43B5}
+.d{stroke-dasharray:6 4}
+.halo{fill:none;stroke:#F4F7FA;stroke-width:8}
+.bd circle{fill:#1E3A5F}.bd text{fill:#fff;font-size:13px;font-weight:700;text-anchor:middle}
+.ring{fill:none;stroke:#F1B862;stroke-width:4}
+.cap,.ring{opacity:0;animation:hien 12s linear infinite}
+.s2{animation-delay:2s}.s3{animation-delay:4s}.s4{animation-delay:6s}.s5{animation-delay:8s}.s6{animation-delay:10s}
+@keyframes hien{0%,15.8%{opacity:1}16.6%,100%{opacity:0}}
+.dot{stroke:#fff;stroke-width:2}
+.tinh{display:none}
+@media (prefers-reduced-motion:reduce){.dong,.cap,.ring{display:none}.tinh{display:inline}}
+</style>
+<defs>
+<marker id="aq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#2563EB"/></marker>
+<marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#15803D"/></marker>
+<marker id="ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#92600A"/></marker>
+<marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#5D43B5"/></marker>
+<path id="r1" d="M500,138V200H100V280"/>
+<path id="r2" d="M500,138V200H462V300"/>
+<path id="r3" d="M500,392V470"/>
+<path id="r4a" d="M392,518H352"/>
+<path id="r4b" d="M650,580V616H677V638"/>
+<path id="r5a" d="M372,392V650"/>
+<path id="r5b" d="M534,580V650"/>
+<path id="r6a" d="M560,392V424H960V470"/>
+<path id="r6b" d="M1060,470V192H462V300"/>
+<path id="r7" d="M500,138V214H852V520H702"/>
+</defs>
+<rect width="1120" height="890" rx="16" fill="#F8FAFC"/>
+<text x="24" y="44" class="t">Desktiny · kiến trúc hai tầng</text>
+<text x="24" y="70" class="m" font-size="15">Mọi yêu cầu qua cổng Nginx · Workspace chỉ gọi Core qua HTTP /core/v1/</text>
+
+<!-- người dùng -->
+<rect x="370" y="84" width="260" height="54" rx="10" class="box"/>
+<text x="500" y="106" class="h" text-anchor="middle">Người dùng</text>
+<text x="500" y="126" class="m" text-anchor="middle">trình duyệt, điện thoại</text>
+
+<!-- cổng -->
+<rect x="200" y="170" width="640" height="60" rx="10" fill="#E9EEF5" stroke="#1E3A5F" stroke-width="1.5"/>
+<text x="216" y="195" class="h">Cổng Nginx 1.28</text>
+<text x="216" y="216" class="m c">127.0.0.1:8080</text>
+<rect x="380" y="187" width="144" height="26" rx="13" class="chip"/><text x="452" y="205" text-anchor="middle">giới hạn tần suất</text>
+<rect x="532" y="187" width="96" height="26" rx="13" class="chip"/><text x="580" y="205" text-anchor="middle">CSP 'self'</text>
+<rect x="636" y="187" width="138" height="26" rx="13" class="red"/><text x="705" y="205" text-anchor="middle" fill="#B91C1C" class="c">/internal/ 404</text>
+
+<!-- bands -->
+<rect x="200" y="262" width="640" height="150" rx="12" class="band"/>
+<text x="826" y="406" class="k" text-anchor="end">TẦNG 2 · ỨNG DỤNG CÓ GIAO DIỆN</text>
+<rect x="200" y="440" width="640" height="160" rx="12" class="band"/>
+<text x="826" y="460" class="k" text-anchor="end">TẦNG 1 · CORE HEADLESS</text>
+<rect x="200" y="628" width="640" height="134" rx="12" class="band"/>
+<text x="826" y="752" class="k" text-anchor="end">LƯU TRỮ</text>
+
+<!-- đường tĩnh -->
+<path d="M500,138V168" class="l rq" marker-end="url(#aq)"/>
+<path d="M200,200H100V278" class="l rq" marker-end="url(#aq)"/>
+<text x="112" y="192" class="c">/identity/</text>
+<path d="M277,230V298" class="l rq" marker-end="url(#aq)"/>
+<text x="283" y="252" class="c">/</text>
+<path d="M462,230V298" class="l rq" marker-end="url(#aq)"/>
+<text x="468" y="252" class="c">/workspace/v1/</text>
+<path d="M646,230V298" class="l rq" marker-end="url(#aq)"/>
+<text x="652" y="252" class="c">/console/</text>
+<path d="M770,230V298" class="l rq d" marker-end="url(#aq)"/>
+<text x="776" y="252" class="c">/office/</text>
+<path d="M840,214H852V520H702" class="l rq" marker-end="url(#aq)"/>
+<text x="776" y="512" text-anchor="middle" class="c">/core/v1/</text>
+<path d="M500,392V468" class="l rq" marker-end="url(#aq)"/>
+<text x="494" y="434" text-anchor="end">token OIDC</text>
+<path d="M372,392V648" class="l wr" marker-end="url(#aw)"/>
+<path d="M100,392V670H224" class="l wr" marker-end="url(#aw)"/>
+<path d="M534,580V648" class="l wr" marker-end="url(#aw)"/>
+<path d="M650,580V616H677V636" class="l fi" marker-end="url(#af)"/>
+<path d="M392,518H354" class="halo"/>
+<path d="M392,518H354" class="l fi d" marker-end="url(#af)"/>
+<path d="M560,392V424H960V468" class="l ev" marker-end="url(#ae)"/>
+<text x="968" y="452">sự kiện ký HMAC</text>
+<path d="M1060,470V192H842" class="l rq" marker-end="url(#aq)"/>
+<text x="870" y="164">API plugin, token có phạm vi</text>
+<text x="870" y="183" class="c">/workspace/v1/plugin/v1</text>
+<path d="M990,638V582" class="l rq" marker-end="url(#aq)"/>
+<text x="998" y="614">HTTP, khóa riêng</text>
+
+<!-- Keycloak -->
+<rect x="20" y="280" width="160" height="112" rx="10" class="box"/>
+<text x="100" y="308" class="h" text-anchor="middle">Keycloak 26.2</text>
+<text x="100" y="332" class="m" text-anchor="middle">SSO, OIDC + PKCE</text>
+<text x="100" y="352" class="m" text-anchor="middle">TOTP (MFA)</text>
+<text x="100" y="372" class="m" text-anchor="middle">cookie phiên BFF</text>
+
+<!-- Tầng 2 -->
+<rect x="214" y="300" width="130" height="92" rx="10" class="own"/>
+<text x="279" y="330" class="h w" text-anchor="middle">Workspace</text>
+<text x="279" y="352" class="wm" text-anchor="middle">web · Vue 3</text>
+<rect x="356" y="300" width="220" height="92" rx="10" class="own"/>
+<text x="466" y="324" class="h w" text-anchor="middle">workspace-api</text>
+<text x="466" y="344" class="wm" text-anchor="middle">+ workspace-worker</text>
+<text x="466" y="364" class="wm" text-anchor="middle">hồ sơ, việc, Drive,</text>
+<text x="466" y="382" class="wm" text-anchor="middle">plugin, AI tùy chọn</text>
+<rect x="588" y="300" width="116" height="92" rx="10" class="own"/>
+<text x="646" y="330" class="h w" text-anchor="middle">Core admin</text>
+<text x="646" y="352" class="wm c" text-anchor="middle">/console/</text>
+<text x="646" y="372" class="wm" text-anchor="middle">chỉ là client</text>
+<rect x="714" y="300" width="112" height="92" rx="10" class="opt"/>
+<text x="770" y="330" class="b" font-size="15" text-anchor="middle">ONLYOFFICE</text>
+<text x="770" y="352" class="m" text-anchor="middle">tùy chọn,</text>
+<text x="770" y="372" class="m" text-anchor="middle">ký JWT</text>
+
+<!-- Tầng 1 -->
+<rect x="214" y="482" width="138" height="78" rx="10" class="opt"/>
+<text x="283" y="506" class="h" text-anchor="middle">ClamAV</text>
+<text x="283" y="528" class="m" text-anchor="middle">tùy chọn,</text>
+<text x="283" y="548" class="m" text-anchor="middle">quét khi tải lên</text>
+<rect x="392" y="470" width="308" height="110" rx="10" class="own"/>
+<text x="546" y="494" class="h w" text-anchor="middle">core-api + core-worker</text>
+<text x="546" y="515" class="wm" text-anchor="middle">principal/ACL, schema/record</text>
+<text x="546" y="534" class="wm" text-anchor="middle">tệp có phiên bản + SHA-256</text>
+<text x="546" y="553" class="wm" text-anchor="middle">workflow, human task</text>
+<text x="546" y="572" class="wm" text-anchor="middle">nhật ký kiểm toán chuỗi băm</text>
+
+<!-- Lưu trữ -->
+<rect x="214" y="640" width="386" height="88" rx="10" class="box"/>
+<rect x="226" y="650" width="120" height="40" rx="8" fill="#E8F6EE" stroke="#A7DBBC"/>
+<text x="286" y="675" text-anchor="middle" class="c">dx_identity</text>
+<rect x="354" y="650" width="120" height="40" rx="8" fill="#E8F6EE" stroke="#A7DBBC"/>
+<text x="414" y="675" text-anchor="middle" class="c">dx_workspace</text>
+<rect x="482" y="650" width="108" height="40" rx="8" fill="#E8F6EE" stroke="#A7DBBC"/>
+<text x="536" y="675" text-anchor="middle" class="c">dx_core</text>
+<text x="226" y="716"><tspan class="b">PostgreSQL 17</tspan><tspan class="m"> · ba CSDL tách riêng</tspan></text>
+<rect x="612" y="640" width="130" height="88" rx="10" class="box"/>
+<text x="677" y="668" class="h" text-anchor="middle">RustFS (S3)</text>
+<text x="677" y="690" class="m" text-anchor="middle">byte tệp,</text>
+<text x="677" y="710" class="m c" text-anchor="middle">dx-files</text>
+<rect x="754" y="640" width="76" height="88" rx="10" class="off"/>
+<text x="792" y="668" class="b m" text-anchor="middle">Valkey</text>
+<text x="792" y="690" class="m" text-anchor="middle">cấp sẵn,</text>
+<text x="792" y="710" class="m" text-anchor="middle">chưa dùng</text>
+
+<!-- cột phải -->
+<rect x="880" y="470" width="220" height="110" rx="10" class="box"/>
+<text x="990" y="496" class="h" text-anchor="middle">Máy chủ plugin</text>
+<text x="990" y="518" class="m" text-anchor="middle">repo Expansion Pack</text>
+<text x="990" y="538" class="m" text-anchor="middle">Python, SQLite riêng</text>
+<text x="990" y="558" class="m" text-anchor="middle">trang: iframe sandbox</text>
+<rect x="880" y="640" width="220" height="88" rx="10" class="box"/>
+<text x="990" y="668" class="h" text-anchor="middle">Hệ thống ngoài</text>
+<text x="990" y="690" class="m" text-anchor="middle">thiết bị, cổng nộp hồ sơ,</text>
+<text x="990" y="710" class="m" text-anchor="middle">máy chấm công</text>
+
+<!-- số bước: khớp danh sách 1–6 dưới sơ đồ trong README -->
+<circle cx="478" cy="154" r="16" class="ring"/>
+<circle cx="78" cy="240" r="16" class="ring s2"/>
+<circle cx="518" cy="440" r="16" class="ring s3"/>
+<circle cx="702" cy="604" r="16" class="ring s4"/>
+<circle cx="940" cy="450" r="16" class="ring s5"/>
+<circle cx="874" cy="380" r="16" class="ring s6"/>
+<g class="bd">
+<circle cx="478" cy="154" r="11"/><text x="478" y="159">1</text>
+<circle cx="78" cy="240" r="11"/><text x="78" y="245">2</text>
+<circle cx="518" cy="440" r="11"/><text x="518" y="445">3</text>
+<circle cx="702" cy="604" r="11"/><text x="702" y="609">4</text>
+<circle cx="940" cy="450" r="11"/><text x="940" y="455">5</text>
+<circle cx="874" cy="380" r="11"/><text x="874" y="385">6</text>
+</g>
+
+<!-- chấm chạy, vòng 12 giây, mỗi bước 2 giây -->
+<g class="dong">
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.01;.13;1"><mpath xlink:href="#r2"/></animateMotion><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.01;.15"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.175;.3;1"><mpath xlink:href="#r1"/></animateMotion><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.175;.32"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.34;.42;1"><mpath xlink:href="#r3"/></animateMotion><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.34;.43"/></circle>
+<circle r="7" class="dot" fill="#15803D" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.34;.47;1"><mpath xlink:href="#r5a"/></animateMotion><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.34;.48"/></circle>
+<circle r="7" class="dot" fill="#5D43B5" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.505;.55;1"><mpath xlink:href="#r4a"/></animateMotion><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.505;.56"/></circle>
+<circle r="7" class="dot" fill="#5D43B5" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.57;.64;1"><mpath xlink:href="#r4b"/></animateMotion><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.57;.65"/></circle>
+<circle r="7" class="dot" fill="#15803D" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.57;.64;1"><mpath xlink:href="#r5b"/></animateMotion><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.57;.65"/></circle>
+<circle r="7" class="dot" fill="#F1B862" stroke="#92600A" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.675;.74;1"><mpath xlink:href="#r6a"/></animateMotion><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.675;.745"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.75;.82;1"><mpath xlink:href="#r6b"/></animateMotion><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.75;.83"/></circle>
+<circle r="7" class="dot" fill="#2563EB" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;.84;.98;1"><mpath xlink:href="#r7"/></animateMotion><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;.84;.99"/></circle>
+</g>
+
+<!-- chú thích từng bước -->
+<rect x="20" y="778" width="1080" height="44" rx="10" fill="#fff" stroke="#CBD5E1"/>
+<text x="40" y="806" class="cap"><tspan class="b">1 · Qua cổng:</tspan> giới hạn tần suất, gắn CSP, /internal/ trả 404; /workspace/v1/ tới workspace-api.</text>
+<text x="40" y="806" class="cap s2"><tspan class="b">2 · Đăng nhập:</tspan> Keycloak qua /identity/, OIDC + PKCE; trình duyệt chỉ giữ cookie phiên, không giữ token.</text>
+<text x="40" y="806" class="cap s3"><tspan class="b">3 · Workspace gọi Core</tspan> chỉ qua HTTP /core/v1/ bằng token OIDC; mỗi tầng một CSDL, không SQL xuyên tầng.</text>
+<text x="40" y="806" class="cap s4"><tspan class="b">4 · Core lưu</tspan> record vào dx_core, byte tệp vào RustFS, mỗi phiên bản kèm SHA-256; quét ClamAV khi bật.</text>
+<text x="40" y="806" class="cap s5"><tspan class="b">5 · workspace-worker</tspan> gửi sự kiện plugin ký HMAC; máy chủ plugin gọi lại API plugin bằng token có phạm vi.</text>
+<text x="40" y="806" class="cap s6"><tspan class="b">6 · Core admin</tspan> gọi thẳng /core/v1/ như mọi client; ONLYOFFICE (tùy chọn) chỉ nói chuyện với workspace-api.</text>
+<text x="40" y="806" class="tinh"><tspan class="b">Số 1–6:</tspan> qua cổng · đăng nhập · Workspace gọi Core · Core lưu · plugin · Core admin (giải thích dưới sơ đồ).</text>
+
+<!-- chú giải -->
+<g transform="translate(20,846)">
+<path d="M0,10H34" class="l rq" marker-end="url(#aq)"/><text x="44" y="15">yêu cầu / phản hồi</text>
+<path d="M190,10H224" class="l wr" marker-end="url(#aw)"/><text x="234" y="15">ghi dữ liệu</text>
+<path d="M340,10H374" class="l ev" marker-end="url(#ae)"/><text x="384" y="15">sự kiện, tín hiệu</text>
+<path d="M520,10H554" class="l fi" marker-end="url(#af)"/><text x="564" y="15">tệp</text>
+<rect x="612" y="1" width="24" height="18" rx="4" class="own"/><text x="644" y="15">mã của dự án</text>
+<rect x="760" y="1" width="24" height="18" rx="4" class="box"/><text x="792" y="15">nguồn mở dùng nguyên bản</text>
+<rect x="990" y="1" width="24" height="18" rx="4" class="opt"/><text x="1022" y="15">tùy chọn</text>
+</g>
+</svg>
