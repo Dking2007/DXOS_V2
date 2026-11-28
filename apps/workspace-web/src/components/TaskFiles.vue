@@ -13,6 +13,7 @@ import FilePreview from './FilePreview.vue'
 import DrivePicker from './DrivePicker.vue'
 import { mergeIds, uploadToDrive, type AttachedFile } from './attachments'
 import { uploadLabel } from './workForms'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 
 /**
  * Files on a task: the brief from whoever gave it and the results handed in. Everyone on the
@@ -88,7 +89,7 @@ async function attachFromDrive(files: DriveFile[]) {
   }
 }
 async function remove(file: AttachedFile) {
-  if (!window.confirm(`Gỡ “${file.name ?? 'tệp'}” khỏi công việc? Tệp vẫn còn trong kho tài liệu.`)) return
+  if (!(await confirmDialog({ message: `Gỡ “${file.name ?? 'tệp'}” khỏi công việc? Tệp vẫn còn trong kho tài liệu.`, confirmLabel: 'Gỡ tệp', danger: true }))) return
   busy.value = true
   try {
     await save(props.files.filter((f) => f.id !== file.id).map((f) => f.id), 'Đã gỡ tệp khỏi công việc')

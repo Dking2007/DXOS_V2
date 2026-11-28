@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
-import { ArrowLeft, ShieldCheck } from 'lucide-vue-next'
+import { ArrowLeft, Maximize2, Minimize2, ShieldCheck } from 'lucide-vue-next'
 import { api } from '../api'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 interface Editor {
@@ -23,6 +23,33 @@ const sessionId = ref('')
 const editorState = ref('Đang mở tài liệu…')
 let editor: Editor | undefined
 let disposed = false
+// Full screen: the editor covers the whole window (sidebar, header and footer hidden) and, where the
+// browser allows, the screen too. Only CSS changes, so the editor frame is never reloaded.
+const page = ref<HTMLElement | null>(null)
+const expanded = ref(false)
+async function toggleExpanded() {
+  expanded.value = !expanded.value
+  if (expanded.value) {
+    try {
+      await page.value?.requestFullscreen?.()
+    } catch {
+      // Not allowed (or not supported): covering the window is enough.
+    }
+  } else if (document.fullscreenElement) {
+    await document.exitFullscreen().catch(() => undefined)
+  }
+}
+// Esc leaves the browser's full screen; leave the window-covering mode with it.
+function onFullscreenChange() {
+  if (!document.fullscreenElement && expanded.value) expanded.value = false
+}
+function onKey(event: KeyboardEvent) {
+  if (event.key === 'Escape' && expanded.value && !document.fullscreenElement)
+    expanded.value = false
+}
+watch(expanded, (on) =>
+  document.documentElement.classList.toggle('office-expanded', on),
+)
 async function loadScript(url: string) {
   if (window.DocsAPI) return
   const scriptUrl = `${url.replace(/\/$/, '')}/web-apps/apps/api/documents/api.js`
@@ -100,20 +127,44 @@ async function open() {
     loading.value = false
   }
 }
-onMounted(open)
+onMounted(() => {
+  document.addEventListener('fullscreenchange', onFullscreenChange)
+  document.addEventListener('keydown', onKey)
+  void open()
+})
 onBeforeUnmount(() => {
   disposed = true
   editor?.destroyEditor()
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
+  document.removeEventListener('keydown', onKey)
+  document.documentElement.classList.remove('office-expanded')
+  if (document.fullscreenElement)
+    void document.exitFullscreen().catch(() => undefined)
 })
 </script>
 <template>
-  <section class="office-page">
+  <section ref="page" class="office-page" :class="{ expanded }">
     <header class="office-toolbar">
-      <RouterLink :to="fromCase ? `/cases/${fromCase}` : '/drive'" class="button ghost small"
-        ><ArrowLeft :size="16" />{{ fromCase ? 'Về hồ sơ' : 'Về kho tài liệu' }}</RouterLink
-      ><span class="date-line" role="status"
+      <RouterLink
+        :to="fromCase ? `/cases/${fromCase}` : '/drive'"
+        class="button ghost small"
+        ><ArrowLeft :size="16" />{{
+          fromCase ? 'Về hồ sơ' : 'Về kho tài liệu'
+        }}</RouterLink
+      ><span class="date-line office-state" role="status"
         ><ShieldCheck :size="16" />{{ editorState }}</span
+      ><button
+        v-if="!loading && !error"
+        type="button"
+        class="button ghost small"
+        :aria-pressed="expanded"
+        :title="expanded ? 'Thu nhỏ (Esc)' : 'Mở rộng toàn màn hình'"
+        @click="toggleExpanded"
       >
+        <component :is="expanded ? Minimize2 : Maximize2" :size="16" />{{
+          expanded ? 'Thu nhỏ' : 'Toàn màn hình'
+        }}
+      </button>
     </header>
     <StatePanel
       v-if="loading || error"
@@ -136,5 +187,37 @@ onBeforeUnmount(() => {
 .office-note {
   border-radius: 0 0 8px 8px;
   font-size: 0.8125rem;
+}
+.office-state {
+  margin-left: auto;
+}
+/* Covers the whole window, above the sidebar, header and the assistant button. */
+.office-page.expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  height: 100dvh;
+  min-height: 0;
+  padding: 0;
+  background: var(--canvas);
+}
+.office-page.expanded .office-toolbar {
+  border-radius: 0;
+  border-width: 0 0 1px;
+  padding: 6px 12px;
+}
+.office-page.expanded .office-frame {
+  border: 0;
+  min-height: 0;
+}
+.office-page.expanded .office-note {
+  border-radius: 0;
+}
+</style>
+<style>
+/* The page behind must not scroll under the full-screen editor. */
+html.office-expanded,
+html.office-expanded body {
+  overflow: hidden;
 }
 </style>

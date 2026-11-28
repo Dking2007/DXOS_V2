@@ -63,7 +63,10 @@ watch(tourOpen, (value) => {
 watch(
   () => session.user?.id,
   (id) => {
-    if (id && !tourSeen(id)) window.setTimeout(() => (tourOpen.value = true), 600)
+    if (!id || tourSeen(id)) return
+    // Mark on first show, not only on close: a reload or tab close without "Bỏ qua" must not bring it back.
+    markTourSeen(id)
+    window.setTimeout(() => (tourOpen.value = true), 600)
   },
   { immediate: true },
 )

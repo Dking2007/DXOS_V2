@@ -13,17 +13,30 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Đóng gói nguồn tar.gz và SHA256SUMS
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Kiểm số phiên bản theo SemVer (khớp mọi tệp, CHANGELOG, đủ loại tăng so với API)
+        run: |
+          PREVIOUS="$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
+          python scripts/check_version.py --tag "${GITHUB_REF_NAME}" ${PREVIOUS:+--since "${PREVIOUS}"}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Đóng gói nguồn tar.gz, SBOM và SHA256SUMS
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p dist
           git archive --format=tar.gz --prefix="dxos-${VERSION}/" -o "dist/dxos-${VERSION}.tar.gz" "${GITHUB_REF_NAME}"
-          (cd dist && sha256sum "dxos-${VERSION}.tar.gz" > SHA256SUMS)
+          npm sbom --sbom-format cyclonedx --package-lock-only > dist/sbom-npm.cdx.json
+          pip install cyclonedx-bom==9.0.0
+          cyclonedx-py requirements requirements.lock --of JSON -o dist/sbom-python.cdx.json
+          (cd dist && sha256sum "dxos-${VERSION}.tar.gz" sbom-npm.cdx.json sbom-python.cdx.json > SHA256SUMS)
       - name: Lấy ghi chú từ CHANGELOG.md
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           awk -v v="[${VERSION}]" 'index($0,"## "v)==1{f=1;next} f&&/^## /{exit} f' CHANGELOG.md > RELEASE_NOTES.md
-          printf '\n---\nTệp chính: `dxos-%s.tar.gz` (kèm `SHA256SUMS`). Mục "Source code (zip)" do GitHub tự thêm, không phải bản phân phối chính thức.\n' "${VERSION}" >> RELEASE_NOTES.md
+          printf '\n---\nTệp chính: `dxos-%s.tar.gz` (kèm `SHA256SUMS`). `sbom-*.cdx.json`: danh mục thành phần (CycloneDX) của phụ thuộc npm và Python. Mục "Source code (zip)" do GitHub tự thêm, không phải bản phân phối chính thức.\n' "${VERSION}" >> RELEASE_NOTES.md
           test -s RELEASE_NOTES.md
       - name: Tạo GitHub Release
         env:
@@ -31,4 +44,5 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           gh release create "${GITHUB_REF_NAME}" "dist/dxos-${VERSION}.tar.gz" dist/SHA256SUMS \
+            dist/sbom-npm.cdx.json dist/sbom-python.cdx.json \
             --title "${GITHUB_REF_NAME}" --notes-file RELEASE_NOTES.md

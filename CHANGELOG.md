@@ -1,16 +1,53 @@
 # Changelog
 
 Định dạng theo [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/), đánh phiên bản theo
-[SemVer](https://semver.org/lang/vi/). Mỗi mục trỏ tới commit thật trong lịch sử Git; từ
-0.2.0 trở đi mỗi thay đổi đi kèm issue/PR. So sánh chi tiết V1 → V2: [docs/V2_CHANGES.md](docs/V2_CHANGES.md);
-V2 → V3: [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
+[SemVer](https://semver.org/lang/vi/). Ngày của mỗi phiên bản là ngày đăng GitHub Release (giờ Việt Nam); riêng 0.1.0
+không có Release nên ghi ngày commit `f089bfb`. Mỗi mục trỏ tới commit thật trong lịch sử Git; số PR chỉ ghi khi thay
+đổi vào `main` qua pull request. Bản có nhiều thay đổi để chi tiết riêng trong `docs/changes/`.
+So sánh V1 → V2: [docs/V2_CHANGES.md](docs/V2_CHANGES.md); V2 → V3: [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
+
+### Ghi chú về đánh số phiên bản (ghi bổ sung ngày 28/11/2026)
+
+Đối chiếu lại các tag đã phát hành với SemVer bằng cách so hợp đồng API giữa từng cặp tag. Các tag đã phát hành
+giữ nguyên, vì SemVer không cho sửa một phiên bản đã phát hành; các sai lệch dưới đây chỉ được ghi lại.
+- `0.2.2` thêm 17 thao tác API Workspace (tính năng mới tương thích) nhưng chỉ tăng số cuối. Theo SemVer, đúng ra
+  phải là `0.3.0`.
+- Tag `v0.2.0` và `v0.2.1` gắn lên mã có `package.json` vẫn ghi `0.1.0`, nên gói nguồn của hai bản này tự báo số
+  0.1.0. Từ `v0.2.2` thì số trong mã khớp với tag.
+- `0.2.2` → `3.0.0` xóa 15 thao tác API và cột `cases.assignee_id`, nên tăng số chính là đúng. Việc bỏ qua 1.x, 2.x
+  để khớp tên gọi V3 được giải thích ở [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
+- `3.0.0` → `3.1.0` không đổi API công khai, chỉ thêm tính năng (plugin `.zip` qua route sẵn có), nên tăng số giữa
+  là đúng. Bản kế tiếp `3.2.0` cũng chỉ thêm tính năng.
+
+Từ bản kế tiếp, workflow phát hành chạy `scripts/check_version.py` để chặn ba lỗi trên: số phiên bản lệch giữa các
+tệp, tag không khớp với mã hoặc CHANGELOG, và tăng số không đủ so với thay đổi API.
 
 ## [Unreleased]
 
-Nhánh `feat/ui-ux-nang-cap`: nâng cấp trải nghiệm người dùng của Workspace. Không đổi API, không thêm migration
-hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăng nhập OIDC.
+Nâng cấp trải nghiệm người dùng của Workspace (PR #40, nhánh `feat/ui-ux-nang-cap`; đã vào `main`, chưa gắn tag):
+trang Cài đặt cá nhân, trình thiết kế quy trình có sao chép/dán và hoàn tác, sơ đồ cơ cấu tổ chức, bộ chọn người có
+tìm kiếm, rà soát nút bấm và khoảng cách. Không đổi API, không thêm migration hay thư viện mới; thay đổi phía máy chủ
+duy nhất là luồng đăng nhập OIDC.
 
 ### Added
+- `scripts/seed_demo.py`: nạp hồ sơ, công việc, bảng tin, trò chuyện và tài liệu minh họa qua API công khai; chạy lại không tạo trùng.
+- Quét mã độc tệp tải lên bằng ClamAV (tùy chọn: profile `security`, biến `CLAMAV_HOST`); lỗi quét thì từ chối tệp, phát hiện thì ghi audit.
+- Cảnh báo dữ liệu cá nhân (CCCD, số điện thoại, e-mail…) khi xem trước tệp và xem bản đã che (`GET /drive/files/{id}/pii`, dùng `dx-piivn`).
+- `scripts/backup.py`, `scripts/restore.py`: sao lưu và khôi phục ba cơ sở dữ liệu và kho tệp, kèm manifest SHA-256; số đo diễn tập trong `docs/operations.md`.
+- Tài khoản demo `lanh-dao-mfa` bắt buộc cài TOTP ở lần đăng nhập đầu (chỉ cài mới).
+- `scripts/check_version.py`: workflow phát hành kiểm số phiên bản theo SemVer; Release đính kèm SBOM CycloneDX.
+- **Trình soạn thảo ONLYOFFICE toàn màn hình**: nút "Toàn màn hình" trên trang chỉnh sửa tài liệu che cả cửa sổ (ẩn thanh
+  bên, đầu trang) và bật chế độ toàn màn hình của trình duyệt; "Thu nhỏ" hoặc Esc để quay lại, không tải lại tài liệu.
+- **Kho tài liệu** mặc định xem dạng lưới; lựa chọn danh sách/lưới của từng người được nhớ trên trình duyệt.
+- **Hoạt động của công việc** vẽ thành sơ đồ quy trình (cùng kiểu trình thiết kế quy trình): mỗi bước là một nút có
+  icon, người làm và giờ, nối bằng mũi tên theo màu trạng thái; cập nhật phụ nét đứt. Nút "Phóng to" mở sơ đồ ngang,
+  tự xuống hàng theo bề rộng, kéo và thu phóng được.
+- **Công việc dạng giấy** (kiểu xem mặc định, lựa chọn được nhớ trên trình duyệt): mỗi việc là một tờ giấy kẻ dòng
+  có băng dính màu theo mức ưu tiên, góc gấp, mô tả ngắn, nhãn, tiến độ checklist, người nhận và hạn; dấu mộc
+  "Quá hạn", "Trả lại", "Hoàn tất", "Đã hủy". Tờ giấy nghiêng nhẹ, nhấc lên khi rê chuột (đứng thẳng khi giảm chuyển động).
+- **Bảng tin** làm mới giao diện: dải chào theo buổi kèm ngày và số bài mới hôm nay; thanh lọc dạng kính mờ dính dưới
+  thanh trên cùng; thẻ bài bo tròn, bóng mềm, avatar có viền màu, nút thao tác dạng viên; ảnh đơn nằm trên nền mờ của
+  chính nó thay cho khung đen; thông báo chính thức ở cột phải xếp theo dòng thời gian.
 - **Cài đặt cá nhân** (`/preferences`, mọi người dùng; 9bf7477): giao diện sáng/tối/theo máy, mật độ hiển thị, thu
   gọn thanh bên, cỡ chữ 90–125% (toàn bộ cỡ chữ đổi sang `rem`), phông chữ, giãn dòng, giảm chuyển động, tăng tương
   phản, luôn hiện viền focus, gạch chân liên kết, định dạng ngày (dd/mm/yyyy hoặc yyyy-mm-dd), giờ 24h/12h, ngày đầu
@@ -26,6 +63,19 @@ hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăn
 - Icon điều hướng có màu theo module, tương phản ≥ 3:1 ở cả nền sáng và tối (9bf7477); nút "Lên đầu trang" (9bf7477).
 
 ### Changed
+- Trình bày lại README (sơ đồ kiến trúc, luồng nghiệp vụ, bảng công nghệ), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT và mẫu issue.
+- Gói giao diện đang dùng có màu riêng thì biểu tượng menu, nút trợ lý AI và trang đăng nhập (ánh sáng, vòng bạc, nút) ngả theo màu của gói thay vì giữ màu xanh mặc định; mỗi phân hệ vẫn giữ sắc riêng để phân biệt.
+- Trang đăng nhập mặc định lại có khung (`framed`), thiết kế lại: viền đôi sáng dần về góc, góc bạc có viên đá, dấu thoi giữa cạnh, một vệt sáng chạy chậm quanh viền; tiêu đề mặc định chỉ xuống dòng giữa các cụm từ nên điện thoại 360 px không còn chữ "TỬ", "DUYỆT" đứng một mình. Gói giao diện vẫn chọn được `flat` hoặc `image`.
+- Tài khoản demo mới có tên người và chức danh riêng; lời chào dùng đầy đủ họ tên.
+- Hộp xác nhận trong ứng dụng thay hộp `confirm()` của trình duyệt.
+- **Core không có giao diện khi chạy riêng** (đúng yêu cầu Core headless của đề thi): công cụ quản trị kỹ thuật
+  Core admin (`apps/core-admin`) chuyển từ profile `core` sang profile mới `console` (vẫn có trong `workspace`).
+  `--profile core` chỉ chạy Core API, worker, Keycloak, gateway và kho lưu trữ; gateway trả 404 kèm lời giải thích
+  ở `/` và `/console/` thay vì 502. Muốn dùng Core admin khi chỉ chạy Core: thêm `--profile console`. README,
+  `docs/installation.md`, `docs/operations.md`, `SELF_REVIEW.md` hướng dẫn thử Core bằng `examples/core-client` và
+  `/core/v1/docs`; test triển khai kiểm `--profile core` không có ứng dụng giao diện nào.
+- Trang Công việc bỏ kiểu xem Kanban và "Theo hạn"; còn dạng giấy (mặc định) và danh sách dạng bảng. Lọc theo trạng
+  thái và "Quá hạn" vẫn có trong bộ lọc.
 - Chuẩn hóa khoảng cách theo token (`--space-*`, `--gap-icon`, `--field-gap`, `--control-h`): nút, tab, ô nhập,
   cảnh báo, bảng, hộp thoại không còn dính nhau; viền focus rõ khi dùng bàn phím (9bf7477).
 - Rà soát nút bấm trên các màn hình (fd29309, 0c682f3): chống gửi trùng, trạng thái "Đang …", nút bị khóa có lý do,
@@ -33,8 +83,38 @@ hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăn
   khi thiếu quyền, trạng thái tải/trống/lỗi cho danh sách.
 - Hộp Phát hành quy trình: "Lưu & phát hành" khi canvas chưa lưu, thay cho nút Phát hành bấm được nhưng lỗi.
 - Tab "Giao diện" rời khỏi Thiết lập (quản trị) sang Cài đặt cá nhân; địa chỉ cũ tự chuyển hướng.
+- Hiệu năng: canvas không tuần tự hóa sơ đồ trong lúc kéo bước và không vẽ lại cả trang theo từng khung thu phóng
+  (c5d4bb9); nhắn tin và bảng tin chỉ vẽ lại dòng/bài thay đổi khi gõ phím (0c682f3); bộ định dạng ngày/dung lượng
+  dùng lại thay vì tạo mới mỗi dòng; danh mục ít đổi không tải lại mỗi lần quay lại cửa sổ (9bf7477, c5d4bb9).
+- Bộ chọn người có tìm kiếm thay ô chọn thường ở "Chuyển cho", cấu hình bước quy trình (người nhận, giao cho, đơn vị
+  nhận, chuyển cấp) và thiết kế biểu mẫu (4e38e30); chặn tạo biểu mẫu khi bước "người cụ thể" chưa chọn người
+  (3e8aa00).
 
 ### Fixed
+- Trang chủ: tên hồ sơ dài trong "Hồ sơ gần đây" kết thúc bằng "…" thay vì chạy đè lên nhãn trạng thái.
+- Xóa được biểu mẫu không còn dùng (B7): nút "Xóa biểu mẫu" cạnh ô chọn biểu mẫu khi tạo luồng, `DELETE /forms/{id}`. Biểu mẫu
+  đã có hồ sơ thì được lưu trữ (hồ sơ vẫn xem được); biểu mẫu quy trình còn dùng hoặc do gói cài thì bị từ chối kèm lý do.
+- Khung plugin co lại vừa nội dung: SDK khung đo chiều cao phần thân trang thay cho `scrollHeight` của `<html>` (giá trị này
+  không bao giờ nhỏ hơn khung, nên khung chỉ giãn mà không co). Trạng thái công việc thống nhất "Đang thực hiện" (thanh
+  tiến trình và bộ lọc trước ghi "Đang làm").
+- Hồ sơ không còn kẹt ở "Đang xử lý" khi một nhánh quy trình hết bước mà không có bước Kết thúc (ví dụ kết thúc bằng "Gửi thông
+  báo"): hồ sơ nhận quyết định cuối cùng trên đường đi (duyệt, trả lại, từ chối), không có quyết định nào thì là đã duyệt;
+  diễn tập quy trình báo cùng kết quả. Hồ sơ đã kẹt vì một bước lỗi thì người tạo thu hồi được (B1).
+- `desktiny-plugin check` (và bước đóng gói dùng nó) kiểm cả độ dài tiêu đề, mô tả và cấu trúc ô cấu hình (`settings_schema`,
+  `config_schema`, `parameters`) như Desktiny, nên không còn manifest qua bước kiểm mà bị từ chối khi cài.
+- Tiêu đề màn đăng nhập không còn bị cắt dấu tiếng Việt (Ử, Ệ…).
+- Thanh trên cùng không tràn ngang ở 390 px; tên tổ chức và đường dẫn trang không bị rút khi còn chỗ.
+- Canvas quy trình mở vừa khung, tên bước hai dòng, nhãn nhánh dễ đọc, gọn trên điện thoại.
+- Điện thoại 360 px không còn cuộn ngang: nhóm nút thanh trên cùng không bị ép nhỏ hơn các nút (nút "Đăng xuất" lòi
+  ra 4 px khi tên trang dài), cột Bảng tin không giãn theo nội dung rộng nhất (tràn 112 px). Canvas quy trình trên
+  điện thoại mở ở cỡ đọc được (75%) từ bước kích hoạt thay vì thu cả luồng còn 20%; luồng ngắn vẫn hiện trọn và
+  "Vừa màn hình" vẫn cho xem toàn cảnh. Dòng trạng thái luồng không còn ép câu thành cột một chữ chiếm nửa màn hình.
+- Hộp thoại đặt tiêu điểm vào ô nhập đầu tiên; hướng dẫn làm quen chỉ hiện một lần; sửa lỗi tiếp cận bàn phím và nhãn.
+- Giao việc có tên rất dài không còn lỗi 500; nhãn mức ưu tiên không xuống dòng.
+- Người được giao gửi được hồ sơ do luồng tự động tạo (trước đây lỗi 404).
+- Danh sách Cần phê duyệt tự làm mới; lịch sử hồ sơ hiện "Quyết định: Duyệt/Trả lại/Từ chối" thay mã `case.decision`.
+- Bản cài bằng `make install` không nạp được gói giao diện dựng sẵn: mã tìm ở `$PREFIX/packs` trong khi gói được
+  chép vào `$PREFIX/share/desktiny/packs`. `.env.example` thêm `DATABASE_URL` và `PACKS_DIR` (tuỳ chọn) cho bản cài.
 - Đăng nhập để form Keycloak quá 5 phút trả JSON `oidc_state_invalid`: state đăng nhập nay sống 30 phút, callback
   lỗi chuyển về trang đăng nhập kèm thông báo (f3be40b).
 - Nút thu gọn thanh bên không có tác dụng ở trang thiết kế quy trình (9bf7477).
@@ -45,15 +125,12 @@ hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăn
 - Rò tài nguyên: tài liệu PDF và URL tạm khi đóng xem trước giữa chừng, trình soạn thảo ONLYOFFICE tạo sau khi rời
   trang, các hẹn giờ không được hủy (fd29309, 0c682f3, c5d4bb9).
 
-### Performance
-- Canvas không tuần tự hóa sơ đồ trong lúc kéo bước và không vẽ lại cả trang theo từng khung thu phóng (c5d4bb9).
-- Nhắn tin và bảng tin chỉ vẽ lại dòng/bài thay đổi khi gõ phím (0c682f3); bộ định dạng ngày/dung lượng dùng lại
-  thay vì tạo mới mỗi dòng; danh mục ít đổi không tải lại mỗi lần quay lại cửa sổ (9bf7477, c5d4bb9).
+## [3.1.0] - 2026-11-24
 
-## [3.1.0] - 2026-11-21 — plugin đóng gói
-
-Gộp nhánh `feat/plugin-dong-goi` (Raphael-Fug, Mai1174). Thêm migration `workspace_0028`; không xóa hay đổi
-API cũ nên giữ số chính 3. SDK `desktiny-plugin` lên 0.3.0 (thêm định dạng `desktiny-plugin/2`).
+Cài tính năng mới bằng một tệp `.zip`: plugin đóng gói. Gói giao diện chỉnh được trang đăng nhập; "Gói ngành" đổi
+tên thành "Gói giao diện". Gộp nhánh `feat/plugin-dong-goi` (Raphael-Fug, Mai1174), không qua PR riêng; bản này vào
+`main` cùng PR #40. Thêm migration `workspace_0028`; không xóa hay đổi API cũ nên giữ số chính 3. SDK
+`desktiny-plugin` lên 0.3.0 (thêm định dạng `desktiny-plugin/2`).
 
 ### Added
 - **Plugin đóng gói** (`desktiny-plugin/2`, migration `workspace_0028`, [docs/plugins.md](docs/plugins.md)): cài một
@@ -70,337 +147,89 @@ API cũ nên giữ số chính 3. SDK `desktiny-plugin` lên 0.3.0 (thêm địn
   ≥ 4,5:1 ở trình tạo gói và máy chủ; chữ trên nút đăng nhập, dòng ghi chú dưới nút, bật/tắt hiệu ứng chuyển động;
   xem trước theo giá trị mới. Gói cũ giữ trang mặc định.
 
-### Docs
-- README: mô tả kiến trúc theo hai tầng của đề thi OLP PMNM 2026 (Core headless ở Tầng 1, ứng dụng giao diện ở Tầng 2);
-  Core admin ghi là client riêng, không thuộc Core; thêm liên kết trực tiếp tới bug tracker và trang Releases.
-- SELF_REVIEW: thêm mục 5 đối chiếu từng tiêu chí PoF, yêu cầu bắt buộc, bốn nguyên tắc kỹ thuật và quy định nộp bài
-  với thể lệ và đề thi gốc trên vfossa.vn (đọc ngày 21/11/2026).
-- Bỏ khỏi kho các ghi chép nội bộ về so sánh với dự án khác; sửa một liên kết hỏng trong `docs/design/`.
-
 ### Changed
 - Đổi tên **Gói ngành** thành **Gói giao diện** trên menu, tiêu đề trang, hướng dẫn, thông báo và tài liệu (mã,
   đường dẫn `/packs`, API và định dạng `desktiny-pack/1` giữ nguyên).
+- Tài liệu: README mô tả kiến trúc theo hai tầng của đề thi OLP PMNM 2026 (Core headless ở Tầng 1, ứng dụng giao diện
+  ở Tầng 2), Core admin ghi là client riêng, không thuộc Core, thêm liên kết trực tiếp tới bug tracker và trang
+  Releases; SELF_REVIEW thêm mục 5 đối chiếu từng tiêu chí PoF, yêu cầu bắt buộc, bốn nguyên tắc kỹ thuật và quy định
+  nộp bài với thể lệ và đề thi gốc trên vfossa.vn (đọc ngày 21/11/2026).
 
-## [3.0.0] - 2026-11-15 — DXOS V3: gói ngành và plugin kết nối
+### Removed
+- Bỏ khỏi kho các ghi chép nội bộ về so sánh với dự án khác; sửa một liên kết hỏng trong `docs/design/`.
 
-Bản này gồm gói ngành (PR #37, áp dụng lại sau khi bị revert ở PR #38) và nhánh `feat/plugin-ket-noi`
-(plugin kết nối, API bản 2, SDK `desktiny-plugin`). Plugin đóng gói `.zip` (`feat/plugin-dong-goi`) chưa nằm
-trong bản này.
+## [3.0.0] - 2026-11-15
 
-Số phiên bản nhảy từ 0.2.2 lên 3.0.0 để khớp tên gọi V3 của đợt dự thi (V1 = 0.1.0, V2 = 0.2.x). Theo SemVer,
-số chính đổi cũng hợp lệ vì so với 0.2.2 bản này thêm migration `core_0003`, `workspace_0014`–`workspace_0027`
-(có bước xóa cột `cases.assignee_id` ở `workspace_0014`) và contract `contracts/plugin.openapi.json` mới. Gói tách riêng (`dx-flowkit`, `desktiny-plugin`, `dx-piivn`) giữ số
-phiên bản của chính chúng.
+DXOS V3: quy trình nghiệp vụ vẽ trên canvas, gói ngành, plugin kết nối và tính năng AI. Số phiên bản nhảy từ 0.2.2
+lên 3.0.0 để khớp tên gọi V3 (V1 = 0.1.0, V2 = 0.2.x). Plugin đóng gói `.zip` chưa có trong bản này (xem 3.1.0).
+Gói tách riêng (`dx-flowkit`, `desktiny-plugin`, `dx-piivn`) giữ số phiên bản của chính chúng.
+Chi tiết đầy đủ: [docs/changes/3.0.0.md](docs/changes/3.0.0.md).
 
-### Changed
-- **Trang đăng nhập** làm lại: thẻ tiêu đề có khung viền trang trí trên nền xanh đậm, luôn vừa một màn hình, hiệu
-  ứng xuất hiện, vệt sáng, hạt sáng, vòng biểu tượng xoay, ánh kim trên tiêu đề và nút; tắt khi máy đặt giảm chuyển
-  động. Một nút "Đăng nhập bằng SSO".
-- Rà soát giao diện theo góp ý người dùng:
-  - Công việc: tab mới **Chờ tôi nghiệm thu** (`GET /tasks?scope=review`) khớp đúng số trên menu; các tab hiện số
-    đếm; trang tự mở tab đang có việc chờ.
-  - Kho tài liệu: mục **Được chia sẻ với tôi** (`shared=true` cho `/drive/files` và `/drive/folders`) liệt kê tệp,
-    thư mục người khác chia sẻ mà không thư mục nào mình mở được dẫn tới; gốc “Tài liệu của tôi” chỉ còn đồ của
-    mình; dòng tệp ghi “chia sẻ bởi …”.
-  - Danh sách hồ sơ: cột **Đang chờ** (người, bước, hạn; trả về trong `waiting_on`) thay cột “Lần sửa”; bản nháp
-    của mình có nút **Tiếp tục soạn** và **Trình** ngay trên dòng.
-  - Chân trang không còn bị nút trợ lý AI che; gợi ý bật hỏi đáp AI chỉ cho người quản trị AI, có nút ẩn.
-  - Trang Trợ lý AI: lời giải thích đúng phạm vi dữ liệu trợ lý đọc; “Mức sẵn sàng” cho biết tính năng dữ liệu
-    của người hỏi đang bật hay tắt.
-  - Bỏ chữ kỹ thuật (`AUTOMATION_ALLOWED_HOSTS`, “độ sâu 3”, mã tài khoản đăng nhập); “Thêm thành viên” thay
-    “Thêm hồ sơ thành viên”.
-  - Cần phê duyệt: bỏ chữ “Hồ sơ” thừa, bỏ nhãn in hoa; ủy quyền chia nhóm “Bạn đang ủy quyền cho” / “Bạn đang
-    được ủy quyền”, mục đã hết hạn gập lại.
-  - Chi tiết công việc: luồng áp dụng cho mọi công việc chỉ hiện với quản trị luồng; người không gắn được luồng
-    chỉ thấy luồng đang gắn.
-  - Thành viên: ô tìm, lọc theo phòng ban, ảnh đại diện và chức danh.
-  - Tìm kiếm: bỏ ô tìm trùng, dùng ô tìm trên thanh trên cùng (nút “Đổi từ khóa” mở sẵn từ khóa).
-  - Trình thiết kế quy trình: ô tìm bước, nhóm bước thu gọn được; nút Lưu chuyển “Đã lưu” khi không có thay đổi.
+**Phá tương thích:**
+- Migration `workspace_0014` xóa cột `cases.assignee_id`: hồ sơ bỏ "người phụ trách"; luồng tự động gửi tới người
+  phụ trách nay gửi người lập hồ sơ.
+- API `/business-packages*` và `/package-versions*` thay bằng `/processes`; `CaseCreate.package_version_id` đổi thành
+  `process_id`; `/ai/package-versions/{id}/scenarios` đổi thành `/ai/processes/{id}/scenarios` (migration
+  `workspace_0018`).
 
 ### Added
-- **Plugin đóng gói** (`desktiny-plugin/2`, migration `workspace_0028`, [docs/plugins.md](docs/plugins.md)): cài một
-  tệp `.zip` là có tính năng mới, không cần máy chủ riêng.
-  - Dee` (chỉ trường khai trong `writes.fields` và được duyệt,
-    cần token phiên), `tasks.write` (cần token phiên), `notifications.send`; `Idempotency-Key` bắt buộc; lịch sử hồ sơ
-    hiện “Plugin X” hoặc “A qua plugin X”; nhật ký hoạt động `plugin.write.*`.
-  - Tệp: `files.read` (danh sách, nội dung qua Core kèm SHA-256), `cases.attach` (25 MB/tệp, 200 MB/ngày, gắn với
-    bước); bước `plugin_action` có thể nhận danh sách tệp.
-  - `cases.list` theo quy trình chọn lúc duyệt (phân trang con trỏ, `updated_since`), `departments.read`, `people.list`.
-  - Bước chạy lâu `mode: "async"` với `timeout_days`, `calls/{id}/complete` (ký HMAC) và `/progress`, nhánh
-    `timeout`; huỷ thì plugin nhận `plugin.call.cancelled`.
-  - Sự kiện của plugin (`emits`, `POST /plugin/v1/events`) làm điểm bắt đầu quy trình; sự kiện lõi mới
-    `case.step_entered`, `case.file_added`, `case.closed`, `case.overdue`, `task.overdue`.
-  - Khung giao diện: vị trí `case.tab`, `case.action`, `task.action`, `admin.page`; lệnh `toast`, `navigate`,
-    `refresh`, `close`, `confirm`; `frame_permissions` duyệt từng quyền, đặt vào `allow` của iframe.
-  - Công cụ cho trợ lý AI (`assistant_tools`, tính năng `assistant_plugins`), gọi bằng token phiên chỉ đọc của người hỏi.
-  - Cấu hình theo cơ quan (`settings_schema`, ô bí mật mã hoá, `GET /plugin/v1/settings`); `health_endpoint`, tỉ lệ
-    lỗi và độ trễ 24 giờ, báo người duyệt khi lỗi liên tiếp; giới hạn tần suất theo plugin và kênh (429 +
-    `Retry-After`); contract riêng `contracts/plugin.openapi.json`.
-  - SDK: `desktiny-plugin` 0.2.0 (client mới, CLI `init`/`check`/`pack`/`dev`), SDK khung JS có lệnh mới.
-- **Plugin kết nối (`desktiny-plugin/1`), tầng 2** (migration `workspace_0023`, [docs/plugins.md](docs/plugins.md)):
-  ứng dụng chạy ở máy chủ riêng (chỉ máy chủ trong `PLUGIN_ALLOWED_HOSTS`), mã không chạy trong Desktiny. Màn
-  **Quản trị › Plugin**: cài từ manifest (chờ duyệt), duyệt quyền và sự kiện, khoá ký và token chỉ hiện một lần, bật/tắt
-  (tắt là mọi token hết hiệu lực), đổi khoá, gỡ, nhật ký trao đổi và gửi lại sự kiện. Bốn kênh: sự kiện qua outbox ký
-  HMAC-SHA256 và thử lại; API `/workspace/v1/plugin/v1` với token cài đặt (chỉ đọc bản ghi đã được báo) hoặc token
-  phiên 10 phút (đọc theo quyền người xem); bước quy trình `plugin_action` với ô cấu hình tự dựng từ `config_schema`,
-  nhánh Thành công/Lỗi, giá trị trả về cho bước sau; khung giao diện iframe sandbox ở cột phải hồ sơ, công việc, trang
-  chủ và trang riêng (nhóm **Ứng dụng**), truyền ngữ cảnh và màu của gói qua `postMessage`. CSP `frame-src` lấy từ
-  `PLUGIN_FRAME_SOURCES` (gateway dùng template của nginx). Bộ công cụ: `packages/desktiny-plugin` (Python),
-  `packages/plugin-sdk` (JavaScript), plugin mẫu `examples/plugins/tra-cuu-mst`. 5 test backend, 2 test SDK, 3 test
-  plugin mẫu, 1 test frontend.
-- **Gói ngành (`desktiny-pack/1`), tầng 1 của hướng phát triển plugin/giao diện** (migration `workspace_0022`,
-  [docs/packs.md](docs/packs.md)). Màn **Quản trị › Gói ngành** (`organization.manage`): cài gói `.zip` hoặc gói có
-  sẵn trong `packs/` sau khi **xem trước**, nâng cấp cùng `id`, gỡ (quy trình đã có hồ sơ chỉ ngừng phát hành), xuất
-  `.zip`. Phần giao diện: tên ứng dụng và cơ quan, logo, favicon, màu sáng/tối (kiểm tương phản WCAG AA cả hai
-  giao diện), phông, mật độ, bo góc, trang đăng nhập (khung/phẳng/ảnh nền), từ ngữ, ẩn/sắp menu, khối trang chủ;
-  áp khi tải ứng dụng qua `GET /appearance` công khai. Phần nghiệp vụ: quy trình (biểu mẫu + đồ thị, phát hành
-  sẵn), biểu mẫu, mẫu quy trình, luồng tự động (cài ở trạng thái tắt), bài kiến thức. **Trình tạo gói** của cơ quan
-  (`local.*`) có xem trước trực tiếp. SVG được lọc bỏ mã; tài nguyên phục vụ với CSP riêng. 17 mẫu quy trình chuyển
-  từ mã sang gói mặc định `desktiny.core`; gói mẫu `packs/truong-hoc`. Gateway thêm Content-Security-Policy và
-  `frame-ancestors` cho ứng dụng web. 6 test backend, 5 test frontend.
-- **12 quy trình mẫu mới** trong Tạo luồng: hồ sơ khẩn trình thẳng ban giám đốc, nghỉ phép theo số ngày, mua sắm theo
-  giá trị, công tác và tạm ứng, công văn đến, trình ký văn bản đi, rà soát hợp đồng song song, thanh toán theo chứng từ,
-  sửa chữa tài sản, đề xuất tuyển dụng, ban hành quy định có xác nhận đã đọc, quá hạn thì chuyển cấp trên. Bước ban
-  giám đốc chọn theo vai trò nên chạy được ngay; các mẫu khai sẵn tài liệu cần có và hạn từng bước. Bước giao cho vai
-  trò hiện tên vai trò thay cho mã.
-- **Hồ sơ: tài liệu theo từng bước.** Bấm một bước trong tab Quy trình thấy mục Tài liệu: số tệp cần nộp, tên các
-  tài liệu cần có (`required_documents`, khai trong trình thiết kế ở bước đầu, các bước có người xử lý và Giao việc)
-  và các tệp thực nộp ở bước đó (kèm khi trình, nộp ở bước, kết quả công việc) với người nộp, thời điểm, dung lượng.
-  Tệp Word/Excel/PowerPoint mở bằng OnlyOffice chỉ xem (`POST /drive/files/{id}/office-sessions?case_id=`, ai xem
-  được hồ sơ thì đọc được), tệp khác mở trong khung xem. `GET /cases/{id}/process` có thêm `files`. Sửa lỗi tệp nộp ở
-  bước duyệt (sau khi trình) không tải về được. 2 test backend.
-- **Trợ lý công việc:** trên trang hồ sơ, trợ lý AI có thêm tab "Trợ lý công việc" hỏi đáp riêng về hồ sơ đó (thay
-  khung hỏi đáp hồ sơ cũ); nút "Hỏi AI về hồ sơ" và câu gợi ý mở thẳng tab này.
-- **Khung tiến trình hồ sơ** làm mới: nhãn tóm tắt hồ sơ đang ở đâu, đường nối tô theo đoạn đã đi, biểu tượng và màu
-  riêng cho bước đã duyệt, đang chờ, trả lại, từ chối.
-- **Hồ sơ cá nhân** (`/profile`, migration `workspace_0021`): mỗi người tự sửa họ tên, chức danh, số điện thoại,
-  email liên hệ, giới thiệu ngắn (`PATCH /me/profile`) và ảnh đại diện PNG/JPEG/WebP tối đa 2 MB
-  (`PUT`/`DELETE /me/avatar`, lưu ở Core, xem qua `GET /users/{id}/avatar`). Vai trò và phòng ban vẫn do quản
-  trị viên đổi. Ảnh hiện ở thanh trên cùng, Bảng tin và Nhắn tin (hội thoại riêng có thêm `peer_id`); người chưa
-  có ảnh vẫn hiện chữ cái đầu. Nhật ký ghi lại việc sửa hồ sơ và đổi/gỡ ảnh. 3 test backend.
-- **Hỏi đáp AI về hồ sơ** (tính năng `case_qa`, `POST /ai/cases/{id}/ask`): nút “Hỏi AI về hồ sơ” mở ngăn kéo hỏi
-  đáp ngay trên trang hồ sơ. AI đọc nội dung biểu mẫu, quy trình đã đi qua (bước, người quyết định, lý do, người
-  đang chờ, hạn), công việc gắn hồ sơ trong quyền người hỏi và tài liệu kèm; trả lời kèm nguồn đã đối chiếu với hồ
-  sơ, nhớ ngữ cảnh các câu hỏi trước trong cùng tab. Cùng quyền với tóm tắt hồ sơ. 1 test backend.
-- Tab **Quy trình** của hồ sơ làm lại: chiếm hết bề ngang, sơ đồ cao hơn, chế độ toàn màn hình, bản đồ thu nhỏ;
-  dải trạng thái (kết quả, đang chờ ai, hạn, tiến độ); đường đã đi tô liền, nhánh chưa đi mờ, đoạn đang chờ chạy
-  hiệu ứng; mỗi bước đã qua có số thứ tự; cột **Đường đi của hồ sơ** liệt kê các bước theo thời gian (kể cả lượt
-  quay lại), bấm để zoom tới bước và xem người xử lý, quyết định, lý do, thời điểm. Lượt chạy quy trình ghi thêm
-  thời điểm tới bước (`at`) và xong bước (`done_at`).
-- **Quy trình hồ sơ trên canvas tự động hóa** (migration `workspace_0017`): tab **Quy trình hồ sơ** trong
-  `/automations` vẽ đường đi của hồ sơ bằng đúng trình thiết kế luồng, thêm các bước **Duyệt** (lãnh đạo đơn vị
-  hoặc người cụ thể; cổng Duyệt / Trả lại / Từ chối, tắt được từng lựa chọn, hạn xử lý, hướng dẫn cho người
-  duyệt), **Xin ý kiến** song song (cần tất cả hoặc một người đồng ý), **Giao việc và chờ** (tạo việc gắn hồ sơ,
-  đi tiếp khi việc được nghiệm thu hoặc bị hủy), **Yêu cầu bổ sung** và **Kết thúc**. Node Điều kiện đọc được
-  câu trả lời biểu mẫu (`form.<trường>`), số và tên tài liệu đính kèm. 5 mẫu có sẵn và mẫu "Từ bước duyệt của
-  biểu mẫu" (`GET /automations/process-template`). Bật quy trình cho một biểu mẫu thì hồ sơ trình sau đó đi
-  theo quy trình thay cho bước duyệt khai trong biểu mẫu; mỗi biểu mẫu bật một quy trình
-  (`process_already_enabled`), hồ sơ ghim bản quy trình lúc trình. Mỗi bước Duyệt/Xin ý kiến vẫn là một human
-  task Core; quyết định ghi ở Workspace trước, bước không cho phép thì từ chối (`decision_not_offered`). Chi
-  tiết hồ sơ có tab **Quy trình** (`GET /cases/{id}/process`) vẽ sơ đồ chỉ đọc, tô bước đã qua, bước đang chờ
-  ai, ý kiến và kết quả; hồ sơ theo bước duyệt tuyến tính cũng được vẽ như vậy. Thu hồi hồ sơ dừng quy trình
-  và hủy các run Core còn chờ. Chạy thử quy trình nhận quyết định giả lập theo từng bước. 9 test backend, 4 test
-  frontend.
-- Công việc có đính kèm tệp: thẻ **Tài liệu** trong chi tiết công việc cho tải tệp lên hoặc chọn từ kho
-  tài liệu, xem trước và tải về qua công việc (`POST /tasks/{id}/files/{file_id}/download`, ghi nhật ký
-  `task.file_download`), nên người nhận việc mở được tệp mà không cần chia sẻ riêng. Người làm được thêm
-  tệp kết quả và chỉ gỡ được tệp do mình đính kèm (`task_file_not_yours`); người giao gỡ được mọi tệp.
-  Hộp thoại **Giao việc mới** đính kèm được tệp ngay khi giao. Hoạt động ghi `files_changed`. 2 test
-  backend, 1 test frontend.
-- Báo cáo theo phòng ban: bảng "Tình hình từng đơn vị" (việc đang mở, quá hạn, hoàn tất trong kỳ; hồ sơ, đang chờ
-  duyệt, quá hạn, lần trả lại), phòng nhiều việc/hồ sơ quá hạn đứng đầu (`by_department` trong
-  `/reports/overview`). Xuất CSV hồ sơ (`GET /reports/cases.csv`): bước đang chờ, người đang xử lý, hạn bước, quá
-  hạn, chỉ những hồ sơ người tải được xem. 1 test.
-- 17 tính năng AI (migration `workspace_0016`), mô tả trong [docs/ai-features.md](docs/ai-features.md): đọc tài
-  liệu để điền biểu mẫu (tạo căn cứ trường nguồn AI, câu trích phải có thật trong trang), tóm tắt hồ sơ cho
-  người duyệt, soát hồ sơ trước khi trình, gợi ý ý kiến duyệt/lý do trả lại, soạn văn bản hành chính ra tệp
-  Word theo NĐ 30/2020, tóm tắt và hỏi đáp trên tài liệu, tìm theo ý nghĩa (vector, lập chỉ mục trong
-  worker), gợi ý nhãn và thư mục, giao việc bằng câu nói, tách việc con, bản tin việc hôm nay, nhận xét báo
-  cáo bằng lời, tóm tắt hội thoại, hỗ trợ viết bài và mô tả ảnh, node "Hỏi AI" trong luồng tự động, trợ lý
-  trả lời về dữ liệu của chính người hỏi, sinh kịch bản thử cho gói nghiệp vụ. Người có quyền
-  `assistant.manage` bật từng tính năng và chọn dịch vụ riêng ở tab **Tính năng AI**; mặc định tắt hết. Dịch
-  vụ AI nhận được ảnh và PDF (Claude, OpenAI, Gemini, Ollama, vLLM, cổng tương thích); tạo vector qua
-  OpenAI, Gemini, Ollama, vLLM, cổng Chat Completions. Phụ thuộc mới `pypdf` 6.20.1 (BSD-3-Clause). 12 test
-  backend, 1 test frontend; đã chạy thật với Ollama `gpt-oss:20b` và `bge-m3`.
-  Một dịch vụ AI phục vụ nhiều tính năng, mỗi tính năng chọn model riêng trong danh sách model lấy thẳng từ
-  dịch vụ (`POST /assistant/models` nay lấy được của mọi loại dịch vụ, tách model trò chuyện và model tạo vector).
-- Trợ lý AI dùng được máy chủ AI tự cài: **Ollama** (gọi API gốc `/api/chat`, đặt `num_ctx` 16384 để
-  kiến thức không bị cắt ngầm) và **vLLM** (OpenAI Chat Completions). Khóa API không bắt buộc với hai
-  loại này; nút "Lấy danh sách model" đọc model có trên máy chủ (`POST /assistant/models`, dùng được
-  cả cho cổng Chat Completions). Chờ tối đa 180 giây; bỏ phần `<think>…</think>` của model suy luận
-  khỏi câu trả lời. Cấu hình ngay trong giao diện như các dịch vụ khác: địa chỉ nội bộ và HTTP được nhận
-  mà không cần `ASSISTANT_ALLOWED_HOSTS`, nhưng chỉ ở gốc máy chủ (hoặc `/v1`) nên chỉ các đường dẫn cố
-  định của máy chủ model được gọi, và địa chỉ link-local (metadata đám mây) vẫn bị chặn. Cổng `custom_*`
-  giữ quy tắc cũ. Compose thêm `host.docker.internal` cho `workspace-api` để gọi Ollama chạy trên
-  chính máy cài Docker. Logo từ `@lobehub/icons-static-svg` (đã có). 5 test backend, 1 test frontend.
-- Đóng hồ sơ (migration `workspace_0015`, thêm `cases.deleted_at`, `cases.archived_at`). Trước đây
-  không có cách nào bỏ một hồ sơ tạo nhầm. Người lập **xóa bản nháp chưa từng trình**
-  (`DELETE /cases/{id}`; ẩn khỏi mọi danh sách, tìm kiếm, báo cáo, nhật ký vẫn ghi). Hồ sơ đã từng
-  trình không xóa được: người lập **hủy** khi đang là bản nháp hoặc bị trả lại (`POST
-  /cases/{id}/cancel`, trạng thái `cancelled`, lịch sử giữ nguyên). Lãnh đạo (quyền xem hồ sơ của
-  phòng hoặc toàn cơ quan) **lưu trữ / bỏ lưu trữ** hồ sơ đã duyệt, từ chối hoặc đã hủy (`POST
-  /cases/{id}/archive`). Hồ sơ đã hủy và đã lưu trữ rời danh sách mặc định, xem ở tab "Đã hủy",
-  "Lưu trữ" và vẫn tìm thấy. 4 test.
-- Tab **Nhật ký hoạt động** trong Thiết lập cho người có quyền `audit.read`: ai làm gì, lúc nào, có
-  liên kết tới hồ sơ/công việc/luồng. Trước đây quyền này có trong ma trận phân quyền nhưng không có
-  màn hình nào dùng. `GET /audit-logs` trả thêm `actor_name`. Test frontend bắt buộc mọi hành động
-  backend ghi nhật ký đều có nhãn tiếng Việt.
-- `docs/operations.md`: kết quả diễn tập backup/restore ngày 31/10/2026 (PostgreSQL + object storage sang project riêng, số dòng và hash khớp) và lỗi `pg_restore --no-owner`; `docs/acceptance.md` ghi lượt chạy ONLYOFFICE Document Server thật.
-- CI chạy thêm `packages/flowkit/tests` (56 test) và test Node của plugin `vn-document-format` (29 test), trước đây không được chạy.
+- Plugin kết nối `desktiny-plugin/1` và API plugin bản 2 (migration `workspace_0023`–`workspace_0027`, contract
+  `contracts/plugin.openapi.json`, SDK `desktiny-plugin` 0.2.0; PR #39, nhánh `feat/plugin-ket-noi`).
+- Gói ngành `desktiny-pack/1` (migration `workspace_0022`; PR #37, bị revert ở PR #38, áp dụng lại trong PR #39).
+- Quy trình hồ sơ vẽ trên canvas tự động hóa, công việc có đính kèm tệp (migration `workspace_0017`, PR #35).
+- Hồ sơ cá nhân và ảnh đại diện (migration `workspace_0021`, PR #36); trợ lý công việc và hỏi đáp AI trên trang hồ
+  sơ; tài liệu theo từng bước của hồ sơ; 12 quy trình mẫu mới.
+- 17 tính năng AI, mặc định tắt (migration `workspace_0016`); trợ lý AI dùng được máy chủ Ollama và vLLM tự cài.
+- Đóng hồ sơ: xóa bản nháp, hủy, lưu trữ (migration `workspace_0015`); tab Nhật ký hoạt động; báo cáo theo phòng ban
+  và xuất CSV hồ sơ.
+- Chuỗi băm cho nhật ký audit của Core (migration `core_0003`), gói `dx-piivn` 0.1.0 và `scripts/audit_repo.mjs`
+  (PR #34). Ba mục này trước đây ghi nhầm vào 0.2.2.
 
 ### Changed
-- **Trợ lý AI trả lời về dữ liệu của người hỏi** (tính năng `assistant_my_data`, vẫn tắt mặc định) mở rộng: ngoài hồ sơ
-  mình lập, việc được giao và việc chờ duyệt, trợ lý còn biết việc mình giao, điều phối, theo dõi, việc xong 30 ngày
-  qua; bàn giao việc 60 ngày qua và ủy quyền duyệt; hồ sơ mình đã xử lý; tài liệu của mình và đang chia sẻ với ai,
-  tài liệu và thư mục người khác chia sẻ cho mình. Chỉ những gì người hỏi mở được; mỗi nhóm tối đa 12 mục, ưu tiên
-  mục khớp câu hỏi. Câu trả lời ghi mã `@n` cạnh từng mục, giao diện biến thành nút mở và danh sách **Mở nhanh**
-  (`items` trong `POST /assistant/chat`); mã cũ bị bỏ khỏi lịch sử gửi lại. `GET /assistant` có `my_data` và
-  thêm câu hỏi gợi ý. 2 test backend, 2 test giao diện.
-- **Thanh bên** sáng và gọn: cùng nền với trang, chỉ một viền mảnh; trang đang mở tô nền nhạt và chữ đậm. Gộp còn
-  hai nhóm (việc hằng ngày và Quản trị), số đang chờ hiện nhỏ cuối dòng, nút thu gọn thành biểu tượng cạnh logo, bỏ
-  dòng phiên bản. Chế độ tối, thu gọn và ngăn kéo trên điện thoại vẫn hoạt động.
-- **Chi tiết công việc** dễ theo dõi hơn: khung tóm tắt ở đầu trang cho thấy việc đang ở bước nào (Đã giao →
-  Tiếp nhận → Đang làm → Chờ nghiệm thu → Hoàn tất), một câu nói rõ bước tiếp theo cho đúng người đang xem (người
-  làm, người giao), hạn còn bao lâu hoặc đã quá bao lâu, nút Đổi hạn ngay cạnh hạn. Nút hủy/từ chối xếp cuối, tách
-  khỏi thao tác chính. **Báo cáo** dùng lời thường cho phạm vi, kỳ và giờ; định nghĩa số liệu gom vào một mục mở
-  ra khi cần.
-- **Giao diện theo design system** ([design-system/desktiny/MASTER.md](design-system/desktiny/MASTER.md), tạo bằng skill
-  ui-ux-pro-max): phong cách tối giản, màu chính navy, bỏ nền chuyển sắc và bóng đổ nặng; cỡ chữ tối thiểu 12px (trước đó
-  có chữ 8px), nút tối thiểu 40px và 44px trên màn hình cảm ứng; viền focus rõ; tôn trọng giảm chuyển động. Bỏ các khẩu
-  hiệu và nhãn thừa, tiêu đề trang nói thẳng tên trang, Trang chủ bỏ banner, thay emoji bằng icon, số hiển thị có phân cách
-  hàng nghìn, thanh trên cùng không còn tràn ngang trên điện thoại.
-- **Một loại luồng** (migration `workspace_0020`): bỏ hai tab Quy trình hồ sơ và Luồng tự động. Node kích hoạt quyết định
-  luồng chạy khi nào; chọn biểu mẫu thì luồng là đường đi của hồ sơ biểu mẫu đó. Mọi loại bước dùng được cho mọi luồng,
-  kể cả Duyệt, Xin ý kiến, Nhập thông tin trên luồng của công việc hay bài viết (`approval_tasks.case_id` nay có thể trống,
-  xử lý ngay ở màn Cần phê duyệt). Mọi luồng đều phát hành theo phiên bản; `/automations/{id}/enabled` tương đương phát
-  hành hoặc ngừng áp dụng. **Kết quả của bước:** bước cần người đặt được trường và số tệp phải nộp khi đồng ý
-  (`step_result_required`), bước Giao việc chặn nộp khi thiếu tệp (`task_result_required`), và bước sau đọc được kết quả
-  qua `{ten_buoc.truong}`. **14 node mới:** Rẽ nhiều nhánh, Chạy song song, Chờ đủ nhánh, Chờ đến khi, Đặt giá trị, Xác nhận
-  đã đọc, Cập nhật hồ sơ/việc, Tạo văn bản, Lưu và chia sẻ tệp, Tạo hồ sơ khác, Nhắn tin và đăng tin, Gửi email (cấu hình
-  `SMTP_*`), Gọi API lấy dữ liệu, AI trích xuất. Các bước hành động theo quyền của người tạo luồng. 31 test backend, 4 test
-  frontend.
-- **Node quy trình cấu hình linh hoạt** (migration `workspace_0019`), mô tả trong
-  [docs/process-packages.md](docs/process-packages.md). Người xử lý theo người cụ thể, nhóm, vai trò, thành viên phòng
-  ban, lãnh đạo đơn vị hoặc người ghi trong biểu mẫu; bước Duyệt hoàn tất theo người đầu tiên, tất cả hoặc đủ số người,
-  bước Xin ý kiến thêm đủ số người. Khi quá hạn: nhắc, chuyển người khác hoặc đi cổng **Quá hạn**
-  (outbox `process.overdue`). Cổng **Trả lại** nối được về bước trước: câu trả lời cũ giữ lại và đánh dấu đã thay thế,
-  tối đa 5 lần mỗi bước (`loop_limit`); vòng lặp qua cổng khác vẫn bị từ chối. Bước mới **Nhập thông tin** (`input`): một
-  người điền thêm trường, tệp, dùng được trong điều kiện sau đó qua `form.<mã>`, kể cả người tạo hồ sơ. Từng bước đặt
-  được trường và tài liệu người ở bước đó được xem, trường được sửa khi trả lời; có áp dụng ở API, không chỉ ở giao diện.
-  Người được hỏi chuyển được cho người khác (`POST /approval-tasks/{id}/forward`) và bước có thể không nhận người được
-  ủy quyền. Bước mới **Quy trình con** (`subprocess`) chạy một quy trình đã phát hành, kết quả chọn cổng đi tiếp; phiên
-  bản cha ghim phiên bản con lúc phát hành. 32 test backend, 3 test frontend.
-- **Quy trình nghiệp vụ** gộp Tự động hóa và Gói nghiệp vụ thành một mục (`/processes`; `/automations` và `/packages`
-  chuyển hướng), migration `workspace_0018`. Luồng canvas là gốc: canvas là bản nháp, **Phát hành** tạo phiên bản
-  (`process_versions`) và hồ sơ ghim phiên bản đó khi tạo. Bảng phát hành có phân quyền sử dụng theo vai trò và phòng ban
-  (`PUT /processes/{id}/settings`), số tài liệu tối thiểu, kịch bản thử (`/processes/{id}/scenarios`,
-  `/scenario-reports`) chạy bằng đúng bộ máy thật ở chế độ không ghi dữ liệu, so sánh tác động với bản đang áp dụng
-  (`/processes/{id}/impact`) và lịch sử phiên bản. Mọi kịch bản đã viết phải đạt trên đúng bản nháp mới phát hành được
-  (`simulation_required`). Một biểu mẫu có thể có nhiều quy trình; tạo hồ sơ chọn trong các quy trình người đó được dùng
-  (`GET /processes/available`, `process_required`, `process_use_denied`). Tạo quy trình bắt đầu từ thư viện mẫu, tạo
-  hoặc sửa biểu mẫu ngay trong màn này. Mỗi gói cũ được chuyển thành một quy trình giữ nguyên id, hồ sơ đã ghim và quyền
-  được giữ, bộ thử cũ chép sang nhưng không kèm quyết định giả lập và đường đi vì chúng đặt theo node của Core; bảng gói
-  cũ giữ lại chỉ để đọc. Quản trị kỹ thuật được thêm `forms.manage`; lãnh đạo phòng không còn quản lý quy trình. Thay API
-  `/business-packages*`, `/package-versions*`; `CaseCreate.package_version_id` đổi thành `process_id`;
-  `/ai/package-versions/{id}/scenarios` đổi thành `/ai/processes/{id}/scenarios`. Đã chạy migration lên và xuống trên bản
-  sao dữ liệu PostgreSQL. 14 test backend thay `test_packages.py`, `test_processes.py`; 2 test frontend. Spec:
-  [docs/superpowers/specs/2026-11-06-quy-trinh-nghiep-vu-design.md](docs/superpowers/specs/2026-11-06-quy-trinh-nghiep-vu-design.md).
-- **Hạn xử lý theo từng bước duyệt** (migration `workspace_0017`, `approval_tasks.due_at`): mỗi bước có "thời
-  hạn xử lý" (giờ hoặc ngày), tính từ lúc hồ sơ tới bước đó. Hồ sơ quá hạn khi một bước đang chờ quá hạn của nó;
-  lịch việc của người duyệt, danh sách Cần phê duyệt và thẻ "chờ lâu ở bước nào" (thêm số bước quá hạn) dùng hạn
-  này. Bỏ ô "Hạn xử lý" do người lập tự đặt khi tạo hồ sơ (API vẫn nhận `due_at` cho dữ liệu cũ). 2 test backend,
-  1 test frontend.
-- Tính năng AI: nút "Gói khuyến nghị" bật 13 tính năng chỉ đọc những gì người dùng đã được xem (để riêng tìm
-  theo ý nghĩa, bước AI trong luồng, trợ lý xem dữ liệu người hỏi, sinh kịch bản thử). Khi một lần gọi AI quá 6
-  giây, góc dưới màn hình báo "AI đang xử lý… N giây"; quá 15 giây nói rõ máy chủ AI của cơ quan có thể mất 1–2
-  phút. Test frontend đối chiếu danh sách tính năng với `ai_core.FEATURES`.
-- Hồ sơ: form nhập tay "Đối chiếu với tài liệu gốc" ẩn sau nút "Thêm căn cứ thủ công"; phần chính là các
-  đề xuất chờ xác nhận. Liên kết tới console Core đổi tên thành "Bảng điều khiển kỹ thuật" (vẫn chỉ hiện cho
-  Quản trị kỹ thuật); console ghi rõ là công cụ nền tảng và chỉ chỗ xem nhật ký nghiệp vụ.
-- Gọn chức năng trùng lặp (rà soát ngày 31/10/2026):
-  - **Bước duyệt chỉ khai báo ở biểu mẫu.** Gói nghiệp vụ không nhận `approval_steps` riêng nữa;
-    mỗi phiên bản gói chụp lại bước duyệt của biểu mẫu (giao diện vốn đã làm vậy, chỉ API cho ghi đè).
-  - **Hồ sơ bỏ "người phụ trách"** (migration `workspace_0014` xóa cột `cases.assignee_id`). Người
-    xử lý hồ sơ là công việc gắn với hồ sơ, đã có nút tạo trong trang hồ sơ. Luồng tự động gửi tới
-    "người phụ trách" của sự kiện hồ sơ nay gửi người lập hồ sơ.
-  - **Core dùng `dx-flowkit`** thay cho bản sao trong `dx_core.workflow` (thông báo lỗi tiếng Việt
-    giữ nguyên). `dx-flowkit` 0.2.0 thêm `compare` và các toán tử `contains`, `empty`, `not_empty`;
-    điều kiện của biểu mẫu, bước duyệt và luồng tự động hóa cùng dùng `compare` (trước đây ba hàm
-    viết riêng). So sánh lớn/nhỏ nhận hai số hoặc hai chuỗi; giá trị khác kiểu là "không khớp" ở
-    Workspace, là lỗi `condition_type_error` ở Core như trước. CI chạy cả test của `packages/flowkit`.
-  - **"Hồ sơ đang chờ lâu ở bước nào?" chuyển từ Trang chủ sang Báo cáo**, theo khoảng thời gian
-    của trang Báo cáo. Trang chủ bỏ 4 ô số liệu trùng với huy hiệu thanh bên và bộ lọc lịch việc.
-- Gói nghiệp vụ phát hành được khi đã kiểm tra cấu hình, không bắt buộc bộ kịch bản chạy thử; bộ
-  kịch bản đã tạo thì vẫn phải đạt.
-- Mẫu tự động hóa không lặp lại thông báo có sẵn nữa: thay bằng nhắc việc bị trả lại chưa làm lại
-  sau 1 ngày, nhắc hồ sơ trả lại chưa trình lại sau 2 ngày, báo lãnh đạo khi việc khẩn được nộp,
-  tạo việc lưu trữ khi hồ sơ được duyệt. Bước sau node Chờ nay đọc lại trạng thái hiện tại của công
-  việc/hồ sơ (trước đây dùng dữ liệu lúc xảy ra sự kiện nên không viết được "nếu vẫn chưa xong").
-- Từ ngữ: công việc dùng "nghiệm thu", hồ sơ dùng "phê duyệt". Công việc ở trạng thái `submitted`
-  hiện "Chờ nghiệm thu" (trước đây hiện "Đã trình" của hồ sơ), `completed` hiện "Đã nghiệm thu".
-- Tìm kiếm không phân biệt dấu ở mọi nơi: Ctrl+K, trang Tìm kiếm, danh sách công việc, hồ sơ, kho
-  tài liệu, chọn bản ghi khi chạy luồng, lọc cuộc trò chuyện (gõ "bao cao" ra "Báo cáo"). Dùng chung
-  `dx_workspace/text.py` và `apps/shared/src/text.ts`.
-- Bỏ mũi tên ▾ ở nhãn "e-Office" trên thanh bên: không có chức năng chuyển không gian nào.
+- Quy trình nghiệp vụ (`/processes`) gộp Tự động hóa và Gói nghiệp vụ, phát hành theo phiên bản, có kịch bản thử
+  (migration `workspace_0018`); node cấu hình linh hoạt (`workspace_0019`); một loại luồng với 14 node mới
+  (`workspace_0020`); hạn xử lý theo từng bước duyệt. PR #35, #36.
+- Giao diện theo design system: trang đăng nhập làm lại, thanh bên gọn, chi tiết công việc có khung tóm tắt, rà soát
+  giao diện theo góp ý người dùng.
+- Trợ lý AI trả lời về dữ liệu của người hỏi mở rộng phạm vi (tính năng `assistant_my_data`, vẫn tắt mặc định).
+- Gọn chức năng trùng lặp: bước duyệt chỉ khai ở biểu mẫu, Core dùng `dx-flowkit` 0.2.0.
+- Tìm kiếm không phân biệt dấu ở mọi nơi; công việc dùng "nghiệm thu", hồ sơ dùng "phê duyệt".
 
 ### Fixed
-- Tab **Quy trình** trong hồ sơ và thao tác nhân đôi node đứng im do `structuredClone` không nhận dữ liệu reactive.
-- Điện thoại: dòng "giờ · phạm vi" ở đầu bài viết bảng tin không còn xuống dòng từng chữ (cắt bằng dấu …,
-  nhãn "Đã ghim" chỉ còn biểu tượng); nút trợ lý AI thu sang mép phải khi cuộn xuống và trang có thêm khoảng
-  trống cuối, nên không còn che nút ở hàng cuối danh sách Việc hôm nay.
-- Image web build lỗi `vue-tsc` vì thiếu `examples/plugins` (test `flow/pluginNodes.test.ts` đọc manifest plugin
-  mẫu): `web.Dockerfile` copy thư mục này vào bước build — cherry-pick `1f57e43` từ `feat/plugin-dong-goi`.
+- Tab Quy trình của hồ sơ và thao tác nhân đôi node đứng im; bố cục bảng tin và nút trợ lý AI trên điện thoại; image
+  web build lỗi `vue-tsc` vì thiếu `examples/plugins`.
 
 ## [0.2.2] - 2026-10-31
 
-### Added
-- Trợ lý AI ở góc màn hình (migration `workspace_0012`): trả lời về quy trình nghiệp vụ và cách
-  dùng phần mềm, chỉ dựa trên kiến thức do quản trị viên nhập, có ghi nguồn `[1]`. Quyền mới
-  `assistant.manage` (mặc định Ban giám đốc, Quản trị kỹ thuật) cho màn **Trợ lý AI**: bật/tắt,
-  lời chào, câu gợi ý, hướng dẫn thêm, giới hạn câu hỏi/người/ngày; dịch vụ Claude (SDK `anthropic`
-  2.3.0), OpenAI, Gemini, DeepSeek với khóa API mã hóa, chỉ hiện 4 ký tự cuối, kiểm tra kết nối;
-  kiến thức viết tay, nhập tệp `.md/.txt`, sinh từ gói nghiệp vụ đang áp dụng, thử tìm không tốn
-  lượt gọi AI. Trợ lý không đọc hồ sơ/công việc/tài liệu/tin nhắn. 8 test backend, 4 test frontend.
-  Logo các dịch vụ AI lấy từ `@lobehub/icons-static-svg` 1.95.0 (MIT; logo là nhãn hiệu của từng hãng).
-  Cổng riêng (migration `workspace_0013`): dùng endpoint tự đặt theo giao thức Anthropic Messages,
-  OpenAI Chat Completions hoặc OpenAI Responses (model như `auto`). Chỉ nhận HTTPS trên địa chỉ
-  công khai; cổng nội bộ/HTTP phải có trong biến mới `ASSISTANT_ALLOWED_HOSTS`; kiểm lại trước mỗi
-  lần gọi, không theo chuyển hướng.
-- `scripts/audit_repo.mjs` và bước CI tương ứng: thoát 1 nếu Git đang theo dõi tệp `.env` (trừ `.example`), khóa/chứng chỉ riêng, bản dump, `infra/identity/generated/`, hoặc image Compose không ghim phiên bản hay dùng `latest`. Chạy trên kho hiện tại: sạch (269 tệp); thử trên kho mẫu có lỗi: 3 vi phạm, thoát 1. Ý tưởng từ gagaduy/OpenDXOS.
-- `packages/pii-vn` (`dx-piivn` 0.1.0): dò CCCD, CMND, số điện thoại di động, số tài khoản, mã số thuế và e-mail trong văn bản, không phụ thuộc thư viện ngoài. CCCD được kiểm mã tỉnh, chữ số thế kỷ và năm sinh; số 12 chữ số ngẫu nhiên qua khoảng 1,6% (test đo, ngưỡng 3%). 12 test, `ruff` sạch. Danh sách mã tỉnh và đầu số di động chưa đối chiếu văn bản chính thức; chưa nối vào Workspace.
-- Chuỗi băm cho nhật ký audit của Core (`dx_core/audit_chain.py`, migration `core_0003`): mỗi dòng audit mới chứa `seq`, `prev_hash`, `entry_hash` (SHA-256) nên sửa, xóa hoặc đảo dòng bị phát hiện. `GET /core/v1/audit-logs/verify` (quản trị) trả `ok`, số dòng đã kiểm, `head` và dòng đầu tiên bị hỏng. Trên PostgreSQL, trigger chặn `UPDATE`/`DELETE` bảng `audit_logs`. 5 test mới; migration và trigger đã chạy thử trên PostgreSQL 17. Dòng audit cũ (trước migration) được báo là `unchained`, không coi là hợp lệ. Ý tưởng lấy từ dự án PSA-OVNCR/dxos (I4). Chưa neo `head` ra ngoài và chưa có chuỗi cho audit của Workspace.
-- `packages/flowkit` (`dx-flowkit` 0.1.0): kiểm tra và chạy thử đồ thị quy trình JSON, tách từ `dx_core.workflow`, không phụ thuộc thư viện ngoài. 56 test; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên. `dx_core.workflow` chưa dùng gói này.
-- `plugins/vn-document-format` (0.1.0): plugin ONLYOFFICE kiểm tra thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP, Phụ lục I. 29 test; đã chạy thử trong ONLYOFFICE 8.3.3 trên hai tệp mẫu. Có icon, ảnh chụp và CHANGELOG theo hướng dẫn marketplace. Chưa kiểm lề trên 8.3.3 (thiếu hàm đọc lề); chưa gửi lên marketplace.
-- Mục "Đóng góp ngược cho cộng đồng nguồn mở" trong README, ghi trạng thái thật từng việc.
-- `scripts/desktiny-migrate.sh` (cài thành `$PREFIX/bin/desktiny-migrate`): chạy migration CSDL từ bản đã cài, không cần thư mục mã nguồn.
+V2 bản dùng để chấm: trợ lý AI, `dx-flowkit`, plugin `vn-document-format`, sửa cài đặt và bootstrap. Phần lớn thay
+đổi vào `main` qua PR #31; trợ lý AI gộp thẳng từ nhánh `feat/ai-assistant`.
+Chi tiết đầy đủ: [docs/changes/0.2.2.md](docs/changes/0.2.2.md).
 
-### Fixed
-- Sửa chữ `WorkMMODIARY` (lỗi thay chuỗi) thành `Workspace` trong chú thích mã và `docs/acceptance.md`.
-- Tạo hồ sơ với trường số không bắt buộc để trống bị từ chối (`amount: None is not of type number`): form web gửi `null`, nay `validate_payload` coi giá trị `null` là chưa nhập. Có test hồi quy.
-- Người dùng demo do `scripts/bootstrap.py` sinh có họ (`lastName`) trống; Keycloak 26 buộc điền họ ở bước `VERIFY_PROFILE`, nên lần đăng nhập đầu của mọi tài khoản demo bị chặn và Playwright E2E có đăng nhập không qua được. Nay `lastName` là `Demo`.
-- `make install` không cài `alembic.ini` và `migrations/`, nên bản cài ra `PREFIX` không thể khởi tạo CSDL khi xóa thư mục mã nguồn (tiêu chí PoF 4, mục "chạy được ngoài thư mục mã nguồn"). Nay cài vào `$PREFIX/share/desktiny/<service>-api/`.
+### Added
+- Trợ lý AI ở góc màn hình, trả lời từ kiến thức do quản trị viên nhập (migration `workspace_0012`,
+  `workspace_0013`); dịch vụ Claude, OpenAI, Gemini, DeepSeek hoặc cổng riêng.
+- Gói `dx-flowkit` 0.1.0 (`packages/flowkit`): kiểm tra và chạy thử đồ thị quy trình JSON.
+- Plugin ONLYOFFICE `vn-document-format` 0.1.0: kiểm thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP.
+- `desktiny-migrate`: chạy migration từ bản đã cài; mục "Đóng góp ngược cho cộng đồng nguồn mở" trong README.
 
 ### Changed
-- Cấu trúc Workspace API: bỏ hai vòng phụ thuộc bị che bằng import trong hàm (`tasks` ↔ `messaging`, `routers` ↔ `packages`). `validate_payload` và `step_evidence` chuyển vào `schemas.py`; `membership` và `message_readable` chuyển vào `policies.py`; các import cục bộ giữa `automations`, `messaging` và `tasks` đưa lên đầu tệp. Không đổi hành vi hay API (contract OpenAPI không đổi; 105 test dịch vụ + 4 test ranh giới đạt). `tests/test_boundaries.py` có thêm test chặn vòng phụ thuộc mới.
-- Thêm `.gitattributes` và `.editorconfig` (LF thống nhất giữa Windows/Linux/macOS).
-- `npm run generate:api` giữ header SPDX của hai tệp sinh ra (trước đây xóa mất, làm job `compliance` đỏ). CI so sánh `contracts/` và `apps/shared/src/generated/` với bản đã commit.
-- Chuyển hai tài liệu thiết kế vào `docs/design/`; `docs/third-party-inventory.md` ghi rõ phạm vi so với `THIRD_PARTY.md`.
-- Ba `pyproject.toml` khai báo `license = "Apache-2.0"` (trước đây `pip-licenses` báo UNKNOWN cho gói tự viết). Quét `pip-licenses` trên image runtime ngày 28/10/2026: 47 gói, không có GPL/SSPL/BUSL/Elastic; chỉ psycopg là LGPL-3.0 (đúng khai báo, nạp libpq của hệ điều hành).
-- Cập nhật `docs/architecture.md`, `docs/installation.md`, `docs/acceptance.md` theo trạng thái thật (chat, bảng tin, canvas đã có; Docker/E2E đã chạy ngày 28/10/2026; ghi rõ mục chưa kiểm). `docs/issues-backlog.json` bổ sung các việc đã xong và việc còn mở.
-- Thống nhất số phiên bản 0.2.2 ở `package.json` (gốc và 3 workspace), `package-lock.json`, 3 `pyproject.toml` (kèm ràng buộc `dx-platform-kit==`), tiêu đề OpenAPI của hai dịch vụ và `contracts/*.openapi.json` (trước đây còn ghi 0.1.0).
-- Thêm `.mailmap` gộp tên hiển thị "unknown" của các commit cũ về `Dking2007` (cùng email; không viết lại lịch sử); CONTRIBUTING.md hướng dẫn cấu hình `user.name`/`user.email` trước khi commit.
-- `make install` dùng pip của `.venv` (cần `make venv` trước) thay vì `python3 -m pip` của hệ thống (kèm `--ignore-installed` để mọi phụ thuộc thật sự nằm trong `PREFIX`, không bị bỏ qua vì đã có trong `.venv`): Python 3.13 từ deadsnakes trên Ubuntu 24.04 không có pip, nên lệnh cũ thất bại. `desktiny-migrate` tự chọn đúng `python3.X` đã cài gói thay vì `python3` mặc định. BUILD.md gọi `make venv deps PYTHON=python3.13`. Cả ba lỗi tìm ra khi chạy BUILD.md từng dòng trong Ubuntu 24.04 sạch (27/10/2026).
-- Phụ thuộc `psycopg[binary]` đổi thành `psycopg` thuần Python: không còn đóng gói sẵn libpq trong wheel; hệ điều hành cung cấp `libpq5` (đã thêm vào `api.Dockerfile`, bước CI backend và BUILD.md). `psycopg-binary` bị loại khỏi `requirements.lock` và `THIRD_PARTY.md` (54 gói Python).
-- BUILD.md: thêm mục Thư viện hệ thống và `libpq5` vào bảng yêu cầu.
-- Tài liệu (`V2_CHANGES.md`, `SELF_REVIEW.md`) trỏ tới v0.2.2 là bản dùng để chấm (thay cho v0.2.1; v0.2.0 vẫn chỉ là mốc lịch sử có lỗi `reuse lint`).
-- Hợp nhất nhánh `feat/ai-assistant` (trợ lý AI) vào `main`; đã chạy lại toàn bộ kiểm trên bản hợp nhất: ruff, pytest (118 đạt, 1 bỏ qua vì cần PostgreSQL thật), contract OpenAPI và kiểu TypeScript sinh ra khớp mã, lint/typecheck/test/build frontend, kiểm SPDX và `THIRD_PARTY.md`.
+- Workspace API bỏ hai vòng phụ thuộc giữa module, không đổi hành vi hay API.
+- `psycopg[binary]` đổi thành `psycopg` dùng `libpq5` của hệ điều hành; `make install` dùng pip của `.venv`.
+- Thống nhất số phiên bản 0.2.2; thêm `.gitattributes`, `.editorconfig`, `.mailmap`; tài liệu cập nhật theo trạng
+  thái thật.
+
+### Fixed
+- Chữ `WorkMMODIARY` thành `Workspace`; trường số không bắt buộc để trống bị từ chối; tài khoản demo không đăng nhập
+  được với Keycloak 26; `make install` không cài `alembic.ini` và `migrations/`.
 
 ## [0.2.1] - 2026-10-26
 
 ### Fixed
 - `reuse lint` lỗi do `scripts/add_spdx_headers.mjs` và `CONTRIBUTING.md` chứa mẫu header SPDX bị đọc nhầm; bỏ khóa không hợp lệ trong `REUSE.toml` — `d31d057`, `fdc0e7c`. CI toàn bộ xanh từ bản này; `v0.2.0` giữ nguyên làm mốc lịch sử. **Lưu ý:** `v0.2.0` được build từ commit `633b9ec` khi `reuse lint` còn lỗi, vì vậy bản dùng để chấm/cài đặt là `v0.2.1` trở lên, không phải `v0.2.0`.
 
-## [0.2.0] - 2026-10-26 — DXOS V2: sẵn sàng đối chiếu tiêu chí PoF
+## [0.2.0] - 2026-10-26
+
+DXOS V2: sẵn sàng đối chiếu tiêu chí PoF.
 
 Bản V2 giữ nguyên chức năng của V1 (0.1.0) và hoàn thiện phần kho mã nguồn: giấy phép, khai
 báo thành phần ngoài, hướng dẫn biên dịch, phát hành và tài liệu cộng đồng.
@@ -422,7 +251,10 @@ báo thành phần ngoài, hướng dẫn biên dịch, phát hành và tài li�
 - `package.json` (gốc và 3 workspace) khai báo `"license": "Apache-2.0"`.
 - README/docs trỏ về BUILD.md làm điểm vào cài đặt.
 
-## [0.1.0] - 2026-10-24 — DXOS V1 (đường cơ sở)
+## [0.1.0] - 2026-10-24
+
+DXOS V1 (đường cơ sở). Ghi bổ sung: tại tag `v0.1.0` chưa có `CHANGELOG.md`; mục này viết sau, cùng lúc tạo
+CHANGELOG ở bản 0.2.0. Tag tạo ngày 26/10/2026, không có GitHub Release.
 
 Trạng thái kho trước khi bước vào V2, tag hồi tố tại `f089bfb`.
 
@@ -439,10 +271,10 @@ Trạng thái kho trước khi bước vào V2, tag hồi tố tại `f089bfb`.
 ### Fixed
 - Thứ tự import trong `auth.py` để CI backend qua ruff — `d495abb`.
 
-[Unreleased]: https://github.com/Dking2007/DXOS_V2/compare/v3.1.0...HEAD
-[3.1.0]: https://github.com/Dking2007/DXOS_V2/compare/v3.0.0...v3.1.0
-[3.0.0]: https://github.com/Dking2007/DXOS_V2/compare/v0.2.2...v3.0.0
-[0.2.2]: https://github.com/Dking2007/DXOS_V2/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/Dking2007/DXOS_V2/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/Dking2007/DXOS_V2/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/Dking2007/DXOS_V2/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Dking2007/DXOS_Desktiny/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/Dking2007/DXOS_Desktiny/compare/v3.0.0...v3.1.0
+[3.0.0]: https://github.com/Dking2007/DXOS_Desktiny/compare/v0.2.2...v3.0.0
+[0.2.2]: https://github.com/Dking2007/DXOS_Desktiny/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/Dking2007/DXOS_Desktiny/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/Dking2007/DXOS_Desktiny/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Dking2007/DXOS_Desktiny/releases/tag/v0.1.0

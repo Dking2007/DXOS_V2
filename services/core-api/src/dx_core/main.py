@@ -41,7 +41,7 @@ from .models import (
     Workflow,
 )
 from .policy import admin, authorized_resources, check, owner_or_admin
-from .storage import BlobStore, checksum, inspect_content
+from .storage import BlobStore, checksum, inspect_content, scan_content
 from .transactions import audit, begin_idempotency, emit
 from .workflow import advance, simulate_graph, validate_graph
 
@@ -177,6 +177,19 @@ def create_app(settings: Settings | None = None, engine=None):
     engine = engine or make_engine(settings.database_url)
     auth = Auth(settings, engine)
     store = BlobStore(settings)
+
+    def scan(db: Session, actor: Actor, file: StorageFile, content: bytes):
+        if not settings.clamav_host:
+            return
+        try:
+            scan_content(content, settings.clamav_host, settings.clamav_port)
+        except AppError as exc:
+            if exc.code == "malware_detected":
+                db.rollback()  # drop the half-made idempotency row, or a retry would replay {}
+                audit(db, actor, "file.malware_detected", file.id, {"checksum": checksum(content)})
+                db.commit()  # keep the evidence although the request fails
+            raise
+
     app = FastAPI(
         title="DX Core",
         version="3.1.0",
@@ -534,6 +547,7 @@ def create_app(settings: Settings | None = None, engine=None):
             raise AppError(422, "size_mismatch", "Kích thước tệp chưa đủ hoặc không khớp.")
         content = bytes(data)
         mime = inspect_content(content, file.name, file.mime)
+        scan(db, actor, file, content)
         key = "blobs/" + uid()
         store.put(key, content, mime)
         upload.object_key, upload.checksum, upload.state = key, checksum(content), "received"
@@ -638,6 +652,7 @@ def create_app(settings: Settings | None = None, engine=None):
         file = get_file(file_id, db, actor, "write", lock=True)
         revision(file, expected_revision)
         mime = inspect_content(content, file.name, file.mime)
+        scan(db, actor, file, content)
         key = "blobs/" + uid()
         store.put(key, content, mime)
         version = StorageVersion(
@@ -766,8 +781,12 @@ def create_app(settings: Settings | None = None, engine=None):
         return {"valid": True, "order": validate_graph(body.graph, settings.workflow_max_steps)}
 
     @router.post("/workflow-simulations", status_code=201)
-    def simulate_draft_graph(body: SimulationInput, db: DB, actor: User,
-                             idem_key: str | None = Header(None, alias="Idempotency-Key")):
+    def simulate_draft_graph(
+        body: SimulationInput,
+        db: DB,
+        actor: User,
+        idem_key: str | None = Header(None, alias="Idempotency-Key"),
+    ):
         if len(json.dumps(body.model_dump(), ensure_ascii=False)) > 262_144:
             raise AppError(413, "simulation_too_large", "Dữ liệu chạy thử vượt giới hạn.")
         idem, replay = begin_idempotency(db, actor, "workflow.simulate", idem_key, body.model_dump())
@@ -888,7 +907,16 @@ def create_app(settings: Settings | None = None, engine=None):
     @router.get("/workflow-runs/{run_id}/decision-traces")
     def run_decision_traces(run_id: str, db: DB, actor: User):
         run = get_run(run_id, db, actor)
-        return page(list(db.scalars(select(DecisionTrace).where(DecisionTrace.run_id == run.id).order_by(DecisionTrace.created_at, DecisionTrace.id))), 100)
+        return page(
+            list(
+                db.scalars(
+                    select(DecisionTrace)
+                    .where(DecisionTrace.run_id == run.id)
+                    .order_by(DecisionTrace.created_at, DecisionTrace.id)
+                )
+            ),
+            100,
+        )
 
     @router.post("/workflow-runs/{run_id}/cancel")
     def cancel_run(run_id: str, body: Revision, db: DB, actor: User):

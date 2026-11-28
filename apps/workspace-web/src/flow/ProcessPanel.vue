@@ -27,6 +27,7 @@ import { toast } from '../ui/toast'
 import { roleLabel } from '../ui/labels'
 import { KINDS, OUTCOMES, branchLabel, outputs } from './nodes'
 import type { ApiGraph, Branch } from './nodes'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 
 /** What makes a drawn process usable: who may use it, the rehearsal, and publishing it. */
 interface ProcessRule {
@@ -216,12 +217,12 @@ const publishBlocked = computed(() => {
   if (upToDate.value) return 'Bản nháp trùng với phiên bản đang áp dụng: chưa có gì mới để phát hành'
   return ''
 })
-function removeScenarioAsk(scenario: Scenario) {
-  if (!window.confirm(`Xóa kịch bản “${scenario.name}”? Thao tác này không hoàn tác được.`)) return
+async function removeScenarioAsk(scenario: Scenario) {
+  if (!(await confirmDialog({ message: `Xóa kịch bản “${scenario.name}”? Thao tác này không hoàn tác được.`, confirmLabel: 'Xóa kịch bản', danger: true }))) return
   void removeScenario(scenario.id)
 }
-function unpublish() {
-  if (!window.confirm('Ngừng áp dụng? Hồ sơ mới sẽ không dùng quy trình này; hồ sơ đã tạo vẫn đi theo phiên bản của mình.'))
+async function unpublish() {
+  if (!(await confirmDialog({ message: 'Ngừng áp dụng? Hồ sơ mới sẽ không dùng quy trình này; hồ sơ đã tạo vẫn đi theo phiên bản của mình.', confirmLabel: 'Ngừng áp dụng', danger: true })))
     return
   void act(() => send('/unpublish', 'POST', expected()), 'Đã ngừng áp dụng quy trình')
 }

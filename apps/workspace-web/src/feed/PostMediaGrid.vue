@@ -22,6 +22,7 @@ const singleVideo = computed(() => props.items.length === 1 && props.items[0].ki
       :key="item.id"
       type="button"
       class="feed-tile"
+      :style="item.kind === 'image' ? { '--backdrop': `url(${JSON.stringify(item.url)})` } : undefined"
       :aria-label="item.kind === 'video' ? `Xem video ${item.name}` : `Xem ảnh ${item.name}`"
       @click="emit('open', index)"
     >

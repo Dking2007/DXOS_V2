@@ -61,6 +61,7 @@ import {
 } from '../chat/upload'
 import { messageRows } from '../chat/rows'
 import '../chat/chat.css'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 const EMOJI = ['👍', '❤️', '😂', '🎉', '😮', '🙏']
 const route = useRoute()
 const router = useRouter()
@@ -382,7 +383,7 @@ async function react(message: ChatMessage, emoji: string) {
 const removing = ref<string | null>(null)
 async function remove(message: ChatMessage) {
   if (removing.value) return
-  if (!window.confirm('Xóa tin nhắn này? Tệp đính kèm cũng không còn xem được.')) return
+  if (!(await confirmDialog({ message: 'Xóa tin nhắn này? Tệp đính kèm cũng không còn xem được.', confirmLabel: 'Xóa tin nhắn', danger: true }))) return
   removing.value = message.id
   try {
     await api.request(`/messages/${message.id}`, { method: 'DELETE' })
@@ -539,7 +540,7 @@ async function addMembers() {
 const leaving = ref(false)
 async function leave() {
   if (leaving.value) return
-  if (!window.confirm('Rời khỏi hội thoại này? Bạn sẽ không đọc được lịch sử nữa.')) return
+  if (!(await confirmDialog({ message: 'Rời khỏi hội thoại này? Bạn sẽ không đọc được lịch sử nữa.', confirmLabel: 'Rời hội thoại', danger: true }))) return
   leaving.value = true
   try {
     await api.request(`/conversations/${activeId.value}/members/${session.user?.id}`, { method: 'DELETE' })

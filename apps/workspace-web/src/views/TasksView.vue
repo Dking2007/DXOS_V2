@@ -6,13 +6,12 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   AlarmClock,
-  CalendarClock,
   ChevronRight,
-  Columns3,
   List,
   ListChecks,
   Plus,
   Search,
+  StickyNote,
 } from 'lucide-vue-next'
 import { api } from '../api'
 import { formatDate, queryString } from '@dx/web-shared/api.ts'
@@ -21,6 +20,7 @@ import type { Task, TaskStatus } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import TaskCreateDialog from '../components/TaskCreateDialog.vue'
+import TaskPaper from '../components/TaskPaper.vue'
 import { useOverview } from '../ui/overview'
 import { useSession } from '../stores/session'
 const route = useRoute()
@@ -60,7 +60,25 @@ function pick(value: Scope) {
 const status = ref(String(route.query.status ?? ''))
 const overdueOnly = ref(route.query.overdue === 'true')
 const search = ref('')
-const view = ref<'list' | 'board' | 'due'>('list')
+// Sheets of paper by default; each person's own choice of view is remembered on this browser.
+type View = 'paper' | 'list'
+const VIEW_KEY = 'dx-tasks-view'
+function storedView(): View {
+  try {
+    const saved = window.localStorage.getItem(VIEW_KEY)
+    return saved === 'list' ? 'list' : 'paper'
+  } catch {
+    return 'paper'
+  }
+}
+const view = ref<View>(storedView())
+watch(view, (value) => {
+  try {
+    window.localStorage.setItem(VIEW_KEY, value)
+  } catch {
+    // Storage blocked: the choice lasts for this visit only.
+  }
+})
 const cursor = ref<string | null>(null)
 const showCreate = ref(route.query.create === '1')
 watch(
@@ -98,42 +116,16 @@ const tasks = useQuery({
     ),
 })
 const items = computed(() => tasks.data.value?.items ?? [])
-const columns: { status: TaskStatus; label: string }[] = [
+const statuses: { status: TaskStatus; label: string }[] = [
   { status: 'assigned', label: 'Chờ tiếp nhận' },
   { status: 'accepted', label: 'Đã tiếp nhận' },
-  { status: 'in_progress', label: 'Đang làm' },
+  { status: 'in_progress', label: 'Đang thực hiện' },
   { status: 'blocked', label: 'Vướng mắc' },
   { status: 'returned', label: 'Bị trả lại' },
   { status: 'submitted', label: 'Chờ nghiệm thu' },
   { status: 'completed', label: 'Hoàn tất' },
 ]
 const priorityLabel = { low: 'Thấp', normal: 'Bình thường', high: 'Cao', urgent: 'Khẩn' }
-function bucket(task: Task) {
-  if (['completed', 'cancelled'].includes(task.status)) return 'done'
-  if (!task.due_at) return 'none'
-  if (task.overdue) return 'overdue'
-  const due = new Date(task.due_at)
-  const now = new Date()
-  const end = new Date(now)
-  end.setHours(23, 59, 59, 999)
-  if (due <= end) return 'today'
-  end.setDate(end.getDate() + 7)
-  return due <= end ? 'week' : 'later'
-}
-const dueGroups = computed(() =>
-  [
-    { key: 'overdue', label: 'Quá hạn' },
-    { key: 'today', label: 'Hạn hôm nay' },
-    { key: 'week', label: 'Trong 7 ngày tới' },
-    { key: 'later', label: 'Sau đó' },
-    { key: 'none', label: 'Chưa đặt hạn' },
-  ].map((group) => ({
-    ...group,
-    tasks: items.value
-      .filter((task) => bucket(task) === group.key)
-      .sort((a, b) => (a.due_at ?? '').localeCompare(b.due_at ?? '')),
-  })),
-)
 async function created(task: Task) {
   showCreate.value = false
   await queryClient.invalidateQueries({ queryKey: ['tasks'] })
@@ -172,8 +164,8 @@ function closeCreate() {
           <option value="assigned,accepted,in_progress,blocked,returned,submitted">
             Đang mở
           </option>
-          <option v-for="column in columns" :key="column.status" :value="column.status">
-            {{ column.label }}
+          <option v-for="item in statuses" :key="item.status" :value="item.status">
+            {{ item.label }}
           </option>
           <option value="draft">Bản nháp</option>
           <option value="cancelled">Đã hủy</option>
@@ -190,26 +182,21 @@ function closeCreate() {
         /></label>
         <div class="segmented" role="group" aria-label="Kiểu hiển thị">
           <button
+            :class="{ active: view === 'paper' }"
+            :aria-pressed="view === 'paper'"
+            aria-label="Dạng giấy"
+            title="Dạng giấy"
+            @click="view = 'paper'"
+          >
+            <StickyNote :size="17" /></button
+          ><button
             :class="{ active: view === 'list' }"
+            :aria-pressed="view === 'list'"
             aria-label="Danh sách"
             title="Danh sách"
             @click="view = 'list'"
           >
-            <List :size="17" /></button
-          ><button
-            :class="{ active: view === 'board' }"
-            aria-label="Kanban"
-            title="Kanban"
-            @click="view = 'board'"
-          >
-            <Columns3 :size="17" /></button
-          ><button
-            :class="{ active: view === 'due' }"
-            aria-label="Theo hạn"
-            title="Theo hạn"
-            @click="view = 'due'"
-          >
-            <CalendarClock :size="17" />
+            <List :size="17" />
           </button>
         </div>
       </div>
@@ -239,6 +226,9 @@ function closeCreate() {
         <Plus :size="16" />Giao việc
       </button></StatePanel
     >
+    <div v-if="items.length && view === 'paper'" class="paper-board">
+      <TaskPaper v-for="task in items" :key="task.id" :task="task" />
+    </div>
     <div v-if="items.length && view === 'list'" class="table-wrap">
       <table>
         <thead>
@@ -288,55 +278,6 @@ function closeCreate() {
         </tbody>
       </table>
     </div>
-    <div v-if="items.length && view === 'board'" class="kanban">
-      <div v-for="column in columns" :key="column.status" class="kanban-column">
-        <header>
-          <StatusBadge kind="task" :status="column.status" /><span class="muted">{{
-            items.filter((task) => task.status === column.status).length
-          }}</span>
-        </header>
-        <RouterLink
-          v-for="task in items.filter((item) => item.status === column.status)"
-          :key="task.id"
-          :to="`/tasks/${task.id}`"
-          class="kanban-card"
-          :class="{ overdue: task.overdue }"
-        >
-          <strong class="kanban-title" :title="task.title">{{ task.title }}</strong>
-          <small>{{ task.assignee_name || task.department_name || 'Chưa giao' }}</small>
-          <div class="kanban-meta">
-            <span class="priority" :class="`priority-${task.priority}`">{{
-              priorityLabel[task.priority]
-            }}</span>
-            <span v-if="task.due_at" :class="{ 'overdue-text': task.overdue }">{{
-              formatDate(task.due_at)
-            }}</span>
-          </div>
-        </RouterLink>
-      </div>
-    </div>
-    <div v-if="items.length && view === 'due'" class="due-groups">
-      <section v-for="group in dueGroups.filter((g) => g.tasks.length)" :key="group.key">
-        <h3 :class="{ 'overdue-text': group.key === 'overdue' }">
-          {{ group.label }} <span class="muted">· {{ group.tasks.length }}</span>
-        </h3>
-        <RouterLink
-          v-for="task in group.tasks"
-          :key="task.id"
-          :to="`/tasks/${task.id}`"
-          class="list-row plain-link"
-        >
-          <div class="grow">
-            <p class="ellipsis" :title="task.title">{{ task.title }}</p>
-            <small
-              >{{ task.assignee_name || task.department_name || 'Chưa giao' }} ·
-              {{ formatDate(task.due_at, true) }}</small
-            >
-          </div>
-          <StatusBadge kind="task" :status="task.status" />
-        </RouterLink>
-      </section>
-    </div>
     <div v-if="tasks.data.value?.has_more || cursor" class="pagination">
       <button class="button secondary small" :disabled="!cursor" @click="cursor = null">
         Về đầu</button
@@ -352,6 +293,18 @@ function closeCreate() {
   <TaskCreateDialog v-if="showCreate && canCreate" @close="closeCreate" @created="created" />
 </template>
 <style scoped>
+/* A cork-board of sheets: enough room around each one for its tilt and its tape. */
+.paper-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 30px 26px;
+  padding: 30px var(--space-6, 24px) 28px;
+  border-top: 1px solid var(--border);
+  background-color: var(--surface-2);
+  background-image: radial-gradient(color-mix(in srgb, var(--border) 70%, transparent) 1px, transparent 1px);
+  background-size: 16px 16px;
+  border-radius: 0 0 8px 8px;
+}
 .tasks-overdue-toggle {
   margin: 0;
   min-height: 36px;
@@ -365,24 +318,7 @@ function closeCreate() {
   overflow: hidden;
   overflow-wrap: anywhere;
 }
-.kanban-title {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-}
 .nowrap {
-  white-space: nowrap;
-}
-.plain-link {
-  color: inherit;
-  text-decoration: none;
-}
-.ellipsis {
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 </style>

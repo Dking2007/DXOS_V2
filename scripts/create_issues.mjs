@@ -6,7 +6,7 @@
 // Token cần quyền Issues: write (fine-grained) hoặc scope `repo`. Không lưu token vào repo.
 import { readFileSync } from 'node:fs'
 
-const REPO = process.env.GITHUB_REPOSITORY ?? 'Raphael-Fug/DXOS_V2'
+const REPO = process.env.GITHUB_REPOSITORY ?? 'Dking2007/DXOS_Desktiny'
 const dry = process.argv.includes('--dry-run')
 const token = process.env.GITHUB_TOKEN
 if (!dry && !token) {

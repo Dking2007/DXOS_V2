@@ -13,6 +13,7 @@ requires-python = ">=3.13"
 dependencies = [
   "dx-platform-kit==3.1.0",
   "dx-flowkit==0.2.0",
+  "dx-piivn==0.1.0",
   "fastapi>=0.115,<1",
   "uvicorn>=0.34,<1",
   "sqlalchemy>=2.0,<3",

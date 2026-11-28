@@ -39,7 +39,7 @@ test('seeded staff creates a dossier and sees a persisted revision', async ({
     .first()
     .click()
   await page.getByLabel('Tên hồ sơ').fill(`E2E hồ sơ ${Date.now()}`)
-  await page.getByLabel('Mẫu hồ sơ').selectOption({ index: 1 })
+  await page.getByLabel('Quy trình').selectOption({ index: 1 })
   const required = page.locator(
     'dialog .schema-form input[required]:not([type="checkbox"])',
   )

@@ -49,8 +49,8 @@ async function submit() {
     busy.value = false
   }
 }
-function close() {
-  if (!busy.value && confirmDiscard(!!points.value.trim())) emit('close')
+async function close() {
+  if (!busy.value && await confirmDiscard(!!points.value.trim())) emit('close')
 }
 </script>
 <template>

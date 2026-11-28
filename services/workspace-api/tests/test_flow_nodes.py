@@ -15,6 +15,7 @@ from dx_workspace.models import (
     Conversation,
     ConversationMember,
     DriveFile,
+    Form,
     Message,
     Outbox,
     Post,
@@ -484,6 +485,25 @@ def test_a_new_dossier_is_opened_as_a_draft_for_its_owner(world):  # noqa: F811
     with Session(engine) as db:
         case = db.scalar(select(Case).where(Case.title == "Theo Việc thử"))
         assert case.status == "draft" and case.owner_id == people(world)["manager"]
+
+
+def test_the_owner_of_a_flow_made_draft_can_submit_it_and_others_cannot(world):  # noqa: F811
+    _, _, engine, *_ = world
+    form = make_form(world)
+    event_flow(world, [node("hs", "create_case", form_id=form["id"], title="Do luồng", answers={"reason": "Tự mở"})], [edge("start", "hs")])
+    submitted_task(world)
+    with Session(engine) as db:
+        case = db.scalar(select(Case).where(Case.title == "Do luồng"))
+        case_id, revision = case.id, case.revision
+        # The owner is the form's own approver here; point approval at the director so submitting is allowed.
+        db.get(Form, case.form_id).approval_steps = [{"label": "Giám đốc", "resolver": "user", "user_id": people(world)["director"]}]
+        db.commit()
+    body = {"expected_revision": revision}
+    assert as_(world, "staff").post(f"{API}/cases/{case_id}/submit", json=body, headers={"Idempotency-Key": "s-other"}).status_code in (403, 404)
+    sent = as_(world, "manager").post(f"{API}/cases/{case_id}/submit", json=body, headers={"Idempotency-Key": "s-owner"})
+    assert sent.status_code == 202, sent.text
+    drain(world)
+    assert case_status(world, {"id": case_id}) != "draft"
 
 
 def test_a_new_dossier_with_a_required_field_missing_stops_with_a_reason(world):  # noqa: F811

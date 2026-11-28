@@ -22,7 +22,7 @@ Danh sách đầy đủ và giấy phép: [THIRD_PARTY.md](THIRD_PARTY.md).
 ## 2. Cách A — Docker Compose (toàn bộ nền tảng, có SSO)
 
 ```bash
-git clone https://github.com/Raphael-Fug/DXOS_V2.git && cd DXOS_V2
+git clone https://github.com/Dking2007/DXOS_Desktiny.git && cd DXOS_Desktiny
 make up                       # bootstrap .env, build image, khởi động, nạp dữ liệu demo
 # cổng khác: make up BASE_URL=http://localhost:8090
 ```
@@ -33,7 +33,7 @@ Mở http://localhost:8080/ . Tài khoản demo ngẫu nhiên nằm ở
 ## 3. Cách B — Biên dịch trực tiếp (không Docker)
 
 ```bash
-git clone https://github.com/Raphael-Fug/DXOS_V2.git && cd DXOS_V2
+git clone https://github.com/Dking2007/DXOS_Desktiny.git && cd DXOS_Desktiny
 make venv deps PYTHON=python3.13   # môi trường ảo Python 3.13 + npm ci (Ubuntu 24.04: python3 mặc định là 3.12)
 make build                    # biên dịch frontend → apps/*/dist
 make test                     # pytest + vitest
@@ -43,7 +43,8 @@ make install PREFIX=$HOME/desktiny   # cài ra ngoài thư mục mã nguồn
 Sau `make install`, gói Python (`dx_core`, `dx_workspace`, `dx_platform_kit`) nằm dưới
 `$PREFIX/lib/python3.13/site-packages`, web tĩnh dưới `$PREFIX/share/desktiny/`, migration
 CSDL ở `$PREFIX/share/desktiny/{core,workspace}-api/`, lệnh `$PREFIX/bin/desktiny-migrate`, cấu hình mẫu ở
-`$PREFIX/share/desktiny/config/env.example`. Có thể xóa thư mục mã nguồn rồi chạy:
+`$PREFIX/share/desktiny/config/env.example`, gói giao diện dựng sẵn ở `$PREFIX/share/desktiny/packs` (Workspace API
+tự tìm thấy; đặt `PACKS_DIR` nếu để ở chỗ khác). Có thể xóa thư mục mã nguồn rồi chạy:
 
 ```bash
 export PYTHONPATH=$HOME/desktiny/lib/python3.13/site-packages
@@ -67,7 +68,7 @@ trước khi chạy backend; image Docker `api.Dockerfile` đã cài sẵn.
 
 ```bash
 make lint test                # ruff, eslint, vue-tsc, pytest, vitest
-pipx install reuse && make reuse    # giấy phép từng tệp (REUSE)
+pipx install 'reuse[charset-normalizer]' && make reuse    # giấy phép từng tệp (REUSE); thay thế: `apt install file`
 make licenses                 # cập nhật THIRD_PARTY.md từ lockfile
 ```
 
@@ -90,6 +91,9 @@ make dist                     # dist/dxos-<phiên bản>.tar.gz + dist/SHA256SUM
 | `bootstrap.py` từ chối ghi đè | `.env` đã tồn tại; xóa `.env` và `infra/identity/generated/` **và** volume nếu muốn tạo lại |
 | `npm ci` lệch lockfile | Dùng Node 22 + npm 10; không chạy `npm install` rồi commit lockfile mới tùy ý |
 
-> Ghi chú trung thực: cách B (`make venv deps`, `build`, `test`, `install`, `desktiny-migrate`, `uvicorn`) đã được chạy từng
-> dòng trong container `ubuntu:24.04` sạch ngày 27/10/2026. Cách A (`make up`, toàn bộ nền tảng với SSO) chưa được chạy thử
-> trong lần này. Mục [SELF_REVIEW.md](SELF_REVIEW.md) ghi rõ phần đã kiểm và chưa kiểm.
+> Ghi chú trung thực: lần kiểm gần nhất ngày 27/11/2026, trong container `ubuntu:24.04` sạch, clone nhánh `main` tại commit
+> `c4ccb9f`, chạy theo cách B. Đã qua: `make venv deps`, `build`, `test` (pytest thoát mã 0, vitest 182/182), `lint`, kiểm tra
+> tiêu đề SPDX, `THIRD_PARTY.md`, `audit_repo`, `make dist` kèm checksum, `make install PREFIX=`, xóa mã nguồn rồi chạy
+> `desktiny-migrate core`, và `/health/live` trả 200. Riêng `make reuse`: `pipx install reuse` trơn báo lỗi
+> `NoEncodingModuleError`; cài `reuse[charset-normalizer]` thì `reuse lint` đạt 483/483 tệp. Chưa chạy: `make up` từ tag
+> (cách A), ScanCode, ONLYOFFICE, sao lưu/khôi phục. Mục [SELF_REVIEW.md](SELF_REVIEW.md) ghi rõ phần đã kiểm và chưa kiểm.

@@ -2,6 +2,8 @@
 # SPDX-FileCopyrightText: 2026 Desktiny contributors
 import hashlib
 import io
+import socket
+import struct
 import zipfile
 from pathlib import Path
 
@@ -149,3 +151,28 @@ def inspect_content(data: bytes, name: str, claimed_mime: str) -> str:
 
 def checksum(data: bytes):
     return hashlib.sha256(data).hexdigest()
+
+
+def scan_content(data: bytes, host: str, port: int = 3310) -> None:
+    """Stream data to clamd; a detection or any failure to get a clean verdict rejects the file."""
+    unavailable = AppError(503, "scan_unavailable", "Chưa quét được tệp, thử lại sau.")
+    try:
+        with socket.create_connection((host, port), timeout=30) as conn:
+            conn.sendall(b"zINSTREAM\0")
+            for i in range(0, len(data), 65536):
+                chunk = data[i : i + 65536]
+                conn.sendall(struct.pack("!I", len(chunk)) + chunk)
+            conn.sendall(struct.pack("!I", 0))
+            reply = b""
+            while not reply.endswith(b"\0"):
+                part = conn.recv(4096)
+                if not part or len(reply) > 4096:
+                    break
+                reply += part
+    except OSError as exc:
+        raise unavailable from exc
+    reply = reply.rstrip(b"\0\n")
+    if reply.endswith(b"FOUND"):
+        raise AppError(422, "malware_detected", "Tệp bị phát hiện chứa mã độc.")
+    if not reply.endswith(b"OK"):
+        raise unavailable

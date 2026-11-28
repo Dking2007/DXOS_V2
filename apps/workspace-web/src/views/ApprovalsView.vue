@@ -23,6 +23,7 @@ import type { ApprovalTask, User } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 const queryClient = useQueryClient()
 const session = useSession()
 interface Delegation {
@@ -82,8 +83,8 @@ function openDelegate() {
 const delegateDirty = computed(
   () => !!delegateId.value || !!startsAt.value || !!endsAt.value || !!delegateReason.value.trim(),
 )
-function closeDelegate() {
-  if (!delegating.value && confirmDiscard(delegateDirty.value)) showDelegate.value = false
+async function closeDelegate() {
+  if (!delegating.value && await confirmDiscard(delegateDirty.value)) showDelegate.value = false
 }
 /** The period is checked as it is typed; the same rules the server applies. */
 const periodProblem = computed(() => (endsAt.value ? delegationProblem(startsAt.value, endsAt.value) : ''))
@@ -121,7 +122,7 @@ async function createDelegation() {
 const revoking = ref('')
 async function revoke(item: Delegation) {
   if (revoking.value) return
-  if (!window.confirm(`Thu hồi ủy quyền cho ${item.delegate_name}? Từ lúc này ${item.delegate_name} không duyệt thay bạn nữa.`))
+  if (!(await confirmDialog({ message: `Thu hồi ủy quyền cho ${item.delegate_name}? Từ lúc này ${item.delegate_name} không duyệt thay bạn nữa.`, confirmLabel: 'Thu hồi', danger: true })))
     return
   revoking.value = item.id
   try {
@@ -141,7 +142,9 @@ const tasks = useQuery({
     api.request<Page<ApprovalTask>>(
       `/approval-tasks${queryString({ cursor: cursor.value })}`,
     ),
-  refetchInterval: 20_000,
+  // Same cadence as chat: a case just submitted shows up within seconds, and coming back to the tab refreshes at once.
+  refetchInterval: 8_000,
+  refetchOnWindowFocus: 'always',
 })
 /** The deadline the process set for this step has passed. */
 function stepLate(task: { due_at?: string | null; state?: string; status?: string }) {

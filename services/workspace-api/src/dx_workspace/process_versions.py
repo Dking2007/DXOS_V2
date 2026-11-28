@@ -27,6 +27,7 @@ from .automations import (
     PROCESS_SAMPLE,
     Execution,
     config_hash,
+    ending_outcome,
     expand_subprocesses,
     flow_of,
     graph_of,
@@ -161,6 +162,11 @@ def rehearse(db: Session, graph: dict, form: m.Form | None, required_files: int,
     trigger = next(node["id"] for node in graph["nodes"] if node["type"] == "trigger")
     steps = execution.walk([trigger])
     failed = next((step for step in steps if step["state"] == "failed"), None)
+    if form and not failed and execution.outcome is None:
+        # As the real run does: branches that ran out of steps keep the last decision.
+        outcome, source = ending_outcome(steps)
+        execution.conclude(outcome, {"id": source})
+        steps = execution.steps
     return {
         "error": failed.get("error", "step_failed") if failed else None,
         "message": failed.get("message", "") if failed else "",

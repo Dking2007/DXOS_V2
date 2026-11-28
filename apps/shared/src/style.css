@@ -762,9 +762,6 @@ select:disabled {
 .modal-header h2 {
   overflow-wrap: anywhere;
 }
-.modal-header .eyebrow {
-  margin-bottom: var(--space-1);
-}
 .modal-body {
   padding: var(--space-6);
 }

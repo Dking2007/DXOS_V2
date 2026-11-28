@@ -69,7 +69,7 @@ import type { MenuItem } from '../flow/CanvasMenu.vue'
 import ShortcutHelp from '../flow/ShortcutHelp.vue'
 import StepPicker from '../flow/StepPicker.vue'
 import { useCanvasEditing } from '../flow/useCanvasEditing'
-import { makeRoom } from '../flow/layout'
+import { FIT_VIEW, makeRoom } from '../flow/layout'
 import type { Point } from '../flow/layout'
 import { isMac, isTypingTarget, shortcutFor } from '../flow/shortcuts'
 import NodeInspector from '../flow/NodeInspector.vue'
@@ -220,7 +220,7 @@ onNodesInitialized(() => {
   nextTick(() => {
     saved.value = snapshot()
     editing.history.reset()
-    fitView({ padding: 0.2, maxZoom: 1 })
+    void editing.fitOpening()
   })
 })
 // The graph part comes from the editing helper's JSON, which is already kept up to date (and
@@ -281,6 +281,8 @@ function startFrom(template: { key: string; title: string; graph: ApiGraph }) {
 
 const selected = computed(() => nodes.value.find((node) => node.id === selectedId.value) ?? null)
 const infoOpen = ref(false)
+// Only offered on phones, where the strip costs a fifth of the screen.
+const statusClosed = ref(false)
 watch(selectedId, (id) => id && (infoOpen.value = false))
 const triggerNode = computed(() => nodes.value.find((node) => node.data?.kind === 'trigger'))
 const processForm = computed(() => forms.value.find((f) => f.id === triggerNode.value?.data?.config.form_id))
@@ -663,7 +665,7 @@ function onKey(event: KeyboardEvent) {
       break
     case 'fit':
       event.preventDefault()
-      fitView({ padding: 0.2, maxZoom: 1, duration: 300 })
+      fitView({ ...FIT_VIEW, duration: 300 })
       break
     case 'layout':
       event.preventDefault()
@@ -785,7 +787,7 @@ async function runMenu(key: string) {
       editing.tidy()
       break
     case 'fit':
-      fitView({ padding: 0.2, maxZoom: 1, duration: 300 })
+      fitView({ ...FIT_VIEW, duration: 300 })
       break
     case 'insert':
       if (current.edgeId) insertOnEdge(current.edgeId, client)
@@ -1179,7 +1181,7 @@ function toggleGroup(group: string) {
       >
         <AlertTriangle :size="15" aria-hidden="true" />{{ errors.length }} vấn đề
       </button>
-      <span v-else-if="nodes.length > 1" class="flow-ok"><CheckCircle2 :size="15" aria-hidden="true" />Hợp lệ</span>
+      <span v-else-if="nodes.length > 1" class="flow-ok" title="Hợp lệ"><CheckCircle2 :size="15" aria-hidden="true" /><span class="btn-label wide-label">Hợp lệ</span></span>
       <button
         class="icon-button"
         :class="{ active: infoOpen }"
@@ -1201,53 +1203,59 @@ function toggleGroup(group: string) {
         }}</span>
         <button
           class="button secondary small"
+          aria-label="Phát hành"
           :disabled="!ruleId"
           :title="ruleId ? 'Phân quyền, kịch bản thử và phát hành' : 'Lưu luồng lần đầu trước khi phát hành'"
           @click="panelOpen = true"
         >
-          <Rocket :size="15" />Phát hành
+          <Rocket :size="15" /><span class="btn-label">Phát hành</span>
         </button>
         <button
           v-if="isProcess && processFormDetail"
           class="button secondary small"
+          aria-label="Sửa biểu mẫu"
+          title="Sửa biểu mẫu"
           @click="editingForm = true"
         >
-          <FilePen :size="15" />Sửa biểu mẫu
+          <FilePen :size="15" /><span class="btn-label wide-label">Sửa biểu mẫu</span>
         </button>
         <button
           class="button secondary small"
           :class="{ active: drawer === 'test' }"
           :aria-pressed="drawer === 'test'"
+          aria-label="Chạy thử"
           title="Chạy với dữ liệu mẫu, không tác động thật"
           @click="drawer = drawer === 'test' ? null : 'test'"
         >
-          <FlaskConical :size="15" />Chạy thử
+          <FlaskConical :size="15" /><span class="btn-label">Chạy thử</span>
         </button>
         <button
           class="button secondary small"
           :disabled="!ruleId"
           :class="{ active: drawer === 'runs' }"
           :aria-pressed="drawer === 'runs'"
+          aria-label="Lịch sử chạy"
           :title="ruleId ? 'Các lần luồng đã chạy' : 'Lưu luồng trước để xem lịch sử chạy'"
           @click="drawer = drawer === 'runs' ? null : 'runs'"
         >
-          <History :size="15" />Lịch sử chạy
+          <History :size="15" /><span class="btn-label wide-label">Lịch sử chạy</span>
         </button>
         <button
           class="button small"
           :class="{ secondary: !dirty && !!ruleId }"
           :disabled="busy || (!dirty && !!ruleId)"
           :aria-busy="saving"
+          :aria-label="saving ? 'Đang lưu…' : !dirty && ruleId ? 'Đã lưu' : 'Lưu'"
           :title="saving ? 'Đang lưu…' : busy ? 'Đợi thao tác đang chạy xong' : !dirty && !!ruleId ? 'Không có thay đổi cần lưu' : `Lưu (${mod}+S)`"
           @click="save"
         >
-          <component :is="!dirty && !!ruleId && !saving ? CheckCircle2 : Save" :size="15" />{{
+          <component :is="!dirty && !!ruleId && !saving ? CheckCircle2 : Save" :size="15" /><span class="btn-label">{{
             saving ? 'Đang lưu…' : !dirty && ruleId ? 'Đã lưu' : 'Lưu'
-          }}
+          }}</span>
         </button>
       </div>
     </header>
-    <div class="flow-status" :class="{ on: enabled && ruleId, off: !enabled || !ruleId }">
+    <div v-if="!statusClosed" class="flow-status" :class="{ on: enabled && ruleId, off: !enabled || !ruleId }">
       <Zap v-if="enabled && ruleId" :size="16" /><Power v-else :size="16" />
       <template v-if="isProcess">
         <span v-if="!ruleId"
@@ -1292,6 +1300,9 @@ function toggleGroup(group: string) {
         @click="openRunDialog"
       >
         <PlayCircle :size="15" />Chạy ngay với {{ familyLabel }}…
+      </button>
+      <button class="icon-button status-close" aria-label="Ẩn dòng thông báo" title="Ẩn" @click="statusClosed = true">
+        <X :size="15" />
       </button>
     </div>
     <div v-if="error" class="notice error flow-alert" role="alert">
@@ -1505,7 +1516,7 @@ function toggleGroup(group: string) {
               class="icon-button"
               aria-label="Vừa màn hình"
               title="Vừa màn hình (Shift+1)"
-              @click="fitView({ padding: 0.2, maxZoom: 1, duration: 300 })"
+              @click="fitView({ ...FIT_VIEW, duration: 300 })"
             >
               <Maximize :size="16" />
             </button>
@@ -1539,7 +1550,7 @@ function toggleGroup(group: string) {
               <Network :size="16" />
             </button>
             <button
-              class="icon-button"
+              class="icon-button desk-only"
               :class="{ active: snapToGrid }"
               :aria-pressed="snapToGrid"
               aria-label="Bám lưới khi kéo"
@@ -1549,7 +1560,7 @@ function toggleGroup(group: string) {
               <Grid3x3 :size="16" />
             </button>
             <button
-              class="icon-button"
+              class="icon-button desk-only"
               :class="{ active: showMinimap }"
               :aria-pressed="showMinimap"
               aria-label="Bản đồ thu nhỏ"
@@ -1559,7 +1570,7 @@ function toggleGroup(group: string) {
               <MapIcon :size="16" />
             </button>
             <button
-              class="icon-button"
+              class="icon-button desk-only"
               :class="{ active: helpOpen }"
               :aria-pressed="helpOpen"
               aria-label="Phím tắt"

@@ -1,6 +1,7 @@
 -c requirements.lock
 -e ./packages/platform-kit
 -e ./packages/flowkit
+-e ./packages/pii-vn
 -e ./packages/desktiny-plugin
 -e ./services/core-api
 -e ./services/workspace-api

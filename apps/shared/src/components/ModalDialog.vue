@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, useId } from 'vue'
 import { X } from 'lucide-vue-next'
+import { confirmDialog } from '../confirm'
 const props = defineProps<{
   title: string
   wide?: boolean
@@ -20,7 +21,7 @@ async function requestClose() {
   if (closing) return
   closing = true
   try {
-    if (props.dirty && !window.confirm(DISCARD_QUESTION)) return
+    if (props.dirty && !(await confirmDialog({ message: DISCARD_QUESTION, confirmLabel: 'Bỏ thay đổi', danger: true }))) return
     if (props.beforeClose && !(await props.beforeClose())) return
     emit('close')
   } finally {
@@ -35,6 +36,10 @@ onMounted(async () => {
   previous = document.activeElement
   await nextTick()
   dialog.value?.showModal()
+  // showModal() focuses the first focusable element, which is the close button; prefer the first field.
+  dialog.value
+    ?.querySelector<HTMLElement>('.modal-body :is(input, select, textarea):not([disabled], [type="hidden"])')
+    ?.focus()
 })
 onBeforeUnmount(() => {
   if (previous instanceof HTMLElement) previous.focus()
@@ -55,7 +60,6 @@ onBeforeUnmount(() => {
   >
     <header class="modal-header">
       <div>
-        <span class="eyebrow">Desktiny</span>
         <h2 :id="titleId">{{ title }}</h2>
       </div>
       <button

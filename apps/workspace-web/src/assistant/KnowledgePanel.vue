@@ -12,6 +12,7 @@ import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import { api } from '../api'
 import { toast } from '../ui/toast'
 import { confirmDiscard } from '../ui/unsaved'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 
 defineProps<{ categories: AssistantAdmin['categories'] }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -81,8 +82,8 @@ async function openEdit(item: AssistantArticle) {
     rowBusy.value = ''
   }
 }
-function closeEditor() {
-  if (!busy.value && confirmDiscard(state() !== opened.value)) editorOpen.value = false
+async function closeEditor() {
+  if (!busy.value && await confirmDiscard(state() !== opened.value)) editorOpen.value = false
 }
 async function importFile(event: Event) {
   const input = event.target as HTMLInputElement
@@ -124,7 +125,7 @@ async function saveArticle() {
 }
 async function remove(item: AssistantArticle) {
   if (rowBusy.value) return
-  if (!window.confirm(`Xóa bài “${item.title}”? Trợ lý sẽ không dùng bài này nữa.`)) return
+  if (!(await confirmDialog({ message: `Xóa bài “${item.title}”? Trợ lý sẽ không dùng bài này nữa.`, confirmLabel: 'Xóa bài', danger: true }))) return
   rowBusy.value = item.id
   try {
     await api.request(`/assistant/articles/${item.id}`, { method: 'DELETE' })

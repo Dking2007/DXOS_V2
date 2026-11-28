@@ -357,6 +357,9 @@ kbd {
   border-bottom: 1px solid var(--border);
   color: var(--muted);
 }
+.palette-input:focus-within {
+  border-bottom-color: var(--focus);
+}
 .palette-input input {
   flex: 1;
   min-height: 30px;
@@ -538,7 +541,11 @@ kbd {
     0 0 0 3px #4cc3cc,
     0 0 0 9999px #0d1f3080;
   pointer-events: none;
-  transition: all 0.25s ease;
+  transition:
+    top 0.25s ease,
+    left 0.25s ease,
+    width 0.25s ease,
+    height 0.25s ease;
 }
 .tour-card {
   position: fixed;
@@ -662,6 +669,7 @@ kbd {
   }
   .topbar-search {
     flex: none;
+    min-width: 0;
     width: 40px;
     padding: 0;
     justify-content: center;
@@ -1319,64 +1327,88 @@ main:focus {
   }
 }
 [data-tone='home'] {
-  --tone: var(--nav-hue-home);
-  --tone-solid: var(--nav-solid-home);
+  --tone-own: var(--nav-hue-home);
+  --tone-solid-own: var(--nav-solid-home);
 }
 [data-tone='tasks'] {
-  --tone: var(--nav-hue-tasks);
-  --tone-solid: var(--nav-solid-tasks);
+  --tone-own: var(--nav-hue-tasks);
+  --tone-solid-own: var(--nav-solid-tasks);
 }
 [data-tone='approvals'] {
-  --tone: var(--nav-hue-approvals);
-  --tone-solid: var(--nav-solid-approvals);
+  --tone-own: var(--nav-hue-approvals);
+  --tone-solid-own: var(--nav-solid-approvals);
 }
 [data-tone='cases'] {
-  --tone: var(--nav-hue-cases);
-  --tone-solid: var(--nav-solid-cases);
+  --tone-own: var(--nav-hue-cases);
+  --tone-solid-own: var(--nav-solid-cases);
 }
 [data-tone='chat'] {
-  --tone: var(--nav-hue-chat);
-  --tone-solid: var(--nav-solid-chat);
+  --tone-own: var(--nav-hue-chat);
+  --tone-solid-own: var(--nav-solid-chat);
 }
 [data-tone='feed'] {
-  --tone: var(--nav-hue-feed);
-  --tone-solid: var(--nav-solid-feed);
+  --tone-own: var(--nav-hue-feed);
+  --tone-solid-own: var(--nav-solid-feed);
 }
 [data-tone='drive'] {
-  --tone: var(--nav-hue-drive);
-  --tone-solid: var(--nav-solid-drive);
+  --tone-own: var(--nav-hue-drive);
+  --tone-solid-own: var(--nav-solid-drive);
 }
 [data-tone='reports'] {
-  --tone: var(--nav-hue-reports);
-  --tone-solid: var(--nav-solid-reports);
+  --tone-own: var(--nav-hue-reports);
+  --tone-solid-own: var(--nav-solid-reports);
 }
 [data-tone='processes'] {
-  --tone: var(--nav-hue-processes);
-  --tone-solid: var(--nav-solid-processes);
+  --tone-own: var(--nav-hue-processes);
+  --tone-solid-own: var(--nav-solid-processes);
 }
 [data-tone='assistant'] {
-  --tone: var(--nav-hue-assistant);
-  --tone-solid: var(--nav-solid-assistant);
+  --tone-own: var(--nav-hue-assistant);
+  --tone-solid-own: var(--nav-solid-assistant);
 }
 [data-tone='plugins'] {
-  --tone: var(--nav-hue-plugins);
-  --tone-solid: var(--nav-solid-plugins);
+  --tone-own: var(--nav-hue-plugins);
+  --tone-solid-own: var(--nav-solid-plugins);
 }
 [data-tone='packs'] {
-  --tone: var(--nav-hue-packs);
-  --tone-solid: var(--nav-solid-packs);
+  --tone-own: var(--nav-hue-packs);
+  --tone-solid-own: var(--nav-solid-packs);
 }
 [data-tone='settings'] {
-  --tone: var(--nav-hue-settings);
-  --tone-solid: var(--nav-solid-settings);
+  --tone-own: var(--nav-hue-settings);
+  --tone-solid-own: var(--nav-solid-settings);
 }
 [data-tone='app'] {
-  --tone: var(--nav-hue-app);
-  --tone-solid: var(--nav-solid-app);
+  --tone-own: var(--nav-hue-app);
+  --tone-solid-own: var(--nav-solid-app);
 }
 [data-tone='neutral'] {
-  --tone: var(--nav-hue-neutral);
-  --tone-solid: var(--nav-solid-neutral);
+  --tone-own: var(--nav-hue-neutral);
+  --tone-solid-own: var(--nav-solid-neutral);
+}
+[data-tone] {
+  --tone: var(--tone-own);
+  --tone-solid: var(--tone-solid-own);
+}
+/* With a sector pack's colours in force, each module keeps its own hue but leans halfway to the pack's main
+   colour, so the menu reads as one family with the pack instead of a stock rainbow beside it. Icons stay told
+   apart; strokes keep >= 4.3:1 on their tint, active tiles keep white icons >= 5:1 (mixes of two dark colours
+   in the light theme, of two light colours in the dark theme; solids are darkened there). */
+:root[data-pack-colors] {
+  --nav-brand: var(--teal-ink);
+  --nav-brand-solid: var(--teal);
+}
+:root[data-pack-colors][data-theme='dark'] {
+  --nav-brand-solid: color-mix(in oklab, var(--teal) 40%, #000);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-pack-colors]:not([data-theme='light']) {
+    --nav-brand-solid: color-mix(in oklab, var(--teal) 40%, #000);
+  }
+}
+:root[data-pack-colors] [data-tone]:not([data-tone='neutral']) {
+  --tone: color-mix(in oklab, var(--tone-own) 50%, var(--nav-brand));
+  --tone-solid: color-mix(in oklab, var(--tone-solid-own) 50%, var(--nav-brand-solid));
 }
 /* A tinted tile with a coloured icon; the solid form marks the active item. */
 .nav-tile,

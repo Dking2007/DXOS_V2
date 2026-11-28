@@ -86,3 +86,14 @@ def test_a_file_not_on_the_task_cannot_be_downloaded_through_it(world):  # noqa:
     other = upload(world, "manager", "rieng.txt")
     response = act(world, "staff").post(f"{API}/tasks/{task['id']}/files/{other['id']}/download")
     assert response.status_code == 404
+
+
+def test_a_task_with_a_maximum_length_title_can_still_be_assigned(world):  # noqa: F811
+    users = world[7]
+    response = act(world, "manager").post(
+        API + "/tasks", json={"title": "Đ" * 250, "assignee_id": users["staff"]}
+    )
+    assert response.status_code == 201, response.text
+    inbox = act(world, "staff").get(API + "/notifications").json()
+    items = inbox["items"] if isinstance(inbox, dict) else inbox
+    assert any(len(n["title"]) == 250 and n["title"].endswith("…") for n in items)

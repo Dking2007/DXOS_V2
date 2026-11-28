@@ -180,8 +180,8 @@ const dirty = computed(
     attachments.value.length > 0 ||
     watcherIds.value.length > 0,
 )
-function close() {
-  if (!busy.value && confirmDiscard(dirty.value)) emit('close')
+async function close() {
+  if (!busy.value && await confirmDiscard(dirty.value)) emit('close')
 }
 // Indexed by line so focus lands on the line just added (a v-for ref array keeps no order).
 const checklistInputs: (HTMLInputElement | null)[] = []

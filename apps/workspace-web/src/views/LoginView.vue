@@ -1,7 +1,9 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
-<!-- The entrance: a framed title card on a deep blue ground that always fits one screen, one way in
-     through the organisation's SSO. Everything moves gently and stays still for reduced motion. -->
+<!-- The entrance: a framed title card that always fits one screen, one way in through the organisation's SSO.
+     The frame (double rule, silver corners, a light travelling round the edge), the beam and the specks are the
+     stock "framed" style; a sector pack may choose "flat" or "image" instead. Everything stays still for reduced
+     motion or when the pack turns effects off. -->
 <script setup lang="ts">
 import { ChevronRight, Loader2, TriangleAlert } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -92,18 +94,30 @@ const SPECKS = [
       />
     </div>
     <div v-if="style === 'framed'" class="entry-frame" aria-hidden="true">
+      <span class="entry-comet" />
+      <i v-for="side in ['t', 'r', 'b', 'l']" :key="side" :class="['entry-mark', side]" />
       <svg
         v-for="corner in ['tl', 'tr', 'bl', 'br']"
         :key="corner"
         :class="['entry-corner', corner]"
         viewBox="0 0 120 120"
       >
-        <path pathLength="1" d="M2 40 V2 H40" />
-        <path pathLength="1" d="M14 70 V14 H70" />
-        <path pathLength="1" d="M28 90 C28 52 52 28 90 28" />
-        <rect x="8" y="8" width="12" height="12" transform="rotate(45 14 14)" />
-        <circle cx="28" cy="90" r="2.2" />
-        <circle cx="90" cy="28" r="2.2" />
+        <defs>
+          <linearGradient :id="`entry-silver-${corner}`" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ffffff" />
+            <stop offset="0.45" stop-color="#c9d7ef" />
+            <stop offset="1" stop-color="#c9d7ef" stop-opacity="0" />
+          </linearGradient>
+        </defs>
+        <!-- A bright cap over the frame's own corner, an inner bracket, a flourish between them. -->
+        <path class="cap" pathLength="1" :stroke="`url(#entry-silver-${corner})`" d="M0 62 V0 H62" />
+        <path pathLength="1" d="M11 40 V11 H40" />
+        <path class="flourish" pathLength="1" d="M22 84 C22 48 48 22 84 22" />
+        <path class="tick" pathLength="1" d="M11 50 V56 M50 11 H56" />
+        <circle cx="22" cy="84" r="1.8" />
+        <circle cx="84" cy="22" r="1.8" />
+        <circle cx="11" cy="11" r="1.6" />
+        <rect class="gem" x="-5.5" y="-5.5" width="11" height="11" transform="rotate(45)" />
       </svg>
     </div>
 
@@ -125,7 +139,12 @@ const SPECKS = [
       <p class="entry-kicker rise" style="--d: 0.5s"><span>{{ brand.name.toLocaleUpperCase('vi') }}</span></p>
       <h1 id="entry-title" class="entry-title rise" style="--d: 0.65s">
         <template v-if="entry.title">{{ entry.title }}</template
-        ><template v-else>Hệ thống văn phòng điện tử<br />hồ sơ, tài liệu và phê duyệt</template>
+        ><template v-else
+          ><span class="entry-phrase">Hệ thống</span>{{ ' ' }}<span class="entry-phrase">văn phòng điện tử</span
+          ><br /><span class="entry-phrase">hồ sơ, tài liệu</span>{{ ' ' }}<span class="entry-phrase"
+            >và phê duyệt</span
+          ></template
+        >
       </h1>
       <div class="entry-divider rise" style="--d: 0.85s" aria-hidden="true">
         <i />
@@ -176,6 +195,18 @@ const SPECKS = [
 .entry.entry-flat {
   background: linear-gradient(160deg, var(--teal-strong, #16304f), var(--teal, #1e3a5f));
 }
+/* A pack's ground colours carry through the light, the silver and the button, so nothing stays stock blue. */
+.entry.has-ground {
+  --glow: color-mix(in srgb, var(--ground-from) 28%, #fff);
+  --metal-1: color-mix(in srgb, var(--ground-from) 8%, #f2f2f2);
+  --metal-2: color-mix(in srgb, var(--ground-from) 30%, #a6a6a6);
+  --metal-3: #ffffff;
+  --metal-4: color-mix(in srgb, var(--ground-from) 38%, #8f8f8f);
+  --core-1: color-mix(in srgb, var(--ground-from) 70%, #fff);
+  --core-2: var(--ground-from);
+  --button-top: color-mix(in srgb, var(--ground-from) 78%, #fff);
+  --button-bottom: color-mix(in srgb, var(--ground-from) 70%, #000);
+}
 /* A pack's own ground colours, for "framed" and "flat" (the photo is tinted in the script). */
 .entry.has-ground:not(.entry-image) {
   background:
@@ -199,10 +230,13 @@ const SPECKS = [
   animation: none;
   stroke-dashoffset: 0;
 }
+.entry-still .entry-comet {
+  display: none;
+}
 .entry-emblem-core.has-logo {
   overflow: hidden;
-  padding: 18%;
-  background: #fff;
+  padding: 16%;
+  background: radial-gradient(circle at 35% 30%, #fff, var(--metal-1));
   border-radius: 50%;
 }
 .entry-emblem-core.has-logo img {
@@ -214,6 +248,16 @@ const SPECKS = [
   --ink: #e8eef8;
   --soft: #b9c6db;
   --line: rgba(205, 220, 245, 0.42);
+  /* Light, metal and button tones; a pack's ground colours retint them (has-ground below). */
+  --glow: rgb(170 200 255);
+  --metal-1: #d9e4f7;
+  --metal-2: #8fa9d6;
+  --metal-3: #f3f7ff;
+  --metal-4: #7f9ccd;
+  --core-1: #2b5bb0;
+  --core-2: #12306a;
+  --button-top: rgba(70, 84, 112, 0.85);
+  --button-bottom: rgba(28, 36, 56, 0.92);
   /* One scale for everything, from the smaller of the screen's height and width, so it always fits. */
   --u: min(1vh, 0.62vw);
   position: relative;
@@ -257,7 +301,7 @@ const SPECKS = [
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(160, 190, 240, 0.17),
+    color-mix(in srgb, var(--glow) 17%, transparent),
     transparent
   );
   transform: rotate(18deg);
@@ -286,8 +330,8 @@ const SPECKS = [
   width: 3px;
   height: 3px;
   border-radius: 50%;
-  background: #d8e6ff;
-  box-shadow: 0 0 8px 2px rgba(170, 200, 255, 0.55);
+  background: color-mix(in srgb, var(--glow) 60%, #fff);
+  box-shadow: 0 0 8px 2px color-mix(in srgb, var(--glow) 55%, transparent);
   opacity: 0;
   animation: speck linear infinite;
 }
@@ -312,15 +356,53 @@ const SPECKS = [
   }
 }
 
-/* The frame draws itself in, then the corners. */
+/* The frame: a double rule that draws itself in, brighter towards the corners, with a light travelling round. */
+@property --entry-turn {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
 .entry-frame {
+  --frame-ground: var(--ground-from, #102a5e);
+  --rule: rgba(205, 220, 245, 0.22);
+  --rule-bright: rgba(230, 238, 252, 0.75);
   position: absolute;
   inset: 22px;
-  border: 1px solid var(--line);
-  outline: 1px solid rgba(205, 220, 245, 0.16);
-  outline-offset: -10px;
   pointer-events: none;
+  /* A faint glow inside the frame, as if the card were lit from within. */
+  box-shadow: inset 0 0 140px color-mix(in srgb, var(--glow) 8%, transparent);
   animation: frame-in 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.entry-frame::before,
+.entry-frame::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+/* Outer rule: strongest at the corners, quieter along the middle of each side. */
+.entry-frame::before {
+  inset: 0;
+  background:
+    linear-gradient(90deg, var(--rule-bright), var(--rule) 28%, var(--rule) 72%, var(--rule-bright)) top / 100% 1px
+      no-repeat,
+    linear-gradient(90deg, var(--rule-bright), var(--rule) 28%, var(--rule) 72%, var(--rule-bright)) bottom / 100%
+      1px no-repeat,
+    linear-gradient(180deg, var(--rule-bright), var(--rule) 28%, var(--rule) 72%, var(--rule-bright)) left / 1px
+      100% no-repeat,
+    linear-gradient(180deg, var(--rule-bright), var(--rule) 28%, var(--rule) 72%, var(--rule-bright)) right / 1px
+      100% no-repeat;
+}
+/* Inner rule, set in a little and broken at the corners where the brackets sit. */
+.entry-frame::after {
+  --gap: 96px;
+  inset: 11px;
+  border: 1px solid rgba(205, 220, 245, 0.16);
+  -webkit-mask:
+    linear-gradient(#000 0 0) center / calc(100% - var(--gap)) 100% no-repeat,
+    linear-gradient(#000 0 0) center / 100% calc(100% - var(--gap)) no-repeat;
+  mask:
+    linear-gradient(#000 0 0) center / calc(100% - var(--gap)) 100% no-repeat,
+    linear-gradient(#000 0 0) center / 100% calc(100% - var(--gap)) no-repeat;
 }
 @keyframes frame-in {
   from {
@@ -328,11 +410,89 @@ const SPECKS = [
     inset: 46px;
   }
 }
+/* A soft light running round the outer rule, once about every half minute. */
+.entry-comet {
+  position: absolute;
+  inset: -1px;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--entry-turn),
+    transparent 0deg 318deg,
+    color-mix(in srgb, var(--glow) 25%, transparent) 338deg,
+    rgba(240, 246, 255, 0.95) 354deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--glow) 80%, transparent));
+  opacity: 0.8;
+  animation: comet 28s 1.8s linear infinite;
+}
+@keyframes comet {
+  to {
+    --entry-turn: 360deg;
+  }
+}
+/* A small diamond in the middle of each side, sitting on the rule. */
+.entry-mark {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(230, 238, 252, 0.85);
+  background: var(--frame-ground);
+  transform: rotate(45deg);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--glow) 45%, transparent);
+}
+.entry-mark::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: rgba(230, 238, 252, 0.85);
+}
+.entry-mark.t,
+.entry-mark.b {
+  left: calc(50% - 5px);
+}
+.entry-mark.t {
+  top: -5px;
+}
+.entry-mark.b {
+  bottom: -5px;
+}
+.entry-mark.l,
+.entry-mark.r {
+  top: calc(50% - 5px);
+}
+.entry-mark.l {
+  left: -5px;
+}
+.entry-mark.r {
+  right: -5px;
+}
+/* Silver corners: a bright cap over the frame's corner, an inner bracket, a flourish and a jewel. */
 .entry-corner {
   position: absolute;
-  width: 110px;
-  height: 110px;
+  width: 120px;
+  height: 120px;
+  overflow: visible;
   fill: none;
+  stroke: rgba(225, 235, 250, 0.62);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+}
+.entry-corner .cap {
+  stroke-width: 2.2;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--glow) 55%, transparent));
+}
+.entry-corner .flourish {
+  stroke: rgba(225, 235, 250, 0.4);
+}
+.entry-corner .tick {
   stroke: rgba(225, 235, 250, 0.75);
   stroke-width: 1.4;
 }
@@ -347,14 +507,23 @@ const SPECKS = [
 .entry-corner path:nth-of-type(3) {
   animation-delay: 0.9s;
 }
+.entry-corner path:nth-of-type(4) {
+  animation-delay: 1.1s;
+}
 @keyframes draw {
   to {
     stroke-dashoffset: 0;
   }
 }
-.entry-corner rect {
-  fill: none;
-  stroke-width: 1.6;
+.entry-corner circle {
+  fill: rgba(225, 235, 250, 0.85);
+  stroke: none;
+}
+.entry-corner .gem {
+  fill: var(--frame-ground);
+  stroke: #eef4ff;
+  stroke-width: 1.3;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--glow) 90%, transparent));
   animation: diamond 4s 1.6s ease-in-out infinite;
 }
 @keyframes diamond {
@@ -363,30 +532,26 @@ const SPECKS = [
     opacity: 1;
   }
   50% {
-    opacity: 0.35;
+    opacity: 0.55;
   }
 }
-.entry-corner circle {
-  fill: rgba(225, 235, 250, 0.85);
-  stroke: none;
-}
 .entry-corner.tl {
-  top: 6px;
-  left: 6px;
+  top: 0;
+  left: 0;
 }
 .entry-corner.tr {
-  top: 6px;
-  right: 6px;
+  top: 0;
+  right: 0;
   transform: scaleX(-1);
 }
 .entry-corner.bl {
-  bottom: 6px;
-  left: 6px;
+  bottom: 0;
+  left: 0;
   transform: scaleY(-1);
 }
 .entry-corner.br {
-  bottom: 6px;
-  right: 6px;
+  bottom: 0;
+  right: 0;
   transform: scale(-1);
 }
 
@@ -449,8 +614,8 @@ const SPECKS = [
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    rgba(120, 160, 230, 0.18),
-    rgba(120, 160, 230, 0) 70%
+    color-mix(in srgb, var(--glow) 18%, transparent),
+    color-mix(in srgb, var(--glow) 0%, transparent) 70%
   );
   box-shadow:
     0 0 0 1px rgba(205, 220, 245, 0.16),
@@ -494,11 +659,11 @@ const SPECKS = [
   inset: -20%;
   background: conic-gradient(
     from 210deg,
-    #d9e4f7,
-    #8fa9d6,
-    #f3f7ff,
-    #7f9ccd,
-    #d9e4f7
+    var(--metal-1),
+    var(--metal-2),
+    var(--metal-3),
+    var(--metal-4),
+    var(--metal-1)
   );
   animation: turn 9s linear infinite;
 }
@@ -514,7 +679,7 @@ const SPECKS = [
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #2b5bb0, #12306a 70%);
+  background: radial-gradient(circle at 35% 30%, var(--core-1), var(--core-2) 70%);
   color: #f4f8ff;
   font-size: clamp(42px, calc(var(--u) * 6.6), 66px);
   font-weight: 600;
@@ -528,7 +693,9 @@ const SPECKS = [
 .entry-title {
   margin: calc(var(--u) * 2.2) 0 0;
   font-size: clamp(21px, min(4.1vw, calc(var(--u) * 5.6)), 56px);
-  line-height: 1.22;
+  line-height: 1.35;
+  /* background-clip: text paints only inside the box; stacked marks (Ử, Ệ) need room. */
+  padding-block: 0.18em 0.08em;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.01em;
@@ -556,6 +723,10 @@ const SPECKS = [
   animation:
     rise 0.9s var(--d, 0s) cubic-bezier(0.2, 0.7, 0.2, 1) both,
     sheen 6s 2s ease-in-out infinite;
+}
+/* The stock title wraps between phrases, never inside one. */
+.entry-phrase {
+  white-space: nowrap;
 }
 @keyframes sheen {
   0%,
@@ -592,7 +763,7 @@ const SPECKS = [
   height: 7px;
   background: #dfe8f7;
   transform: rotate(45deg);
-  box-shadow: 0 0 10px rgba(200, 220, 255, 0.8);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--glow) 80%, transparent);
 }
 .entry-code {
   margin: 0;
@@ -620,11 +791,7 @@ const SPECKS = [
   overflow: hidden;
   border: 1px solid rgba(225, 235, 250, 0.55);
   border-radius: 999px;
-  background: linear-gradient(
-    180deg,
-    rgba(70, 84, 112, 0.85),
-    rgba(28, 36, 56, 0.92)
-  );
+  background: linear-gradient(180deg, var(--button-top), var(--button-bottom));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     0 12px 30px rgba(2, 8, 24, 0.45);
@@ -691,7 +858,7 @@ const SPECKS = [
   border-color: rgba(240, 246, 255, 0.9);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    0 0 24px rgba(140, 180, 255, 0.35),
+    0 0 24px color-mix(in srgb, var(--glow) 35%, transparent),
     0 16px 36px rgba(2, 8, 24, 0.55);
 }
 .entry-button:hover:not(:disabled) svg {
@@ -750,35 +917,59 @@ const SPECKS = [
   .entry-frame {
     inset: 10px;
   }
+  .entry-frame::after {
+    --gap: 60px;
+    inset: 7px;
+  }
   .entry-corner {
     width: 64px;
     height: 64px;
   }
-  .entry-org {
-    letter-spacing: 0.3em;
+  /* On a phone the side diamonds would crowd the text; keep top and bottom only. */
+  .entry-mark.l,
+  .entry-mark.r {
+    display: none;
+  }
+  /* Tighter tracking so a phrase wraps by words instead of leaving one word alone. */
+  .entry-org,
+  .entry-kicker {
+    letter-spacing: 0.18em;
+    text-indent: 0.18em;
     gap: 12px;
   }
   .entry-title {
     font-size: 1.3125rem;
     line-height: 1.35;
+    /* A pack's own title: even lines, so a narrow phone never leaves one word alone on a line. */
+    text-wrap: balance;
+  }
+  /* The stock title already breaks between its phrases. */
+  .entry-title:has(.entry-phrase) {
+    text-wrap: wrap;
   }
   .entry-code {
-    letter-spacing: 0.24em;
+    letter-spacing: 0.1em;
+    text-indent: 0.1em;
+    text-wrap: balance;
   }
   .entry-button {
     gap: 12px;
     padding: 0 22px 0 26px;
   }
   /* Long organisation names wrap instead of being cut by the frame. */
-  .entry-org {
+  .entry-org,
+  .entry-kicker {
     max-width: 100%;
   }
-  .entry-org span {
+  .entry-org span,
+  .entry-kicker span {
     min-width: 0;
     overflow-wrap: anywhere;
   }
   .entry-org::before,
-  .entry-org::after {
+  .entry-org::after,
+  .entry-kicker::before,
+  .entry-kicker::after {
     flex: none;
   }
 }
@@ -806,7 +997,8 @@ const SPECKS = [
     animation: none;
     stroke-dashoffset: 0;
   }
-  :root:not([data-motion='full']) .entry-specks {
+  :root:not([data-motion='full']) .entry-specks,
+  :root:not([data-motion='full']) .entry-comet {
     display: none;
   }
   :root:not([data-motion='full']) .entry-button,

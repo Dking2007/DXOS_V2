@@ -537,8 +537,14 @@ def load_pack(files: dict[str, bytes]) -> Pack:
 
 
 def packs_folder(settings) -> Path | None:
+    """Where the built-in packs are: PACKS_DIR, the source tree, an installed copy, then the Docker image."""
+    here = Path(__file__).resolve()
     candidates = [settings.packs_dir] if settings.packs_dir else []
-    candidates += [str(Path(__file__).resolve().parents[4] / "packs"), "/app/packs"]
+    candidates.append(str(here.parents[4] / "packs"))  # source tree: <repo>/packs
+    # `make install PREFIX=...` puts the code under <prefix>/lib/pythonX.Y/site-packages (or a distro variant
+    # such as local/lib/.../dist-packages) and the packs under <prefix>/share/desktiny/packs.
+    candidates += [str(parent / "share" / "desktiny" / "packs") for parent in here.parents]
+    candidates.append("/app/packs")
     for candidate in candidates:
         if candidate and Path(candidate).is_dir():
             return Path(candidate)

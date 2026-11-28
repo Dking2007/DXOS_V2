@@ -2,8 +2,10 @@
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { onBeforeUnmount, onMounted, toValue, type MaybeRefOrGetter } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 
 export const DISCARD_QUESTION = 'Bạn có thay đổi chưa lưu. Rời đi và bỏ các thay đổi này?'
+const askDiscard = (message: string) => confirmDialog({ message, confirmLabel: 'Bỏ thay đổi', danger: true })
 export const LOGOUT_QUESTION = 'Bạn có thay đổi chưa lưu. Đăng xuất và bỏ các thay đổi này?'
 
 // Every mounted guard, so actions outside the page (logging out) can ask first.
@@ -25,9 +27,9 @@ export function hasUnsavedChanges() {
 }
 
 /** Asks once for everything open on screen; once agreed, the page guards let the leave through. */
-export function confirmLeaveAll(question = DISCARD_QUESTION) {
+export async function confirmLeaveAll(question = DISCARD_QUESTION) {
   if (released || !hasUnsavedChanges()) return true
-  if (!window.confirm(question)) return false
+  if (!(await askDiscard(question))) return false
   released = true
   return true
 }
@@ -55,10 +57,10 @@ export function useUnsavedGuard(dirty: MaybeRefOrGetter<boolean>) {
     unregister()
     window.removeEventListener('beforeunload', beforeUnload)
   })
-  onBeforeRouteLeave(() => !guarded() || window.confirm(DISCARD_QUESTION))
-  return { confirmDiscard: () => !toValue(dirty) || window.confirm(DISCARD_QUESTION) }
+  onBeforeRouteLeave(() => !guarded() || askDiscard(DISCARD_QUESTION))
+  return { confirmDiscard: async () => !toValue(dirty) || askDiscard(DISCARD_QUESTION) }
 }
 
-export function confirmDiscard(dirty: boolean) {
-  return !dirty || window.confirm(DISCARD_QUESTION)
+export async function confirmDiscard(dirty: boolean) {
+  return !dirty || askDiscard(DISCARD_QUESTION)
 }

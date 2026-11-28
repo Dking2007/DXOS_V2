@@ -112,6 +112,13 @@ def create_case(execution, data: dict) -> dict:
     payload = s.validate_payload(form, typed)
     key = f"{execution.run.id}:{execution.attempt_key()}:case"
     record = execution.core.post("/records", {"schema_id": form.core_schema_id, "payload": payload}, key=key)
+    # The record belongs to the service; hand the owner the same rights a hand-made case gives them.
+    state = execution.core.get(f"/resources/{record['resource_id']}/grants")
+    execution.core.grant(
+        record["resource_id"],
+        [{"subject": owner.subject, "action": a, "effect": "allow"} for a in ("read", "write", "share")],
+        state["revision"],
+    )
     from .process_versions import live_versions, may_use
 
     version = next((v for rule, v in live_versions(db, form.id) if may_use(rule, owner)), None)

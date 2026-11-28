@@ -31,6 +31,7 @@ import { roleLabel } from './ui/labels'
 import { isCollapsed, sidebarPrefs, toggleLabel, toggleSidebar } from './ui/sidebar'
 import { confirmLeaveAll, LOGOUT_QUESTION, resetLeaveConsent } from './ui/unsaved'
 import AvatarPhoto from './components/AvatarPhoto.vue'
+import ConfirmHost from '@dx/web-shared/components/ConfirmHost.vue'
 import AppToaster from './components/shell/AppToaster.vue'
 import BackToTop from './components/shell/BackToTop.vue'
 import CommandPalette from './components/shell/CommandPalette.vue'
@@ -109,7 +110,7 @@ const initials = computed(
       .toUpperCase() ?? '',
 )
 async function logout() {
-  if (loggingOut.value || !confirmLeaveAll(LOGOUT_QUESTION)) return
+  if (loggingOut.value || !(await confirmLeaveAll(LOGOUT_QUESTION))) return
   loggingOut.value = true
   sessionError.value = ''
   try {
@@ -137,10 +138,10 @@ function toggleSidebarCollapsed() {
       <div class="sidebar-head">
         <RouterLink to="/home" class="brand" aria-label="Trang chủ"
           ><span class="brand-mark" :class="{ 'has-logo': !!brand.logo }" aria-hidden="true"
-            ><img v-if="brand.logo" :src="brand.logo" alt="" /><template v-else>{{
+            ><img v-if="brand.logo" :src="brand.logo" alt="" width="28" height="28" /><template v-else>{{
               brand.name.charAt(0)
             }}</template></span
-          ><span class="brand-text"
+          ><span class="brand-text" :title="[brand.name, brand.org].filter(Boolean).join(' · ')"
             ><span>{{ brand.name }}</span><small v-if="brand.org">{{ brand.org }}</small></span
           ></RouterLink
         >
@@ -218,8 +219,8 @@ function toggleSidebarCollapsed() {
             @click="sidebar = true"
           >
             <Menu :size="21" aria-hidden="true" /></button
-          ><span class="topbar-crumb">Không gian nội bộ</span><span class="topbar-divider" aria-hidden="true">/</span
-          ><strong>{{ term(String(route.meta.title ?? '')) }}</strong><PageHelp />
+          ><span class="topbar-crumb" title="Không gian nội bộ">Không gian nội bộ</span><span class="topbar-divider" aria-hidden="true">/</span
+          ><strong :title="term(String(route.meta.title ?? ''))">{{ term(String(route.meta.title ?? '')) }}</strong><PageHelp />
         </div>
         <button
           class="topbar-search"
@@ -287,4 +288,5 @@ function toggleSidebarCollapsed() {
     <AiBusy />
   </div>
   <AppToaster />
+  <ConfirmHost />
 </template>

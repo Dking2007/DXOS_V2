@@ -19,6 +19,7 @@ mọi thư viện lấy qua trình quản lý gói (npm, pip) và mọi dịch v
 | RustFS | 1.0.3 | Apache-2.0 | <https://github.com/rustfs/rustfs> | dịch vụ chạy riêng — lưu trữ S3, thay MinIO (AGPL-3.0) |
 | Nginx | 1.28.0-alpine | BSD-2-Clause | <https://nginx.org/LICENSE> | dịch vụ chạy riêng — API gateway/static host |
 | ONLYOFFICE Docs (tùy chọn) | 8.3.3 | AGPL-3.0-only | <https://github.com/ONLYOFFICE/DocumentServer> | dịch vụ chạy riêng, mặc định TẮT; giao tiếp qua HTTP/JWT, không liên kết vào mã Desktiny |
+| ClamAV (tùy chọn) | 1.4.3 | GPL-2.0-only | <https://github.com/Cisco-Talos/clamav> | dịch vụ chạy riêng (image `clamav/clamav`), mặc định TẮT; Core chỉ nói chuyện qua socket TCP (INSTREAM), không liên kết vào mã Desktiny |
 | Python (base image) | 3.13.5-slim-bookworm | PSF-2.0 | <https://docs.python.org/3/license.html> | runtime của container API |
 | Node.js (build image) | 22.17.0-alpine | MIT | <https://github.com/nodejs/node> | chỉ dùng khi build frontend |
 | Alpine Linux | 3.21.3 | MIT (+ gói riêng) | <https://www.alpinelinux.org/> | helper một lần cấp quyền tệp realm |
@@ -31,6 +32,7 @@ MongoDB, HashiCorp Vault/Terraform, Camunda 8, Elasticsearch bản SSPL. Workflo
 - **psycopg — LGPL-3.0-only**: cài từ PyPI (gói thuần Python, không `[binary]`), nạp libpq của hệ điều hành (`libpq5`, PostgreSQL License) qua liên kết động; không sửa, không đính kèm mã nguồn.
   Tương thích với Apache-2.0 khi dùng như thư viện; người phân phối image cần giữ thông báo LGPL.
 - **ONLYOFFICE Docs — AGPL-3.0**: tùy chọn, mặc định tắt, chạy container riêng; giữ logo/thông báo của hãng.
+- **ClamAV — GPL-2.0**: tùy chọn, profile `security`, container riêng; chỉ giao tiếp qua socket, không liên kết/đính kèm mã.
 - **certifi — MPL-2.0**: dùng nguyên bản, không sửa tệp.
 
 ## 2. Thư viện Python (63) — nguồn: PyPI, khóa trong `requirements.lock`

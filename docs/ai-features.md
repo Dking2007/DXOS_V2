@@ -5,7 +5,7 @@ SPDX-FileCopyrightText: 2026 Desktiny contributors
 
 # Tính năng AI
 
-18 tính năng AI rải trong các màn hình. Ban giám đốc và Quản trị kỹ thuật (quyền `assistant.manage`, cùng
+19 tính năng AI rải trong các màn hình. Ban giám đốc và Quản trị kỹ thuật (quyền `assistant.manage`, cùng
 quyền với trợ lý AI) bật từng tính năng ở **Trợ lý AI › Tính năng AI**, chọn dịch vụ AI riêng cho từng tính
 năng nếu muốn. Tính năng chưa bật thì không có nút nào hiện ra. Mặc định mọi tính năng đều tắt.
 
@@ -47,7 +47,8 @@ model trò chuyện với model tạo vector (theo tên model; Gemini theo khả
 | | 14. Hỗ trợ viết bài bảng tin | Khung soạn bài | Viết gọn, sửa chính tả, gợi ý tiêu đề, mô tả ảnh cho trình đọc màn hình (lưu ở `post_attachments.alt`). |
 | Mở rộng | 15. Bước "Hỏi AI" trong luồng | Trình thiết kế luồng | AI chọn một đáp án; node Điều kiện rẽ nhánh theo trường kết quả (mặc định `ai_label`). |
 | | 16. Trợ lý trả lời về dữ liệu của người hỏi | Trợ lý AI | Thêm vào lời dặn: hồ sơ, việc, việc chờ duyệt của chính người hỏi. Không bao giờ của người khác. |
-| | 17. Sinh kịch bản thử cho Quy trình nghiệp vụ | Quy trình nghiệp vụ › Phát hành › Kịch bản thử | Kết quả mong đợi lấy từ lần chạy thử thật của quy trình, người dùng kiểm tra lại trước khi lưu. |
+| | 17. Trợ lý dùng công cụ của plugin | Trợ lý AI | Trợ lý chọn tối đa một công cụ chỉ đọc mà plugin kết nối cung cấp (đã được duyệt), gọi bằng phiên của chính người hỏi rồi trả lời kèm nguồn “theo plugin X”. Kết quả không đưa vào chỉ mục tri thức. |
+| | 18. Sinh kịch bản thử cho Quy trình nghiệp vụ | Quy trình nghiệp vụ › Phát hành › Kịch bản thử | Kết quả mong đợi lấy từ lần chạy thử thật của quy trình, người dùng kiểm tra lại trước khi lưu. |
 
 ## Đọc tài liệu
 

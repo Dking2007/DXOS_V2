@@ -345,6 +345,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/v1/drive/files/{file_id}/pii": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pii Check
+         * @description Counts of personal identifiers in a file's text; the masked text only when asked for.
+         */
+        get: operations["pii_check_workspace_v1_drive_files__file_id__pii_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/drive/files/{file_id}/shares": {
         parameters: {
             query?: never;
@@ -393,6 +413,30 @@ export interface paths {
         /** Create Form */
         post: operations["create_form_workspace_v1_forms_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/v1/forms/{form_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Form
+         * @description Remove a form nobody needs any more.
+         *
+         *     A form a process still uses, or one a sector pack installed, is refused with the reason: change the
+         *     process's form or remove the pack instead. A form dossiers were filed on is archived, not deleted, so
+         *     those dossiers stay readable; it no longer appears when creating a dossier or a process.
+         */
+        delete: operations["delete_form_workspace_v1_forms__form_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -503,7 +547,9 @@ export interface paths {
          * @description Take a submitted dossier back before anyone has decided on it.
          *
          *     The submission snapshot stays in history; pending approval tasks are closed here at
-         *     once so nobody can decide on a dossier its owner has pulled back.
+         *     once so nobody can decide on a dossier its owner has pulled back. A dossier whose flow
+         *     stopped without a result (a failed step) may be taken back even after decisions, so it
+         *     is never stuck "đang xử lý" with nothing left to do.
          */
         post: operations["withdraw_case_workspace_v1_cases__case_id__withdraw_post"];
         delete?: never;
@@ -5647,6 +5693,39 @@ export interface operations {
             };
         };
     };
+    pii_check_workspace_v1_drive_files__file_id__pii_get: {
+        parameters: {
+            query?: {
+                redacted?: boolean;
+            };
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     shares_workspace_v1_drive_files__file_id__shares_get: {
         parameters: {
             query?: never;
@@ -5805,6 +5884,35 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_form_workspace_v1_forms__form_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

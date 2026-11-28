@@ -68,6 +68,7 @@ import FilePreview from '../components/FilePreview.vue'
 import DocumentAiDialog from '../ai/DocumentAiDialog.vue'
 import DraftDocumentDialog from '../ai/DraftDocumentDialog.vue'
 import { useAi } from '../ai/useAi'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 const queryClient = useQueryClient()
 const session = useSession()
 /** Sharing and trashing belong to the owner only; the API refuses them for collaborators too. */
@@ -123,7 +124,22 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocumentPointer)
   document.removeEventListener('keydown', onDocumentKey)
 })
-const viewMode = ref<'list' | 'grid'>('list')
+// Grid by default; a person's own choice of list or grid is remembered on this browser.
+function storedViewMode(): 'list' | 'grid' {
+  try {
+    return window.localStorage.getItem('dx-drive-view') === 'list' ? 'list' : 'grid'
+  } catch {
+    return 'grid'
+  }
+}
+const viewMode = ref<'list' | 'grid'>(storedViewMode())
+watch(viewMode, (mode) => {
+  try {
+    window.localStorage.setItem('dx-drive-view', mode)
+  } catch {
+    // Storage blocked: the choice lasts for this visit only.
+  }
+})
 const sortBy = ref<'name' | 'created' | 'size'>('created')
 const sortDescending = ref(true)
 const dragging = ref(false)
@@ -580,7 +596,7 @@ async function download(item: DriveFile) {
 }
 async function restore(version: FileVersion) {
   if (!selected.value) return
-  if (!window.confirm(`Khôi phục phiên bản ${version.version_no}? Nội dung hiện tại được giữ lại thành một phiên bản cũ.`)) return
+  if (!(await confirmDialog({ message: `Khôi phục phiên bản ${version.version_no}? Nội dung hiện tại được giữ lại thành một phiên bản cũ.`, confirmLabel: 'Khôi phục', danger: true }))) return
   await perform(() =>
     api.request(`/drive/files/${selected.value!.id}/restore`, {
       method: 'POST',
@@ -676,7 +692,7 @@ function clearUpload() {
           :title="owns(item) ? item.name : `${item.name} · được chia sẻ bởi ${ownerName(item)}`"
           @click="enter(item)"
         >
-          <FolderClosed :size="23" /><span>{{ item.name }}</span
+          <FolderClosed :size="23" /><span :title="item.name">{{ item.name }}</span
           ><ChevronRight :size="14" class="folder-open-arrow" aria-hidden="true" />
         </button>
         <div class="folder-tools">
@@ -1166,6 +1182,7 @@ function clearUpload() {
     v-if="preview"
     :key="preview.id"
     :name="preview.name"
+    :file-id="preview.id"
     :source="() => previewSource(preview!)"
     :download="() => download(preview!)"
     @close="preview = null"

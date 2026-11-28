@@ -7,6 +7,8 @@ import { AlertTriangle, Copy, Plus, Trash2 } from 'lucide-vue-next'
 import { isMac } from './shortcuts'
 import { KINDS, OPERATORS, RECIPIENTS, nodeReference, waitLabel } from './nodes'
 import StepOptions from './StepOptions.vue'
+import PeoplePicker from '../components/pickers/PeoplePicker.vue'
+import { asText, departmentOptions, userOptions } from '../components/pickers/options'
 import NodeSettings from './NodeSettings.vue'
 import FieldListEditor, { type StepField } from './FieldListEditor.vue'
 import type { FlowCondition, FlowNodeData, NodeKind, TriggerInfo } from './nodes'
@@ -53,6 +55,9 @@ function parseValue(text: string): unknown {
 function showValue(value: unknown) {
   return typeof value === 'string' ? value : JSON.stringify(value ?? '')
 }
+const userChoices = computed(() => userOptions(props.users))
+const assigneeChoices = computed(() => userOptions(props.users, '— Theo đơn vị —'))
+const departmentChoices = computed(() => departmentOptions(props.departments, '—'))
 function toggleRecipient(key: string) {
   const list = (c.value.recipients as string[]) ?? []
   set('recipients', list.includes(key) ? list.filter((r) => r !== key) : [...list, key])
@@ -450,20 +455,13 @@ const waitUnit = computed(() => {
               {{ label }}
             </button>
           </div>
-          <select
-            aria-label="Thêm người cụ thể"
-            value=""
-            @change="
-              (event) => {
-                const value = (event.target as HTMLSelectElement).value
-                if (value) toggleRecipient(value)
-                ;(event.target as HTMLSelectElement).value = ''
-              }
-            "
-          >
-            <option value="">+ Thêm người cụ thể…</option>
-            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.display_name }}</option>
-          </select>
+          <PeoplePicker
+            id="node-recipient-add"
+            model-value=""
+            :options="userChoices"
+            placeholder="+ Thêm người cụ thể…"
+            @update:model-value="(v) => { if (asText(v)) toggleRecipient(asText(v)) }"
+          />
           <div class="chip-select">
             <button
               v-for="person in ((c.recipients as string[]) ?? []).filter((r) => !(r in RECIPIENTS))"
@@ -515,17 +513,11 @@ const waitUnit = computed(() => {
         </div>
         <div class="field">
           <label for="node-assignee">Giao cho</label
-          ><select id="node-assignee" :value="c.assignee_id ?? ''" @change="set('assignee_id', ($event.target as HTMLSelectElement).value || null)">
-            <option value="">— Theo đơn vị —</option>
-            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.display_name }}</option>
-          </select>
+          ><PeoplePicker id="node-assignee" :model-value="(c.assignee_id as string) ?? ''" :options="assigneeChoices" placeholder="— Theo đơn vị —" @update:model-value="set('assignee_id', asText($event) || null)" />
         </div>
         <div class="field">
           <label for="node-dept">Đơn vị nhận</label
-          ><select id="node-dept" :value="c.department_id ?? ''" @change="set('department_id', ($event.target as HTMLSelectElement).value || null)">
-            <option value="">—</option>
-            <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
-          </select>
+          ><PeoplePicker id="node-dept" :model-value="(c.department_id as string) ?? ''" :options="departmentChoices" placeholder="—" @update:model-value="set('department_id', asText($event) || null)" />
         </div>
         <div class="condition-row">
           <div class="field">

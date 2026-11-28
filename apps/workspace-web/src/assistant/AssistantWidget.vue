@@ -48,6 +48,7 @@ const ITEM_KIND: Record<AssistantItem['kind'], string> = {
 }
 import CaseChat from './CaseChat.vue'
 import { assistantOpen, assistantTab, caseContext, historyFor, type ChatTurn } from './state'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 
 const session = useSession()
 const route = useRoute()
@@ -152,8 +153,8 @@ async function send(text = draft.value) {
     input.value?.focus()
   }
 }
-function reset() {
-  if (!window.confirm('Xóa cuộc trò chuyện hiện tại và bắt đầu lại?')) return
+async function reset() {
+  if (!(await confirmDialog({ message: 'Xóa cuộc trò chuyện hiện tại và bắt đầu lại?', confirmLabel: 'Xóa và bắt đầu lại', danger: true }))) return
   if (onCase.value) return caseChat.value?.clear()
   turns.value = []
   error.value = ''

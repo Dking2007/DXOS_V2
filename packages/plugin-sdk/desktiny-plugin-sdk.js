@@ -90,8 +90,17 @@ function connect(options = {}) {
     return body
   }
 
+  /** The page's own height. Inside a frame, <html>'s scrollHeight is never below the frame's height, so a frame
+   * measured that way could grow but never shrink back; the body's box plus its margins can. */
+  function contentHeight() {
+    const body = document.body
+    if (!body) return document.documentElement.scrollHeight
+    const style = getComputedStyle(body)
+    return body.getBoundingClientRect().height + parseFloat(style.marginTop || '0') + parseFloat(style.marginBottom || '0')
+  }
+
   function resize(height) {
-    post({ type: 'resize', height: Math.ceil(height ?? document.documentElement.scrollHeight) })
+    post({ type: 'resize', height: Math.ceil(height ?? contentHeight()) })
   }
 
   /** Commands Desktiny carries out for the frame. */
@@ -108,7 +117,10 @@ function connect(options = {}) {
   }
 
   if (options.autoResize !== false && 'ResizeObserver' in window) {
-    new ResizeObserver(() => resize()).observe(document.documentElement)
+    const watcher = new ResizeObserver(() => resize())
+    const watchBody = () => watcher.observe(document.body)
+    if (document.body) watchBody()
+    else document.addEventListener('DOMContentLoaded', watchBody, { once: true })
   }
   post({ type: 'ready' })
   return {

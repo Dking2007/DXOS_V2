@@ -85,7 +85,7 @@ national title and motto. It only reports problems; it never edits the document.
 Why: every Vietnamese school and agency writes documents to this layout, and the
 editor has no way to check it. We hit this while building Desktiny, an open-source
 (Apache-2.0) workflow platform for Vietnamese organisations
-(https://github.com/Raphael-Fug/DXOS_V2) that uses ONLYOFFICE Docs for editing
+(https://github.com/Dking2007/DXOS_Desktiny) that uses ONLYOFFICE Docs for editing
 approval documents. The plugin started as a check for those documents. There is a similar tool for Chinese official
 documents (chineseautoformattool) but none for Vietnamese ones, as far as I could
 tell from the plugin list.

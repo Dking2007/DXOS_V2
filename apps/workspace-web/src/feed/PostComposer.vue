@@ -43,7 +43,6 @@ async function describe(key: string) {
 }
 const media = useMediaUploads(() => session.user?.csrf_token ?? '')
 const name = computed(() => session.user?.display_name ?? '')
-const firstName = computed(() => name.value.split(' ').slice(-1)[0] ?? '')
 const open = computed(() => focused.value || !!body.value || media.items.value.length > 0)
 // Department managers may announce to their own department; moderators to everyone.
 const canOfficial = computed(
@@ -127,7 +126,7 @@ defineExpose({ focus, reset, hasMedia })
         v-model="body"
         rows="1"
         :maxlength="LIMIT"
-        :placeholder="`Chia sẻ điều gì đó với đồng nghiệp, ${firstName}…`"
+        :placeholder="`Chia sẻ điều gì đó với đồng nghiệp, ${name}…`"
         aria-label="Nội dung bài viết"
         @input="grow"
         @focus="focused = true"

@@ -69,5 +69,6 @@ người đồng ý); chưa quorum. Quy trình canvas chạy bằng engine luồ
 cần người quyết định vẫn là một human task Core (xem `process-packages.md`). UI là danh sách việc cần xử lý và báo cáo cơ bản, không phải
 dashboard phân tích tùy chỉnh. Workspace đã có giao việc, nhắn tin (polling REST, chưa
 WebSocket), bảng tin, tìm kiếm, ủy quyền và tự động hóa dạng canvas kéo-thả; mô tả và giới
-hạn từng phần ở README. Chưa có AI/OCR/RAG.
+hạn từng phần ở README. Tính năng AI là tùy chọn, mặc định tắt và cần dịch vụ AI do tổ chức cấu hình
+(xem `ai-features.md`); chưa có OCR riêng ngoài model có thị giác.
 Các giới hạn thực tế của code và kiểm thử được ghi tại `acceptance.md` và README.

@@ -169,6 +169,20 @@ BRANCH_LABELS = {
 # An approval branch left unconnected settles the dossier the obvious way, so a one-step
 # process is just trigger → approval.
 IMPLICIT_OUTCOME = {"approve": "approved", "return": "needs_revision", "reject": "rejected"}
+
+
+def ending_outcome(steps: list[dict]) -> tuple[str, str | None]:
+    """How a dossier ends when its flow runs out of steps without reaching an ending step.
+
+    A branch that only sends a notice after the decision ("Báo người nộp") has nothing left to
+    do: the dossier keeps the last decision taken on the way (approve, return, reject), and a
+    flow nobody had to decide on is approved. Returns the outcome and the step it comes from.
+    """
+    for step in reversed(steps):
+        if not step.get("superseded") and step.get("branch") in IMPLICIT_OUTCOME:
+            return IMPLICIT_OUTCOME[step["branch"]], step.get("node_id")
+    last = next((step.get("node_id") for step in reversed(steps) if step.get("node_id")), None)
+    return "approved", last
 TERMINAL = {"request_info", "finish"}
 OUTCOMES = {"approved": "Đã duyệt", "rejected": "Từ chối", "needs_revision": "Yêu cầu bổ sung"}
 ROLE_RECIPIENTS = {"assignee", "creator", "owner", "author", "department_manager"}

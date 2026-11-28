@@ -56,7 +56,7 @@ const statusLabel: Record<string, string> = {
     <span class="flow-node-icon"><component :is="meta.icon" :size="22" :stroke-width="1.9" /></span>
     <div class="flow-node-text">
       <small>{{ meta.group === 'Kích hoạt' ? 'KÍCH HOẠT' : meta.title.toUpperCase() }}</small>
-      <strong>{{ data.label || meta.title }}</strong>
+      <strong :title="data.label || meta.title">{{ data.label || meta.title }}</strong>
       <span>{{ text }}</span>
       <em v-if="data.outcome" class="flow-node-outcome">→ {{ OUTCOMES[data.outcome] ?? data.outcome }}</em>
     </div>

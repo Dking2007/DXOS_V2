@@ -82,9 +82,9 @@ const TABS = computed(() =>
 )
 // The permission matrix keeps its edits in memory; leaving its tab would lose them silently.
 const matrixDirty = ref(false)
-function selectTab(next: SettingsTab) {
+async function selectTab(next: SettingsTab) {
   if (next === tab.value) return
-  if (tab.value === 'permissions' && !confirmDiscard(matrixDirty.value)) return
+  if (tab.value === 'permissions' && !(await confirmDiscard(matrixDirty.value))) return
   matrixDirty.value = false
   tab.value = next
 }
@@ -217,9 +217,9 @@ function modalState() {
 }
 const dialogDirty = computed(() => !!modal.value && modalState() !== opened.value)
 useUnsavedGuard(dialogDirty)
-function closeModal() {
+async function closeModal() {
   if (busy.value) return
-  if (confirmDiscard(dialogDirty.value)) modal.value = null
+  if (await confirmDiscard(dialogDirty.value)) modal.value = null
 }
 function show(type: NonNullable<typeof modal.value>) {
   modal.value = type

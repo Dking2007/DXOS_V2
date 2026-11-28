@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     storage_backend: str = "s3"
     storage_local_path: str = ".data/blobs"
     max_upload_bytes: int = 52_428_800
+    clamav_host: str = ""  # empty = no malware scan
+    clamav_port: int = 3310
     download_ticket_seconds: int = 120
     onlyoffice_public_url: str = "http://localhost:8080/office"
     onlyoffice_internal_url: str = "http://onlyoffice"

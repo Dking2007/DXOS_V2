@@ -46,6 +46,41 @@ KEY = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
 
 
 PACKAGED = "desktiny-plugin/2"
+CONFIG_TYPES = {"string", "number", "boolean"}
+
+
+def text_problem(where: str, value, low: int, high: int) -> str | None:
+    """Desktiny's length rule for a title or description, worded for the field that breaks it."""
+    size = len(str(value or ""))
+    if low <= size <= high:
+        return None
+    return f"{where}: cần {low}–{high} ký tự (đang có {size})." if low else f"{where}: tối đa {high} ký tự (đang có {size})."
+
+
+def schema_problems(where: str, schema) -> list[str]:
+    """A config schema (`settings_schema`, a step's `config_schema`, a tool's `parameters`) as Desktiny checks it."""
+    if not schema:
+        return []
+    found = []
+    properties = schema.get("properties") or {}
+    if schema.get("type", "object") != "object":
+        found.append(f"{where}: `type` phải là object.")
+    if len(properties) > 20:
+        found.append(f"{where}: tối đa 20 ô.")
+    for key, field in properties.items():
+        if not KEY.match(key):
+            found.append(f"{where}: tên ô “{key}” chỉ gồm chữ thường, số, gạch dưới.")
+        field = field or {}
+        found += [p for p in (text_problem(f"{where} › {key}: title", field.get("title"), 1, 80),
+                              text_problem(f"{where} › {key}: description", field.get("description"), 0, 300)) if p]  # fmt: skip
+        if field.get("type", "string") not in CONFIG_TYPES:
+            found.append(f"{where} › {key}: `type` chỉ là string, number hoặc boolean.")
+        if field.get("enum") is not None and len(field["enum"]) > 30:
+            found.append(f"{where} › {key}: `enum` tối đa 30 giá trị.")
+    missing = set(schema.get("required") or []) - set(properties)
+    if missing:
+        found.append(f"{where}: `required` nêu ô không có: {', '.join(sorted(missing))}.")
+    return found
 
 
 def problems(manifest: dict, folder: Path | None = None) -> list[str]:
@@ -94,9 +129,14 @@ def problems(manifest: dict, folder: Path | None = None) -> list[str]:
         schema = node.get("config_schema") or {}
         need(not any(f.get("secret") for f in (schema.get("properties") or {}).values()),
              f"Bước `{node.get('kind')}`: ô secret chỉ dùng trong settings_schema.")  # fmt: skip
+        found += [p for p in (text_problem(f"Bước `{node.get('kind')}`: title", node.get("title"), 1, 80),
+                              text_problem(f"Bước `{node.get('kind')}`: description", node.get("description"), 0, 300)) if p]  # fmt: skip
+        found += schema_problems(f"Bước `{node.get('kind')}` › config_schema", schema)
     for ui in manifest.get("ui", []):
         need(ui.get("slot") in SLOTS, f"Khung `{ui.get('title')}`: vị trí chỉ gồm {', '.join(sorted(SLOTS))}.")
         need(PATH.match(str(ui.get("url", ""))) is not None, f"Khung `{ui.get('title')}`: url phải là /… trên base_url.")
+        found += [p for p in [text_problem(f"Khung `{ui.get('url')}`: title", ui.get("title"), 1, 80)] if p]
+        need(80 <= int(ui.get("height", 240) or 0) <= 1200, f"Khung `{ui.get('title')}`: height 80–1200.")
         if packaged and folder is not None:
             page = folder / str(ui.get("url", "")).lstrip("/")
             need(page.is_file() and page.suffix.lower() in {".html", ".htm"},
@@ -116,6 +156,9 @@ def problems(manifest: dict, folder: Path | None = None) -> list[str]:
     for tool in manifest.get("assistant_tools", []):
         need(PATH.match(str(tool.get("endpoint", ""))) is not None, f"Công cụ `{tool.get('name')}`: endpoint phải là /…")
         need(len(str(tool.get("description", ""))) >= 10, f"Công cụ `{tool.get('name')}`: mô tả ít nhất 10 ký tự.")
+        need(len(str(tool.get("description", ""))) <= 300, f"Công cụ `{tool.get('name')}`: mô tả tối đa 300 ký tự.")
+        found += schema_problems(f"Công cụ `{tool.get('name')}` › parameters", tool.get("parameters"))
+    found += schema_problems("settings_schema", manifest.get("settings_schema"))
     return found
 
 

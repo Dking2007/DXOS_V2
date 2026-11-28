@@ -22,6 +22,7 @@ x-api-env: &api-env
   ONLYOFFICE_INTERNAL_URL: http://onlyoffice
   ONLYOFFICE_JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:?Bootstrap required}
   ONLYOFFICE_ENABLED: ${ONLYOFFICE_ENABLED:-false}
+  CLAMAV_HOST: ${CLAMAV_HOST:-}
   AUTOMATION_ALLOWED_HOSTS: ${AUTOMATION_ALLOWED_HOSTS:-}
   PLUGIN_ALLOWED_HOSTS: ${PLUGIN_ALLOWED_HOSTS:-}
   PLUGIN_READS_PER_MINUTE: ${PLUGIN_READS_PER_MINUTE:-600}
@@ -330,7 +331,9 @@ services:
       dockerfile: infra/compose/web.Dockerfile
       args:
         APP: core-admin
-    profiles: [core, workspace]
+    # A client of the Core API, not part of Core: `--profile core` alone serves no page at all (Core is
+    # headless). Add `--profile console` for this technical tool; Workspace keeps it.
+    profiles: [console, workspace]
     restart: unless-stopped
     networks: [dx]
 
@@ -352,6 +355,7 @@ services:
         condition: service_healthy
       core-admin:
         condition: service_started
+        required: false  # absent with `--profile core` alone; /console/ then answers 404
       identity:
         condition: service_healthy
     networks: [dx]
@@ -374,6 +378,22 @@ services:
     shm_size: 256mb
     networks: [dx]
 
+  clamav:
+    image: clamav/clamav:1.4.3
+    profiles: [security]
+    restart: unless-stopped
+    environment:
+      CLAMD_CONF_StreamMaxLength: 64M # > MAX_UPLOAD_BYTES (50 MB)
+    volumes:
+      - clamav-db:/var/lib/clamav
+    healthcheck:
+      test: [CMD, clamdcheck.sh]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    networks: [dx]
+
 networks:
   dx:
     driver: bridge
@@ -386,3 +406,4 @@ volumes:
   office-data:
   office-logs:
   office-lib:
+  clamav-db:

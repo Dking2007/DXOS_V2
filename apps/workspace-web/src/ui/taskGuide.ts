@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
 // Where a task stands and what the person looking at it should do next, in plain words.
 
-export const TASK_STAGES = ['Đã giao', 'Tiếp nhận', 'Đang làm', 'Chờ nghiệm thu', 'Hoàn tất'] as const
+export const TASK_STAGES = ['Đã giao', 'Tiếp nhận', 'Đang thực hiện', 'Chờ nghiệm thu', 'Hoàn tất'] as const
 
 /** The stage reached: the index into TASK_STAGES; -1 for a cancelled task. */
 export function taskStage(status: string): number {

@@ -304,13 +304,19 @@ time {
   .topbar {
     gap: 4px;
   }
+  /* The buttons never shrink, so the group must not either: with `min-width: 0` a longer page name
+     squeezed the group below its buttons and pushed "Đăng xuất" past the edge of a 360px phone. */
   .topbar-actions {
     gap: 2px;
-    min-width: 0;
+    flex-shrink: 0;
   }
   .topbar .icon-button {
     width: 36px;
     height: 36px;
+  }
+  /* Without this the five buttons on the right outgrow a 390px bar and logout is cut off. */
+  .topbar .page-help {
+    display: none;
   }
   .topbar-title,
   .topbar > :first-child {
@@ -848,6 +854,7 @@ a.user-profile:focus-visible {
 }
 /* Larger text never wraps the top bar onto two lines; long names end in an ellipsis instead. */
 .topbar-location {
+  flex: 0 1 auto;
   min-width: 0;
   white-space: nowrap;
 }

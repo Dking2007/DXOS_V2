@@ -71,3 +71,27 @@ def test_direct_conversation_names_the_other_person(world):  # noqa: F811
     listed = client.get(API + "/conversations").json()["items"]
     direct = next(item for item in listed if item["id"] == created.json()["id"])
     assert direct["peer_id"] == manager
+
+
+def test_seed_keeps_job_title_apart_from_the_person_name():
+    from dx_platform.database import make_engine
+    from dx_workspace.models import Base, User
+    from dx_workspace.seed import seed
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    engine = make_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    seed(
+        engine,
+        {
+            "users": [
+                {"subject": "s1", "display_name": "Nguyễn Minh Quân", "role": "director", "job_title": "Giám đốc"},
+                {"subject": "s2", "display_name": "Lê Thu Hà", "role": "staff"},
+            ]
+        },
+    )
+    with Session(engine) as db:
+        users = {u.subject: u for u in db.scalars(select(User))}
+    assert users["s1"].display_name == "Nguyễn Minh Quân" and users["s1"].job_title == "Giám đốc"
+    assert users["s2"].job_title is None

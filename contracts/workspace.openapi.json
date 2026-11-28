@@ -1234,6 +1234,57 @@
         }
       }
     },
+    "/workspace/v1/drive/files/{file_id}/pii": {
+      "get": {
+        "tags": [
+          "drive"
+        ],
+        "summary": "Pii Check",
+        "description": "Counts of personal identifiers in a file's text; the masked text only when asked for.",
+        "operationId": "pii_check_workspace_v1_drive_files__file_id__pii_get",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          },
+          {
+            "name": "redacted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Redacted"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/drive/files/{file_id}/shares": {
       "get": {
         "tags": [
@@ -1488,6 +1539,42 @@
                 "schema": {}
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/v1/forms/{form_id}": {
+      "delete": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Delete Form",
+        "description": "Remove a form nobody needs any more.\n\nA form a process still uses, or one a sector pack installed, is refused with the reason: change the\nprocess's form or remove the pack instead. A form dossiers were filed on is archived, not deleted, so\nthose dossiers stay readable; it no longer appears when creating a dossier or a process.",
+        "operationId": "delete_form_workspace_v1_forms__form_id__delete",
+        "parameters": [
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Form Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -1977,7 +2064,7 @@
           "cases"
         ],
         "summary": "Withdraw Case",
-        "description": "Take a submitted dossier back before anyone has decided on it.\n\nThe submission snapshot stays in history; pending approval tasks are closed here at\nonce so nobody can decide on a dossier its owner has pulled back.",
+        "description": "Take a submitted dossier back before anyone has decided on it.\n\nThe submission snapshot stays in history; pending approval tasks are closed here at\nonce so nobody can decide on a dossier its owner has pulled back. A dossier whose flow\nstopped without a result (a failed step) may be taken back even after decisions, so it\nis never stuck \"đang xử lý\" with nothing left to do.",
         "operationId": "withdraw_case_workspace_v1_cases__case_id__withdraw_post",
         "parameters": [
           {

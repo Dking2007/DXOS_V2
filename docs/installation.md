@@ -95,7 +95,13 @@ docker compose --env-file .env -f infra/compose/compose.yaml --profile workspace
 
 # 3. Nạp dữ liệu demo (hai phòng Hành chính / Kỹ thuật)
 python scripts/seed.py --confirm-demo
+
+# 4. (Tùy chọn) Nạp nội dung minh họa: hồ sơ, công việc, bảng tin, chat, tài liệu
+python scripts/seed_demo.py --confirm-demo
 ```
+
+`seed_demo.py` đăng nhập bằng các tài khoản demo và gọi API công khai; chạy lại không tạo trùng
+(mục demo có tiền tố `[Demo]`). Dùng `--base-url` nếu địa chỉ khác `PUBLIC_BASE_URL` trong `.env`.
 
 `bootstrap.py` **từ chối chạy lại** nếu `.env` hoặc `infra/identity/generated/` đã tồn
 tại — đây là chủ ý, để không xóa secret của deployment đang dùng. Muốn làm lại từ đầu
@@ -123,7 +129,7 @@ migrate + Keycloak import). Nếu API không healthy, đọc log `core-migrate` 
 | Đường dẫn | Nội dung |
 |---|---|
 | <http://localhost:8080/> | Workspace web |
-| <http://localhost:8080/console/> | Core admin console |
+| <http://localhost:8080/console/> | Core admin, công cụ kỹ thuật (profile `workspace` hoặc `console`) |
 | <http://localhost:8080/identity/admin/> | Keycloak console kỹ thuật |
 | <http://localhost:8080/office/> | ONLYOFFICE (chỉ khi bật profile `office`) |
 
@@ -152,16 +158,31 @@ Profile `office` **không** tự thêm Workspace — luôn đi kèm `--profile w
 Khi `ONLYOFFICE_ENABLED=false`, editor **không hoạt động** — repo không có mock lưu tài
 liệu để thay thế. Đây là chủ ý: không hiển thị lưu thành công giả.
 
+### A5b. Bật quét mã độc ClamAV (tùy chọn)
+
+Cần khoảng 1–1.5 GB RAM và vài phút tải chữ ký lần đầu. Đặt `CLAMAV_HOST=clamav` trong
+`.env`, rồi thêm `--profile security` vào lệnh `up -d`. Từ lúc đó mọi upload bị từ chối
+nếu ClamAV không trả lời; chi tiết ở [security.md](security.md).
+
 ### A6. Chỉ chạy Core độc lập
 
 ```bash
 docker compose --env-file .env -f infra/compose/compose.yaml --profile core up --build -d
 ```
 
-Truy cập `/console/`; trang Workspace `/` không có trong profile này. Client
-`core-example` được bootstrap cấp namespace `equipment` (khác `workspace`); secret nằm
-trong `.env` dưới `CORE_EXAMPLE_CLIENT_SECRET`. Ví dụ gọi API ở
-[`examples/core-client`](../examples/core-client).
+Core **không có giao diện**: profile này chỉ chạy Core API, worker, Keycloak, gateway và
+kho lưu trữ. Gateway phục vụ API `/core/v1/` (tài liệu OpenAPI ở `/core/v1/docs`) và
+Keycloak `/identity/`; `/` và `/console/` trả 404. Thử Core bằng client ngoài
+[`examples/core-client`](../examples/core-client): client `core-example` được bootstrap
+cấp namespace `equipment` (khác `workspace`); secret nằm trong `.env` dưới
+`CORE_EXAMPLE_CLIENT_SECRET`.
+
+Công cụ quản trị kỹ thuật Core admin là một client riêng của Core API (Tầng 2), không
+thuộc Core. Muốn dùng khi chỉ chạy Core, thêm `--profile console`:
+
+```bash
+docker compose --env-file .env -f infra/compose/compose.yaml --profile core --profile console up --build -d
+```
 
 ---
 
@@ -200,12 +221,13 @@ Chạy API local mà không có PostgreSQL/Keycloak/S3 thì các route cần SSO
 
 ## Tài khoản demo và luồng đầu tiên
 
-Bootstrap tạo 8 identity trong Keycloak và 4 OIDC client. Đăng nhập các tài khoản này
+Bootstrap tạo 9 identity trong Keycloak và 4 OIDC client. Đăng nhập các tài khoản này
 (tên không phải mật khẩu — mật khẩu ngẫu nhiên nằm trong file credential):
 
 | Tài khoản | Vai trò | Phòng |
 |---|---|---|
 | `director` | Ban giám đốc | administration |
+| `lanh-dao-mfa` | Ban giám đốc (Phó giám đốc) | administration — bắt buộc cài TOTP ở lần đăng nhập đầu |
 | `manager` | Lãnh đạo phòng | administration |
 | `staff` | Nhân viên | administration |
 | `manager-b` | Lãnh đạo phòng | engineering |

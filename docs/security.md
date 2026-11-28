@@ -11,6 +11,20 @@ credential riêng từng môi trường, network/egress policy, tài nguyên CPU
 có mã hóa, kiểm tra dependency/image và threat model. Không đưa Compose dev lên
 Internet rồi coi là hardening đầy đủ.
 
+## Xác thực hai lớp (MFA)
+
+Bootstrap đặt required action `CONFIGURE_TOTP` cho đúng một tài khoản demo,
+`lanh-dao-mfa` (Phó giám đốc, vai trò `director`). Lần đăng nhập đầu Keycloak bắt quét
+mã QR bằng ứng dụng TOTP (6 chữ số, 30 giây — mặc định của Keycloak). Các tài khoản
+khác, kể cả `director` mà seed và e2e dùng, không bị bắt MFA để tự động hóa không vỡ.
+Chỉ áp dụng cho cài đặt mới; realm đã import không đổi.
+
+Bật OTP cho người khác: Keycloak admin console, realm `dx`, Users, chọn người dùng,
+thêm required action "Configure OTP". Muốn bắt mọi người dùng: Authentication,
+Required actions, bật "Set as default action" cho "Configure OTP" (chỉ ảnh hưởng người
+mới), hoặc thêm điều kiện OTP vào browser flow. Production: bắt MFA cho vai trò lãnh
+đạo và quản trị, lưu mã khôi phục, và không dùng tài khoản demo.
+
 ## Secret và bootstrap
 
 `python scripts/bootstrap.py` dùng CSPRNG cho mật khẩu/client secret/session/Office
@@ -73,10 +87,44 @@ cần egress firewall và policy riêng cho Document Server.
 JSON Schema validation không thay luật nghiệp vụ. Không eval Python/JavaScript hoặc
 SQL tùy ý từ graph/form. File không được dùng tên gốc làm object key/path. Rich text
 không thuộc phạm vi đợt đầu; tránh render nội dung không tin cậy với `v-html`.
-Kiểm định dạng file/giới hạn giải nén không phải quét malware; hiện chưa tích hợp
-antivirus hoặc sandbox scan. Audit của Core có chuỗi băm SHA-256 (`GET
+Kiểm định dạng file/giới hạn giải nén không phải quét malware. Quét mã độc là tùy chọn,
+xem mục "Quét mã độc (ClamAV)" bên dưới; sandbox scan chưa có. Audit của Core có chuỗi băm SHA-256 (`GET
 /core/v1/audit-logs/verify`) và trigger chặn sửa/xóa trên PostgreSQL: sửa trực tiếp
 bằng SQL bị phát hiện. Chuỗi không chống được người ghi lại toàn bộ bảng rồi tính lại mọi
 hash; muốn chống điều đó phải lưu `head` ở nơi quản trị DB không sửa được (chưa làm).
 Audit của Workspace và các dòng Core ghi trước `core_0003` chưa có chuỗi.
 Không log Authorization/cookie/secret hoặc toàn bộ nội dung tài liệu.
+
+## Quét mã độc (ClamAV)
+
+Tùy chọn, mặc định TẮT. Bật bằng profile `security` (chạy `clamav/clamav`, container riêng)
+và đặt `CLAMAV_HOST=clamav` trong `.env` (`CLAMAV_PORT` mặc định 3310 nếu dùng Core ngoài Compose):
+
+```bash
+docker compose --env-file .env -f infra/compose/compose.yaml --profile workspace --profile security up -d
+```
+
+Core quét từng tệp (upload và phiên bản mới) sau bước kiểm nội dung, trước khi ghi vào kho.
+Phát hiện mã độc trả 422 `malware_detected` và ghi audit `file.malware_detected`.
+**Lỗi quét = từ chối**: không kết nối được, hết thời gian hoặc trả lời lạ đều trả 503
+`scan_unavailable`, tệp không được lưu. Vì vậy khi đã đặt `CLAMAV_HOST`, upload phụ thuộc
+vào ClamAV; clamd phải đặt `StreamMaxLength` lớn hơn `MAX_UPLOAD_BYTES` (compose đặt 64M).
+
+Tài nguyên: clamd nạp toàn bộ cơ sở dữ liệu chữ ký, cần khoảng 1–1.5 GB RAM và vài phút
+cập nhật chữ ký lần đầu (xem số đo trong báo cáo kiểm thử). Chỉ quét lúc tải lên; tệp đã
+lưu không được quét lại khi chữ ký mới ra.
+
+## Cảnh báo dữ liệu cá nhân trong tệp
+
+Khi xem trước một tệp trong Kho tài liệu, Workspace gọi `GET
+/workspace/v1/drive/files/{id}/pii` (thêm `?redacted=true` để lấy văn bản đã che). Route
+dùng cùng quyền đọc tệp như tải về, đếm số CCCD, CMND, điện thoại, tài khoản, mã số thuế
+và e-mail bằng `dx-piivn`, rồi hiện một cảnh báo không chặn kèm nút "Xem bản đã che".
+Giá trị tìm thấy không được ghi log hay lưu; chỉ số lượng và bản đã che được trả về.
+
+Giới hạn: đây là gợi ý, không phải DLP. Chỉ đọc được chữ trong PDF có lớp văn bản, Word,
+Excel, PowerPoint và văn bản thuần (ảnh và bản scan không được kiểm tra); mỗi trang bị cắt
+ở 6.000 ký tự và tối đa 60 trang; tệp trên 20 MB bỏ qua. CCCD chỉ được kiểm tra cấu trúc,
+không có chữ số kiểm tra. Danh sách mã tỉnh trong `dx-piivn` chưa đối chiếu với văn bản
+chính thức, nên có thể bỏ sót hoặc báo thừa; số tài khoản và mã số thuế chỉ nhận khi có
+từ khoá đứng trước.

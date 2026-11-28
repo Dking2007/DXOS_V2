@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { answerConfirm, pendingConfirm } from '@dx/web-shared/confirm.ts'
 import {
   SIDEBAR_KEY,
   SIDEBAR_WIDE_KEY,
@@ -94,29 +95,31 @@ describe('back to top', () => {
 describe('unsaved changes on logout', () => {
   afterEach(() => {
     resetLeaveConsent()
-    vi.unstubAllGlobals()
+    answerConfirm(false)
   })
 
-  it('asks only when something on screen is unsaved, and only once', () => {
-    const confirm = vi.fn(() => true)
-    vi.stubGlobal('window', { confirm })
+  it('asks only when something on screen is unsaved, and only once', async () => {
     let dirty = false
     const unregister = registerDirty(() => dirty)
     expect(hasUnsavedChanges()).toBe(false)
-    expect(confirmLeaveAll()).toBe(true)
-    expect(confirm).not.toHaveBeenCalled()
+    await expect(confirmLeaveAll()).resolves.toBe(true)
+    expect(pendingConfirm.value).toBeNull()
     dirty = true
-    expect(confirmLeaveAll()).toBe(true)
-    expect(confirmLeaveAll()).toBe(true)
-    expect(confirm).toHaveBeenCalledTimes(1)
+    const first = confirmLeaveAll()
+    expect(pendingConfirm.value?.danger).toBe(true)
+    answerConfirm(true)
+    await expect(first).resolves.toBe(true)
+    await expect(confirmLeaveAll()).resolves.toBe(true)
+    expect(pendingConfirm.value).toBeNull()
     unregister()
     expect(hasUnsavedChanges()).toBe(false)
   })
 
-  it('stays put when the person cancels', () => {
-    vi.stubGlobal('window', { confirm: () => false })
+  it('stays put when the person cancels', async () => {
     const unregister = registerDirty(() => true)
-    expect(confirmLeaveAll()).toBe(false)
+    const leaving = confirmLeaveAll()
+    answerConfirm(false)
+    await expect(leaving).resolves.toBe(false)
     unregister()
   })
 })

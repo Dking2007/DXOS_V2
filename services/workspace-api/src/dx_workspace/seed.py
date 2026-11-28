@@ -44,6 +44,7 @@ def seed(engine, source):
             user = User(
                 subject=entry["subject"],
                 display_name=entry["display_name"],
+                job_title=entry.get("job_title"),
                 role=entry["role"],
                 department_id=department.id if department else None,
             )

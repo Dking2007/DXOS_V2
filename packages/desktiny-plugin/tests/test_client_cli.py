@@ -116,3 +116,17 @@ def test_check_reads_a_packaged_plugin_folder(tmp_path, capsys):
     assert main(["check", str(folder)]) == 1
     out = capsys.readouterr().out
     assert "events" in out and "ui/trang.html" in out and "desktiny-pack.json" in out
+
+
+def test_check_applies_desktinys_length_and_settings_rules():
+    """A title over 80 characters made Desktiny refuse a plugin the check had passed (Ký số, 28/11/2026)."""
+    manifest = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+    manifest["settings_schema"] = {"type": "object", "required": ["khoa", "mat"], "properties": {
+        "khoa": {"type": "string", "title": "Khoá ký của cơ quan, dùng để ký phiếu xác nhận của mọi văn bản được ký số trong hệ thống"},
+        "Sai-Ten": {"type": "date", "title": "Ngày"}}}  # fmt: skip
+    manifest["ui"] = [{"slot": "page", "title": "x" * 81, "url": "/ui/a.html", "height": 40}]
+    found = " ".join(problems(manifest))
+    assert "settings_schema › khoa: title: cần 1–80 ký tự" in found
+    assert "Sai-Ten" in found and "string, number hoặc boolean" in found and "mat" in found
+    assert "Khung `/ui/a.html`: title" in found and "height 80–1200" in found
+

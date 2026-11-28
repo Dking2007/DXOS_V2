@@ -123,3 +123,28 @@ export function auditLink(action: string, resourceId: string): string | null {
   const route = auditSubject(action).route
   return route && resourceId ? route + resourceId : null
 }
+
+const CASE_EVENTS: Record<string, string> = {
+  'case.created': 'Đã tạo hồ sơ',
+  'case.updated': 'Đã cập nhật bản nháp',
+  'case.submitted': 'Đã trình duyệt',
+  'case.withdrawn': 'Người tạo đã thu hồi hồ sơ',
+  'case.approved': 'Hồ sơ được phê duyệt',
+  'case.returned': 'Hồ sơ được trả lại',
+  'case.rejected': 'Hồ sơ bị từ chối',
+  'approval.decided': 'Đã ghi nhận quyết định',
+  'case.workflow_started': 'Đã bắt đầu quy trình xử lý',
+  'plugin.write.comment': 'Ý kiến',
+  'plugin.write.fields': 'Cập nhật trường của hồ sơ',
+  'plugin.write.attach': 'Gắn tài liệu vào hồ sơ',
+}
+const DECISIONS: Record<string, string> = { approve: 'Duyệt', return: 'Trả lại', reject: 'Từ chối' }
+
+/** A line of a case's history: never the raw code, and a decision says which one was taken. */
+export function caseEventLabel(action: string, detail?: unknown): string {
+  if (action === 'case.decision') {
+    const decision = (detail as { decision?: unknown } | null)?.decision
+    return typeof decision === 'string' && DECISIONS[decision] ? `Quyết định: ${DECISIONS[decision]}` : 'Quyết định'
+  }
+  return CASE_EVENTS[action] ?? auditLabel(action)
+}

@@ -16,10 +16,14 @@ import {
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { errorText } from '@dx/web-shared/api.ts'
 import { previewKind, TEXT_PREVIEW_LIMIT } from '../ui/preview'
+import { piiSummary } from '../ui/pii'
+import { api } from '../api'
 
 const props = defineProps<{
   name: string
   mime?: string | null
+  /** Drive file id; when given, the file's text is checked for personal data. */
+  fileId?: string
   /** Resolves to a URL the browser can fetch (a short-lived download link). */
   source: () => Promise<string>
   /** Opens the normal download; omitted when downloading is not offered. */
@@ -45,6 +49,27 @@ let renderToken = 0
 /** Closed while the file was still loading: whatever arrives late is released, not shown. */
 let disposed = false
 const abort = new AbortController()
+const piiWarning = ref('')
+const maskedText = ref<string | null>(null)
+
+// A hint only: when the check fails or finds nothing, the preview stays as it was.
+async function checkPii() {
+  if (!props.fileId) return
+  try {
+    const report = await api.request<{ counts: Record<string, number> }>(`/drive/files/${props.fileId}/pii`)
+    if (!disposed) piiWarning.value = piiSummary(report.counts)
+  } catch {
+    /* no warning */
+  }
+}
+async function showMasked() {
+  try {
+    const report = await api.request<{ redacted_text?: string }>(`/drive/files/${props.fileId}/pii?redacted=true`)
+    if (!disposed) maskedText.value = report.redacted_text ?? ''
+  } catch (cause) {
+    if (!disposed) error.value = errorText(cause)
+  }
+}
 
 async function load() {
   loading.value = true
@@ -165,6 +190,7 @@ onMounted(async () => {
   await nextTick()
   if (disposed) return
   dialog.value?.showModal()
+  void checkPii()
   if (kind.value) await load()
   else loading.value = false
 })
@@ -222,7 +248,16 @@ onBeforeUnmount(() => {
         <button class="icon-button" type="button" aria-label="Đóng" title="Đóng (Esc)" @click="emit('close')"><X :size="20" /></button>
       </div>
     </header>
-    <div class="preview-body" :class="kind ?? 'none'">
+    <div v-if="piiWarning" class="notice warning" role="status">
+      Tệp có thể chứa dữ liệu cá nhân: {{ piiWarning }}.
+      <button class="button secondary small" type="button" :aria-pressed="maskedText !== null" @click="maskedText === null ? showMasked() : (maskedText = null)">
+        {{ maskedText === null ? 'Xem bản đã che' : 'Ẩn bản đã che' }}
+      </button>
+    </div>
+    <div v-if="maskedText !== null" class="preview-body text">
+      <div class="preview-text"><pre>{{ maskedText || 'Không có nội dung chữ.' }}</pre></div>
+    </div>
+    <div v-show="maskedText === null" class="preview-body" :class="kind ?? 'none'">
       <div v-if="loading" class="preview-state" role="status">
         <LoaderCircle class="spin" :size="28" /><span>Đang mở tệp…</span>
       </div>

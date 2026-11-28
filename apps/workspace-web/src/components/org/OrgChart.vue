@@ -764,4 +764,7 @@ watchEffect(
     transform: none;
   }
 }
+:root[data-motion='reduce'] .org-node-main:hover {
+  transform: none;
+}
 </style>

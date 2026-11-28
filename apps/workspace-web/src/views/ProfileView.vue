@@ -14,6 +14,7 @@ import { roleLabel } from '../ui/labels'
 import { initialsOf } from '../ui/people'
 import { useUnsavedGuard } from '../ui/unsaved'
 import AvatarPhoto from '../components/AvatarPhoto.vue'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 
 const session = useSession()
 const queryClient = useQueryClient()
@@ -125,7 +126,7 @@ async function choose(event: Event) {
   }
 }
 async function removePhoto() {
-  if (uploading.value || !window.confirm('Gỡ ảnh đại diện? Đồng nghiệp sẽ thấy chữ viết tắt tên bạn thay cho ảnh.'))
+  if (uploading.value || !(await confirmDialog({ message: 'Gỡ ảnh đại diện? Đồng nghiệp sẽ thấy chữ viết tắt tên bạn thay cho ảnh.', confirmLabel: 'Gỡ ảnh', danger: true })))
     return
   uploading.value = true
   try {

@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { ApprovalStep, FormField, User } from '@dx/web-shared/types.ts'
 import { errorText } from '@dx/web-shared/api.ts'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
@@ -21,6 +21,14 @@ const fields = ref<FormField[]>(JSON.parse(JSON.stringify(props.fields ?? [])) a
 // Unused while a process is in force; the form needs them if its process is ever withdrawn.
 const steps = ref<ApprovalStep[]>([{ label: 'Lãnh đạo phòng phê duyệt', resolver: 'department_manager' }])
 const users: User[] = []
+// The step person picker is not a native form control, so check it here (it replaced a required <select>).
+const blocked = computed(() =>
+  !fields.value.length
+    ? 'Thêm ít nhất một trường.'
+    : steps.value.some((step) => step.resolver === 'user' && !step.user_id)
+      ? 'Chọn người duyệt cho mọi bước "người cụ thể".'
+      : '',
+)
 const busy = ref(false)
 const error = ref('')
 
@@ -65,7 +73,7 @@ async function create() {
       <div v-if="error" class="notice error error-inline" role="alert">{{ error }}</div>
       <div class="form-actions">
         <button type="button" class="button secondary" @click="emit('close')">Hủy</button>
-        <button class="button" :disabled="busy || !fields.length">{{ busy ? 'Đang tạo…' : 'Tạo biểu mẫu' }}</button>
+        <button class="button" :disabled="busy || !!blocked" :title="blocked || undefined">{{ busy ? 'Đang tạo…' : 'Tạo biểu mẫu' }}</button>
       </div>
     </form>
   </ModalDialog>

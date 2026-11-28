@@ -201,6 +201,8 @@ export function applyAppearance(state: AppearanceState | null) {
     ['font', look?.font && look.font !== 'source-sans-3' ? look.font : null],
     ['density', look?.density === 'compact' ? 'compact' : null],
     ['radius', look?.radius && look.radius !== 'medium' ? look.radius : null],
+    // Menu icons lean towards the pack's main colour (shell.css, "Navigation icon tones").
+    ['packColors', look?.colors?.light?.teal || look?.colors?.dark?.teal ? '1' : null],
   ] as const) {
     if (value) root.dataset[key] = value
     else delete root.dataset[key]

@@ -11,6 +11,7 @@ import { useSession } from '../stores/session'
 import { PERMISSION_GROUPS, PERMISSIONS, roleLabel } from '../ui/labels'
 import { toast } from '../ui/toast'
 import { useUnsavedGuard } from '../ui/unsaved'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 
 interface Role {
   key: string
@@ -100,8 +101,8 @@ async function save() {
     busy.value = false
   }
 }
-function reset() {
-  if (!roles.data.value || !window.confirm('Bỏ mọi thay đổi phân quyền chưa lưu?')) return
+async function reset() {
+  if (!roles.data.value || !(await confirmDialog({ message: 'Bỏ mọi thay đổi phân quyền chưa lưu?', confirmLabel: 'Bỏ thay đổi', danger: true }))) return
   draft.value = copy(roles.data.value.items)
 }
 </script>

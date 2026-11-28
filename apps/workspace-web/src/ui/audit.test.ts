@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { describe, expect, it } from 'vitest'
-import { auditKnown, auditLabel, auditLink } from './audit'
+import { auditKnown, auditLabel, auditLink, caseEventLabel } from './audit'
 
 // Every action the backend records, so a new one cannot ship with a raw code as its label.
 const sources = import.meta.glob('../../../../services/workspace-api/src/dx_workspace/*.py', {
@@ -31,5 +31,18 @@ describe('audit log text', () => {
       actions.add('task.' + action)
     expect(actions.size).toBeGreaterThan(20)
     expect([...actions].filter((action) => !auditKnown(action))).toEqual([])
+  })
+})
+
+describe('caseEventLabel', () => {
+  it('names a decision in Vietnamese, with the one taken', () => {
+    expect(caseEventLabel('case.decision', { decision: 'approve' })).toBe('Quyết định: Duyệt')
+    expect(caseEventLabel('case.decision', { decision: 'return' })).toBe('Quyết định: Trả lại')
+    expect(caseEventLabel('case.decision', { decision: 'reject' })).toBe('Quyết định: Từ chối')
+    expect(caseEventLabel('case.decision', 'text')).toBe('Quyết định')
+  })
+  it('keeps known labels and never shows a raw code', () => {
+    expect(caseEventLabel('case.submitted')).toBe('Đã trình duyệt')
+    expect(caseEventLabel('case.cancelled')).toBe('Hồ sơ: hủy hồ sơ')
   })
 })

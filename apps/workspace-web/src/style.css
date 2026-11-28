@@ -1547,10 +1547,17 @@ body:has(.assistant-fab) .app-footer {
   min-width: 0;
   line-height: 1.15;
 }
+.brand {
+  min-width: 0;
+}
+/* A long organisation name wraps to two lines before it is cut. */
 .brand-text > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .brand-text small {
   overflow: hidden;

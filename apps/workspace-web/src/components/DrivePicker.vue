@@ -28,7 +28,7 @@ const items = computed(() => (files.data.value?.items ?? []).filter((f) => !prop
 function toggle(id: string) {
   chosen.value = chosen.value.includes(id) ? chosen.value.filter((x) => x !== id) : [...chosen.value, id]
 }
-function confirm() {
+function pick() {
   const all = files.data.value?.items ?? []
   emit(
     'picked',
@@ -72,7 +72,7 @@ function confirm() {
         class="button"
         :disabled="!chosen.length"
         :title="chosen.length ? '' : 'Chọn ít nhất một tệp.'"
-        @click="confirm"
+        @click="pick"
       >
         {{ chosen.length ? `Đính kèm ${chosen.length} tệp` : 'Đính kèm tệp' }}
       </button>

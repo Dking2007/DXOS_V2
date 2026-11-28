@@ -80,6 +80,9 @@ def notify(
     if not db.scalar(
         select(Notification.id).where(Notification.user_id == user_id, Notification.event_key == event_key)
     ):
+        # The title column holds 250 characters and callers prefix it to a task or case title that may
+        # already be that long; cut it here instead of failing the whole request.
+        title = title if len(title) <= 250 else title[:249] + "…"
         db.add(Notification(user_id=user_id, event_key=event_key, title=title, case_id=case_id, link=link))
 
 

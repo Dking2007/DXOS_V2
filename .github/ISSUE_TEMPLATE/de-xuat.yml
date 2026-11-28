@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
+name: Đề xuất
+description: Đề xuất tính năng hoặc cải tiến
+labels: [enhancement]
+body:
+  - type: textarea
+    id: van-de
+    attributes:
+      label: Vấn đề cần giải quyết
+      description: Ai gặp khó khăn gì, trong tình huống nào?
+    validations:
+      required: true
+  - type: textarea
+    id: giai-phap
+    attributes:
+      label: Giải pháp đề xuất
+    validations:
+      required: true
+  - type: dropdown
+    id: noi-dat
+    attributes:
+      label: Nên đặt ở đâu
+      description: Nghiệp vụ riêng của một cơ quan thường thuộc gói giao diện hoặc plugin, không phải Core.
+      options:
+        - Core (API dùng chung)
+        - Workspace (ứng dụng)
+        - Gói giao diện hoặc plugin
+        - Chưa rõ
+    validations:
+      required: true
+  - type: textarea
+    id: thay-the
+    attributes:
+      label: Phương án khác đã cân nhắc
+  - type: textarea
+    id: giay-phep
+    attributes:
+      label: Phụ thuộc mới và giấy phép
+      description: Nếu cần thư viện hay dịch vụ mới, nêu tên, phiên bản và giấy phép (SPDX). Chỉ nhận giấy phép OSI.

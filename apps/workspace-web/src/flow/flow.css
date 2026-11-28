@@ -20,7 +20,6 @@
 .flow-name {
   width: auto;
   min-width: 200px;
-  max-width: 420px;
   flex: 1;
   border-color: transparent;
   background: transparent;
@@ -94,6 +93,9 @@
   padding: 8px 18px;
   font-size: 0.875rem;
   border-bottom: 1px solid var(--border);
+}
+.flow-status .status-close {
+  display: none;
 }
 .flow-status > span {
   flex: 1;
@@ -349,8 +351,11 @@
   font-weight: 600;
   line-height: 1.3;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 .flow-node-text span {
   display: block;
@@ -415,17 +420,19 @@
   border-radius: 6px;
   pointer-events: none;
 }
+/* Tints sit on the card colour so the connecting line never shows through a label. */
 .tag-good {
   color: var(--green-ink);
-  background: var(--green-soft);
+  background: linear-gradient(var(--green-soft), var(--green-soft)), var(--surface);
 }
 .tag-bad {
   color: var(--red);
-  background: var(--red-soft);
+  background: linear-gradient(var(--red-soft), var(--red-soft)), var(--surface);
 }
 .tag-warn {
   color: #a8700f;
-  background: color-mix(in srgb, #d39a2c 18%, transparent);
+  background: linear-gradient(color-mix(in srgb, #d39a2c 18%, transparent), color-mix(in srgb, #d39a2c 18%, transparent)),
+    var(--surface);
 }
 .branch-tag {
   white-space: nowrap;
@@ -1250,6 +1257,12 @@ kbd {
   border-radius: 3px;
 }
 
+/* Rarely-needed actions give up their words so a long flow name is not cut. */
+@media (max-width: 1500px) {
+  .flow-topbar .wide-label {
+    display: none;
+  }
+}
 @media (max-width: 1200px) {
   .flow-body {
     grid-template-columns: 190px minmax(0, 1fr);
@@ -1303,6 +1316,54 @@ kbd {
   }
   .flow-name {
     min-width: 0;
+  }
+  .canvas-toolbar .desk-only {
+    display: none;
+  }
+}
+/* Phones: icon-only actions keep the header to two short rows and the strip can be dismissed. */
+@media (max-width: 640px) {
+  .flow-topbar {
+    gap: 6px;
+    padding: 6px 10px;
+  }
+  .flow-name {
+    flex: 1 1 0;
+  }
+  .flow-topbar-actions {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+  .flow-topbar .btn-label {
+    display: none;
+  }
+  /* The validity pill is not a button: keep its words for screen readers. */
+  .flow-topbar .flow-ok .btn-label {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .flow-topbar-actions .button.small {
+    min-width: 38px;
+    min-height: 38px;
+    padding: 0 8px;
+    justify-content: center;
+  }
+  .flow-status {
+    padding: 6px 10px;
+  }
+  /* The sentence keeps a full row; the scope picker and "Chạy ngay" wrap below it instead of
+     squeezing it into a one-word column that pushed the canvas off the screen. */
+  .flow-status > span {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+  .flow-status .status-close {
+    display: inline-flex;
+    margin-left: auto;
   }
 }
 .template-card:disabled {

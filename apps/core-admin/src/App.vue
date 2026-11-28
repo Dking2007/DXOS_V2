@@ -30,6 +30,7 @@ import {
   queryString,
 } from '@dx/web-shared/api.ts'
 import type { Page } from '@dx/web-shared/api.ts'
+import ConfirmHost from '@dx/web-shared/components/ConfirmHost.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
@@ -791,6 +792,7 @@ async function validate() {
       </main>
     </div>
   </div>
+  <ConfirmHost />
   <ModalDialog
     v-if="modal"
     :title="

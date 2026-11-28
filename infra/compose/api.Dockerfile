@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends libpq5 \
 COPY requirements.lock /app/requirements.lock
 COPY packages/platform-kit /app/packages/platform-kit
 COPY packages/flowkit /app/packages/flowkit
-RUN pip install -c /app/requirements.lock /app/packages/platform-kit /app/packages/flowkit
+COPY packages/pii-vn /app/packages/pii-vn
+RUN pip install -c /app/requirements.lock /app/packages/platform-kit /app/packages/flowkit /app/packages/pii-vn
 ARG SERVICE
 COPY services/${SERVICE} /app/services/${SERVICE}
 # Sector packs shipped with the release (read by the Workspace API, harmless for Core).
