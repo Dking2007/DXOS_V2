@@ -26,6 +26,10 @@
   <a href="docs/doi-chieu-de-thi.md"><b>Contest requirements map</b></a> (Vietnamese)
 </p>
 
+<p align="center">
+  <img src="docs/images/hero-ghep.png" width="100%" alt="Desktiny screens: case list, home page, process designer and the phone version">
+</p>
+
 Entry for the OLP Open Source Software contest 2026, topic: the DX-OS Open-Core digital office platform. Latest
 release: **v3.1.0**; changes waiting for 3.2.0 are under `[Unreleased]` in the [CHANGELOG](CHANGELOG.md).
 *Desk + destiny*; the former name was DX Workspace, so code, databases and containers still use `dx_workspace` /
@@ -139,9 +143,23 @@ Each organisation's specific business lives in **interface packs** and **plugins
 </table>
 
 <p align="center">
-  <img src="docs/images/dien-thoai.png" width="220" alt="Desktiny on a phone screen, web version"><br>
-  <sub>A staff member checks tasks on a phone with the web version</sub>
+  <img src="docs/images/dt-trang-chu.png" width="180" alt="Home on a phone">
+  <img src="docs/images/dt-ho-so.png" width="180" alt="Cases on a phone">
+  <img src="docs/images/dt-cong-viec.png" width="180" alt="Tasks on a phone">
+  <img src="docs/images/dt-dang-nhap.png" width="180" alt="Sign-in on a phone">
+  <br><sub>The web app on a phone: home, cases, tasks, sign-in</sub>
 </p>
+
+<table>
+  <tr>
+    <th width="50%">Case detail: step-by-step progress and who is handling it</th>
+    <th width="50%">The same screen in dark mode</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/ho-so-chi-tiet.png" width="100%" alt="Case detail page in light mode with processing steps"></td>
+    <td><img src="docs/images/toi-ho-so.png" width="100%" alt="Case detail page in dark mode"></td>
+  </tr>
+</table>
 
 <sub>All images: synthetic sample data. Image provenance: [docs/images/README.md](docs/images/README.md). Full feature
 description and scope (Vietnamese): [docs/tinh-nang.md](docs/tinh-nang.md); AI features:
@@ -347,14 +365,16 @@ flowchart TB
 These are samples: agency names are fictitious, deadlines and amounts are illustrative, and the digital signature is
 simulated. **Compatibility:** expansion packs 1.1.0 need Desktiny **3.1.0** or later.
 
+<p align="center">
+  <img src="docs/images/goi-truoc-sau.png" width="100%" alt="Two images side by side: the default look and the look after installing the one-stop pack"><br>
+  <sub>The same Desktiny before and after installing the “commune one-stop” pack: colours, terms, menus and processes follow the business</sub>
+</p>
+
 <table>
   <tr>
-    <th width="50%">An administrator installs a <code>.zip</code> pack, previews it, then turns it on</th>
-    <th width="50%">After installing “One-stop desk”: wording, colours and processes follow the one-stop office</th>
-  </tr>
-  <tr>
-    <td><img src="docs/images/goi-giao-dien.png" width="100%" alt="Admin › Interface packs screen with an installed pack and its preview"></td>
-    <td><img src="docs/images/mot-cua-trang-chu.png" width="100%" alt="Desktiny home page after installing the One-stop desk expansion pack"></td>
+    <td width="33%"><img src="docs/images/goi-mot-cua.png" width="100%" alt="Desktiny home page with the Commune one-stop pack"><br><sub>Commune one-stop</sub></td>
+    <td width="33%"><img src="docs/images/goi-nhan-su.png" width="100%" alt="Desktiny home page with the Company HR pack"><br><sub>Company HR</sub></td>
+    <td width="33%"><img src="docs/images/goi-van-thu.png" width="100%" alt="Desktiny home page with the Records office pack"><br><sub>Records office</sub></td>
   </tr>
 </table>
 
@@ -472,12 +492,20 @@ There is no online instance; follow [Quick start](#quick-start).
     <td><img src="docs/media/gif-thiet-ke-quy-trinh.gif" width="100%" alt="Animation: drag approval and condition steps on the canvas, test-run with sample data"></td>
   </tr>
   <tr>
-    <th>Installing one expansion pack turns Desktiny into a one-stop desk</th>
+    <th>Switch the theme pack: the whole app turns into one-stop or HR</th>
     <th>A citizen applies online, the one-stop desk receives it</th>
   </tr>
   <tr>
-    <td><img src="docs/media/gif-doi-nghiep-vu.gif" width="100%" alt="Animation: upload a zip in Admin, preview, enable; interface and processes change"></td>
+    <td><img src="docs/media/gif-doi-nghiep-vu.gif" width="100%" alt="Animation: pick a theme pack in Administration; colours, terms and menus change to one-stop, then HR"></td>
     <td><img src="docs/media/gif-cong-dan-nop.gif" width="100%" alt="Animation: fill in the online application form, the case appears in the intake register"></td>
+  </tr>
+  <tr>
+    <th>A device crosses a threshold; a flow opens an incident case</th>
+    <th>Staff update a task on a phone</th>
+  </tr>
+  <tr>
+    <td><img src="docs/media/gif-canh-bao-cam-bien.gif" width="100%" alt="Animation: a sensor reading crosses the threshold, the plugin logs an incident and a flow creates an incident case"></td>
+    <td align="center"><img src="docs/media/gif-dien-thoai.gif" width="60%" alt="Animation: open a task on a phone and update its progress"></td>
   </tr>
 </table>
 

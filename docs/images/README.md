@@ -24,11 +24,20 @@ chuyển động bằng CSS và SMIL, không có script, phông hay ảnh ngoài
 | `tai-lieu.png` | Kho tài liệu | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |
 | `bang-tin.png` | Bảng tin | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |
 | `dang-nhap.png` | Trang đăng nhập | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |
-| `dien-thoai.png` | Desktiny trên màn hình điện thoại | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |
-| `mot-cua-trang-chu.png` | Trang chủ sau khi cài bản mở rộng Một cửa cấp xã | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |
-| `goi-giao-dien.png` | Quản trị › Gói giao diện | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |
 | `../media/gif-trinh-duyet.gif` | Trình hồ sơ, duyệt, xem lịch sử | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |
 | `../media/gif-thiet-ke-quy-trinh.gif` | Vẽ quy trình và chạy thử | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |
-| `../media/gif-doi-nghiep-vu.gif` | Cài bản mở rộng, giao diện và quy trình đổi | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |
+| `../media/gif-doi-nghiep-vu.gif` | Đổi gói giao diện: cả ứng dụng đổi sang Một cửa rồi Nhân sự | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |
 | `../media/gif-cong-dan-nop.gif` | Nộp hồ sơ trực tuyến, bộ phận một cửa tiếp nhận | README, README_EN | Chụp bằng Playwright từ bản demo với dữ liệu mẫu giả, 28/11/2026 |
-| `ban-mo-rong.png`, `dang-nhap-dien-thoai.png` | Ảnh của bản 3.1.0 | Không còn dùng trong README | Ảnh chụp màn hình cũ, giữ lại cho lịch sử |
+| `hero-ghep.png` | Ảnh ghép đầu trang: danh sách hồ sơ, trang chủ, canvas, điện thoại | README, README_EN | Ghép bằng Pillow từ ảnh chụp Playwright, dữ liệu mẫu giả |
+| `ho-so-chi-tiet.png` | Chi tiết hồ sơ, chế độ sáng | README, README_EN | Chụp bằng Playwright từ bản demo (mã nhánh tích hợp ngày 28/11/2026), dữ liệu mẫu giả |
+| `toi-ho-so.png` | Chi tiết hồ sơ, chế độ tối | README, README_EN | Chụp bằng Playwright từ bản demo (mã nhánh tích hợp ngày 28/11/2026), dữ liệu mẫu giả |
+| `dt-trang-chu.png` | Trang chủ trên điện thoại (390 px) | README, README_EN | Chụp bằng Playwright từ bản demo (mã nhánh tích hợp ngày 28/11/2026), dữ liệu mẫu giả |
+| `dt-ho-so.png` | Hồ sơ trên điện thoại | README, README_EN | Chụp bằng Playwright từ bản demo (mã nhánh tích hợp ngày 28/11/2026), dữ liệu mẫu giả |
+| `dt-cong-viec.png` | Công việc trên điện thoại | README, README_EN | Chụp bằng Playwright từ bản demo (mã nhánh tích hợp ngày 28/11/2026), dữ liệu mẫu giả |
+| `dt-dang-nhap.png` | Trang đăng nhập trên điện thoại | README, README_EN | Chụp bằng Playwright từ bản demo (mã nhánh tích hợp ngày 28/11/2026), dữ liệu mẫu giả |
+| `goi-truoc-sau.png` | Trước và sau khi cài gói Một cửa | README, README_EN | Ghép bằng Pillow từ ảnh chụp Playwright, dữ liệu mẫu giả |
+| `goi-mot-cua.png` | Trang chủ với gói Một cửa cấp xã | README, README_EN | Chụp bằng Playwright từ bản demo (mã nhánh tích hợp ngày 28/11/2026), dữ liệu mẫu giả |
+| `goi-nhan-su.png` | Trang chủ với gói Nhân sự doanh nghiệp | README, README_EN | Chụp bằng Playwright từ bản demo (mã nhánh tích hợp ngày 28/11/2026), dữ liệu mẫu giả |
+| `goi-van-thu.png` | Trang chủ với gói Văn thư – điều hành | README, README_EN | Chụp bằng Playwright từ bản demo (mã nhánh tích hợp ngày 28/11/2026), dữ liệu mẫu giả |
+| `../media/gif-canh-bao-cam-bien.gif` | Cảm biến vượt ngưỡng tạo hồ sơ sự cố | README, README_EN | Chụp bằng Playwright từ bản demo (mã nhánh tích hợp ngày 28/11/2026), dữ liệu mẫu giả |
+| `../media/gif-dien-thoai.gif` | Cập nhật công việc trên điện thoại | README, README_EN | Chụp bằng Playwright từ bản demo (mã nhánh tích hợp ngày 28/11/2026), dữ liệu mẫu giả |

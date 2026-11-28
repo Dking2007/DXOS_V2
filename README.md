@@ -26,6 +26,10 @@ Tiếng Việt | [English](README_EN.md)
   <a href="docs/doi-chieu-de-thi.md"><b>Đối chiếu đề</b></a>
 </p>
 
+<p align="center">
+  <img src="docs/images/hero-ghep.png" width="100%" alt="Các màn hình Desktiny: danh sách hồ sơ, trang chủ, trình thiết kế quy trình và bản trên điện thoại">
+</p>
+
 Sản phẩm dự thi OLP Phần mềm nguồn mở 2026, chủ đề nền tảng văn phòng số DX-OS Open-Core. Bản phát hành mới nhất:
 **v3.1.0**; các thay đổi chờ bản 3.2.0 nằm ở mục `[Unreleased]` của [CHANGELOG](CHANGELOG.md). *Desk + destiny*;
 tên cũ DX Workspace, nên mã, cơ sở dữ liệu và container vẫn dùng tên `dx_workspace` / `dx-workspace`.
@@ -139,9 +143,23 @@ riêng của từng cơ quan nằm trong **gói giao diện** và **plugin**, c�
 </table>
 
 <p align="center">
-  <img src="docs/images/dien-thoai.png" width="220" alt="Desktiny trên màn hình điện thoại, bản web"><br>
-  <sub>Nhân viên xem việc trên điện thoại bằng bản web</sub>
+  <img src="docs/images/dt-trang-chu.png" width="180" alt="Trang chủ trên điện thoại">
+  <img src="docs/images/dt-ho-so.png" width="180" alt="Hồ sơ trên điện thoại">
+  <img src="docs/images/dt-cong-viec.png" width="180" alt="Công việc trên điện thoại">
+  <img src="docs/images/dt-dang-nhap.png" width="180" alt="Đăng nhập trên điện thoại">
+  <br><sub>Bản web trên điện thoại: trang chủ, hồ sơ, công việc, đăng nhập</sub>
 </p>
+
+<table>
+  <tr>
+    <th width="50%">Chi tiết hồ sơ: tiến trình từng bước, ai đang xử lý</th>
+    <th width="50%">Cùng màn hình ở chế độ tối</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/ho-so-chi-tiet.png" width="100%" alt="Trang chi tiết hồ sơ ở chế độ sáng với các bước xử lý"></td>
+    <td><img src="docs/images/toi-ho-so.png" width="100%" alt="Trang chi tiết hồ sơ ở chế độ tối"></td>
+  </tr>
+</table>
 
 <sub>Mọi ảnh: dữ liệu mẫu giả. Nguồn gốc ảnh: [docs/images/README.md](docs/images/README.md). Mô tả đầy đủ và phạm vi
 từng tính năng: [docs/tinh-nang.md](docs/tinh-nang.md); tính năng AI: [docs/ai-features.md](docs/ai-features.md).</sub>
@@ -341,14 +359,16 @@ flowchart TB
 Đây là bản mẫu: tên cơ quan là tên giả, thời hạn và mức tiền chỉ để minh họa, ký số là mô phỏng. **Tương thích:** bản
 mở rộng 1.1.0 cần Desktiny **3.1.0** trở lên.
 
+<p align="center">
+  <img src="docs/images/goi-truoc-sau.png" width="100%" alt="Hai ảnh cạnh nhau: giao diện mặc định và giao diện sau khi cài gói Một cửa"><br>
+  <sub>Cùng một Desktiny trước và sau khi cài gói “Một cửa cấp xã”: màu, từ ngữ, menu và quy trình đổi theo nghiệp vụ</sub>
+</p>
+
 <table>
   <tr>
-    <th width="50%">Quản trị cài gói <code>.zip</code>, xem trước rồi bật</th>
-    <th width="50%">Sau khi cài “Một cửa cấp xã”: từ ngữ, màu và quy trình đổi theo bộ phận một cửa</th>
-  </tr>
-  <tr>
-    <td><img src="docs/images/goi-giao-dien.png" width="100%" alt="Màn Quản trị › Gói giao diện với gói đã cài và phần xem trước"></td>
-    <td><img src="docs/images/mot-cua-trang-chu.png" width="100%" alt="Trang chủ Desktiny sau khi cài bản mở rộng Một cửa cấp xã"></td>
+    <td width="33%"><img src="docs/images/goi-mot-cua.png" width="100%" alt="Trang chủ Desktiny với gói Một cửa cấp xã"><br><sub>Một cửa cấp xã</sub></td>
+    <td width="33%"><img src="docs/images/goi-nhan-su.png" width="100%" alt="Trang chủ Desktiny với gói Nhân sự doanh nghiệp"><br><sub>Nhân sự doanh nghiệp</sub></td>
+    <td width="33%"><img src="docs/images/goi-van-thu.png" width="100%" alt="Trang chủ Desktiny với gói Văn thư – điều hành"><br><sub>Văn thư – điều hành</sub></td>
   </tr>
 </table>
 
@@ -465,12 +485,20 @@ Chưa có bản chạy trực tuyến; chạy theo [Dùng thử nhanh](#dùng-th
     <td><img src="docs/media/gif-thiet-ke-quy-trinh.gif" width="100%" alt="Ảnh động: kéo thả bước duyệt và điều kiện trên canvas, chạy thử với dữ liệu mẫu"></td>
   </tr>
   <tr>
-    <th>Cài một bản mở rộng, Desktiny đổi sang nghiệp vụ một cửa</th>
+    <th>Đổi gói giao diện: cả ứng dụng đổi sang nghiệp vụ một cửa, nhân sự</th>
     <th>Người dân nộp hồ sơ trực tuyến, bộ phận một cửa tiếp nhận</th>
   </tr>
   <tr>
-    <td><img src="docs/media/gif-doi-nghiep-vu.gif" width="100%" alt="Ảnh động: tải tệp zip ở Quản trị, xem trước, bật; giao diện và quy trình đổi"></td>
+    <td><img src="docs/media/gif-doi-nghiep-vu.gif" width="100%" alt="Ảnh động: chọn gói giao diện ở Quản trị, ứng dụng đổi màu, từ ngữ và menu theo Một cửa rồi Nhân sự"></td>
     <td><img src="docs/media/gif-cong-dan-nop.gif" width="100%" alt="Ảnh động: điền biểu mẫu nộp trực tuyến, hồ sơ xuất hiện ở sổ tiếp nhận"></td>
+  </tr>
+  <tr>
+    <th>Thiết bị vượt ngưỡng, luồng tự tạo hồ sơ sự cố</th>
+    <th>Nhân viên cập nhật việc trên điện thoại</th>
+  </tr>
+  <tr>
+    <td><img src="docs/media/gif-canh-bao-cam-bien.gif" width="100%" alt="Ảnh động: số đo cảm biến vượt ngưỡng, plugin ghi sự cố và luồng tạo hồ sơ sự cố"></td>
+    <td align="center"><img src="docs/media/gif-dien-thoai.gif" width="60%" alt="Ảnh động: mở một công việc trên điện thoại và cập nhật tiến độ"></td>
   </tr>
 </table>
 
