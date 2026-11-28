@@ -51,6 +51,7 @@ duy nhất là luồng đăng nhập OIDC.
 - Icon điều hướng có màu theo module, tương phản ≥ 3:1 ở cả nền sáng và tối (9bf7477); nút "Lên đầu trang" (9bf7477).
 
 ### Changed
+- Trình bày lại README (sơ đồ kiến trúc, luồng nghiệp vụ, bảng công nghệ), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT và mẫu issue.
 - Trang đăng nhập mặc định kiểu `flat`; khung, vệt sáng thuộc gói giao diện chọn `framed`.
 - Tài khoản demo mới có tên người và chức danh riêng; lời chào dùng đầy đủ họ tên.
 - Hộp xác nhận trong ứng dụng thay hộp `confirm()` của trình duyệt.

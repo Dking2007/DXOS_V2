@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
+blank_issues_enabled: false
+contact_links:
+  - name: Báo lỗ hổng bảo mật (riêng tư)
+    url: https://github.com/Dking2007/DXOS_Desktiny/security/advisories/new
+    about: Không mở issue công khai cho lỗ hổng; báo riêng qua GitHub Security Advisory.
+  - name: Bản mở rộng, plugin mẫu
+    url: https://github.com/Dking2007/Desktiny_expansion_pack/issues
+    about: Lỗi của gói và plugin mẫu báo ở repo Desktiny Expansion Pack.

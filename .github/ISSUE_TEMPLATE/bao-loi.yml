@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
+name: Báo lỗi
+description: Desktiny làm sai, báo lỗi hoặc không chạy được
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Lỗ hổng bảo mật **không** báo ở đây: xem [SECURITY.md](https://github.com/Dking2007/DXOS_Desktiny/blob/main/SECURITY.md).
+        Không dán mật khẩu, token hay dữ liệu thật.
+  - type: textarea
+    id: mo-ta
+    attributes:
+      label: Mô tả lỗi
+      description: Chuyện gì xảy ra?
+    validations:
+      required: true
+  - type: textarea
+    id: tai-hien
+    attributes:
+      label: Các bước tái hiện
+      placeholder: |
+        1. Đăng nhập bằng tài khoản demo `staff`
+        2. Vào Hồ sơ, bấm …
+        3. Thấy lỗi …
+    validations:
+      required: true
+  - type: textarea
+    id: mong-doi
+    attributes:
+      label: Kết quả mong đợi
+    validations:
+      required: true
+  - type: input
+    id: phien-ban
+    attributes:
+      label: Phiên bản hoặc commit
+      placeholder: v3.1.0 hoặc 7aea827
+    validations:
+      required: true
+  - type: dropdown
+    id: cach-chay
+    attributes:
+      label: Cách chạy
+      options:
+        - Docker Compose (profile workspace)
+        - Docker Compose (profile core)
+        - Cài bằng make install (BUILD.md)
+        - Chạy cục bộ để phát triển
+        - Khác
+    validations:
+      required: true
+  - type: input
+    id: moi-truong
+    attributes:
+      label: Hệ điều hành, trình duyệt
+      placeholder: Ubuntu 24.04, Firefox 133
+  - type: textarea
+    id: nhat-ky
+    attributes:
+      label: Nhật ký, ảnh chụp
+      description: Log của `docker compose logs`, ảnh màn hình. Che thông tin nhạy cảm.
+      render: text

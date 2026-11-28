@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Desktiny contributors
+name: Phản hồi dùng thử
+description: Nhận xét sau khi dùng thử Desktiny (người dùng, người đánh giá)
+labels: [feedback]
+body:
+  - type: markdown
+    attributes:
+      value: Cảm ơn bạn đã dùng thử. Dùng tài khoản demo và dữ liệu giả; không dán mật khẩu.
+  - type: dropdown
+    id: vai-tro
+    attributes:
+      label: Bạn dùng thử với vai trò
+      options:
+        - Nhân viên (staff)
+        - Trưởng phòng (manager)
+        - Lãnh đạo (director)
+        - Quản trị kỹ thuật (technical-admin)
+        - Người viết gói hoặc plugin
+        - Khác
+    validations:
+      required: true
+  - type: checkboxes
+    id: da-thu
+    attributes:
+      label: Đã thử
+      options:
+        - label: Giao việc, theo dõi công việc
+        - label: Tạo, trình và duyệt hồ sơ
+        - label: Thiết kế quy trình, chạy thử
+        - label: Kho tài liệu
+        - label: Nhắn tin, bảng tin, tìm kiếm
+        - label: Cài gói giao diện hoặc plugin
+        - label: Tính năng AI
+  - type: textarea
+    id: tot
+    attributes:
+      label: Điều làm được tốt
+  - type: textarea
+    id: kho
+    attributes:
+      label: Điều gây khó hoặc chưa đúng
+    validations:
+      required: true
+  - type: input
+    id: phien-ban
+    attributes:
+      label: Phiên bản hoặc commit
+      placeholder: v3.1.0
