@@ -55,9 +55,32 @@ python scripts/restore.py <thu-muc-backup> --project dx-restore --env-file .env 
 dùng `pg_restore --clean`), và không dùng `--no-owner` (xem lỗi 31/10 bên dưới).
 
 **Có phạm vi:** `dx_core`, `dx_workspace`, `dx_identity` (gồm realm/user Keycloak đã lưu trong DB) và toàn bộ object
-storage (RustFS). **Chưa phạm vi:** `.env` và khóa mã hóa (backup tách biệt, có kiểm soát truy cập), dữ liệu
-ONLYOFFICE, broker (cache), realm JSON sinh từ bootstrap, image/source. Tar volume khi hệ thống đang ghi không phải
+storage (RustFS). Thêm `--include-config` thì có cả `config.tar.gz`: `.env` (secret client OIDC, khóa mã hóa) và
+`infra/identity/generated/` (realm JSON, tài khoản demo). Khôi phục sang máy khác mà muốn đăng nhập được thì cần tệp
+này, vì secret client lưu trong DB `dx_identity` phải khớp `.env`. Tệp chứa secret, quyền đọc chỉ chủ sở hữu (0600):
+giữ tách biệt, mã hóa khi chép đi. Giải nén bằng `python scripts/restore.py <thu-muc-backup> --project … --config-to
+<thu-muc-moi>` (không ghi đè tệp đã có), rồi dựng project đích bằng `.env` đó.
+
+**Không cần sao lưu:** broker (Valkey, mã Python không dùng `BROKER_URL`, không giữ dữ liệu nghiệp vụ); dữ liệu
+ONLYOFFICE (tài liệu lưu về kho tệp qua callback khi đóng hoặc lưu; volume chỉ giữ phiên đang mở và log, phiên
+chưa lưu sẽ mất); image và mã nguồn (dựng lại từ tag). Tar volume khi hệ thống đang ghi không phải
 snapshot nhất quán giữa DB và object; muốn RPO chặt thì dừng ghi trong lúc sao lưu.
+
+### Diễn tập trọn vòng 28/11/2026, gồm đăng nhập trên bản khôi phục (Ubuntu, Docker Engine 29.8, 16 lõi)
+
+Project Compose riêng `dxkiem` dựng từ `main` (`b582216`), có dữ liệu `seed_demo.py` và hai hồ sơ Một cửa đã duyệt
+qua giao diện. Các bước:
+
+1. `python scripts/backup.py --project dxkiem --out <ngoài repo> --include-config`: 2,6 giây (`dx_core` 88.931 B,
+   `dx_identity` 223.171 B, `dx_workspace` 290.733 B, `objects.tar.gz` 7.012 B, `config.tar.gz` 3.188 B, quyền 0600).
+2. `docker compose -p dxkiem … down -v`: xóa mọi volume của project.
+3. Dựng lại `postgres`, `object-storage` trống; `restore.py … --confirm`: 4,9 giây.
+4. Dựng lại cả project; đăng nhập `staff` qua Keycloak **thành công**; đủ 15 hồ sơ, hai hồ sơ đã duyệt vẫn
+   `approved`; tải một tệp trong Kho tài liệu (vé Core 200, tải 200, 62 byte).
+5. `restore.py … --config-to <thư mục mới>`: `.env` và `infra/identity/generated/` khớp từng byte với bản gốc; chạy
+   lại vào cùng thư mục bị từ chối, không ghi đè.
+
+Chưa thử: khôi phục sang một máy khác thật; dữ liệu ONLYOFFICE.
 
 ### Diễn tập đo 28/11/2026 (Docker Desktop 29.9 trên Windows 11, máy phát triển 20 luồng CPU, PostgreSQL 17.5)
 

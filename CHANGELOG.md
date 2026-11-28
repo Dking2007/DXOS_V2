@@ -30,6 +30,9 @@ tìm kiếm, rà soát nút bấm và khoảng cách. Không đổi API, không 
 duy nhất là luồng đăng nhập OIDC.
 
 ### Added
+- `backup.py --include-config`: sao lưu kèm `.env` và `infra/identity/generated/` (tệp 0600) để khôi phục sang máy khác vẫn đăng
+  nhập được; `restore.py --config-to` giải nén mà không ghi đè. Diễn tập trọn vòng 28/11 (xóa volume, khôi phục, đăng nhập,
+  tải tệp) ghi trong `docs/operations.md`.
 - README: ba sơ đồ động vẽ tay bằng SVG (kiến trúc, luồng hồ sơ, dữ liệu nằm ở đâu) trong `docs/images/*-dong.svg`; sơ đồ Mermaid giữ lại trong mục thu gọn *Sơ đồ dạng chữ*.
 - `scripts/seed_demo.py`: nạp hồ sơ, công việc, bảng tin, trò chuyện và tài liệu minh họa qua API công khai; chạy lại không tạo trùng.
 - Quét mã độc tệp tải lên bằng ClamAV (tùy chọn: profile `security`, biến `CLAMAV_HOST`); lỗi quét thì từ chối tệp, phát hiện thì ghi audit.

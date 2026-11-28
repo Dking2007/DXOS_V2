@@ -34,3 +34,23 @@ def test_commands():
     assert "--clean" not in restore.restore_cmd(base, "dx_core", False)
     assert "--clean" in restore.restore_cmd(base, "dx_core", True)
     assert "--no-owner" not in restore.restore_cmd(base, "dx_core", True)
+
+
+def test_config_is_packed_owner_only_and_unpacked_without_overwriting(tmp_path):
+    root = tmp_path / "goc"
+    (root / "infra/identity/generated").mkdir(parents=True)
+    (root / ".env").write_text("SESSION_SECRET=bi-mat\n")
+    (root / "infra/identity/generated/dx-realm.json").write_text("{}")
+    out = tmp_path / "sao-luu"
+    out.mkdir()
+    assert backup.pack_config(root, out / backup.CONFIG_FILE) == [".env", "infra/identity/generated"]
+    assert (out / backup.CONFIG_FILE).stat().st_mode & 0o777 == 0o600
+    target = tmp_path / "dich"
+    target.mkdir()
+    assert sorted(restore.unpack_config(out, target)) == [".env", "infra/identity/generated/dx-realm.json"]
+    assert (target / ".env").read_text() == "SESSION_SECRET=bi-mat\n"
+    with pytest.raises(SystemExit, match="đã có"):
+        restore.unpack_config(out, target)
+    (root / ".env").unlink()
+    with pytest.raises(SystemExit, match="không thấy"):
+        backup.pack_config(root, tmp_path / "khac.tar.gz")

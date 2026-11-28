@@ -5,6 +5,8 @@
 
 Cần --confirm. Từ chối nếu database đích không trống, trừ khi --force (pg_restore --clean).
 Không dùng --no-owner: role dx_* đã được init-databases.sh tạo trên môi trường mới.
+Bản sao lưu có config.tar.gz (backup.py --include-config) thì `--config-to THU_MUC` giải nén `.env` và
+infra/identity/generated vào đó (không ghi đè tệp đã có); dựng project đích bằng chính `.env` này.
 """
 
 from __future__ import annotations
@@ -15,7 +17,31 @@ import sys
 import time
 from pathlib import Path
 
-from backup import DATABASES, HELPER_IMAGE, OBJECTS_FILE, ROOT, compose_cmd, container_id, verify_manifest
+from backup import (
+    CONFIG_FILE,
+    DATABASES,
+    HELPER_IMAGE,
+    OBJECTS_FILE,
+    ROOT,
+    compose_cmd,
+    container_id,
+    verify_manifest,
+)
+
+
+def unpack_config(backup: Path, target: Path) -> list[str]:
+    """The saved `.env` and identity files into `target`; refuses to overwrite anything already there."""
+    import tarfile
+
+    with tarfile.open(backup / CONFIG_FILE) as archive:
+        members = archive.getmembers()
+        for member in members:
+            if member.name.startswith(("/", "..")) or ".." in Path(member.name).parts:
+                raise SystemExit(f"{CONFIG_FILE}: đường dẫn không hợp lệ {member.name}")
+            if member.isfile() and (target / member.name).exists():
+                raise SystemExit(f"{target / member.name} đã có; chọn thư mục khác cho --config-to")
+        archive.extractall(target, filter="data")
+    return [m.name for m in members if m.isfile()]
 
 
 def restore_cmd(base: list[str], db: str, force: bool) -> list[str]:
@@ -41,10 +67,17 @@ def main() -> None:
     ap.add_argument("--compose-file", type=Path, default=ROOT / "infra/compose/compose.yaml")
     ap.add_argument("--confirm", action="store_true")
     ap.add_argument("--force", action="store_true", help="ghi đè database đích không trống")
+    ap.add_argument("--config-to", type=Path, help="chỉ giải nén config.tar.gz vào thư mục này rồi dừng")
     a = ap.parse_args()
+    verify_manifest(a.backup)
+    if a.config_to:
+        if not (a.backup / CONFIG_FILE).is_file():
+            raise SystemExit(f"bản sao lưu không có {CONFIG_FILE} (tạo bằng backup.py --include-config)")
+        for name in unpack_config(a.backup, a.config_to):
+            print(f"  {a.config_to / name}")
+        return
     if not a.confirm:
         raise SystemExit("restore ghi đè dữ liệu đích: thêm --confirm")
-    verify_manifest(a.backup)
     base = compose_cmd(a.project, a.env_file, a.compose_file)
     if not a.force:
         for db in DATABASES:
